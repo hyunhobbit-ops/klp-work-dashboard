@@ -1,0 +1,697 @@
+// ========================================
+// KLP KOREA Work Dashboard - Desktop App
+// ========================================
+
+// ===== Data =====
+const projects = [
+    { id: 1, name: "러쉬 성수동 제안", client: "러쉬", supplier: "", status: "진행 중", priority: "🔴 긴급", category: "국내 주문", assignees: ["이현주"], progress: "25%", revenue: 0, startDate: "2026-04-07", deadline: "2026-04-10", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "내일까지 제안서 준다고 함" },
+    { id: 2, name: "지플러스타워 골드바 감사패", client: "지플러스타워", supplier: "", status: "진행 중", priority: "🟡 높음", category: "국내 주문", assignees: ["김현호"], progress: "50%", revenue: 0, startDate: "2026-03-19", deadline: "2026-04-15", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "견적 발송 완료" },
+    { id: 3, name: "미니클락 스토어팜 판매 계획", client: "자체", supplier: "", status: "진행 중", priority: "🟢 보통", category: "자체 브랜드", assignees: ["이현주", "김현호"], progress: "50%", revenue: 0, startDate: "2026-03-10", deadline: "2026-04-30", checks: { design: true, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "빈티지 시계 + 미니클락 상세 계획 작성" },
+    { id: 4, name: "굿즈덕 클로드 리뉴얼", client: "자체", supplier: "", status: "진행 중", priority: "🟢 보통", category: "자체 브랜드", assignees: ["김현호"], progress: "25%", revenue: 0, startDate: "2026-04-01", deadline: "2026-04-30", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "" },
+    { id: 5, name: "해외 PO 시스템 구축", client: "본사", supplier: "", status: "진행 중", priority: "🟡 높음", category: "해외 주문", assignees: ["이현주"], progress: "75%", revenue: 0, startDate: "2026-03-20", deadline: "2026-04-12", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "해외 PO 만들기 진행 중" },
+    { id: 6, name: "빵 주문서 양식 제작", client: "본사", supplier: "", status: "완료", priority: "🟢 보통", category: "기타", assignees: ["김현호"], progress: "100%", revenue: 0, startDate: "2026-03-25", deadline: "2026-03-31", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: true, invoice: true, supplierPayment: true, delivered: true }, memo: "완료" },
+    { id: 7, name: "회사 재고 소진 프로젝트", client: "자체", supplier: "", status: "진행 중", priority: "🟡 높음", category: "자체 브랜드", assignees: ["이현주", "김현호"], progress: "25%", revenue: 0, startDate: "2026-03-12", deadline: "2026-12-31", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "2026년 재고소진의 해" },
+    { id: 8, name: "제안서 DB 구축", client: "본사", supplier: "", status: "시작 전", priority: "🟢 보통", category: "기타", assignees: ["이현주"], progress: "0%", revenue: 0, startDate: "", deadline: "2026-04-20", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "" },
+];
+
+const dailyTasks = [
+    { id: 1, task: "해외 PO 만들기", date: "2026-04-09", assignee: "이현주", target: "본사", priority: "🔴 긴급", done: false },
+    { id: 2, task: "빔프로젝터 알아보기", date: "2026-04-09", assignee: "이현주", target: "본사", priority: "🟡 보통", done: false },
+    { id: 3, task: "세무 재고자산 리스트 보내기", date: "2026-04-09", assignee: "이현주", target: "회계", priority: "🔴 긴급", done: false },
+    { id: 4, task: "제안서 DB만들기", date: "2026-04-09", assignee: "이현주", target: "본사", priority: "🟡 보통", done: false },
+    { id: 5, task: "러쉬성수동 제안서 작성", date: "2026-04-09", assignee: "이현주", target: "거래처", priority: "🔴 긴급", done: false },
+    { id: 6, task: "굿즈덕 클로드 리뉴얼 진행", date: "2026-04-09", assignee: "김현호", target: "본사", priority: "🟡 보통", done: false },
+    { id: 7, task: "중고나라 사업자 가입 확인", date: "2026-04-09", assignee: "김현호", target: "개인", priority: "🔵 낮음", done: true },
+    { id: 8, task: "세무사 최종 마감 결산 보고", date: "2026-04-08", assignee: "이현주", target: "회계", priority: "🔴 긴급", done: true },
+    { id: 9, task: "스토어팜 상세페이지 작업", date: "2026-04-08", assignee: "김현호", target: "본사", priority: "🟡 보통", done: true },
+    { id: 10, task: "각 중고 채널별 사업자 가입", date: "2026-04-08", assignee: "김현호", target: "개인", priority: "🟡 보통", done: false },
+    { id: 11, task: "거래처 견적서 발송", date: "2026-04-10", assignee: "이현주", target: "거래처", priority: "🟡 보통", done: false },
+    { id: 12, task: "유튜브 촬영 스케줄 조율", date: "2026-04-10", assignee: "김현호", target: "유튜브", priority: "🔵 낮음", done: false },
+];
+
+const deliveries = [
+    { id: 1, recipient: "이기석", date: "2026-04-08", type: "일반", sender: "케이엘피코리아", zipcode: "06234", address: "서울 강남구 역삼동 123-4", phone: "010-1234-5678", payment: "선불", product: "미니클락 골드", tracking: "6012345678901", memo: "", price: 85000, rating: "A 단골가능", seller: "1" },
+    { id: 2, recipient: "최자회", date: "2026-04-08", type: "일반", sender: "케이엘피코리아", zipcode: "13487", address: "경기 성남시 분당구 판교로 256", phone: "010-9876-5432", payment: "선불", product: "대통령 시계 세트", tracking: "6012345678902", memo: "부재시 경비실", price: 150000, rating: "B 대통령시계", seller: "1" },
+    { id: 3, recipient: "김상모", date: "2026-04-08", type: "번개", sender: "김현호", zipcode: "04523", address: "서울 중구 남대문로 1가", phone: "010-5555-1234", payment: "착불", product: "빈티지 세이코 다이버", tracking: "6012345678903", memo: "", price: 280000, rating: "A 단골가능", seller: "2" },
+    { id: 4, recipient: "김윤정", date: "2026-04-07", type: "중고", sender: "이현주", zipcode: "08376", address: "서울 구로구 디지털로 300", phone: "010-3333-4444", payment: "선불", product: "카시오 빈티지", tracking: "6012345678904", memo: "", price: 45000, rating: "C 평범", seller: "1" },
+    { id: 5, recipient: "김석진", date: "2026-04-08", type: "당근", sender: "이현주", zipcode: "03722", address: "서울 서대문구 연세로 50", phone: "010-7777-8888", payment: "선불", product: "벽시계 빈티지", tracking: "", memo: "직거래 예정", price: 35000, rating: "", seller: "1" },
+    { id: 6, recipient: "이서윤", date: "2026-04-03", type: "ETSY", sender: "케이엘피코리아", zipcode: "", address: "CA 90001, Los Angeles", phone: "", payment: "선불", product: "Korean Clock Set", tracking: "EV123456789KR", memo: "해외배송 EMS", price: 120000, rating: "", seller: "1" },
+    { id: 7, recipient: "이재호", date: "2026-04-07", type: "일반", sender: "구정두", zipcode: "41256", address: "대구 동구 동대구로 550", phone: "010-2222-3333", payment: "선불", product: "미니클락 실버", tracking: "6012345678906", memo: "", price: 85000, rating: "C 평범", seller: "1" },
+    { id: 8, recipient: "이영찬", date: "2026-04-07", type: "번개", sender: "김현호", zipcode: "48058", address: "부산 해운대구 해운대로 100", phone: "010-6666-9999", payment: "착불", product: "롤렉스 빈티지", tracking: "6012345678907", memo: "시간 약속 필수", price: 450000, rating: "A 단골가능", seller: "2" },
+    { id: 9, recipient: "김윤수", date: "2026-04-07", type: "일반", sender: "케이엘피코리아", zipcode: "06611", address: "서울 서초구 강남대로 27", phone: "010-1111-2222", payment: "선불", product: "기업 감사패 시계", tracking: "6012345678908", memo: "법인 배송", price: 300000, rating: "A 단골가능", seller: "1" },
+    { id: 10, recipient: "김연지", date: "2026-04-06", type: "GS반택", sender: "이현주", zipcode: "10326", address: "경기 고양시 일산서구 중앙로", phone: "010-4444-5555", payment: "선불", product: "미니클락 핑크", tracking: "", memo: "GS 반택 접수", price: 65000, rating: "", seller: "1" },
+];
+
+// ===== State =====
+let currentDate = new Date(2026, 3, 9);
+let currentPersonFilter = 'all';
+let currentProjectFilter = 'all';
+let currentDeliveryTypeFilter = 'all';
+let currentDeliverySearch = '';
+
+// ===== Page Titles =====
+const pageTitles = {
+    dashboard: '홈 대시보드',
+    projects: '프로젝트 진행사항',
+    daily: '일일계획표',
+    delivery: '택배 관리'
+};
+
+// ===== Init =====
+document.addEventListener('DOMContentLoaded', () => {
+    setupTopbar();
+    setupSidebar();
+    setupTabs();
+    setupFilters();
+    setupDateNav();
+    setupSearch();
+    renderAll();
+});
+
+// ===== Topbar =====
+function setupTopbar() {
+    const now = new Date(2026, 3, 9);
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    document.getElementById('topbarDate').textContent =
+        `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 (${days[now.getDay()]})`;
+}
+
+// ===== Sidebar =====
+function setupSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const hamburger = document.getElementById('hamburger');
+    const closeBtn = document.getElementById('sidebarClose');
+
+    hamburger.addEventListener('click', () => {
+        sidebar.classList.add('open');
+        overlay.classList.add('show');
+    });
+
+    const closeSidebar = () => {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+    };
+
+    closeBtn.addEventListener('click', closeSidebar);
+    overlay.addEventListener('click', closeSidebar);
+}
+
+// ===== Tabs =====
+function setupTabs() {
+    document.querySelectorAll('.nav-item').forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+}
+
+function switchTab(tabId) {
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+    const navBtn = document.querySelector(`[data-tab="${tabId}"]`);
+    if (navBtn) navBtn.classList.add('active');
+    document.getElementById(`tab-${tabId}`).classList.add('active');
+    document.getElementById('pageTitle').textContent = pageTitles[tabId] || '';
+
+    // Close mobile sidebar
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('show');
+}
+
+// ===== Filters =====
+function setupFilters() {
+    document.querySelectorAll('[data-filter]').forEach(chip => {
+        chip.addEventListener('click', () => {
+            chip.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            currentProjectFilter = chip.dataset.filter;
+            renderProjects();
+        });
+    });
+    document.querySelectorAll('[data-person]').forEach(chip => {
+        chip.addEventListener('click', () => {
+            chip.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            currentPersonFilter = chip.dataset.person;
+            renderDaily();
+        });
+    });
+    document.querySelectorAll('[data-dtype]').forEach(chip => {
+        chip.addEventListener('click', () => {
+            chip.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            currentDeliveryTypeFilter = chip.dataset.dtype;
+            renderDeliveries();
+        });
+    });
+}
+
+// ===== Date Nav =====
+function setupDateNav() {
+    document.getElementById('prevDate').addEventListener('click', () => {
+        currentDate.setDate(currentDate.getDate() - 1);
+        renderDaily();
+    });
+    document.getElementById('nextDate').addEventListener('click', () => {
+        currentDate.setDate(currentDate.getDate() + 1);
+        renderDaily();
+    });
+}
+
+// ===== Search =====
+function setupSearch() {
+    document.getElementById('deliverySearch').addEventListener('input', e => {
+        currentDeliverySearch = e.target.value.toLowerCase();
+        renderDeliveries();
+    });
+}
+
+// ===== Render All =====
+function renderAll() {
+    renderDashboard();
+    renderProjects();
+    renderDaily();
+    renderDeliveries();
+}
+
+// =====================================
+// DASHBOARD
+// =====================================
+function renderDashboard() {
+    const todayStr = fmtDate(currentDate);
+    const activeCount = projects.filter(p => p.status === '진행 중').length;
+    const todayItems = dailyTasks.filter(t => t.date === todayStr);
+    const todayDone = todayItems.filter(t => t.done).length;
+    const rate = todayItems.length ? Math.round((todayDone / todayItems.length) * 100) : 0;
+    const monthDel = deliveries.filter(d => d.date.startsWith('2026-04')).length;
+
+    document.getElementById('activeProjects').textContent = activeCount;
+    document.getElementById('todayTasks').textContent = todayItems.length;
+    document.getElementById('completionRate').textContent = rate + '%';
+    document.getElementById('monthDelivery').textContent = monthDel;
+
+    // Urgent
+    const urgentProjects = projects.filter(p => p.priority.includes('긴급') && p.status !== '완료');
+    const urgentTasks = dailyTasks.filter(t => t.priority.includes('긴급') && !t.done && t.date <= todayStr);
+    document.getElementById('urgentCount').textContent = urgentProjects.length + urgentTasks.length;
+
+    let urgentHtml = '';
+    urgentProjects.forEach(p => {
+        urgentHtml += `<div class="urgent-item" onclick="showProjectDetail(${p.id})">
+            <div class="urgent-dot"></div>
+            <div class="urgent-info">
+                <div class="urgent-name">${p.name}</div>
+                <div class="urgent-sub">${p.assignees.join(', ')} · 마감 ${fmtDisplay(p.deadline)}</div>
+            </div>
+            <span class="urgent-type">프로젝트</span>
+        </div>`;
+    });
+    urgentTasks.forEach(t => {
+        urgentHtml += `<div class="urgent-item" onclick="switchTab('daily')">
+            <div class="urgent-dot"></div>
+            <div class="urgent-info">
+                <div class="urgent-name">${t.task}</div>
+                <div class="urgent-sub">${t.assignee} · ${fmtDisplay(t.date)}</div>
+            </div>
+            <span class="urgent-type">할 일</span>
+        </div>`;
+    });
+    document.getElementById('urgentList').innerHTML = urgentHtml || empty('긴급 항목이 없습니다');
+
+    // Today schedule
+    const sorted = [...todayItems].sort((a, b) => a.done - b.done);
+    let taskHtml = '';
+    sorted.forEach(t => {
+        taskHtml += `<div class="dash-task-item ${t.done ? 'completed' : ''}">
+            <div class="dash-task-check ${t.done ? 'done' : ''}"></div>
+            <span class="dash-task-name">${t.task}</span>
+            <span class="dash-task-person">${t.assignee}</span>
+        </div>`;
+    });
+    document.getElementById('todaySchedule').innerHTML = taskHtml || empty('오늘 할 일이 없습니다');
+
+    // Project progress
+    const activeProjects = projects.filter(p => p.status === '진행 중').slice(0, 5);
+    let projHtml = '';
+    activeProjects.forEach(p => {
+        const pNum = parseInt(p.progress) || 0;
+        projHtml += `<div class="dash-proj-item" onclick="showProjectDetail(${p.id})">
+            <div class="dash-proj-info">
+                <div class="dash-proj-name">${p.name}</div>
+                <div class="dash-proj-meta">${p.assignees.join(', ')} · ${p.category}</div>
+            </div>
+            <div class="dash-proj-progress">
+                <div class="progress-cell">
+                    <div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div>
+                    <span class="progress-pct">${p.progress}</span>
+                </div>
+            </div>
+        </div>`;
+    });
+    document.getElementById('dashProjects').innerHTML = projHtml || empty('진행 중 프로젝트 없음');
+
+    // Recent deliveries
+    const recent = [...deliveries].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+    let delHtml = '';
+    recent.forEach(d => {
+        delHtml += `<div class="dash-del-item" onclick="showDeliveryDetail(${d.id})">
+            <span class="dash-del-type badge ${typeBadgeClass(d.type)}">${d.type}</span>
+            <div class="dash-del-info">
+                <div class="dash-del-name">${d.recipient}</div>
+                <div class="dash-del-sub">${d.product} · ${d.sender}</div>
+            </div>
+            <span class="dash-del-date">${fmtDisplay(d.date)}</span>
+        </div>`;
+    });
+    document.getElementById('recentDeliveries').innerHTML = delHtml || empty('최근 택배 없음');
+}
+
+// =====================================
+// PROJECTS
+// =====================================
+function renderProjects() {
+    let filtered = projects;
+    if (currentProjectFilter !== 'all') filtered = projects.filter(p => p.status === currentProjectFilter);
+    const order = { '진행 중': 0, '시작 전': 1, '완료': 2 };
+    filtered.sort((a, b) => (order[a.status] ?? 1) - (order[b.status] ?? 1));
+
+    const checkLabels = ['디확', '작지', '선금', '잔금', '계산서', '공급송금', '납품'];
+    const checkKeys = ['design', 'workOrder', 'advancePayment', 'finalPayment', 'invoice', 'supplierPayment', 'delivered'];
+
+    // Table
+    let tableHtml = '';
+    filtered.forEach(p => {
+        const pNum = parseInt(p.progress) || 0;
+        let checksHtml = '<div class="checks-row">';
+        checkKeys.forEach((key, i) => {
+            const done = p.checks[key];
+            checksHtml += `<span class="check-dot ${done ? 'done' : ''}" title="${checkLabels[i]}">${done ? '<svg fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>' : checkLabels[i][0]}</span>`;
+        });
+        checksHtml += '</div>';
+
+        tableHtml += `<tr onclick="showProjectDetail(${p.id})">
+            <td><strong>${p.name}</strong></td>
+            <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
+            <td>${p.priority}</td>
+            <td><span class="badge ${categoryBadgeClass(p.category)}">${p.category}</span></td>
+            <td>${p.assignees.join(', ')}</td>
+            <td>${p.deadline ? fmtDisplay(p.deadline) : '-'}</td>
+            <td><div class="progress-cell"><div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div><span class="progress-pct">${p.progress}</span></div></td>
+            <td>${checksHtml}</td>
+        </tr>`;
+    });
+    document.getElementById('projectTableBody').innerHTML = tableHtml || `<tr><td colspan="8">${empty('프로젝트가 없습니다')}</td></tr>`;
+
+    // Cards (for responsive)
+    let cardHtml = '';
+    filtered.forEach(p => {
+        const pNum = parseInt(p.progress) || 0;
+        const doneCount = checkKeys.filter(k => p.checks[k]).length;
+        cardHtml += `<div class="resp-card" onclick="showProjectDetail(${p.id})">
+            <div class="resp-card-top">
+                <span class="resp-card-title">${p.name}</span>
+                <span class="badge ${statusBadgeClass(p.status)}">${p.status}</span>
+            </div>
+            <div class="resp-card-meta">
+                <div class="resp-card-row">${p.priority} · ${p.category}</div>
+                <div class="resp-card-row"><strong>${p.assignees.join(', ')}</strong> · 마감 ${p.deadline ? fmtDisplay(p.deadline) : '-'}</div>
+                <div class="progress-cell" style="margin-top:6px">
+                    <div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div>
+                    <span class="progress-pct">${p.progress}</span>
+                </div>
+                <div class="resp-card-row" style="margin-top:4px">체크 ${doneCount}/7</div>
+            </div>
+        </div>`;
+    });
+    document.getElementById('projectCardGrid').innerHTML = cardHtml;
+}
+
+// =====================================
+// DAILY PLAN
+// =====================================
+function renderDaily() {
+    const dateStr = fmtDate(currentDate);
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    document.getElementById('currentDateDisplay').textContent =
+        `${currentDate.getFullYear()}. ${currentDate.getMonth() + 1}. ${currentDate.getDate()} (${days[currentDate.getDay()]})`;
+
+    let filtered = dailyTasks.filter(t => t.date === dateStr);
+    if (currentPersonFilter !== 'all') filtered = filtered.filter(t => t.assignee === currentPersonFilter);
+
+    const prioOrder = { '🔴 긴급': 0, '🟡 보통': 1, '🔵 낮음': 2 };
+    const incomplete = filtered.filter(t => !t.done).sort((a, b) => (prioOrder[a.priority] ?? 1) - (prioOrder[b.priority] ?? 1));
+    const complete = filtered.filter(t => t.done);
+
+    const makeItem = (t) => {
+        const tagClass = t.priority.includes('긴급') ? 'tag-urgent' : t.priority.includes('보통') ? 'tag-normal' : 'tag-low';
+        return `<div class="daily-item ${t.done ? 'completed' : ''}">
+            <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="toggleTask(${t.id})">
+                <svg width="12" height="12" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="daily-info">
+                <div class="daily-title">${t.task}</div>
+                <div class="daily-meta">
+                    <span class="daily-tag ${tagClass}">${t.priority}</span>
+                    <span class="daily-person">${t.assignee}</span>
+                    ${t.target ? `<span class="daily-target">${t.target}</span>` : ''}
+                </div>
+            </div>
+        </div>`;
+    };
+
+    let html = '';
+
+    // Incomplete column
+    html += `<div class="daily-column">
+        <div class="daily-col-header">
+            <span class="daily-col-title">미완료</span>
+            <span class="daily-col-count">${incomplete.length}</span>
+        </div>
+        <div class="daily-col-body">
+            ${incomplete.length ? incomplete.map(makeItem).join('') : empty('모두 완료했습니다!')}
+        </div>
+    </div>`;
+
+    // Complete column
+    html += `<div class="daily-column">
+        <div class="daily-col-header">
+            <span class="daily-col-title">완료</span>
+            <span class="daily-col-count">${complete.length}</span>
+        </div>
+        <div class="daily-col-body">
+            ${complete.length ? complete.map(makeItem).join('') : empty('완료 항목 없음')}
+        </div>
+    </div>`;
+
+    document.getElementById('dailyColumns').innerHTML = html;
+}
+
+function toggleTask(id) {
+    const t = dailyTasks.find(x => x.id === id);
+    if (t) {
+        t.done = !t.done;
+        renderDaily();
+        renderDashboard();
+        showToast(t.done ? '완료 처리되었습니다' : '미완료로 변경되었습니다');
+    }
+}
+
+// =====================================
+// DELIVERIES
+// =====================================
+function renderDeliveries() {
+    let filtered = deliveries;
+    if (currentDeliveryTypeFilter !== 'all') filtered = filtered.filter(d => d.type === currentDeliveryTypeFilter);
+    if (currentDeliverySearch) {
+        filtered = filtered.filter(d =>
+            d.recipient.toLowerCase().includes(currentDeliverySearch) ||
+            d.product.toLowerCase().includes(currentDeliverySearch) ||
+            d.tracking.toLowerCase().includes(currentDeliverySearch) ||
+            d.address.toLowerCase().includes(currentDeliverySearch)
+        );
+    }
+    filtered.sort((a, b) => b.date.localeCompare(a.date));
+
+    // Table
+    let tableHtml = '';
+    filtered.forEach(d => {
+        tableHtml += `<tr onclick="showDeliveryDetail(${d.id})">
+            <td>${fmtDisplay(d.date)}</td>
+            <td><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
+            <td>${d.sender}</td>
+            <td><strong>${d.recipient}</strong></td>
+            <td>${d.product}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.address}</td>
+            <td>${d.payment}</td>
+            <td>${d.price ? d.price.toLocaleString() + '원' : '-'}</td>
+            <td>${d.tracking ? `<span class="tracking-num" onclick="event.stopPropagation();copyTracking('${d.tracking}')">${d.tracking}</span>` : '-'}</td>
+            <td>${d.rating ? `<span class="badge ${ratingBadgeClass(d.rating)}">${d.rating}</span>` : '-'}</td>
+        </tr>`;
+    });
+    document.getElementById('deliveryTableBody').innerHTML = tableHtml || `<tr><td colspan="10">${empty('택배 내역 없음')}</td></tr>`;
+
+    // Cards
+    let cardHtml = '';
+    filtered.forEach(d => {
+        cardHtml += `<div class="resp-card" onclick="showDeliveryDetail(${d.id})">
+            <div class="resp-card-top">
+                <span class="resp-card-title">${d.recipient}</span>
+                <span class="badge ${typeBadgeClass(d.type)}">${d.type}</span>
+            </div>
+            <div class="resp-card-meta">
+                <div class="resp-card-row"><strong>${d.product}</strong></div>
+                <div class="resp-card-row">${d.sender} · ${fmtDisplay(d.date)}</div>
+                <div class="resp-card-row">${d.payment} · ${d.price ? d.price.toLocaleString() + '원' : '-'}</div>
+                ${d.tracking ? `<div class="resp-card-row" style="color:var(--blue);font-family:monospace">${d.tracking}</div>` : ''}
+            </div>
+        </div>`;
+    });
+    document.getElementById('deliveryCardGrid').innerHTML = cardHtml;
+}
+
+function copyTracking(num) {
+    navigator.clipboard.writeText(num).then(() => showToast('운송장번호가 복사되었습니다')).catch(() => showToast('복사 실패'));
+}
+
+// =====================================
+// DETAIL PANELS
+// =====================================
+function showProjectDetail(id) {
+    const p = projects.find(x => x.id === id);
+    if (!p) return;
+    const checkLabels = { design: '디확 컨펌', workOrder: '작지 발송', advancePayment: '선금 입금', finalPayment: '잔금 입금', invoice: '계산서 발행', supplierPayment: '공급처 송금', delivered: '납품 완료' };
+
+    let checksHtml = '';
+    Object.entries(p.checks).forEach(([key, val]) => {
+        checksHtml += `<div class="detail-row">
+            <span class="detail-label">${checkLabels[key]}</span>
+            <span class="detail-value" style="color:${val ? 'var(--green)' : 'var(--gray-400)'};font-weight:700">${val ? '완료' : '미완료'}</span>
+        </div>`;
+    });
+
+    document.getElementById('detailPanelTitle').textContent = '프로젝트 상세';
+    document.getElementById('detailContent').innerHTML = `
+        <h2 class="detail-title">${p.name}</h2>
+        <div class="detail-section">
+            <div class="detail-section-title">기본 정보</div>
+            <div class="detail-row"><span class="detail-label">상태</span><span class="detail-value"><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></span></div>
+            <div class="detail-row"><span class="detail-label">우선순위</span><span class="detail-value">${p.priority}</span></div>
+            <div class="detail-row"><span class="detail-label">카테고리</span><span class="detail-value">${p.category}</span></div>
+            <div class="detail-row"><span class="detail-label">담당</span><span class="detail-value">${p.assignees.join(', ')}</span></div>
+            <div class="detail-row"><span class="detail-label">거래처</span><span class="detail-value">${p.client || '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">시작일</span><span class="detail-value">${p.startDate ? fmtDisplay(p.startDate) : '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">마감일</span><span class="detail-value">${p.deadline ? fmtDisplay(p.deadline) : '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">진행률</span><span class="detail-value">${p.progress}</span></div>
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">체크리스트</div>
+            ${checksHtml}
+        </div>
+        ${p.memo ? `<div class="detail-section"><div class="detail-section-title">메모</div><p style="font-size:14px;color:var(--gray-700);line-height:1.7">${p.memo}</p></div>` : ''}`;
+    document.getElementById('detailOverlay').classList.add('show');
+}
+
+function showDeliveryDetail(id) {
+    const d = deliveries.find(x => x.id === id);
+    if (!d) return;
+
+    document.getElementById('detailPanelTitle').textContent = '택배 상세';
+    document.getElementById('detailContent').innerHTML = `
+        <h2 class="detail-title">${d.recipient}</h2>
+        <div class="detail-section">
+            <div class="detail-section-title">배송 정보</div>
+            <div class="detail-row"><span class="detail-label">종류</span><span class="detail-value"><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></span></div>
+            <div class="detail-row"><span class="detail-label">발송인</span><span class="detail-value">${d.sender}</span></div>
+            <div class="detail-row"><span class="detail-label">날짜</span><span class="detail-value">${fmtDisplay(d.date)}</span></div>
+            <div class="detail-row"><span class="detail-label">선/착불</span><span class="detail-value">${d.payment}</span></div>
+            ${d.price ? `<div class="detail-row"><span class="detail-label">판매가</span><span class="detail-value">${d.price.toLocaleString()}원</span></div>` : ''}
+            ${d.rating ? `<div class="detail-row"><span class="detail-label">평가</span><span class="detail-value"><span class="badge ${ratingBadgeClass(d.rating)}">${d.rating}</span></span></div>` : ''}
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">수신 정보</div>
+            <div class="detail-row"><span class="detail-label">상품명</span><span class="detail-value">${d.product}</span></div>
+            <div class="detail-row"><span class="detail-label">우편번호</span><span class="detail-value">${d.zipcode || '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">주소</span><span class="detail-value">${d.address}</span></div>
+            <div class="detail-row"><span class="detail-label">연락처</span><span class="detail-value">${d.phone || '-'}</span></div>
+            ${d.tracking ? `<div class="detail-row"><span class="detail-label">운송장</span><span class="detail-value" style="color:var(--blue);font-family:monospace;cursor:pointer" onclick="copyTracking('${d.tracking}')">${d.tracking}</span></div>` : ''}
+            ${d.memo ? `<div class="detail-row"><span class="detail-label">배송메모</span><span class="detail-value">${d.memo}</span></div>` : ''}
+        </div>`;
+    document.getElementById('detailOverlay').classList.add('show');
+}
+
+function closeDetail() {
+    document.getElementById('detailOverlay').classList.remove('show');
+}
+
+// Click overlay to close detail
+document.addEventListener('click', (e) => {
+    if (e.target.id === 'detailOverlay') closeDetail();
+    if (e.target.id === 'modalOverlay') closeModal();
+});
+
+// =====================================
+// MODALS
+// =====================================
+function openModal(type) {
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+
+    if (type === 'project') {
+        title.textContent = '새 프로젝트';
+        body.innerHTML = `
+            <div class="form-group"><label class="form-label">프로젝트명</label><input type="text" class="form-input" id="newProjectName" placeholder="프로젝트명 입력"></div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">카테고리</label><select class="form-select" id="newProjectCategory"><option value="국내 주문">국내 주문</option><option value="해외 주문">해외 주문</option><option value="자체 브랜드">자체 브랜드</option><option value="IP 콜라보">IP 콜라보</option><option value="유튜브">유튜브</option><option value="기타">기타</option></select></div>
+                <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="newProjectPriority"><option value="🟢 보통">보통</option><option value="🟡 높음">높음</option><option value="🔴 긴급">긴급</option><option value="⚪ 낮음">낮음</option></select></div>
+            </div>
+            <div class="form-group"><label class="form-label">거래처</label><input type="text" class="form-input" id="newProjectClient" placeholder="거래처명"></div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="newProjectAssignee"><option value="김현호">김현호</option><option value="이현주">이현주</option><option value="사장님">사장님</option></select></div>
+                <div class="form-group"><label class="form-label">마감일</label><input type="date" class="form-input" id="newProjectDeadline"></div>
+            </div>
+            <div class="form-group"><label class="form-label">메모</label><input type="text" class="form-input" id="newProjectMemo" placeholder="특이사항"></div>
+            <button class="form-submit" onclick="addProject()">프로젝트 추가</button>`;
+    } else if (type === 'daily') {
+        title.textContent = '새 할 일';
+        body.innerHTML = `
+            <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="newTaskName" placeholder="할 일 입력"></div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="newTaskAssignee"><option value="이현주">이현주</option><option value="김현호">김현호</option><option value="유지은">유지은</option><option value="구정두">구정두</option></select></div>
+                <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="newTaskDate" value="${fmtDate(currentDate)}"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">대상</label><select class="form-select" id="newTaskTarget"><option value="본사">본사</option><option value="거래처">거래처</option><option value="회계">회계</option><option value="개인">개인</option><option value="유튜브">유튜브</option></select></div>
+                <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="newTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
+            </div>
+            <button class="form-submit" onclick="addDailyTask()">할 일 추가</button>`;
+    } else if (type === 'delivery') {
+        title.textContent = '새 택배';
+        body.innerHTML = `
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">받는이</label><input type="text" class="form-input" id="newDelRecipient" placeholder="받는이"></div>
+                <div class="form-group"><label class="form-label">연락처</label><input type="text" class="form-input" id="newDelPhone" placeholder="010-0000-0000"></div>
+            </div>
+            <div class="form-group"><label class="form-label">주소</label><input type="text" class="form-input" id="newDelAddress" placeholder="배송 주소"></div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">종류</label><select class="form-select" id="newDelType"><option value="일반">일반</option><option value="번개">번개</option><option value="중고">중고</option><option value="당근">당근</option><option value="GS반택">GS반택</option><option value="ETSY">ETSY</option></select></div>
+                <div class="form-group"><label class="form-label">발송인</label><select class="form-select" id="newDelSender"><option value="케이엘피코리아">케이엘피코리아</option><option value="이현주">이현주</option><option value="김현호">김현호</option><option value="구정두">구정두</option><option value="김관택">김관택</option></select></div>
+            </div>
+            <div class="form-group"><label class="form-label">상품명</label><input type="text" class="form-input" id="newDelProduct" placeholder="상품명"></div>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">선/착불</label><select class="form-select" id="newDelPayment"><option value="선불">선불</option><option value="착불">착불</option></select></div>
+                <div class="form-group"><label class="form-label">판매가</label><input type="number" class="form-input" id="newDelPrice" placeholder="0"></div>
+            </div>
+            <div class="form-group"><label class="form-label">운송장번호</label><input type="text" class="form-input" id="newDelTracking" placeholder="운송장번호"></div>
+            <div class="form-group"><label class="form-label">배송메모</label><input type="text" class="form-input" id="newDelMemo" placeholder="배송메모"></div>
+            <button class="form-submit" onclick="addDelivery()">택배 추가</button>`;
+    }
+    document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('show');
+}
+
+// ===== Add Handlers =====
+function addProject() {
+    const name = document.getElementById('newProjectName').value.trim();
+    if (!name) { showToast('프로젝트명을 입력해주세요'); return; }
+    projects.unshift({
+        id: Date.now(), name,
+        client: document.getElementById('newProjectClient').value.trim(),
+        supplier: "", status: "시작 전",
+        priority: document.getElementById('newProjectPriority').value,
+        category: document.getElementById('newProjectCategory').value,
+        assignees: [document.getElementById('newProjectAssignee').value],
+        progress: "0%", revenue: 0, startDate: fmtDate(currentDate),
+        deadline: document.getElementById('newProjectDeadline').value,
+        checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
+        memo: document.getElementById('newProjectMemo').value.trim()
+    });
+    closeModal(); renderProjects(); renderDashboard();
+    showToast('프로젝트가 추가되었습니다');
+}
+
+function addDailyTask() {
+    const task = document.getElementById('newTaskName').value.trim();
+    if (!task) { showToast('할 일을 입력해주세요'); return; }
+    dailyTasks.push({
+        id: Date.now(), task,
+        date: document.getElementById('newTaskDate').value,
+        assignee: document.getElementById('newTaskAssignee').value,
+        target: document.getElementById('newTaskTarget').value,
+        priority: document.getElementById('newTaskPriority').value,
+        done: false
+    });
+    closeModal(); renderDaily(); renderDashboard();
+    showToast('할 일이 추가되었습니다');
+}
+
+function addDelivery() {
+    const recipient = document.getElementById('newDelRecipient').value.trim();
+    if (!recipient) { showToast('받는이를 입력해주세요'); return; }
+    deliveries.unshift({
+        id: Date.now(), recipient,
+        date: fmtDate(currentDate),
+        type: document.getElementById('newDelType').value,
+        sender: document.getElementById('newDelSender').value,
+        zipcode: "",
+        address: document.getElementById('newDelAddress').value.trim(),
+        phone: document.getElementById('newDelPhone').value.trim(),
+        payment: document.getElementById('newDelPayment').value,
+        product: document.getElementById('newDelProduct').value.trim(),
+        tracking: document.getElementById('newDelTracking').value.trim(),
+        memo: document.getElementById('newDelMemo').value.trim(),
+        price: parseInt(document.getElementById('newDelPrice').value) || 0,
+        rating: "", seller: "1"
+    });
+    closeModal(); renderDeliveries(); renderDashboard();
+    showToast('택배가 추가되었습니다');
+}
+
+// =====================================
+// UTILITIES
+// =====================================
+function fmtDate(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function fmtDisplay(s) {
+    if (!s) return '';
+    const p = s.split('-');
+    return `${parseInt(p[1])}/${parseInt(p[2])}`;
+}
+
+function empty(text) {
+    return `<div class="empty-state"><div class="empty-text">${text}</div></div>`;
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function statusBadgeClass(s) {
+    if (s === '진행 중') return 'badge-blue';
+    if (s === '완료') return 'badge-green';
+    return 'badge-gray';
+}
+
+function typeBadgeClass(t) {
+    const map = { '일반': 'badge-blue', '번개': 'badge-red', '중고': 'badge-yellow', '당근': 'badge-orange', 'GS반택': 'badge-purple', 'ETSY': 'badge-gray' };
+    return map[t] || 'badge-gray';
+}
+
+function categoryBadgeClass(c) {
+    const map = { '국내 주문': 'badge-blue', '해외 주문': 'badge-purple', '자체 브랜드': 'badge-green', 'IP 콜라보': 'badge-orange', '유튜브': 'badge-red', '기타': 'badge-gray' };
+    return map[c] || 'badge-gray';
+}
+
+function ratingBadgeClass(r) {
+    if (r.includes('A')) return 'badge-blue';
+    if (r.includes('B')) return 'badge-green';
+    if (r.includes('C')) return 'badge-yellow';
+    if (r.includes('X')) return 'badge-red';
+    return 'badge-gray';
+}
