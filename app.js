@@ -1,5 +1,5 @@
 // ========================================
-// KLP KOREA Work Dashboard - Desktop App
+// KLP KOREA Work Dashboard v2
 // ========================================
 
 // ===== Data =====
@@ -51,10 +51,13 @@ let currentDeliverySearch = '';
 
 // ===== Page Titles =====
 const pageTitles = {
-    dashboard: '홈 대시보드',
+    home: '홈',
     projects: '프로젝트 진행사항',
     daily: '일일계획표',
-    delivery: '택배 관리'
+    delivery: '택배 관리',
+    docs: '회사 문서',
+    manual: '회사 매뉴얼',
+    clients: '고객사 리스트'
 };
 
 // ===== Init =====
@@ -99,17 +102,23 @@ function setupSidebar() {
 
 // ===== Tabs =====
 function setupTabs() {
-    document.querySelectorAll('.nav-item').forEach(btn => {
+    document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
         btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
 }
 
 function switchTab(tabId) {
+    // Update nav active state
     document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
     const navBtn = document.querySelector(`[data-tab="${tabId}"]`);
     if (navBtn) navBtn.classList.add('active');
-    document.getElementById(`tab-${tabId}`).classList.add('active');
+
+    // Update content
+    document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+    const tab = document.getElementById(`tab-${tabId}`);
+    if (tab) tab.classList.add('active');
+
+    // Update page title
     document.getElementById('pageTitle').textContent = pageTitles[tabId] || '';
 
     // Close mobile sidebar
@@ -167,16 +176,16 @@ function setupSearch() {
 
 // ===== Render All =====
 function renderAll() {
-    renderDashboard();
+    renderHome();
     renderProjects();
     renderDaily();
     renderDeliveries();
 }
 
 // =====================================
-// DASHBOARD
+// HOME DASHBOARD
 // =====================================
-function renderDashboard() {
+function renderHome() {
     const todayStr = fmtDate(currentDate);
     const activeCount = projects.filter(p => p.status === '진행 중').length;
     const todayItems = dailyTasks.filter(t => t.date === todayStr);
@@ -184,10 +193,16 @@ function renderDashboard() {
     const rate = todayItems.length ? Math.round((todayDone / todayItems.length) * 100) : 0;
     const monthDel = deliveries.filter(d => d.date.startsWith('2026-04')).length;
 
+    // Summary cards
     document.getElementById('activeProjects').textContent = activeCount;
     document.getElementById('todayTasks').textContent = todayItems.length;
     document.getElementById('completionRate').textContent = rate + '%';
     document.getElementById('monthDelivery').textContent = monthDel;
+
+    // Quick menu counts
+    document.getElementById('qProjects').textContent = `${activeCount}건 진행`;
+    document.getElementById('qDaily').textContent = `오늘 ${todayItems.length}건`;
+    document.getElementById('qDelivery').textContent = `이번달 ${monthDel}건`;
 
     // Urgent
     const urgentProjects = projects.filter(p => p.priority.includes('긴급') && p.status !== '완료');
@@ -256,37 +271,31 @@ function renderDashboard() {
         delHtml += `<div class="dash-del-item" onclick="showDeliveryDetail(${d.id})">
             <span class="dash-del-type badge ${typeBadgeClass(d.type)}">${d.type}</span>
             <div class="dash-del-info">
-                <div class="dash-del-name">${d.recipient}</div>
-                <div class="dash-del-sub">${d.product} · ${d.sender}</div>
+                <div class="dash-del-name">${d.recipient} — ${d.product}</div>
+                <div class="dash-del-sub">${d.sender} · ${d.payment}</div>
             </div>
             <span class="dash-del-date">${fmtDisplay(d.date)}</span>
         </div>`;
     });
-    document.getElementById('recentDeliveries').innerHTML = delHtml || empty('최근 택배 없음');
+    document.getElementById('dashDeliveries').innerHTML = delHtml || empty('최근 택배 없음');
 }
 
 // =====================================
 // PROJECTS
 // =====================================
 function renderProjects() {
-    let filtered = projects;
-    if (currentProjectFilter !== 'all') filtered = projects.filter(p => p.status === currentProjectFilter);
-    const order = { '진행 중': 0, '시작 전': 1, '완료': 2 };
-    filtered.sort((a, b) => (order[a.status] ?? 1) - (order[b.status] ?? 1));
+    const filtered = currentProjectFilter === 'all'
+        ? projects
+        : projects.filter(p => p.status === currentProjectFilter);
 
-    const checkLabels = ['디확', '작지', '선금', '잔금', '계산서', '공급송금', '납품'];
-    const checkKeys = ['design', 'workOrder', 'advancePayment', 'finalPayment', 'invoice', 'supplierPayment', 'delivered'];
+    const checkSvg = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
-    // Table
     let tableHtml = '';
+    let cardHtml = '';
     filtered.forEach(p => {
         const pNum = parseInt(p.progress) || 0;
-        let checksHtml = '<div class="checks-row">';
-        checkKeys.forEach((key, i) => {
-            const done = p.checks[key];
-            checksHtml += `<span class="check-dot ${done ? 'done' : ''}" title="${checkLabels[i]}">${done ? '<svg fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>' : checkLabels[i][0]}</span>`;
-        });
-        checksHtml += '</div>';
+        const checksArr = Object.values(p.checks);
+        const checkDots = checksArr.map(v => `<div class="check-dot ${v ? 'done' : ''}">${v ? checkSvg : ''}</div>`).join('');
 
         tableHtml += `<tr onclick="showProjectDetail(${p.id})">
             <td><strong>${p.name}</strong></td>
@@ -296,32 +305,23 @@ function renderProjects() {
             <td>${p.assignees.join(', ')}</td>
             <td>${p.deadline ? fmtDisplay(p.deadline) : '-'}</td>
             <td><div class="progress-cell"><div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div><span class="progress-pct">${p.progress}</span></div></td>
-            <td>${checksHtml}</td>
+            <td><div class="checks-row">${checkDots}</div></td>
         </tr>`;
-    });
-    document.getElementById('projectTableBody').innerHTML = tableHtml || `<tr><td colspan="8">${empty('프로젝트가 없습니다')}</td></tr>`;
 
-    // Cards (for responsive)
-    let cardHtml = '';
-    filtered.forEach(p => {
-        const pNum = parseInt(p.progress) || 0;
-        const doneCount = checkKeys.filter(k => p.checks[k]).length;
         cardHtml += `<div class="resp-card" onclick="showProjectDetail(${p.id})">
             <div class="resp-card-top">
-                <span class="resp-card-title">${p.name}</span>
+                <div class="resp-card-title">${p.name}</div>
                 <span class="badge ${statusBadgeClass(p.status)}">${p.status}</span>
             </div>
             <div class="resp-card-meta">
-                <div class="resp-card-row">${p.priority} · ${p.category}</div>
+                <div class="resp-card-row">${p.priority} · <span class="badge ${categoryBadgeClass(p.category)}">${p.category}</span></div>
                 <div class="resp-card-row"><strong>${p.assignees.join(', ')}</strong> · 마감 ${p.deadline ? fmtDisplay(p.deadline) : '-'}</div>
-                <div class="progress-cell" style="margin-top:6px">
-                    <div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div>
-                    <span class="progress-pct">${p.progress}</span>
-                </div>
-                <div class="resp-card-row" style="margin-top:4px">체크 ${doneCount}/7</div>
+                <div class="resp-card-row" style="margin-top:4px"><div class="progress-cell" style="flex:1"><div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div><span class="progress-pct">${p.progress}</span></div></div>
             </div>
         </div>`;
     });
+
+    document.getElementById('projectTableBody').innerHTML = tableHtml;
     document.getElementById('projectCardGrid').innerHTML = cardHtml;
 }
 
@@ -329,69 +329,60 @@ function renderProjects() {
 // DAILY PLAN
 // =====================================
 function renderDaily() {
-    const dateStr = fmtDate(currentDate);
+    const todayStr = fmtDate(currentDate);
     const days = ['일', '월', '화', '수', '목', '금', '토'];
+    const d = currentDate;
     document.getElementById('currentDateDisplay').textContent =
-        `${currentDate.getFullYear()}. ${currentDate.getMonth() + 1}. ${currentDate.getDate()} (${days[currentDate.getDay()]})`;
+        `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
 
-    let filtered = dailyTasks.filter(t => t.date === dateStr);
-    if (currentPersonFilter !== 'all') filtered = filtered.filter(t => t.assignee === currentPersonFilter);
+    const people = ['이현주', '김현호', '유지은', '구정두'];
+    const displayPeople = currentPersonFilter === 'all'
+        ? people
+        : people.filter(p => p === currentPersonFilter);
 
-    const prioOrder = { '🔴 긴급': 0, '🟡 보통': 1, '🔵 낮음': 2 };
-    const incomplete = filtered.filter(t => !t.done).sort((a, b) => (prioOrder[a.priority] ?? 1) - (prioOrder[b.priority] ?? 1));
-    const complete = filtered.filter(t => t.done);
-
-    const makeItem = (t) => {
-        const tagClass = t.priority.includes('긴급') ? 'tag-urgent' : t.priority.includes('보통') ? 'tag-normal' : 'tag-low';
-        return `<div class="daily-item ${t.done ? 'completed' : ''}">
-            <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="toggleTask(${t.id})">
-                <svg width="12" height="12" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
-            </div>
-            <div class="daily-info">
-                <div class="daily-title">${t.task}</div>
-                <div class="daily-meta">
-                    <span class="daily-tag ${tagClass}">${t.priority}</span>
-                    <span class="daily-person">${t.assignee}</span>
-                    ${t.target ? `<span class="daily-target">${t.target}</span>` : ''}
-                </div>
-            </div>
-        </div>`;
-    };
+    const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
     let html = '';
+    displayPeople.forEach(person => {
+        const tasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === person);
+        const doneCount = tasks.filter(t => t.done).length;
 
-    // Incomplete column
-    html += `<div class="daily-column">
-        <div class="daily-col-header">
-            <span class="daily-col-title">미완료</span>
-            <span class="daily-col-count">${incomplete.length}</span>
-        </div>
-        <div class="daily-col-body">
-            ${incomplete.length ? incomplete.map(makeItem).join('') : empty('모두 완료했습니다!')}
-        </div>
-    </div>`;
+        let itemsHtml = '';
+        const sorted = [...tasks].sort((a, b) => a.done - b.done);
+        sorted.forEach(t => {
+            const tagClass = t.priority.includes('긴급') ? 'tag-urgent' : t.priority.includes('낮음') ? 'tag-low' : 'tag-normal';
+            const tagLabel = t.priority.includes('긴급') ? '긴급' : t.priority.includes('낮음') ? '낮음' : '보통';
 
-    // Complete column
-    html += `<div class="daily-column">
-        <div class="daily-col-header">
-            <span class="daily-col-title">완료</span>
-            <span class="daily-col-count">${complete.length}</span>
-        </div>
-        <div class="daily-col-body">
-            ${complete.length ? complete.map(makeItem).join('') : empty('완료 항목 없음')}
-        </div>
-    </div>`;
+            itemsHtml += `<div class="daily-item ${t.done ? 'completed' : ''}">
+                <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="toggleTask(${t.id})">${checkSvg}</div>
+                <div class="daily-info">
+                    <div class="daily-title">${t.task}</div>
+                    <div class="daily-meta">
+                        <span class="daily-tag ${tagClass}">${tagLabel}</span>
+                        <span class="daily-target">${t.target}</span>
+                    </div>
+                </div>
+            </div>`;
+        });
+
+        html += `<div class="daily-column">
+            <div class="daily-col-header">
+                <span class="daily-col-title">${person}</span>
+                <span class="daily-col-count">${doneCount}/${tasks.length}</span>
+            </div>
+            <div class="daily-col-body">${itemsHtml || empty('할 일 없음')}</div>
+        </div>`;
+    });
 
     document.getElementById('dailyColumns').innerHTML = html;
 }
 
 function toggleTask(id) {
-    const t = dailyTasks.find(x => x.id === id);
-    if (t) {
-        t.done = !t.done;
+    const task = dailyTasks.find(t => t.id === id);
+    if (task) {
+        task.done = !task.done;
         renderDaily();
-        renderDashboard();
-        showToast(t.done ? '완료 처리되었습니다' : '미완료로 변경되었습니다');
+        renderHome();
     }
 }
 
@@ -399,20 +390,20 @@ function toggleTask(id) {
 // DELIVERIES
 // =====================================
 function renderDeliveries() {
-    let filtered = deliveries;
-    if (currentDeliveryTypeFilter !== 'all') filtered = filtered.filter(d => d.type === currentDeliveryTypeFilter);
+    let filtered = currentDeliveryTypeFilter === 'all'
+        ? deliveries
+        : deliveries.filter(d => d.type === currentDeliveryTypeFilter);
+
     if (currentDeliverySearch) {
         filtered = filtered.filter(d =>
             d.recipient.toLowerCase().includes(currentDeliverySearch) ||
             d.product.toLowerCase().includes(currentDeliverySearch) ||
-            d.tracking.toLowerCase().includes(currentDeliverySearch) ||
-            d.address.toLowerCase().includes(currentDeliverySearch)
+            d.tracking.toLowerCase().includes(currentDeliverySearch)
         );
     }
-    filtered.sort((a, b) => b.date.localeCompare(a.date));
 
-    // Table
     let tableHtml = '';
+    let cardHtml = '';
     filtered.forEach(d => {
         tableHtml += `<tr onclick="showDeliveryDetail(${d.id})">
             <td>${fmtDisplay(d.date)}</td>
@@ -420,31 +411,28 @@ function renderDeliveries() {
             <td>${d.sender}</td>
             <td><strong>${d.recipient}</strong></td>
             <td>${d.product}</td>
-            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.address}</td>
+            <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.address}</td>
             <td>${d.payment}</td>
             <td>${d.price ? d.price.toLocaleString() + '원' : '-'}</td>
             <td>${d.tracking ? `<span class="tracking-num" onclick="event.stopPropagation();copyTracking('${d.tracking}')">${d.tracking}</span>` : '-'}</td>
             <td>${d.rating ? `<span class="badge ${ratingBadgeClass(d.rating)}">${d.rating}</span>` : '-'}</td>
         </tr>`;
-    });
-    document.getElementById('deliveryTableBody').innerHTML = tableHtml || `<tr><td colspan="10">${empty('택배 내역 없음')}</td></tr>`;
 
-    // Cards
-    let cardHtml = '';
-    filtered.forEach(d => {
         cardHtml += `<div class="resp-card" onclick="showDeliveryDetail(${d.id})">
             <div class="resp-card-top">
-                <span class="resp-card-title">${d.recipient}</span>
+                <div class="resp-card-title">${d.recipient}</div>
                 <span class="badge ${typeBadgeClass(d.type)}">${d.type}</span>
             </div>
             <div class="resp-card-meta">
                 <div class="resp-card-row"><strong>${d.product}</strong></div>
-                <div class="resp-card-row">${d.sender} · ${fmtDisplay(d.date)}</div>
-                <div class="resp-card-row">${d.payment} · ${d.price ? d.price.toLocaleString() + '원' : '-'}</div>
+                <div class="resp-card-row">${d.sender} · ${fmtDisplay(d.date)} · ${d.payment}</div>
+                <div class="resp-card-row">${d.price ? d.price.toLocaleString() + '원' : ''}</div>
                 ${d.tracking ? `<div class="resp-card-row" style="color:var(--blue);font-family:monospace">${d.tracking}</div>` : ''}
             </div>
         </div>`;
     });
+
+    document.getElementById('deliveryTableBody').innerHTML = tableHtml;
     document.getElementById('deliveryCardGrid').innerHTML = cardHtml;
 }
 
@@ -464,7 +452,7 @@ function showProjectDetail(id) {
     Object.entries(p.checks).forEach(([key, val]) => {
         checksHtml += `<div class="detail-row">
             <span class="detail-label">${checkLabels[key]}</span>
-            <span class="detail-value" style="color:${val ? 'var(--green)' : 'var(--gray-400)'};font-weight:700">${val ? '완료' : '미완료'}</span>
+            <span class="detail-value" style="color:${val ? 'var(--green)' : 'var(--gray-400)'};font-weight:700">${val ? '✓ 완료' : '미완료'}</span>
         </div>`;
     });
 
@@ -522,7 +510,7 @@ function closeDetail() {
     document.getElementById('detailOverlay').classList.remove('show');
 }
 
-// Click overlay to close detail
+// Click overlay to close
 document.addEventListener('click', (e) => {
     if (e.target.id === 'detailOverlay') closeDetail();
     if (e.target.id === 'modalOverlay') closeModal();
@@ -607,7 +595,7 @@ function addProject() {
         checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
         memo: document.getElementById('newProjectMemo').value.trim()
     });
-    closeModal(); renderProjects(); renderDashboard();
+    closeModal(); renderProjects(); renderHome();
     showToast('프로젝트가 추가되었습니다');
 }
 
@@ -622,7 +610,7 @@ function addDailyTask() {
         priority: document.getElementById('newTaskPriority').value,
         done: false
     });
-    closeModal(); renderDaily(); renderDashboard();
+    closeModal(); renderDaily(); renderHome();
     showToast('할 일이 추가되었습니다');
 }
 
@@ -644,7 +632,7 @@ function addDelivery() {
         price: parseInt(document.getElementById('newDelPrice').value) || 0,
         rating: "", seller: "1"
     });
-    closeModal(); renderDeliveries(); renderDashboard();
+    closeModal(); renderDeliveries(); renderHome();
     showToast('택배가 추가되었습니다');
 }
 
