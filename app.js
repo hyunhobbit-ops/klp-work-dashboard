@@ -402,20 +402,34 @@ function renderDeliveries() {
         );
     }
 
+    const ratingOptions = ['', 'A 단골가능', 'B 대통령시계', 'C 평범', 'X 블랙'];
+
     let tableHtml = '';
     let cardHtml = '';
     filtered.forEach(d => {
+        const ratingSelect = `<select class="inline-select" onchange="event.stopPropagation();updateDeliveryRating(${d.id}, this.value)">
+            ${ratingOptions.map(r => `<option value="${r}" ${d.rating === r ? 'selected' : ''}>${r || '-'}</option>`).join('')}
+        </select>`;
+
+        const trackingCell = `<div class="inline-tracking" onclick="event.stopPropagation()">
+            <input type="text" class="inline-input" id="track-${d.id}" value="${d.tracking}" placeholder="운송장번호">
+            <button class="inline-save-btn" onclick="saveTracking(${d.id})">저장</button>
+        </div>`;
+
         tableHtml += `<tr onclick="showDeliveryDetail(${d.id})">
             <td>${fmtDisplay(d.date)}</td>
             <td><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
             <td>${d.sender}</td>
             <td><strong>${d.recipient}</strong></td>
+            <td>${d.phone || '-'}</td>
             <td>${d.product}</td>
+            <td>${d.zipcode || '-'}</td>
             <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.address}</td>
             <td>${d.payment}</td>
             <td>${d.price ? d.price.toLocaleString() + '원' : '-'}</td>
-            <td>${d.tracking ? `<span class="tracking-num" onclick="event.stopPropagation();copyTracking('${d.tracking}')">${d.tracking}</span>` : '-'}</td>
-            <td>${d.rating ? `<span class="badge ${ratingBadgeClass(d.rating)}">${d.rating}</span>` : '-'}</td>
+            <td>${d.memo || '-'}</td>
+            <td>${trackingCell}</td>
+            <td onclick="event.stopPropagation()">${ratingSelect}</td>
         </tr>`;
 
         cardHtml += `<div class="resp-card" onclick="showDeliveryDetail(${d.id})">
@@ -426,8 +440,12 @@ function renderDeliveries() {
             <div class="resp-card-meta">
                 <div class="resp-card-row"><strong>${d.product}</strong></div>
                 <div class="resp-card-row">${d.sender} · ${fmtDisplay(d.date)} · ${d.payment}</div>
+                ${d.phone ? `<div class="resp-card-row">${d.phone}</div>` : ''}
+                ${d.zipcode ? `<div class="resp-card-row">${d.zipcode} ${d.address}</div>` : `<div class="resp-card-row">${d.address}</div>`}
                 <div class="resp-card-row">${d.price ? d.price.toLocaleString() + '원' : ''}</div>
-                ${d.tracking ? `<div class="resp-card-row" style="color:var(--blue);font-family:monospace">${d.tracking}</div>` : ''}
+                ${d.memo ? `<div class="resp-card-row">${d.memo}</div>` : ''}
+                <div class="resp-card-row" onclick="event.stopPropagation()">${trackingCell}</div>
+                <div class="resp-card-row" onclick="event.stopPropagation()">${ratingSelect}</div>
             </div>
         </div>`;
     });
@@ -438,6 +456,21 @@ function renderDeliveries() {
 
 function copyTracking(num) {
     navigator.clipboard.writeText(num).then(() => showToast('운송장번호가 복사되었습니다')).catch(() => showToast('복사 실패'));
+}
+
+function saveTracking(id) {
+    const d = deliveries.find(x => x.id === id);
+    if (!d) return;
+    const input = document.getElementById(`track-${id}`);
+    d.tracking = input.value.trim();
+    showToast('운송장번호가 저장되었습니다');
+}
+
+function updateDeliveryRating(id, value) {
+    const d = deliveries.find(x => x.id === id);
+    if (!d) return;
+    d.rating = value;
+    showToast('평가가 저장되었습니다');
 }
 
 // =====================================
@@ -496,7 +529,7 @@ function showDeliveryDetail(id) {
         </div>
         <div class="detail-section">
             <div class="detail-section-title">수신 정보</div>
-            <div class="detail-row"><span class="detail-label">상품명</span><span class="detail-value">${d.product}</span></div>
+            <div class="detail-row"><span class="detail-label">품목</span><span class="detail-value">${d.product}</span></div>
             <div class="detail-row"><span class="detail-label">우편번호</span><span class="detail-value">${d.zipcode || '-'}</span></div>
             <div class="detail-row"><span class="detail-label">주소</span><span class="detail-value">${d.address}</span></div>
             <div class="detail-row"><span class="detail-label">연락처</span><span class="detail-value">${d.phone || '-'}</span></div>
@@ -554,23 +587,62 @@ function openModal(type) {
     } else if (type === 'delivery') {
         title.textContent = '새 택배';
         body.innerHTML = `
+            <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="newDelDate" value="${fmtDate(new Date())}"></div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">받는이</label><input type="text" class="form-input" id="newDelRecipient" placeholder="받는이"></div>
-                <div class="form-group"><label class="form-label">연락처</label><input type="text" class="form-input" id="newDelPhone" placeholder="010-0000-0000"></div>
+                <div class="form-group"><label class="form-label">연락처</label><input type="text" class="form-input" id="newDelPhone" placeholder="010-0000-0000" maxlength="13"></div>
             </div>
-            <div class="form-group"><label class="form-label">주소</label><input type="text" class="form-input" id="newDelAddress" placeholder="배송 주소"></div>
-            <div class="form-row">
-                <div class="form-group"><label class="form-label">종류</label><select class="form-select" id="newDelType"><option value="일반">일반</option><option value="번개">번개</option><option value="중고">중고</option><option value="당근">당근</option><option value="GS반택">GS반택</option><option value="ETSY">ETSY</option></select></div>
-                <div class="form-group"><label class="form-label">발송인</label><select class="form-select" id="newDelSender"><option value="케이엘피코리아">케이엘피코리아</option><option value="이현주">이현주</option><option value="김현호">김현호</option><option value="구정두">구정두</option><option value="김관택">김관택</option></select></div>
+            <div class="form-row" style="grid-template-columns:100px 1fr">
+                <div class="form-group"><label class="form-label">우편번호</label><input type="text" class="form-input" id="newDelZipcode" placeholder="00000" maxlength="5"></div>
+                <div class="form-group"><label class="form-label">주소</label><input type="text" class="form-input" id="newDelAddress" placeholder="배송 주소"></div>
             </div>
-            <div class="form-group"><label class="form-label">상품명</label><input type="text" class="form-input" id="newDelProduct" placeholder="상품명"></div>
-            <div class="form-row">
+            <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="form-group"><label class="form-label">종류</label>
+                    <select class="form-select" id="newDelType">
+                        <option value="일반">일반</option>
+                        <option value="중고">중고</option>
+                        <option value="번개">번개</option>
+                        <option value="당근">당근</option>
+                        <option value="GS반택">GS반택</option>
+                        <option value="ETSY">ETSY</option>
+                        <option value="__custom">기타 (직접입력)</option>
+                    </select>
+                    <input type="text" class="form-input" id="newDelTypeCustom" placeholder="종류를 입력하세요" style="display:none;margin-top:6px">
+                </div>
+                <div class="form-group"><label class="form-label">발송인</label>
+                    <select class="form-select" id="newDelSender">
+                        <option value="케이엘피코리아">케이엘피코리아</option>
+                        <option value="김관택">김관택</option>
+                        <option value="이현주">이현주</option>
+                        <option value="김현호">김현호</option>
+                        <option value="유지은">유지은</option>
+                        <option value="구정두">구정두</option>
+                    </select>
+                </div>
                 <div class="form-group"><label class="form-label">선/착불</label><select class="form-select" id="newDelPayment"><option value="선불">선불</option><option value="착불">착불</option></select></div>
-                <div class="form-group"><label class="form-label">판매가</label><input type="number" class="form-input" id="newDelPrice" placeholder="0"></div>
             </div>
-            <div class="form-group"><label class="form-label">운송장번호</label><input type="text" class="form-input" id="newDelTracking" placeholder="운송장번호"></div>
-            <div class="form-group"><label class="form-label">배송메모</label><input type="text" class="form-input" id="newDelMemo" placeholder="배송메모"></div>
+            <div class="form-group" id="newDelPriceGroup" style="display:none"><label class="form-label">판매가</label><input type="number" class="form-input" id="newDelPrice" placeholder="0"></div>
+            <div class="form-row" style="grid-template-columns:140px 1fr">
+                <div class="form-group"><label class="form-label">품목</label><input type="text" class="form-input" id="newDelProduct" placeholder="품목"></div>
+                <div class="form-group"><label class="form-label">배송메모</label><input type="text" class="form-input" id="newDelMemo" placeholder="배송메모"></div>
+            </div>
             <button class="form-submit" onclick="addDelivery()">택배 추가</button>`;
+        // 연락처 자동 하이픈
+        document.getElementById('newDelPhone').addEventListener('input', formatPhoneInput);
+        // 종류 변경: 기타 토글 + 판매가 토글
+        const priceTypes = ['중고', '번개', '당근', 'GS반택'];
+        document.getElementById('newDelType').addEventListener('change', function() {
+            const custom = document.getElementById('newDelTypeCustom');
+            const priceGroup = document.getElementById('newDelPriceGroup');
+            if (this.value === '__custom') {
+                custom.style.display = 'block';
+                custom.focus();
+            } else {
+                custom.style.display = 'none';
+                custom.value = '';
+            }
+            priceGroup.style.display = priceTypes.includes(this.value) ? 'block' : 'none';
+        });
     }
     document.getElementById('modalOverlay').classList.add('show');
 }
@@ -617,17 +689,20 @@ function addDailyTask() {
 function addDelivery() {
     const recipient = document.getElementById('newDelRecipient').value.trim();
     if (!recipient) { showToast('받는이를 입력해주세요'); return; }
+    const typeSelect = document.getElementById('newDelType').value;
+    const typeCustom = document.getElementById('newDelTypeCustom').value.trim();
+    const type = typeSelect === '__custom' ? (typeCustom || '기타') : typeSelect;
     deliveries.unshift({
         id: Date.now(), recipient,
-        date: fmtDate(currentDate),
-        type: document.getElementById('newDelType').value,
+        date: document.getElementById('newDelDate').value || fmtDate(new Date()),
+        type,
         sender: document.getElementById('newDelSender').value,
-        zipcode: "",
+        zipcode: document.getElementById('newDelZipcode').value.trim(),
         address: document.getElementById('newDelAddress').value.trim(),
         phone: document.getElementById('newDelPhone').value.trim(),
         payment: document.getElementById('newDelPayment').value,
         product: document.getElementById('newDelProduct').value.trim(),
-        tracking: document.getElementById('newDelTracking').value.trim(),
+        tracking: "",
         memo: document.getElementById('newDelMemo').value.trim(),
         price: parseInt(document.getElementById('newDelPrice').value) || 0,
         rating: "", seller: "1"
@@ -647,6 +722,20 @@ function fmtDisplay(s) {
     if (!s) return '';
     const p = s.split('-');
     return `${parseInt(p[1])}/${parseInt(p[2])}`;
+}
+
+function formatPhoneInput(e) {
+    const input = e.target;
+    const digits = input.value.replace(/\D/g, '');
+    let formatted = '';
+    if (digits.length <= 3) {
+        formatted = digits;
+    } else if (digits.length <= 7) {
+        formatted = digits.slice(0, 3) + '-' + digits.slice(3);
+    } else {
+        formatted = digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
+    }
+    input.value = formatted;
 }
 
 function empty(text) {
