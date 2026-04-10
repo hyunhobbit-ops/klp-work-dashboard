@@ -555,7 +555,7 @@ function renderDaily() {
                 <span class="${titleClass}" ${clickable}>${title}</span>
                 <div class="daily-col-actions">
                     <span class="daily-col-count">${doneCount}/${tasks.length}</span>
-                    <button class="daily-add-btn" onclick="openQuickTask('${assignee}')">+</button>
+                    <button class="daily-add-btn" onclick="openQuickTask('${assignee}')"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg> 새 할 일</button>
                 </div>
             </div>
             <div class="daily-col-body">
