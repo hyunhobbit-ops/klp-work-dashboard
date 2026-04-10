@@ -1162,8 +1162,8 @@ body {
    DAILY PLAN
    ============================ */
 .daily-top-layout { display: flex; gap: 20px; }
-.daily-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; min-width: 0; }
-.daily-memo-panel { width: 300px; flex-shrink: 0; }
+.daily-columns { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; min-width: 0; }
+.daily-memo-panel { flex: 1; min-width: 0; }
 .daily-sidebar { width: 260px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
 
 /* Sidebar cards */
