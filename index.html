@@ -379,9 +379,12 @@
                             <button class="filter-chip" data-dtype="GS반택">GS반택</button>
                             <button class="filter-chip" data-dtype="ETSY">ETSY</button>
                         </div>
-                        <div class="search-bar">
-                            <svg width="16" height="16" fill="none" stroke="#999" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-                            <input type="text" id="deliverySearch" placeholder="받는이, 품목, 운송장번호 검색">
+                        <div class="delivery-toolbar-row">
+                            <div class="date-filter" id="deliveryDateFilter"></div>
+                            <div class="search-bar">
+                                <svg width="16" height="16" fill="none" stroke="#999" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                                <input type="text" id="deliverySearch" placeholder="받는이, 품목, 운송장번호 검색">
+                            </div>
                         </div>
                     </div>
                     <button class="btn-primary" onclick="openModal('delivery')">
@@ -407,6 +410,7 @@
                                 <th>작성자</th>
                                 <th>운송장번호</th>
                                 <th>평가</th>
+                                <th>편집</th>
                             </tr>
                         </thead>
                         <tbody id="deliveryTableBody"></tbody>

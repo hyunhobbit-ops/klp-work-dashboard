@@ -142,6 +142,8 @@ let currentPersonFilter = 'all';
 let currentProjectFilter = 'all';
 let currentDeliveryTypeFilter = 'all';
 let currentDeliverySearch = '';
+let currentDeliveryYear = 'all';
+let currentDeliveryMonth = 'all';
 
 // ===== Page Titles =====
 const pageTitles = {
@@ -488,6 +490,17 @@ function renderDeliveries() {
         ? deliveries
         : deliveries.filter(d => d.type === currentDeliveryTypeFilter);
 
+    // 연도/월 필터
+    if (currentDeliveryYear !== 'all') {
+        filtered = filtered.filter(d => d.date.startsWith(currentDeliveryYear));
+    }
+    if (currentDeliveryMonth !== 'all') {
+        filtered = filtered.filter(d => {
+            const m = d.date.split('-')[1];
+            return m === currentDeliveryMonth;
+        });
+    }
+
     if (currentDeliverySearch) {
         filtered = filtered.filter(d =>
             d.recipient.toLowerCase().includes(currentDeliverySearch) ||
@@ -496,41 +509,48 @@ function renderDeliveries() {
         );
     }
 
+    // 연도/월 선택 UI 렌더
+    renderDateFilter();
+
     const ratingOptions = ['', 'A 단골가능', 'B 대통령시계', 'C 평범', 'X 블랙'];
 
     let tableHtml = '';
     let cardHtml = '';
     filtered.forEach(d => {
-        const ratingSelect = `<select class="inline-select" onchange="event.stopPropagation();updateDeliveryRating(${d.id}, this.value)">
+        const ratingSelect = `<select class="inline-select" onchange="updateDeliveryRating(${d.id}, this.value)">
             ${ratingOptions.map(r => `<option value="${r}" ${d.rating === r ? 'selected' : ''}>${r || '-'}</option>`).join('')}
         </select>`;
 
-        const trackingCell = `<div class="inline-tracking" onclick="event.stopPropagation()">
+        const trackingCell = `<div class="inline-tracking">
             <input type="text" class="inline-input" id="track-${d.id}" value="${d.tracking}" placeholder="운송장번호">
             <button class="inline-save-btn" onclick="saveTracking(${d.id})">저장</button>
         </div>`;
 
         tableHtml += `<tr>
-            <td onclick="showDeliveryDetail(${d.id})">${fmtDisplay(d.date)}</td>
-            <td onclick="showDeliveryDetail(${d.id})"><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
-            <td onclick="showDeliveryDetail(${d.id})">${d.sender}</td>
-            <td onclick="showDeliveryDetail(${d.id})"><strong>${d.recipient}</strong></td>
-            <td onclick="showDeliveryDetail(${d.id})">${d.phone || '-'}</td>
-            <td onclick="showDeliveryDetail(${d.id})">${d.product}</td>
-            <td onclick="showDeliveryDetail(${d.id})">${d.zipcode || '-'}</td>
-            <td onclick="showDeliveryDetail(${d.id})" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.address}</td>
-            <td onclick="showDeliveryDetail(${d.id})">${d.payment}</td>
-            <td onclick="showDeliveryDetail(${d.id})">${d.price ? d.price.toLocaleString() + '원' : '-'}</td>
-            <td onclick="showDeliveryDetail(${d.id})">${d.memo || '-'}</td>
-            <td onclick="showDeliveryDetail(${d.id})"><span class="author-badge">${d.author || '-'}</span></td>
-            <td class="td-no-click">${trackingCell}</td>
-            <td class="td-no-click">${ratingSelect}</td>
+            <td>${fmtDisplay(d.date)}</td>
+            <td><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
+            <td>${d.sender}</td>
+            <td><strong>${d.recipient}</strong></td>
+            <td>${d.phone || '-'}</td>
+            <td>${d.product}</td>
+            <td>${d.zipcode || '-'}</td>
+            <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.address}</td>
+            <td>${d.payment}</td>
+            <td>${d.price ? d.price.toLocaleString() + '원' : '-'}</td>
+            <td>${d.memo || '-'}</td>
+            <td><span class="author-badge">${d.author || '-'}</span></td>
+            <td>${trackingCell}</td>
+            <td>${ratingSelect}</td>
+            <td><button class="edit-btn" onclick="openEditDelivery(${d.id})">편집</button></td>
         </tr>`;
 
-        cardHtml += `<div class="resp-card" onclick="showDeliveryDetail(${d.id})">
+        cardHtml += `<div class="resp-card">
             <div class="resp-card-top">
                 <div class="resp-card-title">${d.recipient}</div>
-                <span class="badge ${typeBadgeClass(d.type)}">${d.type}</span>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <span class="badge ${typeBadgeClass(d.type)}">${d.type}</span>
+                    <button class="edit-btn" onclick="openEditDelivery(${d.id})">편집</button>
+                </div>
             </div>
             <div class="resp-card-meta">
                 <div class="resp-card-row"><strong>${d.product}</strong></div>
@@ -540,14 +560,124 @@ function renderDeliveries() {
                 <div class="resp-card-row">${d.price ? d.price.toLocaleString() + '원' : ''}</div>
                 ${d.memo ? `<div class="resp-card-row">${d.memo}</div>` : ''}
                 <div class="resp-card-row">작성자: <span class="author-badge">${d.author || '-'}</span></div>
-                <div class="resp-card-row" onclick="event.stopPropagation()">${trackingCell}</div>
-                <div class="resp-card-row" onclick="event.stopPropagation()">${ratingSelect}</div>
+                <div class="resp-card-row">${trackingCell}</div>
+                <div class="resp-card-row">${ratingSelect}</div>
             </div>
         </div>`;
     });
 
     document.getElementById('deliveryTableBody').innerHTML = tableHtml;
     document.getElementById('deliveryCardGrid').innerHTML = cardHtml;
+}
+
+function renderDateFilter() {
+    const container = document.getElementById('deliveryDateFilter');
+    if (!container) return;
+
+    // 연도 목록 추출
+    const years = [...new Set(deliveries.map(d => d.date.split('-')[0]))].sort().reverse();
+
+    let html = `<select class="date-filter-select" id="deliveryYearSelect" onchange="setDeliveryYear(this.value)">
+        <option value="all" ${currentDeliveryYear === 'all' ? 'selected' : ''}>전체 연도</option>
+        ${years.map(y => `<option value="${y}" ${currentDeliveryYear === y ? 'selected' : ''}>${y}년</option>`).join('')}
+    </select>
+    <select class="date-filter-select" id="deliveryMonthSelect" onchange="setDeliveryMonth(this.value)">
+        <option value="all" ${currentDeliveryMonth === 'all' ? 'selected' : ''}>전체 월</option>
+        ${Array.from({length: 12}, (_, i) => {
+            const m = String(i + 1).padStart(2, '0');
+            return `<option value="${m}" ${currentDeliveryMonth === m ? 'selected' : ''}>${i + 1}월</option>`;
+        }).join('')}
+    </select>`;
+
+    container.innerHTML = html;
+}
+
+function setDeliveryYear(val) {
+    currentDeliveryYear = val;
+    renderDeliveries();
+}
+
+function setDeliveryMonth(val) {
+    currentDeliveryMonth = val;
+    renderDeliveries();
+}
+
+function openEditDelivery(id) {
+    const d = deliveries.find(x => x.id === id);
+    if (!d) return;
+
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    title.textContent = '택배 편집';
+    body.innerHTML = `
+        <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="editDelDate" value="${d.date}"></div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">받는이</label><input type="text" class="form-input" id="editDelRecipient" value="${d.recipient}"></div>
+            <div class="form-group"><label class="form-label">연락처</label><input type="text" class="form-input" id="editDelPhone" value="${d.phone}" placeholder="010-0000-0000" maxlength="13"></div>
+        </div>
+        <div class="form-row" style="grid-template-columns:100px 1fr">
+            <div class="form-group"><label class="form-label">우편번호</label><input type="text" class="form-input" id="editDelZipcode" value="${d.zipcode}" placeholder="00000" maxlength="5"></div>
+            <div class="form-group"><label class="form-label">주소</label><input type="text" class="form-input" id="editDelAddress" value="${d.address}" placeholder="배송 주소"></div>
+        </div>
+        <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
+            <div class="form-group"><label class="form-label">종류</label>
+                <select class="form-select" id="editDelType">
+                    ${['일반','중고','번개','당근','GS반택','ETSY'].map(t => `<option value="${t}" ${d.type === t ? 'selected' : ''}>${t}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group"><label class="form-label">발송인</label>
+                <select class="form-select" id="editDelSender">
+                    ${['케이엘피코리아','김관택','이현주','김현호','유지은','구정두'].map(s => `<option value="${s}" ${d.sender === s ? 'selected' : ''}>${s}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group"><label class="form-label">선/착불</label>
+                <select class="form-select" id="editDelPayment">
+                    <option value="선불" ${d.payment === '선불' ? 'selected' : ''}>선불</option>
+                    <option value="착불" ${d.payment === '착불' ? 'selected' : ''}>착불</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">품목</label><input type="text" class="form-input" id="editDelProduct" value="${d.product}" placeholder="품목"></div>
+            <div class="form-group"><label class="form-label">판매가</label><input type="number" class="form-input" id="editDelPrice" value="${d.price || ''}" placeholder="0"></div>
+        </div>
+        <div class="form-group"><label class="form-label">배송메모</label><input type="text" class="form-input" id="editDelMemo" value="${d.memo}" placeholder="배송메모"></div>
+        <div class="form-actions">
+            <button class="form-submit" onclick="saveEditDelivery(${d.id})">저장</button>
+            <button class="form-delete-btn" onclick="deleteDelivery(${d.id})">삭제</button>
+        </div>`;
+    document.getElementById('editDelPhone').addEventListener('input', formatPhoneInput);
+    document.getElementById('modalOverlay').classList.add('show');
+}
+
+function saveEditDelivery(id) {
+    const d = deliveries.find(x => x.id === id);
+    if (!d) return;
+    d.date = document.getElementById('editDelDate').value;
+    d.recipient = document.getElementById('editDelRecipient').value.trim();
+    d.phone = document.getElementById('editDelPhone').value.trim();
+    d.zipcode = document.getElementById('editDelZipcode').value.trim();
+    d.address = document.getElementById('editDelAddress').value.trim();
+    d.type = document.getElementById('editDelType').value;
+    d.sender = document.getElementById('editDelSender').value;
+    d.payment = document.getElementById('editDelPayment').value;
+    d.product = document.getElementById('editDelProduct').value.trim();
+    d.price = parseInt(document.getElementById('editDelPrice').value) || 0;
+    d.memo = document.getElementById('editDelMemo').value.trim();
+    closeModal();
+    renderDeliveries();
+    renderHome();
+    showToast('택배가 수정되었습니다');
+}
+
+function deleteDelivery(id) {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    const idx = deliveries.findIndex(x => x.id === id);
+    if (idx !== -1) deliveries.splice(idx, 1);
+    closeModal();
+    renderDeliveries();
+    renderHome();
+    showToast('택배가 삭제되었습니다');
 }
 
 function copyTracking(num) {
@@ -617,28 +747,7 @@ function showProjectDetail(id) {
 }
 
 function showDeliveryDetail(id) {
-    const d = deliveries.find(x => x.id === id);
-    if (!d) return;
-
-    document.getElementById('detailPanelTitle').textContent = '택배 상세';
-    document.getElementById('detailContent').innerHTML = `
-        <div class="detail-section">
-            <div class="detail-row"><span class="detail-label">날짜</span><span class="detail-value">${fmtDisplay(d.date) || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">종류</span><span class="detail-value"><span class="badge ${typeBadgeClass(d.type)}">${d.type || '-'}</span></span></div>
-            <div class="detail-row"><span class="detail-label">발송인</span><span class="detail-value">${d.sender || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">받는이</span><span class="detail-value"><strong>${d.recipient || '-'}</strong></span></div>
-            <div class="detail-row"><span class="detail-label">연락처</span><span class="detail-value">${d.phone || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">품목</span><span class="detail-value">${d.product || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">우편번호</span><span class="detail-value">${d.zipcode || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">주소</span><span class="detail-value">${d.address || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">선/착불</span><span class="detail-value">${d.payment || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">판매가</span><span class="detail-value">${d.price ? d.price.toLocaleString() + '원' : '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">배송메모</span><span class="detail-value">${d.memo || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">작성자</span><span class="detail-value"><span class="author-badge">${d.author || '-'}</span></span></div>
-            <div class="detail-row"><span class="detail-label">운송장번호</span><span class="detail-value"><div class="inline-tracking detail-tracking"><input type="text" class="inline-input" id="detail-track-${d.id}" value="${d.tracking}" placeholder="운송장번호 입력"><button class="inline-save-btn" onclick="saveDetailTracking(${d.id})">저장</button>${d.tracking ? `<button class="inline-copy-btn" onclick="copyTracking('${d.tracking}')">복사</button>` : ''}</div></span></div>
-            <div class="detail-row"><span class="detail-label">평가</span><span class="detail-value">${d.rating ? `<span class="badge ${ratingBadgeClass(d.rating)}">${d.rating}</span>` : '-'}</span></div>
-        </div>`;
-    document.getElementById('detailOverlay').classList.add('show');
+    // 사이드바 상세 패널 제거 — 더 이상 사용하지 않음
 }
 
 function closeDetail() {
