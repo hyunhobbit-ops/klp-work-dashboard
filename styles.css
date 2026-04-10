@@ -1162,7 +1162,7 @@ body {
    DAILY PLAN
    ============================ */
 .daily-top-layout { display: flex; gap: 20px; }
-.daily-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 50%; min-width: 0; flex-shrink: 0; }
+.daily-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; min-width: 0; }
 .daily-sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
 
 /* Sidebar cards */
