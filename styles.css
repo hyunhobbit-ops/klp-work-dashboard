@@ -1205,6 +1205,14 @@ body {
 .daily-client { font-size: 11px; font-weight: 500; color: var(--gray-500); }
 .daily-item:hover { background: var(--gray-50); }
 
+/* Deadline highlight */
+.deadline-item { border-left: 3px solid var(--red); background: #fff5f5; }
+.deadline-item:hover { background: #fee2e2; }
+.deadline-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; color: var(--red); background: #fee2e2; padding: 2px 8px; border-radius: 4px; }
+.deadline-badge-sm { font-size: 10px; padding: 1px 6px; }
+.wk-task.deadline-item { border-left: 3px solid var(--red); background: #fff5f5; }
+.wk-task.deadline-item:hover { background: #fee2e2; border-color: var(--red); }
+
 /* ============================
    WEEKLY KANBAN BOARD
    ============================ */
