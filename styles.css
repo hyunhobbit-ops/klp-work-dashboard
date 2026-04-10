@@ -1206,6 +1206,42 @@ body {
 .daily-item:hover { background: var(--gray-50); }
 
 /* ============================
+   WEEKLY KANBAN BOARD
+   ============================ */
+.weekly-kanban-wrap { margin-top: 24px; }
+.weekly-kanban-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 4px; }
+.weekly-kanban-title { font-size: 16px; font-weight: 700; color: var(--gray-900); }
+.weekly-kanban-range { font-size: 13px; font-weight: 500; color: var(--gray-400); }
+.weekly-kanban-board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.wk-day-col { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-xs); overflow: hidden; min-height: 200px; display: flex; flex-direction: column; }
+.wk-day-col.wk-today { box-shadow: 0 0 0 2px var(--blue), var(--shadow-xs); }
+.wk-day-col.wk-weekend { background: var(--gray-50); }
+.wk-day-header { padding: 10px 12px; border-bottom: 1px solid var(--gray-100); display: flex; align-items: center; justify-content: space-between; }
+.wk-today .wk-day-header { background: var(--blue); }
+.wk-today .wk-day-name, .wk-today .wk-day-date { color: var(--white); }
+.wk-day-name { font-size: 13px; font-weight: 700; color: var(--gray-700); }
+.wk-day-date { font-size: 12px; font-weight: 500; color: var(--gray-400); }
+.wk-day-body { flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 6px; min-height: 100px; transition: background 0.15s; }
+.wk-day-body.wk-drop-target { background: #dbeafe; border-radius: 0 0 var(--radius) var(--radius); }
+.wk-task { background: var(--gray-50); border: 1px solid var(--gray-100); border-radius: 8px; padding: 8px 10px; cursor: grab; transition: all 0.15s; }
+.wk-task:hover { border-color: var(--blue); box-shadow: var(--shadow-xs); }
+.wk-task.completed { opacity: 0.45; }
+.wk-task.wk-dragging { opacity: 0.4; transform: rotate(2deg); }
+.wk-task-top { display: flex; align-items: center; gap: 8px; }
+.wk-task-name { font-size: 13px; font-weight: 600; color: var(--gray-800); line-height: 1.3; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wk-task.completed .wk-task-name { text-decoration: line-through; color: var(--gray-400); }
+.wk-task-tags { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+.wk-inline-input { font-size: 12px; padding: 6px 8px; }
+
+/* 주간 칸반 모바일 반응형 */
+@media (max-width: 900px) {
+    .weekly-kanban-board { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 600px) {
+    .weekly-kanban-board { grid-template-columns: 1fr 1fr; }
+}
+
+/* ============================
    DASHBOARD ITEMS
    ============================ */
 .urgent-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--gray-100); cursor: pointer; transition: opacity var(--transition); }

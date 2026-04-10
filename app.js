@@ -603,6 +603,151 @@ function renderDaily() {
     });
 
     document.getElementById('dailyColumns').innerHTML = html;
+
+    // 개인 탭이면 주간 칸반보드 표시
+    const kanbanWrap = document.getElementById('weeklyKanban');
+    const allPeople = ['이현주', '김현호', '유지은', '구정두'];
+    if (allPeople.includes(currentPersonFilter)) {
+        kanbanWrap.style.display = 'block';
+        renderWeeklyKanban(currentPersonFilter);
+    } else {
+        kanbanWrap.style.display = 'none';
+    }
+}
+
+function getWeekDates(baseDate) {
+    const d = new Date(baseDate);
+    const day = d.getDay(); // 0=일, 1=월 ...
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+        const dt = new Date(monday);
+        dt.setDate(monday.getDate() + i);
+        dates.push(dt);
+    }
+    return dates;
+}
+
+function renderWeeklyKanban(person) {
+    const weekDates = getWeekDates(currentDate);
+    const dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+    const todayStr = fmtDate(currentDate);
+
+    let html = `<div class="weekly-kanban-header">
+        <h3 class="weekly-kanban-title">📅 ${person}님의 주간 계획</h3>
+        <span class="weekly-kanban-range">${fmtDisplay(fmtDate(weekDates[0]))} ~ ${fmtDisplay(fmtDate(weekDates[6]))}</span>
+    </div>`;
+    html += `<div class="weekly-kanban-board">`;
+
+    weekDates.forEach((date, i) => {
+        const dateStr = fmtDate(date);
+        const isToday = dateStr === todayStr;
+        const isWeekend = i >= 5;
+        const tasks = dailyTasks.filter(t => t.date === dateStr && t.assignee === person);
+        const sorted = [...tasks].sort((a, b) => a.done - b.done);
+
+        let itemsHtml = '';
+        sorted.forEach(t => {
+            const tagClass = t.priority.includes('긴급') ? 'tag-urgent' : t.priority.includes('낮음') ? 'tag-low' : 'tag-normal';
+            const tagLabel = t.priority.includes('긴급') ? '긴급' : t.priority.includes('낮음') ? '낮음' : '보통';
+            const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
+            itemsHtml += `<div class="wk-task ${t.done ? 'completed' : ''}" draggable="true" data-task-id="${t.id}" onclick="openEditTask(${t.id})">
+                <div class="wk-task-top">
+                    <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">
+                        <svg width="12" height="12" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                    <span class="wk-task-name">${t.task}</span>
+                </div>
+                <div class="wk-task-tags">
+                    <span class="daily-tag ${tagClass}">${tagLabel}</span>
+                    ${labelStr}
+                </div>
+            </div>`;
+        });
+
+        html += `<div class="wk-day-col ${isToday ? 'wk-today' : ''} ${isWeekend ? 'wk-weekend' : ''}" data-date="${dateStr}">
+            <div class="wk-day-header">
+                <span class="wk-day-name">${dayNames[i]}</span>
+                <span class="wk-day-date">${date.getMonth()+1}/${date.getDate()}</span>
+            </div>
+            <div class="wk-day-body" data-date="${dateStr}">
+                ${itemsHtml}
+                <div class="daily-inline-add">
+                    <input type="text" class="daily-inline-input wk-inline-input" placeholder="+ 할 일" onkeydown="if(event.key==='Enter')inlineAddWeeklyTask(this,'${person}','${dateStr}')">
+                </div>
+            </div>
+        </div>`;
+    });
+
+    html += `</div>`;
+    document.getElementById('weeklyKanban').innerHTML = html;
+
+    // 드래그 앤 드롭 초기화
+    initKanbanDragDrop();
+}
+
+function inlineAddWeeklyTask(input, person, dateStr) {
+    const task = input.value.trim();
+    if (!task) return;
+    dailyTasks.push({
+        id: Date.now(), task,
+        date: dateStr,
+        assignee: person,
+        target: '',
+        priority: '🟡 보통',
+        done: false
+    });
+    renderDaily();
+    renderHome();
+    showToast('할 일이 추가되었습니다');
+    // 포커스 유지
+    setTimeout(() => {
+        const inputs = document.querySelectorAll(`.wk-day-body[data-date="${dateStr}"] .wk-inline-input`);
+        if (inputs.length) inputs[0].focus();
+    }, 50);
+}
+
+function initKanbanDragDrop() {
+    let draggedEl = null;
+
+    document.querySelectorAll('.wk-task[draggable]').forEach(el => {
+        el.addEventListener('dragstart', e => {
+            draggedEl = el;
+            el.classList.add('wk-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', el.dataset.taskId);
+        });
+        el.addEventListener('dragend', () => {
+            el.classList.remove('wk-dragging');
+            document.querySelectorAll('.wk-day-body').forEach(b => b.classList.remove('wk-drop-target'));
+            draggedEl = null;
+        });
+    });
+
+    document.querySelectorAll('.wk-day-body').forEach(body => {
+        body.addEventListener('dragover', e => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            body.classList.add('wk-drop-target');
+        });
+        body.addEventListener('dragleave', () => {
+            body.classList.remove('wk-drop-target');
+        });
+        body.addEventListener('drop', e => {
+            e.preventDefault();
+            body.classList.remove('wk-drop-target');
+            const taskId = parseInt(e.dataTransfer.getData('text/plain'));
+            const newDate = body.dataset.date;
+            const task = dailyTasks.find(t => t.id === taskId);
+            if (task && task.date !== newDate) {
+                task.date = newDate;
+                renderDaily();
+                renderHome();
+                showToast('할 일이 이동되었습니다');
+            }
+        });
+    });
 }
 
 function switchDailyFilter(filter) {
