@@ -141,7 +141,7 @@ const deliveries = [
 
 // ===== State =====
 let currentDate = new Date(2026, 3, 9);
-let currentPersonFilter = 'all';
+let currentPersonFilter = 'viewall';
 let currentProjectFilter = 'all';
 let currentDeliveryTypeFilter = 'all';
 let currentDeliverySearch = '';
