@@ -144,7 +144,6 @@ let currentDate = new Date(2026, 3, 9);
 let currentPersonFilter = 'viewall';
 let weekOffset = 0;
 let monthOffset = 0;
-let dailyMemos = JSON.parse(localStorage.getItem('klp_memos') || '{}');
 let currentProjectFilter = 'all';
 let currentDeliveryTypeFilter = 'all';
 let currentDeliverySearch = '';
@@ -625,37 +624,16 @@ function renderDaily() {
         calendarWrap.style.display = 'none';
     }
 
-    // 전체보기 외에서만 메모 + 사이드바 표시
-    const topLayout = document.querySelector('.daily-top-layout');
-    const memoPanel = document.getElementById('dailyMemoPanel');
+    // 전체보기 외에서만 사이드바 표시
     const sidebarEl = document.getElementById('dailySidebar');
     if (currentPersonFilter !== 'viewall') {
-        topLayout.classList.remove('no-sidebar');
-        memoPanel.style.display = 'block';
         sidebarEl.style.display = 'flex';
-        renderDailyMemo();
         renderDailySidebar();
     } else {
-        topLayout.classList.add('no-sidebar');
-        memoPanel.style.display = 'none';
         sidebarEl.style.display = 'none';
     }
 }
 
-function renderDailyMemo() {
-    const panel = document.getElementById('dailyMemoPanel');
-    if (!panel) return;
-    const todayStr = fmtDate(currentDate);
-    const tabName = currentPersonFilter === 'all' ? '전체' : currentPersonFilter === 'exec' ? '임원' : currentPersonFilter === 'ceo' ? '대표님' : currentPersonFilter;
-    const memoKey = `${tabName}_${todayStr}`;
-    const memoValue = dailyMemos[memoKey] || '';
-    const titleLabel = tabName === '전체' ? '전체 (공통)' : tabName;
-    panel.innerHTML = `
-        <div class="memo-card">
-            <h4 class="memo-card-title">📝 ${titleLabel} 메모</h4>
-            <textarea class="memo-textarea" id="dailyMemoText" placeholder="메모, 회의 내용, 전달사항 등을 자유롭게 작성하세요..." oninput="saveMemo('${memoKey}', this.value)">${memoValue}</textarea>
-        </div>`;
-}
 
 function renderDailySidebar() {
     const sidebar = document.getElementById('dailySidebar');
@@ -754,11 +732,6 @@ function renderDailySidebar() {
 
     html += `</div>`;
     sidebar.innerHTML = html;
-}
-
-function saveMemo(key, value) {
-    dailyMemos[key] = value;
-    localStorage.setItem('klp_memos', JSON.stringify(dailyMemos));
 }
 
 function getWeekDates(baseDate, offset) {
