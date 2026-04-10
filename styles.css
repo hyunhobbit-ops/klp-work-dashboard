@@ -1173,7 +1173,8 @@ body {
 .daily-item:hover { background: var(--gray-50); }
 .daily-item.completed { opacity: 0.5; }
 
-.daily-checkbox { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--gray-300); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: all var(--transition); }
+.daily-checkbox { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--gray-300); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: all var(--transition); position: relative; }
+.daily-checkbox::before { content: ''; position: absolute; top: -8px; left: -8px; right: -8px; bottom: -8px; }
 .daily-checkbox:hover { border-color: var(--blue); }
 .daily-checkbox.checked { border-color: var(--blue); background: var(--blue); }
 .daily-checkbox svg { opacity: 0; transition: opacity var(--transition); }
