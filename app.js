@@ -445,9 +445,10 @@ function getVisiblePeople() {
 
 function getPeopleForFilter(filter) {
     const allPeople = ['이현주', '김현호', '유지은', '구정두'];
-    if (filter === 'viewall') return allPeople; // 전체보기: 모든 개인 (전체 컬럼은 별도 렌더)
-    if (filter === 'all') return []; // 전체: 공통 할 일만 (개인 컬럼 없음)
+    if (filter === 'viewall') return allPeople;
+    if (filter === 'all') return [];
     if (filter === 'exec') return getExecPeople().filter(p => allPeople.includes(p));
+    if (filter === 'ceo') return [];
     return allPeople.filter(p => p === filter);
 }
 
@@ -472,6 +473,11 @@ function renderDailyPersonFilter() {
     // 임원급 이상만 임원 탭 표시
     if (isAdminOrExec) {
         html += `<button class="filter-chip ${currentPersonFilter === 'exec' ? 'active' : ''}" data-person="exec">임원</button>`;
+    }
+
+    // 관리자만 대표님 탭 표시
+    if (isAdmin) {
+        html += `<button class="filter-chip ${currentPersonFilter === 'ceo' ? 'active' : ''}" data-person="ceo">대표님</button>`;
     }
 
     visiblePeople.forEach(p => {
@@ -501,12 +507,14 @@ function renderDaily() {
 
     const visiblePeople = getVisiblePeople();
     // 현재 필터가 볼 수 없는 사람이면 전체보기로 리셋
-    if (currentPersonFilter !== 'all' && currentPersonFilter !== 'exec' && currentPersonFilter !== 'viewall' && !visiblePeople.includes(currentPersonFilter)) {
+    if (currentPersonFilter !== 'all' && currentPersonFilter !== 'exec' && currentPersonFilter !== 'viewall' && currentPersonFilter !== 'ceo' && !visiblePeople.includes(currentPersonFilter)) {
         currentPersonFilter = 'all';
         renderDailyPersonFilter();
     }
     const displayPeople = getPeopleForFilter(currentPersonFilter);
     const showCommonColumn = (currentPersonFilter === 'all' || currentPersonFilter === 'viewall');
+    const showExecColumn = (currentPersonFilter === 'exec' || currentPersonFilter === 'viewall');
+    const showCeoColumn = (currentPersonFilter === 'ceo' || currentPersonFilter === 'viewall');
 
     const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
@@ -543,6 +551,18 @@ function renderDaily() {
     if (showCommonColumn) {
         const commonTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '전체');
         html += renderColumn('전체 (공통)', commonTasks);
+    }
+
+    // "임원" 컬럼 (담당자가 '임원'인 항목)
+    if (showExecColumn) {
+        const execTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '임원');
+        html += renderColumn('임원', execTasks);
+    }
+
+    // "대표님" 컬럼 (담당자가 '대표님'인 항목)
+    if (showCeoColumn) {
+        const ceoTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '대표님');
+        html += renderColumn('대표님', ceoTasks);
     }
 
     // 개인별 컬럼
@@ -869,7 +889,7 @@ function openModal(type) {
         body.innerHTML = `
             <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="newTaskName" placeholder="할 일 입력"></div>
             <div class="form-row">
-                <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="newTaskAssignee"><option value="전체">전체 (공통)</option><option value="이현주">이현주</option><option value="김현호">김현호</option><option value="유지은">유지은</option><option value="구정두">구정두</option></select></div>
+                <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="newTaskAssignee"><option value="전체">전체 (공통)</option><option value="임원">임원</option><option value="대표님">대표님</option><option value="이현주">이현주</option><option value="김현호">김현호</option><option value="유지은">유지은</option><option value="구정두">구정두</option></select></div>
                 <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="newTaskDate" value="${fmtDate(currentDate)}"></div>
             </div>
             <div class="form-row">
