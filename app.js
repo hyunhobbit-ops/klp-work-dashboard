@@ -445,7 +445,7 @@ function getVisiblePeople() {
 
 function getPeopleForFilter(filter) {
     const allPeople = ['이현주', '김현호', '유지은', '구정두'];
-    if (filter === 'viewall') return allPeople;
+    if (filter === 'viewall') return getVisiblePeople();
     if (filter === 'all') return [];
     if (filter === 'exec') return getExecPeople().filter(p => allPeople.includes(p));
     if (filter === 'ceo') return [];
@@ -463,10 +463,8 @@ function renderDailyPersonFilter() {
 
     let html = '';
 
-    // 관리자만 전체보기 탭 표시
-    if (isAdmin) {
-        html += `<button class="filter-chip ${currentPersonFilter === 'viewall' ? 'active' : ''}" data-person="viewall">전체보기</button>`;
-    }
+    // 전체보기 탭: 모든 사용자에게 표시
+    html += `<button class="filter-chip ${currentPersonFilter === 'viewall' ? 'active' : ''}" data-person="viewall">전체보기</button>`;
 
     html += `<button class="filter-chip ${currentPersonFilter === 'all' ? 'active' : ''}" data-person="all">전체</button>`;
 
@@ -512,9 +510,13 @@ function renderDaily() {
         renderDailyPersonFilter();
     }
     const displayPeople = getPeopleForFilter(currentPersonFilter);
+    const userRole = currentUser ? currentUser.role : '';
+    const isAdminUser = ADMIN_ROLES.includes(userRole);
+    const isExecUser = EXEC_ROLES.includes(userRole);
+
     const showCommonColumn = (currentPersonFilter === 'all' || currentPersonFilter === 'viewall');
-    const showExecColumn = (currentPersonFilter === 'exec' || currentPersonFilter === 'viewall');
-    const showCeoColumn = (currentPersonFilter === 'ceo' || currentPersonFilter === 'viewall');
+    const showExecColumn = (currentPersonFilter === 'exec' || (currentPersonFilter === 'viewall' && (isAdminUser || isExecUser)));
+    const showCeoColumn = (currentPersonFilter === 'ceo' || (currentPersonFilter === 'viewall' && isAdminUser));
 
     const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
