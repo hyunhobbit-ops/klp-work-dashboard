@@ -1257,6 +1257,54 @@ body {
 }
 
 /* ============================
+   MONTHLY CALENDAR
+   ============================ */
+.monthly-calendar-wrap { margin-top: 32px; }
+.mc-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 4px; flex-wrap: wrap; gap: 8px; }
+.mc-header-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mc-title { font-size: 16px; font-weight: 700; color: var(--gray-900); }
+.mc-range { font-size: 13px; font-weight: 500; color: var(--gray-400); }
+
+.mc-grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; background: var(--white); box-shadow: var(--shadow-xs); }
+.mc-dow { padding: 10px 8px; text-align: center; font-size: 12px; font-weight: 700; color: var(--gray-500); background: var(--gray-50); border-bottom: 1px solid var(--gray-200); }
+.mc-weekend-header { color: var(--red); }
+
+.mc-cell { min-height: 110px; padding: 6px 8px; border-right: 1px solid var(--gray-100); border-bottom: 1px solid var(--gray-100); display: flex; flex-direction: column; transition: background 0.15s; }
+.mc-cell:nth-child(7n+7) { border-right: none; }
+.mc-cell:hover { background: var(--gray-50); }
+.mc-other-month { background: var(--gray-50); }
+.mc-other-month .mc-date { color: var(--gray-300); }
+.mc-weekend { background: #fafafa; }
+.mc-today { background: #eff6ff; }
+
+.mc-cell-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.mc-date { font-size: 13px; font-weight: 600; color: var(--gray-700); }
+.mc-date-today { background: var(--blue); color: var(--white); width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.mc-count { font-size: 10px; font-weight: 600; color: var(--gray-400); background: var(--gray-100); padding: 1px 5px; border-radius: 8px; }
+
+.mc-cell-body { flex: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.mc-task { display: flex; align-items: center; gap: 4px; padding: 2px 4px; border-radius: 4px; cursor: pointer; transition: background 0.15s; }
+.mc-task:hover { background: rgba(0,0,0,0.05); }
+.mc-task-done { opacity: 0.4; }
+.mc-task-done .mc-task-text { text-decoration: line-through; }
+.mc-task-deadline { background: #fff5f5; border-left: 2px solid var(--red); }
+
+.mc-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.mc-dot-urgent { background: var(--red); }
+.mc-dot-normal { background: var(--yellow); }
+.mc-dot-low { background: var(--blue); }
+
+.mc-task-text { font-size: 11px; font-weight: 500; color: var(--gray-700); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-more { font-size: 10px; font-weight: 600; color: var(--blue); padding: 2px 4px; cursor: default; }
+
+/* 월간 캘린더 모바일 반응형 */
+@media (max-width: 768px) {
+    .mc-cell { min-height: 70px; padding: 4px; }
+    .mc-task-text { font-size: 10px; }
+    .mc-date { font-size: 11px; }
+}
+
+/* ============================
    DASHBOARD ITEMS
    ============================ */
 .urgent-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--gray-100); cursor: pointer; transition: opacity var(--transition); }

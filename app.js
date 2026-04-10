@@ -143,6 +143,7 @@ const deliveries = [
 let currentDate = new Date(2026, 3, 9);
 let currentPersonFilter = 'viewall';
 let weekOffset = 0;
+let monthOffset = 0;
 let currentProjectFilter = 'all';
 let currentDeliveryTypeFilter = 'all';
 let currentDeliverySearch = '';
@@ -491,6 +492,7 @@ function renderDailyPersonFilter() {
             chip.classList.add('active');
             currentPersonFilter = chip.dataset.person;
             weekOffset = 0;
+            monthOffset = 0;
             renderDaily();
         });
     });
@@ -608,14 +610,18 @@ function renderDaily() {
 
     document.getElementById('dailyColumns').innerHTML = html;
 
-    // 전체보기 외 모든 탭에서 주간 칸반보드 표시
+    // 전체보기 외 모든 탭에서 주간 칸반보드 + 월간 캘린더 표시
     const kanbanWrap = document.getElementById('weeklyKanban');
+    const calendarWrap = document.getElementById('monthlyCalendar');
     if (currentPersonFilter !== 'viewall') {
         kanbanWrap.style.display = 'block';
+        calendarWrap.style.display = 'block';
         const kanbanAssignee = currentPersonFilter === 'all' ? '전체' : currentPersonFilter === 'exec' ? '임원' : currentPersonFilter === 'ceo' ? '대표님' : currentPersonFilter;
         renderWeeklyKanban(kanbanAssignee);
+        renderMonthlyCalendar(kanbanAssignee);
     } else {
         kanbanWrap.style.display = 'none';
+        calendarWrap.style.display = 'none';
     }
 }
 
@@ -775,6 +781,100 @@ function initKanbanDragDrop() {
             }
         });
     });
+}
+
+function changeMonth(dir) {
+    monthOffset += dir;
+    renderDaily();
+}
+
+function resetMonth() {
+    monthOffset = 0;
+    renderDaily();
+}
+
+function renderMonthlyCalendar(person) {
+    const baseDate = new Date(currentDate);
+    baseDate.setMonth(baseDate.getMonth() + monthOffset);
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth();
+    const todayStr = fmtDate(new Date());
+
+    const titleLabel = person === '전체' ? '전체 (공통)' : person === '임원' ? '임원' : person === '대표님' ? '대표님' : `${person}님의`;
+    const monthLabel = monthOffset === 0 ? '이번 달' : monthOffset === -1 ? '지난 달' : monthOffset === 1 ? '다음 달' : '';
+
+    // 해당 월의 1일과 마지막 날
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDow = firstDay.getDay(); // 0=일
+
+    // 달력 시작: 월요일 기준, 이전 달 날짜 채우기
+    const startOffset = startDow === 0 ? 6 : startDow - 1;
+    const calendarStart = new Date(firstDay);
+    calendarStart.setDate(calendarStart.getDate() - startOffset);
+
+    // 6주 = 42칸
+    const cells = [];
+    for (let i = 0; i < 42; i++) {
+        const d = new Date(calendarStart);
+        d.setDate(calendarStart.getDate() + i);
+        cells.push(d);
+    }
+
+    let html = `<div class="mc-header">
+        <div class="mc-header-left">
+            <h3 class="mc-title">${titleLabel} 월간 계획</h3>
+            <span class="mc-range">${year}년 ${month + 1}월${monthLabel ? ' (' + monthLabel + ')' : ''}</span>
+        </div>
+        <div class="wk-nav-btns">
+            <button class="wk-nav-btn" onclick="changeMonth(-1)">← 전월</button>
+            <button class="wk-nav-btn wk-nav-today ${monthOffset === 0 ? 'active' : ''}" onclick="resetMonth()">이번 달</button>
+            <button class="wk-nav-btn" onclick="changeMonth(1)">차월 →</button>
+        </div>
+    </div>`;
+
+    html += `<div class="mc-grid">`;
+    // 요일 헤더
+    const dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+    dayNames.forEach((d, i) => {
+        const weekendClass = i >= 5 ? 'mc-weekend-header' : '';
+        html += `<div class="mc-dow ${weekendClass}">${d}</div>`;
+    });
+
+    // 날짜 셀
+    cells.forEach((d, i) => {
+        const dateStr = fmtDate(d);
+        const isCurrentMonth = d.getMonth() === month;
+        const isToday = dateStr === todayStr;
+        const isWeekend = i % 7 >= 5;
+        const tasks = dailyTasks.filter(t => t.date === dateStr && t.assignee === person);
+        const doneCount = tasks.filter(t => t.done).length;
+
+        let tasksHtml = '';
+        const maxShow = 3;
+        tasks.slice(0, maxShow).forEach(t => {
+            const isDeadline = t.isDeadlineCopy;
+            const dotClass = t.priority.includes('긴급') ? 'mc-dot-urgent' : t.priority.includes('낮음') ? 'mc-dot-low' : 'mc-dot-normal';
+            tasksHtml += `<div class="mc-task ${t.done ? 'mc-task-done' : ''} ${isDeadline ? 'mc-task-deadline' : ''}" onclick="event.stopPropagation();openEditTask(${t.id})">
+                <span class="mc-dot ${dotClass}"></span>
+                <span class="mc-task-text">${isDeadline ? '🔥 ' : ''}${t.task.replace(/\s*\(마감일\)\s*$/, '')}</span>
+            </div>`;
+        });
+        if (tasks.length > maxShow) {
+            tasksHtml += `<div class="mc-more">+${tasks.length - maxShow}개 더</div>`;
+        }
+
+        html += `<div class="mc-cell ${isCurrentMonth ? '' : 'mc-other-month'} ${isToday ? 'mc-today' : ''} ${isWeekend ? 'mc-weekend' : ''}">
+            <div class="mc-cell-header">
+                <span class="mc-date ${isToday ? 'mc-date-today' : ''}">${d.getDate()}</span>
+                ${tasks.length > 0 ? `<span class="mc-count">${doneCount}/${tasks.length}</span>` : ''}
+            </div>
+            <div class="mc-cell-body">${tasksHtml}</div>
+        </div>`;
+    });
+
+    html += `</div>`;
+    document.getElementById('monthlyCalendar').innerHTML = html;
 }
 
 function switchDailyFilter(filter) {
