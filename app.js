@@ -520,7 +520,15 @@ function renderDaily() {
 
     const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
-    function renderColumn(title, tasks) {
+    // 컬럼 제목 → 탭 필터 매핑
+    function getTitleFilter(title) {
+        if (title === '전체 (공통)') return 'all';
+        if (title === '임원') return 'exec';
+        if (title === '대표님') return 'ceo';
+        return title; // 개인 이름은 그대로
+    }
+
+    function renderColumn(title, tasks, assignee) {
         const doneCount = tasks.filter(t => t.done).length;
         let itemsHtml = '';
         const sorted = [...tasks].sort((a, b) => a.done - b.done);
@@ -538,10 +546,16 @@ function renderDaily() {
                 </div>
             </div>`;
         });
+        const filterKey = getTitleFilter(title);
+        const clickable = currentPersonFilter === 'viewall' ? `onclick="switchDailyFilter('${filterKey}')"` : '';
+        const titleClass = currentPersonFilter === 'viewall' ? 'daily-col-title clickable' : 'daily-col-title';
         return `<div class="daily-column">
             <div class="daily-col-header">
-                <span class="daily-col-title">${title}</span>
-                <span class="daily-col-count">${doneCount}/${tasks.length}</span>
+                <span class="${titleClass}" ${clickable}>${title}</span>
+                <div class="daily-col-actions">
+                    <span class="daily-col-count">${doneCount}/${tasks.length}</span>
+                    <button class="daily-add-btn" onclick="openQuickTask('${assignee}')">+</button>
+                </div>
             </div>
             <div class="daily-col-body">${itemsHtml || empty('할 일 없음')}</div>
         </div>`;
@@ -552,28 +566,63 @@ function renderDaily() {
     // "전체" 공통 할 일 컬럼 (담당자가 '전체'인 항목)
     if (showCommonColumn) {
         const commonTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '전체');
-        html += renderColumn('전체 (공통)', commonTasks);
+        html += renderColumn('전체 (공통)', commonTasks, '전체');
     }
 
     // "임원" 컬럼 (담당자가 '임원'인 항목)
     if (showExecColumn) {
         const execTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '임원');
-        html += renderColumn('임원', execTasks);
+        html += renderColumn('임원', execTasks, '임원');
     }
 
     // "대표님" 컬럼 (담당자가 '대표님'인 항목)
     if (showCeoColumn) {
         const ceoTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '대표님');
-        html += renderColumn('대표님', ceoTasks);
+        html += renderColumn('대표님', ceoTasks, '대표님');
     }
 
     // 개인별 컬럼
     displayPeople.forEach(person => {
         const tasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === person);
-        html += renderColumn(person, tasks);
+        html += renderColumn(person, tasks, person);
     });
 
     document.getElementById('dailyColumns').innerHTML = html;
+}
+
+function switchDailyFilter(filter) {
+    currentPersonFilter = filter;
+    renderDaily();
+}
+
+function openQuickTask(assignee) {
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    title.textContent = `새 할 일 — ${assignee === '전체' ? '전체 (공통)' : assignee}`;
+    body.innerHTML = `
+        <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="quickTaskName" placeholder="할 일 입력" autofocus></div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="quickTaskDate" value="${fmtDate(currentDate)}"></div>
+            <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="quickTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
+        </div>
+        <div class="form-group"><label class="form-label">대상</label><select class="form-select" id="quickTaskTarget"><option value="본사">본사</option><option value="거래처">거래처</option><option value="회계">회계</option><option value="개인">개인</option><option value="유튜브">유튜브</option></select></div>
+        <button class="form-submit" onclick="addQuickTask('${assignee}')">할 일 추가</button>`;
+    document.getElementById('modalOverlay').classList.add('show');
+}
+
+function addQuickTask(assignee) {
+    const task = document.getElementById('quickTaskName').value.trim();
+    if (!task) { showToast('할 일을 입력해주세요'); return; }
+    dailyTasks.push({
+        id: Date.now(), task,
+        date: document.getElementById('quickTaskDate').value,
+        assignee: assignee,
+        target: document.getElementById('quickTaskTarget').value,
+        priority: document.getElementById('quickTaskPriority').value,
+        done: false
+    });
+    closeModal(); renderDaily(); renderHome();
+    showToast('할 일이 추가되었습니다');
 }
 
 function toggleTask(id) {

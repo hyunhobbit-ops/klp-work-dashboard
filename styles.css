@@ -1074,6 +1074,24 @@ body {
 }
 .date-filter-select:focus { border-color: var(--blue); }
 
+/* Daily column header actions */
+.daily-col-actions { display: flex; align-items: center; gap: 8px; }
+.daily-col-title.clickable { cursor: pointer; transition: color var(--transition); }
+.daily-col-title.clickable:hover { color: var(--blue); text-decoration: underline; }
+.daily-add-btn {
+    width: 26px; height: 26px;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    background: var(--white);
+    color: var(--gray-500);
+    font-size: 16px; font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all var(--transition);
+    line-height: 1;
+}
+.daily-add-btn:hover { background: var(--blue); color: var(--white); border-color: var(--blue); }
+
 /* Inline cell editing */
 /* Toolbar buttons */
 .toolbar-buttons { display: flex; gap: 10px; align-items: center; }
