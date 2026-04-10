@@ -605,25 +605,41 @@ function openQuickTask(assignee) {
     const title = document.getElementById('modalTitle');
     const body = document.getElementById('modalBody');
     title.textContent = `새 할 일 — ${assignee === '전체' ? '전체 (공통)' : assignee}`;
+
+    // 담당자 기본값: 관리자급은 '전체', 나머지는 로그인 계정명
+    const defaultAssignee = currentUser && ADMIN_ROLES.includes(currentUser.role) ? '전체' : (currentUser ? currentUser.name : assignee);
+    const assigneeOptions = ['전체', '임원', '대표님', '이현주', '김현호', '유지은', '구정두'];
+    const assigneeHtml = assigneeOptions.map(a => `<option value="${a}" ${a === defaultAssignee ? 'selected' : ''}>${a === '전체' ? '전체 (공통)' : a}</option>`).join('');
+
+    // 라벨 옵션
+    const labelOptions = ['개인', '회사 업무', '거래처 업무', '마케팅 업무'];
+    const labelHtml = labelOptions.map(l => `<option value="${l}">${l}</option>`).join('');
+
     body.innerHTML = `
         <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="quickTaskName" placeholder="할 일 입력" autofocus></div>
+        <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="quickTaskAssignee">${assigneeHtml}</select></div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="quickTaskDate" value="${fmtDate(currentDate)}"></div>
             <div class="form-group"><label class="form-label">마감일</label><input type="date" class="form-input" id="quickTaskDeadline"></div>
         </div>
+        <div class="form-group"><label class="form-label">라벨</label><select class="form-select" id="quickTaskLabel">${labelHtml}</select></div>
         <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="quickTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
-        <button class="form-submit" onclick="addQuickTask('${assignee}')">할 일 추가</button>`;
+        <div class="form-group"><label class="form-label">거래처</label><select class="form-select" id="quickTaskClient"><option value="">선택 안함</option></select><p class="form-hint" style="color:var(--text-tertiary);font-size:12px;margin-top:4px;">추후 고객사 DB 연동 예정</p></div>
+        <button class="form-submit" onclick="addQuickTask()">할 일 추가</button>`;
     document.getElementById('modalOverlay').classList.add('show');
 }
 
-function addQuickTask(assignee) {
+function addQuickTask() {
     const task = document.getElementById('quickTaskName').value.trim();
     if (!task) { showToast('할 일을 입력해주세요'); return; }
+    const assignee = document.getElementById('quickTaskAssignee').value;
     dailyTasks.push({
         id: Date.now(), task,
         date: document.getElementById('quickTaskDate').value,
         assignee: assignee,
         deadline: document.getElementById('quickTaskDeadline').value || '',
+        label: document.getElementById('quickTaskLabel').value || '',
+        client: document.getElementById('quickTaskClient').value || '',
         target: '',
         priority: document.getElementById('quickTaskPriority').value,
         done: false
