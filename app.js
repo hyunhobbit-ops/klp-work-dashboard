@@ -685,12 +685,10 @@ function renderWeeklyKanban(person) {
                     </div>
                     <span class="wk-task-name">${t.task}</span>
                 </div>
-                <div class="wk-task-bottom">
-                    <div class="wk-task-tags">
-                        <span class="daily-tag ${tagClass}">${tagLabel}</span>
-                        ${labelStr}
-                    </div>
-                    ${wkIsDeadline ? `<span class="deadline-badge-sm">🔥</span>` : ''}
+                ${wkIsDeadline ? `<div class="wk-deadline-badge"><span class="deadline-badge-lg">🔥 마감일</span></div>` : ''}
+                <div class="wk-task-tags">
+                    <span class="daily-tag ${tagClass}">${tagLabel}</span>
+                    ${labelStr}
                 </div>
             </div>`;
         });
