@@ -625,7 +625,28 @@ function renderDaily() {
         calendarWrap.style.display = 'none';
     }
 
-    renderDailySidebar();
+    renderDailyMemo();
+
+    // 사이드바: 전체보기 외에서만 표시
+    const sidebarEl = document.getElementById('dailySidebar');
+    if (currentPersonFilter !== 'viewall') {
+        sidebarEl.style.display = 'flex';
+        renderDailySidebar();
+    } else {
+        sidebarEl.style.display = 'none';
+    }
+}
+
+function renderDailyMemo() {
+    const panel = document.getElementById('dailyMemoPanel');
+    if (!panel) return;
+    const todayStr = fmtDate(currentDate);
+    const memoValue = dailyMemos[todayStr] || '';
+    panel.innerHTML = `
+        <div class="memo-card">
+            <h4 class="memo-card-title">📝 메모</h4>
+            <textarea class="memo-textarea" id="dailyMemoText" placeholder="오늘의 메모, 회의 내용, 전달사항 등을 자유롭게 작성하세요..." oninput="saveMemo('${todayStr}', this.value)">${memoValue}</textarea>
+        </div>`;
 }
 
 function renderDailySidebar() {
@@ -667,16 +688,7 @@ function renderDailySidebar() {
     // 진행률 바 색상
     const barColor = percent >= 80 ? '#16a34a' : percent >= 50 ? '#f59e0b' : 'var(--blue)';
 
-    // 메모 키: 날짜별 저장
-    const memoKey = todayStr;
-    const memoValue = dailyMemos[memoKey] || '';
-
     let html = `
-    <div class="sidebar-card">
-        <h4 class="sidebar-card-title">📝 메모</h4>
-        <textarea class="sidebar-memo" id="sidebarMemo" placeholder="오늘의 메모, 회의 내용, 전달사항 등을 자유롭게 작성하세요..." oninput="saveMemo('${memoKey}', this.value)">${memoValue}</textarea>
-    </div>
-
     <div class="sidebar-card">
         <h4 class="sidebar-card-title">📊 오늘의 요약</h4>
         <div class="sidebar-progress">
