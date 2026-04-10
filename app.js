@@ -536,13 +536,18 @@ function renderDaily() {
             const tagClass = t.priority.includes('긴급') ? 'tag-urgent' : t.priority.includes('낮음') ? 'tag-low' : 'tag-normal';
             const tagLabel = t.priority.includes('긴급') ? '긴급' : t.priority.includes('낮음') ? '낮음' : '보통';
             const deadlineStr = t.deadline ? `마감 ${fmtDisplay(t.deadline)}` : '';
-            itemsHtml += `<div class="daily-item ${t.done ? 'completed' : ''}">
-                <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="toggleTask(${t.id})">${checkSvg}</div>
+            const ddayStr = t.deadline ? getDday(t.deadline) : '';
+            const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
+            const clientStr = t.client ? `<span class="daily-client">📌 ${t.client}</span>` : '';
+            itemsHtml += `<div class="daily-item ${t.done ? 'completed' : ''}" onclick="openEditTask(${t.id})" style="cursor:pointer;">
+                <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">${checkSvg}</div>
                 <div class="daily-info">
                     <div class="daily-title">${t.task}</div>
                     <div class="daily-meta">
                         <span class="daily-tag ${tagClass}">${tagLabel}</span>
-                        ${deadlineStr ? `<span class="daily-deadline">${deadlineStr}</span>` : ''}
+                        ${labelStr}
+                        ${deadlineStr ? `<span class="daily-deadline">${deadlineStr} ${ddayStr}</span>` : ''}
+                        ${clientStr}
                     </div>
                 </div>
             </div>`;
@@ -646,6 +651,81 @@ function addQuickTask() {
     });
     closeModal(); renderDaily(); renderHome();
     showToast('할 일이 추가되었습니다');
+}
+
+function getDday(dateStr) {
+    if (!dateStr) return '';
+    const today = new Date(); today.setHours(0,0,0,0);
+    const target = new Date(dateStr); target.setHours(0,0,0,0);
+    const diff = Math.round((target - today) / (1000 * 60 * 60 * 24));
+    if (diff === 0) return '(D-Day)';
+    if (diff > 0) return `(D-${diff})`;
+    return `(D+${Math.abs(diff)})`;
+}
+
+function getLabelClass(label) {
+    if (label === '개인') return 'personal';
+    if (label === '회사 업무') return 'company';
+    if (label === '거래처 업무') return 'client';
+    if (label === '마케팅 업무') return 'marketing';
+    return 'default';
+}
+
+function openEditTask(id) {
+    const t = dailyTasks.find(x => x.id === id);
+    if (!t) return;
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    title.textContent = '할 일 수정';
+
+    const assigneeOptions = ['전체', '임원', '대표님', '이현주', '김현호', '유지은', '구정두'];
+    const assigneeHtml = assigneeOptions.map(a => `<option value="${a}" ${a === t.assignee ? 'selected' : ''}>${a === '전체' ? '전체 (공통)' : a}</option>`).join('');
+
+    const labelOptions = ['개인', '회사 업무', '거래처 업무', '마케팅 업무'];
+    const labelHtml = labelOptions.map(l => `<option value="${l}" ${l === t.label ? 'selected' : ''}>${l}</option>`).join('');
+
+    const priorityOptions = [['🟡 보통','보통'],['🔴 긴급','긴급'],['🔵 낮음','낮음']];
+    const priorityHtml = priorityOptions.map(([v,l]) => `<option value="${v}" ${v === t.priority ? 'selected' : ''}>${l}</option>`).join('');
+
+    body.innerHTML = `
+        <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="editTaskName" value="${t.task}" autofocus></div>
+        <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="editTaskAssignee">${assigneeHtml}</select></div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="editTaskDate" value="${t.date}"></div>
+            <div class="form-group"><label class="form-label">마감일</label><input type="date" class="form-input" id="editTaskDeadline" value="${t.deadline || ''}"></div>
+        </div>
+        <div class="form-group"><label class="form-label">라벨</label><select class="form-select" id="editTaskLabel">${labelHtml}</select></div>
+        <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="editTaskPriority">${priorityHtml}</select></div>
+        <div class="form-group"><label class="form-label">거래처</label><select class="form-select" id="editTaskClient"><option value="">선택 안함</option></select><p class="form-hint" style="color:var(--text-tertiary);font-size:12px;margin-top:4px;">추후 고객사 DB 연동 예정</p></div>
+        <div style="display:flex;gap:8px;">
+            <button class="form-submit" style="flex:1;" onclick="saveEditTask(${id})">수정 완료</button>
+            <button class="form-submit" style="flex:0;background:var(--red);min-width:80px;" onclick="deleteTask(${id})">삭제</button>
+        </div>`;
+    document.getElementById('modalOverlay').classList.add('show');
+}
+
+function saveEditTask(id) {
+    const t = dailyTasks.find(x => x.id === id);
+    if (!t) return;
+    const name = document.getElementById('editTaskName').value.trim();
+    if (!name) { showToast('할 일을 입력해주세요'); return; }
+    t.task = name;
+    t.assignee = document.getElementById('editTaskAssignee').value;
+    t.date = document.getElementById('editTaskDate').value;
+    t.deadline = document.getElementById('editTaskDeadline').value || '';
+    t.label = document.getElementById('editTaskLabel').value || '';
+    t.client = document.getElementById('editTaskClient').value || '';
+    t.priority = document.getElementById('editTaskPriority').value;
+    closeModal(); renderDaily(); renderHome();
+    showToast('할 일이 수정되었습니다');
+}
+
+function deleteTask(id) {
+    const idx = dailyTasks.findIndex(x => x.id === id);
+    if (idx === -1) return;
+    dailyTasks.splice(idx, 1);
+    closeModal(); renderDaily(); renderHome();
+    showToast('할 일이 삭제되었습니다');
 }
 
 function inlineAddTask(input, assignee) {
