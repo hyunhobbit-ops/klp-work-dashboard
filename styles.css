@@ -1427,7 +1427,6 @@ body {
    ============================ */
 @media (min-width: 1441px) {
     .content { padding: 32px 40px 48px; }
-    .daily-columns { grid-template-columns: 1fr 1fr 1fr; }
 }
 
 @media (max-width: 1440px) {
