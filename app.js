@@ -445,7 +445,8 @@ function getVisiblePeople() {
 
 function getPeopleForFilter(filter) {
     const allPeople = ['이현주', '김현호', '유지은', '구정두'];
-    if (filter === 'all') return getVisiblePeople();
+    if (filter === 'viewall') return allPeople; // 전체보기: 모든 개인 (전체 컬럼은 별도 렌더)
+    if (filter === 'all') return []; // 전체: 공통 할 일만 (개인 컬럼 없음)
     if (filter === 'exec') return getExecPeople().filter(p => allPeople.includes(p));
     return allPeople.filter(p => p === filter);
 }
@@ -455,10 +456,18 @@ function renderDailyPersonFilter() {
     if (!container) return;
 
     const role = currentUser ? currentUser.role : '';
-    const isAdminOrExec = ADMIN_ROLES.includes(role) || EXEC_ROLES.includes(role);
+    const isAdmin = ADMIN_ROLES.includes(role);
+    const isAdminOrExec = isAdmin || EXEC_ROLES.includes(role);
     const visiblePeople = getVisiblePeople();
 
-    let html = `<button class="filter-chip ${currentPersonFilter === 'all' ? 'active' : ''}" data-person="all">전체</button>`;
+    let html = '';
+
+    // 관리자만 전체보기 탭 표시
+    if (isAdmin) {
+        html += `<button class="filter-chip ${currentPersonFilter === 'viewall' ? 'active' : ''}" data-person="viewall">전체보기</button>`;
+    }
+
+    html += `<button class="filter-chip ${currentPersonFilter === 'all' ? 'active' : ''}" data-person="all">전체</button>`;
 
     // 임원급 이상만 임원 탭 표시
     if (isAdminOrExec) {
@@ -491,26 +500,23 @@ function renderDaily() {
     renderDailyPersonFilter();
 
     const visiblePeople = getVisiblePeople();
-    // 현재 필터가 볼 수 없는 사람이면 전체로 리셋
-    if (currentPersonFilter !== 'all' && currentPersonFilter !== 'exec' && !visiblePeople.includes(currentPersonFilter)) {
+    // 현재 필터가 볼 수 없는 사람이면 전체보기로 리셋
+    if (currentPersonFilter !== 'all' && currentPersonFilter !== 'exec' && currentPersonFilter !== 'viewall' && !visiblePeople.includes(currentPersonFilter)) {
         currentPersonFilter = 'all';
         renderDailyPersonFilter();
     }
     const displayPeople = getPeopleForFilter(currentPersonFilter);
+    const showCommonColumn = (currentPersonFilter === 'all' || currentPersonFilter === 'viewall');
 
     const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
-    let html = '';
-    displayPeople.forEach(person => {
-        const tasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === person);
+    function renderColumn(title, tasks) {
         const doneCount = tasks.filter(t => t.done).length;
-
         let itemsHtml = '';
         const sorted = [...tasks].sort((a, b) => a.done - b.done);
         sorted.forEach(t => {
             const tagClass = t.priority.includes('긴급') ? 'tag-urgent' : t.priority.includes('낮음') ? 'tag-low' : 'tag-normal';
             const tagLabel = t.priority.includes('긴급') ? '긴급' : t.priority.includes('낮음') ? '낮음' : '보통';
-
             itemsHtml += `<div class="daily-item ${t.done ? 'completed' : ''}">
                 <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="toggleTask(${t.id})">${checkSvg}</div>
                 <div class="daily-info">
@@ -522,14 +528,27 @@ function renderDaily() {
                 </div>
             </div>`;
         });
-
-        html += `<div class="daily-column">
+        return `<div class="daily-column">
             <div class="daily-col-header">
-                <span class="daily-col-title">${person}</span>
+                <span class="daily-col-title">${title}</span>
                 <span class="daily-col-count">${doneCount}/${tasks.length}</span>
             </div>
             <div class="daily-col-body">${itemsHtml || empty('할 일 없음')}</div>
         </div>`;
+    }
+
+    let html = '';
+
+    // "전체" 공통 할 일 컬럼 (담당자가 '전체'인 항목)
+    if (showCommonColumn) {
+        const commonTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '전체');
+        html += renderColumn('전체 (공통)', commonTasks);
+    }
+
+    // 개인별 컬럼
+    displayPeople.forEach(person => {
+        const tasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === person);
+        html += renderColumn(person, tasks);
     });
 
     document.getElementById('dailyColumns').innerHTML = html;
@@ -850,7 +869,7 @@ function openModal(type) {
         body.innerHTML = `
             <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="newTaskName" placeholder="할 일 입력"></div>
             <div class="form-row">
-                <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="newTaskAssignee"><option value="이현주">이현주</option><option value="김현호">김현호</option><option value="유지은">유지은</option><option value="구정두">구정두</option></select></div>
+                <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="newTaskAssignee"><option value="전체">전체 (공통)</option><option value="이현주">이현주</option><option value="김현호">김현호</option><option value="유지은">유지은</option><option value="구정두">구정두</option></select></div>
                 <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="newTaskDate" value="${fmtDate(currentDate)}"></div>
             </div>
             <div class="form-row">
