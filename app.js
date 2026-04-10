@@ -626,14 +626,17 @@ function renderDaily() {
     }
 
     // 전체보기 외에서만 메모 + 사이드바 표시
+    const topLayout = document.querySelector('.daily-top-layout');
     const memoPanel = document.getElementById('dailyMemoPanel');
     const sidebarEl = document.getElementById('dailySidebar');
     if (currentPersonFilter !== 'viewall') {
+        topLayout.classList.remove('no-sidebar');
         memoPanel.style.display = 'block';
         sidebarEl.style.display = 'flex';
         renderDailyMemo();
         renderDailySidebar();
     } else {
+        topLayout.classList.add('no-sidebar');
         memoPanel.style.display = 'none';
         sidebarEl.style.display = 'none';
     }
