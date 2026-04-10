@@ -2,6 +2,100 @@
 // KLP KOREA Work Dashboard v2
 // ========================================
 
+// ===== Supabase =====
+const SUPABASE_URL = 'https://vtulmuxkriklpiibiues.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null; // { id, name, role }
+
+// ===== Auth =====
+async function checkAuth() {
+    const saved = localStorage.getItem('klp_user');
+    if (saved) {
+        currentUser = JSON.parse(saved);
+        updateSidebarUser();
+        showApp();
+    } else {
+        showLogin();
+    }
+}
+
+function updateSidebarUser() {
+    const initials = currentUser.name.length >= 2
+        ? currentUser.name.slice(-2)
+        : currentUser.name;
+    document.getElementById('userAvatar').textContent = initials;
+    document.getElementById('userName').textContent = currentUser.name;
+    document.getElementById('userRole').textContent = currentUser.role;
+}
+
+async function handleLogin() {
+    const name = document.getElementById('loginName').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errorEl = document.getElementById('loginError');
+    const btn = document.getElementById('loginBtn');
+
+    if (!name || !password) {
+        errorEl.textContent = '이름과 비밀번호를 입력해주세요';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '로그인 중...';
+    errorEl.textContent = '';
+
+    const { data, error } = await sb
+        .from('profiles')
+        .select('id, name, password, role')
+        .eq('name', name)
+        .single();
+
+    if (error || !data) {
+        console.error('Login error:', error);
+        errorEl.textContent = error ? `오류: ${error.message}` : '등록되지 않은 이름입니다';
+        btn.disabled = false;
+        btn.textContent = '로그인';
+        return;
+    }
+
+    if (data.password !== password) {
+        errorEl.textContent = '비밀번호가 올바르지 않습니다';
+        btn.disabled = false;
+        btn.textContent = '로그인';
+        return;
+    }
+
+    currentUser = { id: data.id, name: data.name, role: data.role };
+    localStorage.setItem('klp_user', JSON.stringify(currentUser));
+    updateSidebarUser();
+    showApp();
+}
+
+function handleLogout() {
+    localStorage.removeItem('klp_user');
+    currentUser = null;
+    showLogin();
+}
+
+function showLogin() {
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+}
+
+function showApp() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    renderAll();
+}
+
+// Enter key to login
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') {
+        handleLogin();
+    }
+});
+
 // ===== Data =====
 const projects = [
     { id: 1, name: "러쉬 성수동 제안", client: "러쉬", supplier: "", status: "진행 중", priority: "🔴 긴급", category: "국내 주문", assignees: ["이현주"], progress: "25%", revenue: 0, startDate: "2026-04-07", deadline: "2026-04-10", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "내일까지 제안서 준다고 함" },
@@ -30,16 +124,16 @@ const dailyTasks = [
 ];
 
 const deliveries = [
-    { id: 1, recipient: "이기석", date: "2026-04-08", type: "일반", sender: "케이엘피코리아", zipcode: "06234", address: "서울 강남구 역삼동 123-4", phone: "010-1234-5678", payment: "선불", product: "미니클락 골드", tracking: "6012345678901", memo: "", price: 85000, rating: "A 단골가능", seller: "1" },
-    { id: 2, recipient: "최자회", date: "2026-04-08", type: "일반", sender: "케이엘피코리아", zipcode: "13487", address: "경기 성남시 분당구 판교로 256", phone: "010-9876-5432", payment: "선불", product: "대통령 시계 세트", tracking: "6012345678902", memo: "부재시 경비실", price: 150000, rating: "B 대통령시계", seller: "1" },
-    { id: 3, recipient: "김상모", date: "2026-04-08", type: "번개", sender: "김현호", zipcode: "04523", address: "서울 중구 남대문로 1가", phone: "010-5555-1234", payment: "착불", product: "빈티지 세이코 다이버", tracking: "6012345678903", memo: "", price: 280000, rating: "A 단골가능", seller: "2" },
-    { id: 4, recipient: "김윤정", date: "2026-04-07", type: "중고", sender: "이현주", zipcode: "08376", address: "서울 구로구 디지털로 300", phone: "010-3333-4444", payment: "선불", product: "카시오 빈티지", tracking: "6012345678904", memo: "", price: 45000, rating: "C 평범", seller: "1" },
-    { id: 5, recipient: "김석진", date: "2026-04-08", type: "당근", sender: "이현주", zipcode: "03722", address: "서울 서대문구 연세로 50", phone: "010-7777-8888", payment: "선불", product: "벽시계 빈티지", tracking: "", memo: "직거래 예정", price: 35000, rating: "", seller: "1" },
-    { id: 6, recipient: "이서윤", date: "2026-04-03", type: "ETSY", sender: "케이엘피코리아", zipcode: "", address: "CA 90001, Los Angeles", phone: "", payment: "선불", product: "Korean Clock Set", tracking: "EV123456789KR", memo: "해외배송 EMS", price: 120000, rating: "", seller: "1" },
-    { id: 7, recipient: "이재호", date: "2026-04-07", type: "일반", sender: "구정두", zipcode: "41256", address: "대구 동구 동대구로 550", phone: "010-2222-3333", payment: "선불", product: "미니클락 실버", tracking: "6012345678906", memo: "", price: 85000, rating: "C 평범", seller: "1" },
-    { id: 8, recipient: "이영찬", date: "2026-04-07", type: "번개", sender: "김현호", zipcode: "48058", address: "부산 해운대구 해운대로 100", phone: "010-6666-9999", payment: "착불", product: "롤렉스 빈티지", tracking: "6012345678907", memo: "시간 약속 필수", price: 450000, rating: "A 단골가능", seller: "2" },
-    { id: 9, recipient: "김윤수", date: "2026-04-07", type: "일반", sender: "케이엘피코리아", zipcode: "06611", address: "서울 서초구 강남대로 27", phone: "010-1111-2222", payment: "선불", product: "기업 감사패 시계", tracking: "6012345678908", memo: "법인 배송", price: 300000, rating: "A 단골가능", seller: "1" },
-    { id: 10, recipient: "김연지", date: "2026-04-06", type: "GS반택", sender: "이현주", zipcode: "10326", address: "경기 고양시 일산서구 중앙로", phone: "010-4444-5555", payment: "선불", product: "미니클락 핑크", tracking: "", memo: "GS 반택 접수", price: 65000, rating: "", seller: "1" },
+    { id: 1, recipient: "이기석", date: "2026-04-08", type: "일반", sender: "케이엘피코리아", zipcode: "06234", address: "서울 강남구 역삼동 123-4", phone: "010-1234-5678", payment: "선불", product: "미니클락 골드", tracking: "6012345678901", memo: "", price: 85000, rating: "A 단골가능", seller: "1", author: "김현호" },
+    { id: 2, recipient: "최자회", date: "2026-04-08", type: "일반", sender: "케이엘피코리아", zipcode: "13487", address: "경기 성남시 분당구 판교로 256", phone: "010-9876-5432", payment: "선불", product: "대통령 시계 세트", tracking: "6012345678902", memo: "부재시 경비실", price: 150000, rating: "B 대통령시계", seller: "1", author: "김현호" },
+    { id: 3, recipient: "김상모", date: "2026-04-08", type: "번개", sender: "김현호", zipcode: "04523", address: "서울 중구 남대문로 1가", phone: "010-5555-1234", payment: "착불", product: "빈티지 세이코 다이버", tracking: "6012345678903", memo: "", price: 280000, rating: "A 단골가능", seller: "2", author: "김현호" },
+    { id: 4, recipient: "김윤정", date: "2026-04-07", type: "중고", sender: "이현주", zipcode: "08376", address: "서울 구로구 디지털로 300", phone: "010-3333-4444", payment: "선불", product: "카시오 빈티지", tracking: "6012345678904", memo: "", price: 45000, rating: "C 평범", seller: "1", author: "이현주" },
+    { id: 5, recipient: "김석진", date: "2026-04-08", type: "당근", sender: "이현주", zipcode: "03722", address: "서울 서대문구 연세로 50", phone: "010-7777-8888", payment: "선불", product: "벽시계 빈티지", tracking: "", memo: "직거래 예정", price: 35000, rating: "", seller: "1", author: "이현주" },
+    { id: 6, recipient: "이서윤", date: "2026-04-03", type: "ETSY", sender: "케이엘피코리아", zipcode: "", address: "CA 90001, Los Angeles", phone: "", payment: "선불", product: "Korean Clock Set", tracking: "EV123456789KR", memo: "해외배송 EMS", price: 120000, rating: "", seller: "1", author: "이현주" },
+    { id: 7, recipient: "이재호", date: "2026-04-07", type: "일반", sender: "구정두", zipcode: "41256", address: "대구 동구 동대구로 550", phone: "010-2222-3333", payment: "선불", product: "미니클락 실버", tracking: "6012345678906", memo: "", price: 85000, rating: "C 평범", seller: "1", author: "구정두" },
+    { id: 8, recipient: "이영찬", date: "2026-04-07", type: "번개", sender: "김현호", zipcode: "48058", address: "부산 해운대구 해운대로 100", phone: "010-6666-9999", payment: "착불", product: "롤렉스 빈티지", tracking: "6012345678907", memo: "시간 약속 필수", price: 450000, rating: "A 단골가능", seller: "2", author: "김현호" },
+    { id: 9, recipient: "김윤수", date: "2026-04-07", type: "일반", sender: "케이엘피코리아", zipcode: "06611", address: "서울 서초구 강남대로 27", phone: "010-1111-2222", payment: "선불", product: "기업 감사패 시계", tracking: "6012345678908", memo: "법인 배송", price: 300000, rating: "A 단골가능", seller: "1", author: "이현주" },
+    { id: 10, recipient: "김연지", date: "2026-04-06", type: "GS반택", sender: "이현주", zipcode: "10326", address: "경기 고양시 일산서구 중앙로", phone: "010-4444-5555", payment: "선불", product: "미니클락 핑크", tracking: "", memo: "GS 반택 접수", price: 65000, rating: "", seller: "1", author: "이현주" },
 ];
 
 // ===== State =====
@@ -68,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupFilters();
     setupDateNav();
     setupSearch();
-    renderAll();
+    checkAuth();
 });
 
 // ===== Topbar =====
@@ -416,20 +510,21 @@ function renderDeliveries() {
             <button class="inline-save-btn" onclick="saveTracking(${d.id})">저장</button>
         </div>`;
 
-        tableHtml += `<tr onclick="showDeliveryDetail(${d.id})">
-            <td>${fmtDisplay(d.date)}</td>
-            <td><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
-            <td>${d.sender}</td>
-            <td><strong>${d.recipient}</strong></td>
-            <td>${d.phone || '-'}</td>
-            <td>${d.product}</td>
-            <td>${d.zipcode || '-'}</td>
-            <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.address}</td>
-            <td>${d.payment}</td>
-            <td>${d.price ? d.price.toLocaleString() + '원' : '-'}</td>
-            <td>${d.memo || '-'}</td>
-            <td>${trackingCell}</td>
-            <td onclick="event.stopPropagation()">${ratingSelect}</td>
+        tableHtml += `<tr>
+            <td onclick="showDeliveryDetail(${d.id})">${fmtDisplay(d.date)}</td>
+            <td onclick="showDeliveryDetail(${d.id})"><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
+            <td onclick="showDeliveryDetail(${d.id})">${d.sender}</td>
+            <td onclick="showDeliveryDetail(${d.id})"><strong>${d.recipient}</strong></td>
+            <td onclick="showDeliveryDetail(${d.id})">${d.phone || '-'}</td>
+            <td onclick="showDeliveryDetail(${d.id})">${d.product}</td>
+            <td onclick="showDeliveryDetail(${d.id})">${d.zipcode || '-'}</td>
+            <td onclick="showDeliveryDetail(${d.id})" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.address}</td>
+            <td onclick="showDeliveryDetail(${d.id})">${d.payment}</td>
+            <td onclick="showDeliveryDetail(${d.id})">${d.price ? d.price.toLocaleString() + '원' : '-'}</td>
+            <td onclick="showDeliveryDetail(${d.id})">${d.memo || '-'}</td>
+            <td onclick="showDeliveryDetail(${d.id})"><span class="author-badge">${d.author || '-'}</span></td>
+            <td class="td-no-click">${trackingCell}</td>
+            <td class="td-no-click">${ratingSelect}</td>
         </tr>`;
 
         cardHtml += `<div class="resp-card" onclick="showDeliveryDetail(${d.id})">
@@ -444,6 +539,7 @@ function renderDeliveries() {
                 ${d.zipcode ? `<div class="resp-card-row">${d.zipcode} ${d.address}</div>` : `<div class="resp-card-row">${d.address}</div>`}
                 <div class="resp-card-row">${d.price ? d.price.toLocaleString() + '원' : ''}</div>
                 ${d.memo ? `<div class="resp-card-row">${d.memo}</div>` : ''}
+                <div class="resp-card-row">작성자: <span class="author-badge">${d.author || '-'}</span></div>
                 <div class="resp-card-row" onclick="event.stopPropagation()">${trackingCell}</div>
                 <div class="resp-card-row" onclick="event.stopPropagation()">${ratingSelect}</div>
             </div>
@@ -463,6 +559,15 @@ function saveTracking(id) {
     if (!d) return;
     const input = document.getElementById(`track-${id}`);
     d.tracking = input.value.trim();
+    showToast('운송장번호가 저장되었습니다');
+}
+
+function saveDetailTracking(id) {
+    const d = deliveries.find(x => x.id === id);
+    if (!d) return;
+    const input = document.getElementById(`detail-track-${id}`);
+    d.tracking = input.value.trim();
+    renderDeliveries();
     showToast('운송장번호가 저장되었습니다');
 }
 
@@ -517,24 +622,21 @@ function showDeliveryDetail(id) {
 
     document.getElementById('detailPanelTitle').textContent = '택배 상세';
     document.getElementById('detailContent').innerHTML = `
-        <h2 class="detail-title">${d.recipient}</h2>
         <div class="detail-section">
-            <div class="detail-section-title">배송 정보</div>
-            <div class="detail-row"><span class="detail-label">종류</span><span class="detail-value"><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></span></div>
-            <div class="detail-row"><span class="detail-label">발송인</span><span class="detail-value">${d.sender}</span></div>
-            <div class="detail-row"><span class="detail-label">날짜</span><span class="detail-value">${fmtDisplay(d.date)}</span></div>
-            <div class="detail-row"><span class="detail-label">선/착불</span><span class="detail-value">${d.payment}</span></div>
-            ${d.price ? `<div class="detail-row"><span class="detail-label">판매가</span><span class="detail-value">${d.price.toLocaleString()}원</span></div>` : ''}
-            ${d.rating ? `<div class="detail-row"><span class="detail-label">평가</span><span class="detail-value"><span class="badge ${ratingBadgeClass(d.rating)}">${d.rating}</span></span></div>` : ''}
-        </div>
-        <div class="detail-section">
-            <div class="detail-section-title">수신 정보</div>
-            <div class="detail-row"><span class="detail-label">품목</span><span class="detail-value">${d.product}</span></div>
-            <div class="detail-row"><span class="detail-label">우편번호</span><span class="detail-value">${d.zipcode || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">주소</span><span class="detail-value">${d.address}</span></div>
+            <div class="detail-row"><span class="detail-label">날짜</span><span class="detail-value">${fmtDisplay(d.date) || '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">종류</span><span class="detail-value"><span class="badge ${typeBadgeClass(d.type)}">${d.type || '-'}</span></span></div>
+            <div class="detail-row"><span class="detail-label">발송인</span><span class="detail-value">${d.sender || '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">받는이</span><span class="detail-value"><strong>${d.recipient || '-'}</strong></span></div>
             <div class="detail-row"><span class="detail-label">연락처</span><span class="detail-value">${d.phone || '-'}</span></div>
-            ${d.tracking ? `<div class="detail-row"><span class="detail-label">운송장</span><span class="detail-value" style="color:var(--blue);font-family:monospace;cursor:pointer" onclick="copyTracking('${d.tracking}')">${d.tracking}</span></div>` : ''}
-            ${d.memo ? `<div class="detail-row"><span class="detail-label">배송메모</span><span class="detail-value">${d.memo}</span></div>` : ''}
+            <div class="detail-row"><span class="detail-label">품목</span><span class="detail-value">${d.product || '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">우편번호</span><span class="detail-value">${d.zipcode || '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">주소</span><span class="detail-value">${d.address || '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">선/착불</span><span class="detail-value">${d.payment || '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">판매가</span><span class="detail-value">${d.price ? d.price.toLocaleString() + '원' : '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">배송메모</span><span class="detail-value">${d.memo || '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">작성자</span><span class="detail-value"><span class="author-badge">${d.author || '-'}</span></span></div>
+            <div class="detail-row"><span class="detail-label">운송장번호</span><span class="detail-value"><div class="inline-tracking detail-tracking"><input type="text" class="inline-input" id="detail-track-${d.id}" value="${d.tracking}" placeholder="운송장번호 입력"><button class="inline-save-btn" onclick="saveDetailTracking(${d.id})">저장</button>${d.tracking ? `<button class="inline-copy-btn" onclick="copyTracking('${d.tracking}')">복사</button>` : ''}</div></span></div>
+            <div class="detail-row"><span class="detail-label">평가</span><span class="detail-value">${d.rating ? `<span class="badge ${ratingBadgeClass(d.rating)}">${d.rating}</span>` : '-'}</span></div>
         </div>`;
     document.getElementById('detailOverlay').classList.add('show');
 }
@@ -705,7 +807,8 @@ function addDelivery() {
         tracking: "",
         memo: document.getElementById('newDelMemo').value.trim(),
         price: parseInt(document.getElementById('newDelPrice').value) || 0,
-        rating: "", seller: "1"
+        rating: "", seller: "1",
+        author: currentUser ? currentUser.name : '-'
     });
     closeModal(); renderDeliveries(); renderHome();
     showToast('택배가 추가되었습니다');

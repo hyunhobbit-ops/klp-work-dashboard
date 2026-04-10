@@ -57,6 +57,111 @@ body {
 }
 
 /* ============================
+   LOGIN SCREEN
+   ============================ */
+.login-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #f0f4ff 0%, #e8f3ff 50%, #f7f8fa 100%);
+    padding: 20px;
+}
+
+.login-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    padding: 48px 40px;
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.login-logo {
+    width: 56px;
+    height: 56px;
+    background: var(--blue);
+    color: white;
+    border-radius: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 800;
+    margin-bottom: 16px;
+}
+
+.login-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--gray-900);
+    margin-bottom: 4px;
+}
+
+.login-subtitle {
+    font-size: 14px;
+    color: var(--gray-500);
+    margin-bottom: 32px;
+}
+
+.login-form { text-align: left; }
+
+.login-field { margin-bottom: 16px; }
+.login-field .form-label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--gray-700); }
+.login-field .form-input { width: 100%; padding: 12px 14px; border: 1px solid var(--gray-200); border-radius: var(--radius-xs); font-size: 14px; font-family: inherit; color: var(--gray-800); outline: none; transition: border-color var(--transition); }
+.login-field .form-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(49,130,246,0.1); }
+
+.login-error {
+    font-size: 13px;
+    color: var(--red);
+    min-height: 20px;
+    margin-bottom: 8px;
+}
+
+.login-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--blue);
+    color: white;
+    border: none;
+    border-radius: var(--radius-xs);
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background var(--transition);
+}
+.login-btn:hover { background: var(--blue-dark); }
+.login-btn:disabled { background: var(--gray-300); cursor: not-allowed; }
+
+/* Logout button */
+.logout-btn {
+    margin-left: auto;
+    padding: 6px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--gray-400);
+    cursor: pointer;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+}
+.logout-btn:hover { background: var(--gray-100); color: var(--gray-600); }
+
+/* Author badge in delivery table */
+.author-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--blue-light);
+    color: var(--blue);
+}
+
+/* ============================
    LAYOUT: Sidebar + Main
    ============================ */
 #app {
@@ -911,11 +1016,17 @@ body {
 
 /* Inline editing */
 .inline-tracking { display: flex; align-items: center; gap: 4px; }
-.inline-input { width: 120px; padding: 5px 8px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 12px; font-family: 'SF Mono', 'Fira Code', monospace; color: var(--gray-800); outline: none; background: var(--gray-50); transition: border-color var(--transition); }
-.inline-input:focus { border-color: var(--blue); background: var(--white); }
-.inline-save-btn { padding: 5px 10px; border: none; border-radius: 6px; background: var(--blue); color: white; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; transition: background var(--transition); }
+.inline-input { width: 120px; padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 13px; font-family: 'SF Mono', 'Fira Code', monospace; color: var(--gray-800); outline: none; background: var(--gray-50); transition: border-color var(--transition); min-height: 36px; }
+.inline-input:focus { border-color: var(--blue); background: var(--white); box-shadow: 0 0 0 3px rgba(51,102,255,0.12); }
+.inline-save-btn { padding: 8px 12px; border: none; border-radius: 6px; background: var(--blue); color: white; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; transition: background var(--transition); min-height: 36px; }
 .inline-save-btn:hover { background: var(--blue-dark); }
-.inline-select { padding: 5px 8px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 12px; font-weight: 600; font-family: inherit; color: var(--gray-700); background: var(--gray-50); outline: none; cursor: pointer; transition: border-color var(--transition); }
+.inline-copy-btn { padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: 6px; background: var(--gray-50); color: var(--gray-600); font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; transition: all var(--transition); min-height: 36px; }
+.inline-copy-btn:hover { background: var(--gray-100); border-color: var(--gray-300); }
+.detail-tracking .inline-input { width: 180px; }
+.td-no-click { cursor: default !important; }
+#deliveryTable tbody td:not(.td-no-click) { cursor: pointer; }
+#deliveryTable tbody td:not(.td-no-click):hover { background: var(--gray-50); }
+.inline-select { padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 12px; font-weight: 600; font-family: inherit; color: var(--gray-700); background: var(--gray-50); outline: none; cursor: pointer; transition: border-color var(--transition); min-height: 36px; }
 .inline-select:focus { border-color: var(--blue); }
 
 /* Card Grid */
