@@ -664,9 +664,9 @@ function renderWeeklyKanban(person) {
             <span class="weekly-kanban-range">${fmtDisplay(fmtDate(weekDates[0]))} ~ ${fmtDisplay(fmtDate(weekDates[6]))}${weekLabel ? ' (' + weekLabel + ')' : ''}</span>
         </div>
         <div class="wk-nav-btns">
-            <button class="wk-nav-btn" onclick="changeWeek(-1)">← 전주</button>
+            <button class="wk-nav-btn" onclick="changeWeek(-1)">← 지난주</button>
             <button class="wk-nav-btn wk-nav-today ${weekOffset === 0 ? 'active' : ''}" onclick="resetWeek()">이번 주</button>
-            <button class="wk-nav-btn" onclick="changeWeek(1)">차주 →</button>
+            <button class="wk-nav-btn" onclick="changeWeek(1)">다음주 →</button>
         </div>
     </div>`;
     html += `<div class="weekly-kanban-board">`;
@@ -827,9 +827,9 @@ function renderMonthlyCalendar(person) {
             <span class="mc-range">${year}년 ${month + 1}월${monthLabel ? ' (' + monthLabel + ')' : ''}</span>
         </div>
         <div class="wk-nav-btns">
-            <button class="wk-nav-btn" onclick="changeMonth(-1)">← 전월</button>
+            <button class="wk-nav-btn" onclick="changeMonth(-1)">← 지난달</button>
             <button class="wk-nav-btn wk-nav-today ${monthOffset === 0 ? 'active' : ''}" onclick="resetMonth()">이번 달</button>
-            <button class="wk-nav-btn" onclick="changeMonth(1)">차월 →</button>
+            <button class="wk-nav-btn" onclick="changeMonth(1)">다음달 →</button>
         </div>
     </div>`;
 
