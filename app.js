@@ -527,17 +527,17 @@ function renderDeliveries() {
         </div>`;
 
         tableHtml += `<tr>
-            <td>${fmtDisplay(d.date)}</td>
-            <td><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
-            <td>${d.sender}</td>
-            <td><strong>${d.recipient}</strong></td>
-            <td>${d.phone || '-'}</td>
-            <td>${d.product}</td>
-            <td>${d.zipcode || '-'}</td>
-            <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.address}</td>
-            <td>${d.payment}</td>
-            <td>${d.price ? d.price.toLocaleString() + '원' : '-'}</td>
-            <td>${d.memo || '-'}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="date" data-type="date">${fmtDisplay(d.date)}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="type" data-type="select" data-options="일반,중고,번개,당근,GS반택,ETSY"><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
+            <td class="cell-editable" data-id="${d.id}" data-field="sender" data-type="select" data-options="케이엘피코리아,김관택,이현주,김현호,유지은,구정두">${d.sender}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="recipient"><strong>${d.recipient}</strong></td>
+            <td class="cell-editable" data-id="${d.id}" data-field="phone">${d.phone || '-'}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="product">${d.product}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="zipcode">${d.zipcode || '-'}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="address" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.address}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="payment" data-type="select" data-options="선불,착불">${d.payment}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="price" data-type="number">${d.price ? d.price.toLocaleString() + '원' : '-'}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="memo">${d.memo || '-'}</td>
             <td><span class="author-badge">${d.author || '-'}</span></td>
             <td>${trackingCell}</td>
             <td>${ratingSelect}</td>
@@ -976,6 +976,85 @@ function categoryBadgeClass(c) {
     const map = { '국내 주문': 'badge-blue', '해외 주문': 'badge-purple', '자체 브랜드': 'badge-green', 'IP 콜라보': 'badge-orange', '유튜브': 'badge-red', '기타': 'badge-gray' };
     return map[c] || 'badge-gray';
 }
+
+// ===== Inline Cell Editing (double-click) =====
+document.addEventListener('dblclick', (e) => {
+    const cell = e.target.closest('.cell-editable');
+    if (!cell || cell.querySelector('.cell-edit-input, .cell-edit-select')) return;
+
+    const id = Number(cell.dataset.id);
+    const field = cell.dataset.field;
+    const type = cell.dataset.type || 'text';
+    const d = deliveries.find(x => x.id === id);
+    if (!d) return;
+
+    const currentVal = d[field] ?? '';
+    const originalHtml = cell.innerHTML;
+
+    if (type === 'select') {
+        const options = cell.dataset.options.split(',');
+        const select = document.createElement('select');
+        select.className = 'cell-edit-select';
+        options.forEach(opt => {
+            const o = document.createElement('option');
+            o.value = opt;
+            o.textContent = opt;
+            if (opt === currentVal) o.selected = true;
+            select.appendChild(o);
+        });
+        cell.innerHTML = '';
+        cell.appendChild(select);
+        select.focus();
+
+        const save = () => {
+            d[field] = select.value;
+            renderDeliveries();
+            showToast('수정되었습니다');
+        };
+        select.addEventListener('change', save);
+        select.addEventListener('blur', save);
+    } else if (type === 'date') {
+        const input = document.createElement('input');
+        input.type = 'date';
+        input.className = 'cell-edit-input';
+        input.value = currentVal;
+        cell.innerHTML = '';
+        cell.appendChild(input);
+        input.focus();
+
+        const save = () => {
+            if (input.value) d[field] = input.value;
+            renderDeliveries();
+            showToast('수정되었습니다');
+        };
+        input.addEventListener('change', save);
+        input.addEventListener('blur', save);
+    } else {
+        const input = document.createElement('input');
+        input.type = type === 'number' ? 'number' : 'text';
+        input.className = 'cell-edit-input';
+        input.value = type === 'number' ? (currentVal || '') : (currentVal === '-' ? '' : currentVal);
+        cell.innerHTML = '';
+        cell.appendChild(input);
+        input.focus();
+        input.select();
+
+        const save = () => {
+            if (type === 'number') {
+                d[field] = parseInt(input.value) || 0;
+            } else {
+                d[field] = input.value.trim();
+            }
+            renderDeliveries();
+            showToast('수정되었습니다');
+        };
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter') { ev.preventDefault(); save(); }
+            if (ev.key === 'Escape') { cell.innerHTML = originalHtml; }
+        });
+    }
+});
 
 function ratingBadgeClass(r) {
     if (r.includes('A')) return 'badge-blue';

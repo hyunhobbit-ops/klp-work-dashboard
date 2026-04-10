@@ -1073,6 +1073,22 @@ body {
     transition: border-color var(--transition);
 }
 .date-filter-select:focus { border-color: var(--blue); }
+
+/* Inline cell editing */
+.cell-editable { cursor: default; }
+.cell-editable:hover { background: var(--blue-light) !important; cursor: cell; }
+.cell-edit-input, .cell-edit-select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 2px solid var(--blue);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--gray-800);
+    background: var(--white);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(49,130,246,0.15);
+}
 .inline-select { padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: 6px; font-size: 12px; font-weight: 600; font-family: inherit; color: var(--gray-700); background: var(--gray-50); outline: none; cursor: pointer; transition: border-color var(--transition); min-height: 36px; }
 .inline-select:focus { border-color: var(--blue); }
 
