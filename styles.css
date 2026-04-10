@@ -1161,8 +1161,8 @@ body {
 /* ============================
    DAILY PLAN
    ============================ */
-.daily-top-layout { display: flex; gap: 20px; }
-.daily-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; min-width: 0; }
+.daily-top-layout { display: flex; gap: 20px; justify-content: flex-start; }
+.daily-columns { display: inline-grid; grid-template-columns: repeat(auto-fit, minmax(280px, 320px)); gap: 20px; }
 .daily-sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
 
 /* Sidebar cards */
@@ -1419,7 +1419,6 @@ body {
    ============================ */
 @media (min-width: 1441px) {
     .content { padding: 32px 40px 48px; }
-    .daily-columns { grid-template-columns: 1fr 1fr 1fr; }
 }
 
 @media (max-width: 1440px) {
