@@ -1162,9 +1162,10 @@ body {
    DAILY PLAN
    ============================ */
 .daily-top-layout { display: flex; gap: 20px; }
-.daily-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; min-width: 0; }
-.daily-memo-panel { width: 320px; flex-shrink: 0; }
-.daily-sidebar { display: flex; gap: 16px; margin-top: 20px; }
+.daily-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+.daily-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.daily-memo-panel { }
+.daily-sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
 
 /* Sidebar cards */
 .sidebar-card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-xs); padding: 20px; }
@@ -1185,8 +1186,6 @@ body {
 .memo-textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
 .memo-textarea::placeholder { color: var(--gray-300); }
 
-/* Sidebar horizontal layout */
-.daily-sidebar .sidebar-card { flex: 1; min-width: 0; }
 .sidebar-empty { font-size: 13px; color: var(--gray-400); text-align: center; padding: 20px 0; }
 .sidebar-deadline-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; border-left: 3px solid var(--red); margin-bottom: 8px; background: #fafafa; }
 .sidebar-deadline-item:hover { background: #fff5f5; }
@@ -1448,8 +1447,7 @@ body {
     .summary-row { grid-template-columns: repeat(2, 1fr); }
     .dash-grid { grid-template-columns: 1fr; }
     .daily-top-layout { flex-direction: column; }
-    .daily-memo-panel { width: 100%; }
-    .daily-sidebar { flex-direction: column; }
+    .daily-sidebar { width: 100%; }
     .daily-columns { grid-template-columns: 1fr; }
     .quick-menu { grid-template-columns: repeat(3, 1fr); }
     .goal-details { grid-template-columns: 1fr; }
