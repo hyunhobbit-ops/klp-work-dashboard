@@ -1177,6 +1177,9 @@ body {
 .sidebar-stat { text-align: center; padding: 10px 0; background: var(--gray-50); border-radius: 8px; }
 .sidebar-stat-num { display: block; font-size: 22px; font-weight: 800; color: var(--gray-900); }
 .sidebar-stat-label { font-size: 11px; font-weight: 600; color: var(--gray-400); margin-top: 2px; }
+.sidebar-memo { width: 100%; min-height: 120px; border: 1px solid var(--gray-200); border-radius: 8px; padding: 12px; font-size: 13px; font-family: 'Pretendard', sans-serif; color: var(--gray-700); resize: vertical; line-height: 1.6; transition: border-color var(--transition); box-sizing: border-box; }
+.sidebar-memo:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+.sidebar-memo::placeholder { color: var(--gray-300); }
 .sidebar-empty { font-size: 13px; color: var(--gray-400); text-align: center; padding: 20px 0; }
 .sidebar-deadline-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; border-left: 3px solid var(--red); margin-bottom: 8px; background: #fafafa; }
 .sidebar-deadline-item:hover { background: #fff5f5; }

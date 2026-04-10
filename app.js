@@ -144,6 +144,7 @@ let currentDate = new Date(2026, 3, 9);
 let currentPersonFilter = 'viewall';
 let weekOffset = 0;
 let monthOffset = 0;
+let dailyMemos = JSON.parse(localStorage.getItem('klp_memos') || '{}');
 let currentProjectFilter = 'all';
 let currentDeliveryTypeFilter = 'all';
 let currentDeliverySearch = '';
@@ -666,7 +667,16 @@ function renderDailySidebar() {
     // 진행률 바 색상
     const barColor = percent >= 80 ? '#16a34a' : percent >= 50 ? '#f59e0b' : 'var(--blue)';
 
+    // 메모 키: 날짜별 저장
+    const memoKey = todayStr;
+    const memoValue = dailyMemos[memoKey] || '';
+
     let html = `
+    <div class="sidebar-card">
+        <h4 class="sidebar-card-title">📝 메모</h4>
+        <textarea class="sidebar-memo" id="sidebarMemo" placeholder="오늘의 메모, 회의 내용, 전달사항 등을 자유롭게 작성하세요..." oninput="saveMemo('${memoKey}', this.value)">${memoValue}</textarea>
+    </div>
+
     <div class="sidebar-card">
         <h4 class="sidebar-card-title">📊 오늘의 요약</h4>
         <div class="sidebar-progress">
@@ -724,6 +734,11 @@ function renderDailySidebar() {
 
     html += `</div>`;
     sidebar.innerHTML = html;
+}
+
+function saveMemo(key, value) {
+    dailyMemos[key] = value;
+    localStorage.setItem('klp_memos', JSON.stringify(dailyMemos));
 }
 
 function getWeekDates(baseDate, offset) {
