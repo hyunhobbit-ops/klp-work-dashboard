@@ -518,7 +518,7 @@ function renderDaily() {
     const showExecColumn = (currentPersonFilter === 'exec');
     const showCeoColumn = (currentPersonFilter === 'ceo' || (currentPersonFilter === 'viewall' && isAdminUser));
 
-    const checkSvg = `<svg width="16" height="16" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
+    const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
     // 컬럼 제목 → 탭 필터 매핑
     function getTitleFilter(title) {
