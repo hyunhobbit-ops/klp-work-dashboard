@@ -416,19 +416,17 @@ function renderProjects() {
 // =====================================
 // DAILY PLAN
 // =====================================
+// 권한 등급 매핑
+const ADMIN_ROLES = ['관리자', '부장', '대표'];
+const EXEC_ROLES = ['임원', '차장', '과장'];
+
 function getVisiblePeople() {
     const allPeople = ['이현주', '김현호', '유지은', '구정두'];
     if (!currentUser) return allPeople;
 
     const role = currentUser.role;
-    if (role === '관리자') return allPeople;
-
-    // 임원: 자기 + 같은 임원들
-    if (role === '임원') {
-        // 임원은 임원 권한 가진 사람들 + 자기 자신 표시
-        // 현재는 자기 자신만 (추후 임원 목록 확장 가능)
-        return allPeople.filter(p => p === currentUser.name);
-    }
+    if (ADMIN_ROLES.includes(role)) return allPeople;
+    if (EXEC_ROLES.includes(role)) return allPeople.filter(p => p === currentUser.name);
 
     // 일반: 자기 자신만
     return allPeople.filter(p => p === currentUser.name);
