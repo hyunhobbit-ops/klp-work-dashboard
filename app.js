@@ -539,6 +539,7 @@ function renderDaily() {
             const ddayStr = t.deadline ? getDday(t.deadline) : '';
             const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
             const clientStr = t.client ? `<span class="daily-client">📌 ${t.client}</span>` : '';
+            const ddayClass = ddayStr.includes('D+') ? 'dday-over' : ddayStr.includes('D-Day') ? 'dday-today' : 'dday-left';
             itemsHtml += `<div class="daily-item ${t.done ? 'completed' : ''}" onclick="openEditTask(${t.id})" style="cursor:pointer;">
                 <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">${checkSvg}</div>
                 <div class="daily-info">
@@ -546,10 +547,13 @@ function renderDaily() {
                     <div class="daily-meta">
                         <span class="daily-tag ${tagClass}">${tagLabel}</span>
                         ${labelStr}
-                        ${deadlineStr ? `<span class="daily-deadline">${deadlineStr} ${ddayStr}</span>` : ''}
                         ${clientStr}
                     </div>
                 </div>
+                ${t.deadline ? `<div class="daily-dday-wrap">
+                    <span class="daily-dday ${ddayClass}">${ddayStr}</span>
+                    <span class="daily-dday-date">${fmtDisplay(t.deadline)}</span>
+                </div>` : ''}
             </div>`;
         });
         const filterKey = getTitleFilter(title);
