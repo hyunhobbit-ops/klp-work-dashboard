@@ -810,17 +810,28 @@ function addQuickTask() {
     const task = document.getElementById('quickTaskName').value.trim();
     if (!task) { showToast('할 일을 입력해주세요'); return; }
     const assignee = document.getElementById('quickTaskAssignee').value;
+    const date = document.getElementById('quickTaskDate').value;
+    const deadline = document.getElementById('quickTaskDeadline').value || '';
+    const label = document.getElementById('quickTaskLabel').value || '';
+    const client = document.getElementById('quickTaskClient').value || '';
+    const priority = document.getElementById('quickTaskPriority').value;
+    const groupId = deadline && deadline !== date ? Date.now() : null;
+
     dailyTasks.push({
         id: Date.now(), task,
-        date: document.getElementById('quickTaskDate').value,
-        assignee: assignee,
-        deadline: document.getElementById('quickTaskDeadline').value || '',
-        label: document.getElementById('quickTaskLabel').value || '',
-        client: document.getElementById('quickTaskClient').value || '',
-        target: '',
-        priority: document.getElementById('quickTaskPriority').value,
-        done: false
+        date, assignee, deadline, label, client, target: '', priority, done: false,
+        linkedGroup: groupId
     });
+
+    // 마감일이 시작일과 다르면 마감일에도 연동 태스크 생성
+    if (groupId) {
+        dailyTasks.push({
+            id: Date.now() + 1, task: `${task} (마감일)`,
+            date: deadline, assignee, deadline, label, client, target: '', priority, done: false,
+            linkedGroup: groupId, isDeadlineCopy: true
+        });
+    }
+
     closeModal(); renderDaily(); renderHome();
     showToast('할 일이 추가되었습니다');
 }
@@ -881,21 +892,69 @@ function saveEditTask(id) {
     if (!t) return;
     const name = document.getElementById('editTaskName').value.trim();
     if (!name) { showToast('할 일을 입력해주세요'); return; }
-    t.task = name;
-    t.assignee = document.getElementById('editTaskAssignee').value;
-    t.date = document.getElementById('editTaskDate').value;
-    t.deadline = document.getElementById('editTaskDeadline').value || '';
-    t.label = document.getElementById('editTaskLabel').value || '';
-    t.client = document.getElementById('editTaskClient').value || '';
-    t.priority = document.getElementById('editTaskPriority').value;
+    const newDeadline = document.getElementById('editTaskDeadline').value || '';
+    const newAssignee = document.getElementById('editTaskAssignee').value;
+    const newLabel = document.getElementById('editTaskLabel').value || '';
+    const newClient = document.getElementById('editTaskClient').value || '';
+    const newPriority = document.getElementById('editTaskPriority').value;
+    const newDate = document.getElementById('editTaskDate').value;
+
+    // 마감일 복사본을 수정하는 경우, 원본 이름에서 (마감일) 제거한 이름 사용
+    const baseName = t.isDeadlineCopy ? name.replace(/\s*\(마감일\)\s*$/, '') : name;
+
+    // 연동된 태스크들도 업데이트
+    if (t.linkedGroup) {
+        dailyTasks.filter(x => x.linkedGroup === t.linkedGroup).forEach(linked => {
+            linked.assignee = newAssignee;
+            linked.deadline = newDeadline;
+            linked.label = newLabel;
+            linked.client = newClient;
+            linked.priority = newPriority;
+            if (linked.isDeadlineCopy) {
+                linked.task = `${baseName} (마감일)`;
+                if (newDeadline) linked.date = newDeadline;
+            } else {
+                linked.task = baseName;
+            }
+        });
+    } else {
+        t.task = name;
+        t.assignee = newAssignee;
+        t.date = newDate;
+        t.deadline = newDeadline;
+        t.label = newLabel;
+        t.client = newClient;
+        t.priority = newPriority;
+
+        // 마감일이 새로 추가된 경우 연동 태스크 생성
+        if (newDeadline && newDeadline !== newDate) {
+            const groupId = Date.now();
+            t.linkedGroup = groupId;
+            dailyTasks.push({
+                id: Date.now() + 1, task: `${name} (마감일)`,
+                date: newDeadline, assignee: newAssignee, deadline: newDeadline,
+                label: newLabel, client: newClient, target: '', priority: newPriority,
+                done: t.done, linkedGroup: groupId, isDeadlineCopy: true
+            });
+        }
+    }
+
     closeModal(); renderDaily(); renderHome();
     showToast('할 일이 수정되었습니다');
 }
 
 function deleteTask(id) {
-    const idx = dailyTasks.findIndex(x => x.id === id);
-    if (idx === -1) return;
-    dailyTasks.splice(idx, 1);
+    const t = dailyTasks.find(x => x.id === id);
+    if (!t) return;
+    // 연동된 태스크도 함께 삭제
+    if (t.linkedGroup) {
+        for (let i = dailyTasks.length - 1; i >= 0; i--) {
+            if (dailyTasks[i].linkedGroup === t.linkedGroup) dailyTasks.splice(i, 1);
+        }
+    } else {
+        const idx = dailyTasks.findIndex(x => x.id === id);
+        if (idx !== -1) dailyTasks.splice(idx, 1);
+    }
     closeModal(); renderDaily(); renderHome();
     showToast('할 일이 삭제되었습니다');
 }
@@ -924,7 +983,12 @@ function inlineAddTask(input, assignee) {
 function toggleTask(id) {
     const task = dailyTasks.find(t => t.id === id);
     if (task) {
-        task.done = !task.done;
+        const newDone = !task.done;
+        task.done = newDone;
+        // 연동된 태스크도 동일하게 체크/해제
+        if (task.linkedGroup) {
+            dailyTasks.filter(t => t.linkedGroup === task.linkedGroup).forEach(t => t.done = newDone);
+        }
         renderDaily();
         renderHome();
     }
