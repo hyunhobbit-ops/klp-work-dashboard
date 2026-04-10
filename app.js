@@ -543,19 +543,18 @@ function renderDaily() {
             const clientStr = t.client ? `<span class="daily-client">📌 ${t.client}</span>` : '';
             const ddayClass = ddayStr.includes('D+') ? 'dday-over' : ddayStr.includes('D-Day') ? 'dday-today' : 'dday-left';
             const isDeadline = t.isDeadlineCopy;
-            const deadlineBadge = isDeadline ? `<span class="deadline-badge">🔥 마감일</span>` : '';
             itemsHtml += `<div class="daily-item ${t.done ? 'completed' : ''} ${isDeadline ? 'deadline-item' : ''}" onclick="openEditTask(${t.id})" style="cursor:pointer;">
                 <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">${checkSvg}</div>
                 <div class="daily-info">
-                    <div class="daily-title">${isDeadline ? t.task.replace(/\s*\(마감일\)\s*$/, '') : t.task}</div>
+                    <div class="daily-title">${t.task}</div>
                     <div class="daily-meta">
-                        ${deadlineBadge}
                         <span class="daily-tag ${tagClass}">${tagLabel}</span>
                         ${labelStr}
                         ${clientStr}
                     </div>
                 </div>
-                ${t.deadline && !isDeadline ? `<div class="daily-dday-wrap">
+                ${isDeadline ? `<div class="deadline-badge-wrap"><span class="deadline-badge-lg">🔥 마감일</span></div>`
+                : t.deadline ? `<div class="daily-dday-wrap">
                     <span class="daily-dday ${ddayClass}">${ddayStr}</span>
                     <span class="daily-dday-date">${fmtDisplay(t.deadline)}</span>
                 </div>` : ''}
@@ -679,18 +678,19 @@ function renderWeeklyKanban(person) {
             const tagLabel = t.priority.includes('긴급') ? '긴급' : t.priority.includes('낮음') ? '낮음' : '보통';
             const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
             const wkIsDeadline = t.isDeadlineCopy;
-            const wkDeadlineBadge = wkIsDeadline ? `<span class="deadline-badge deadline-badge-sm">🔥 마감</span>` : '';
             itemsHtml += `<div class="wk-task ${t.done ? 'completed' : ''} ${wkIsDeadline ? 'deadline-item' : ''}" draggable="true" data-task-id="${t.id}" onclick="openEditTask(${t.id})">
                 <div class="wk-task-top">
                     <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">
                         <svg width="12" height="12" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
                     </div>
-                    <span class="wk-task-name">${wkIsDeadline ? t.task.replace(/\s*\(마감일\)\s*$/, '') : t.task}</span>
+                    <span class="wk-task-name">${t.task}</span>
                 </div>
-                <div class="wk-task-tags">
-                    ${wkDeadlineBadge}
-                    <span class="daily-tag ${tagClass}">${tagLabel}</span>
-                    ${labelStr}
+                <div class="wk-task-bottom">
+                    <div class="wk-task-tags">
+                        <span class="daily-tag ${tagClass}">${tagLabel}</span>
+                        ${labelStr}
+                    </div>
+                    ${wkIsDeadline ? `<span class="deadline-badge-sm">🔥</span>` : ''}
                 </div>
             </div>`;
         });
