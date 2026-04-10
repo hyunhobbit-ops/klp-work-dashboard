@@ -1161,7 +1161,29 @@ body {
 /* ============================
    DAILY PLAN
    ============================ */
-.daily-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.daily-main-layout { display: flex; gap: 20px; }
+.daily-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; min-width: 0; }
+.daily-sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
+
+/* Sidebar cards */
+.sidebar-card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-xs); padding: 20px; }
+.sidebar-card-title { font-size: 15px; font-weight: 700; color: var(--gray-900); margin-bottom: 16px; }
+.sidebar-progress { margin-bottom: 16px; }
+.sidebar-progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--gray-500); }
+.sidebar-percent { font-size: 20px; font-weight: 800; color: var(--gray-900); }
+.sidebar-progress-bar { height: 8px; background: var(--gray-100); border-radius: 4px; overflow: hidden; }
+.sidebar-progress-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+.sidebar-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sidebar-stat { text-align: center; padding: 10px 0; background: var(--gray-50); border-radius: 8px; }
+.sidebar-stat-num { display: block; font-size: 22px; font-weight: 800; color: var(--gray-900); }
+.sidebar-stat-label { font-size: 11px; font-weight: 600; color: var(--gray-400); margin-top: 2px; }
+.sidebar-empty { font-size: 13px; color: var(--gray-400); text-align: center; padding: 20px 0; }
+.sidebar-deadline-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; border-left: 3px solid var(--red); margin-bottom: 8px; background: #fafafa; }
+.sidebar-deadline-item:hover { background: #fff5f5; }
+.sidebar-deadline-info { flex: 1; min-width: 0; }
+.sidebar-deadline-name { font-size: 13px; font-weight: 600; color: var(--gray-800); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-deadline-meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.sidebar-dday { font-size: 14px; font-weight: 800; flex-shrink: 0; margin-left: 8px; }
 
 .daily-column { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-xs); overflow: hidden; }
 .daily-col-header { padding: 16px 20px; border-bottom: 1px solid var(--gray-100); display: flex; align-items: center; justify-content: space-between; }
@@ -1415,6 +1437,8 @@ body {
     .main-wrap { margin-left: 0; }
     .summary-row { grid-template-columns: repeat(2, 1fr); }
     .dash-grid { grid-template-columns: 1fr; }
+    .daily-main-layout { flex-direction: column; }
+    .daily-sidebar { width: 100%; }
     .daily-columns { grid-template-columns: 1fr; }
     .quick-menu { grid-template-columns: repeat(3, 1fr); }
     .goal-details { grid-template-columns: 1fr; }

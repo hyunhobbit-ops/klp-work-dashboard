@@ -623,6 +623,107 @@ function renderDaily() {
         kanbanWrap.style.display = 'none';
         calendarWrap.style.display = 'none';
     }
+
+    renderDailySidebar();
+}
+
+function renderDailySidebar() {
+    const sidebar = document.getElementById('dailySidebar');
+    if (!sidebar) return;
+    const todayStr = fmtDate(currentDate);
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    // 현재 필터에 따른 태스크
+    let filteredTasks;
+    if (currentPersonFilter === 'viewall' || currentPersonFilter === 'all') {
+        filteredTasks = dailyTasks;
+    } else if (currentPersonFilter === 'exec') {
+        filteredTasks = dailyTasks.filter(t => t.assignee === '임원');
+    } else if (currentPersonFilter === 'ceo') {
+        filteredTasks = dailyTasks.filter(t => t.assignee === '대표님');
+    } else {
+        filteredTasks = dailyTasks.filter(t => t.assignee === currentPersonFilter);
+    }
+
+    // 오늘 요약
+    const todayTasks = filteredTasks.filter(t => t.date === todayStr);
+    const totalCount = todayTasks.length;
+    const doneCount = todayTasks.filter(t => t.done).length;
+    const urgentCount = todayTasks.filter(t => t.priority && t.priority.includes('긴급') && !t.done).length;
+    const percent = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+
+    // 마감 임박 (D-3 이내, 미완료, 마감일 복사본 제외)
+    const upcoming = filteredTasks
+        .filter(t => t.deadline && !t.done && !t.isDeadlineCopy)
+        .map(t => {
+            const target = new Date(t.deadline); target.setHours(0,0,0,0);
+            const diff = Math.round((target - today) / (1000 * 60 * 60 * 24));
+            return { ...t, daysLeft: diff };
+        })
+        .filter(t => t.daysLeft <= 3)
+        .sort((a, b) => a.daysLeft - b.daysLeft);
+
+    // 진행률 바 색상
+    const barColor = percent >= 80 ? '#16a34a' : percent >= 50 ? '#f59e0b' : 'var(--blue)';
+
+    let html = `
+    <div class="sidebar-card">
+        <h4 class="sidebar-card-title">📊 오늘의 요약</h4>
+        <div class="sidebar-progress">
+            <div class="sidebar-progress-header">
+                <span>완료율</span>
+                <span class="sidebar-percent">${percent}%</span>
+            </div>
+            <div class="sidebar-progress-bar">
+                <div class="sidebar-progress-fill" style="width:${percent}%;background:${barColor}"></div>
+            </div>
+        </div>
+        <div class="sidebar-stats">
+            <div class="sidebar-stat">
+                <span class="sidebar-stat-num">${totalCount}</span>
+                <span class="sidebar-stat-label">전체</span>
+            </div>
+            <div class="sidebar-stat">
+                <span class="sidebar-stat-num" style="color:#16a34a">${doneCount}</span>
+                <span class="sidebar-stat-label">완료</span>
+            </div>
+            <div class="sidebar-stat">
+                <span class="sidebar-stat-num" style="color:var(--blue)">${totalCount - doneCount}</span>
+                <span class="sidebar-stat-label">진행중</span>
+            </div>
+            <div class="sidebar-stat">
+                <span class="sidebar-stat-num" style="color:var(--red)">${urgentCount}</span>
+                <span class="sidebar-stat-label">긴급</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="sidebar-card">
+        <h4 class="sidebar-card-title">🔥 마감 임박</h4>`;
+
+    if (upcoming.length === 0) {
+        html += `<div class="sidebar-empty">마감 임박 할 일이 없습니다</div>`;
+    } else {
+        upcoming.forEach(t => {
+            const ddayText = t.daysLeft === 0 ? 'D-Day' : t.daysLeft > 0 ? `D-${t.daysLeft}` : `D+${Math.abs(t.daysLeft)}`;
+            const ddayClass = t.daysLeft <= 0 ? 'dday-over' : t.daysLeft === 1 ? 'dday-today' : 'dday-left';
+            const tagClass = t.priority && t.priority.includes('긴급') ? 'tag-urgent' : 'tag-normal';
+            const tagLabel = t.priority && t.priority.includes('긴급') ? '긴급' : '보통';
+            html += `<div class="sidebar-deadline-item" onclick="openEditTask(${t.id})">
+                <div class="sidebar-deadline-info">
+                    <div class="sidebar-deadline-name">${t.task}</div>
+                    <div class="sidebar-deadline-meta">
+                        <span class="daily-tag ${tagClass}">${tagLabel}</span>
+                        <span style="font-size:11px;color:var(--gray-400)">${t.assignee}</span>
+                    </div>
+                </div>
+                <span class="sidebar-dday ${ddayClass}">${ddayText}</span>
+            </div>`;
+        });
+    }
+
+    html += `</div>`;
+    sidebar.innerHTML = html;
 }
 
 function getWeekDates(baseDate, offset) {
