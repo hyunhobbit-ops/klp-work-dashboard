@@ -232,14 +232,6 @@ function setupFilters() {
             renderProjects();
         });
     });
-    document.querySelectorAll('[data-person]').forEach(chip => {
-        chip.addEventListener('click', () => {
-            chip.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-            chip.classList.add('active');
-            currentPersonFilter = chip.dataset.person;
-            renderDaily();
-        });
-    });
     document.querySelectorAll('[data-dtype]').forEach(chip => {
         chip.addEventListener('click', () => {
             chip.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
@@ -424,6 +416,46 @@ function renderProjects() {
 // =====================================
 // DAILY PLAN
 // =====================================
+function getVisiblePeople() {
+    const allPeople = ['이현주', '김현호', '유지은', '구정두'];
+    if (!currentUser) return allPeople;
+
+    const role = currentUser.role;
+    if (role === '관리자') return allPeople;
+
+    // 임원: 자기 + 같은 임원들
+    if (role === '임원') {
+        // 임원은 임원 권한 가진 사람들 + 자기 자신 표시
+        // 현재는 자기 자신만 (추후 임원 목록 확장 가능)
+        return allPeople.filter(p => p === currentUser.name);
+    }
+
+    // 일반: 자기 자신만
+    return allPeople.filter(p => p === currentUser.name);
+}
+
+function renderDailyPersonFilter() {
+    const container = document.getElementById('dailyPersonFilter');
+    if (!container) return;
+
+    const visiblePeople = getVisiblePeople();
+    let html = `<button class="filter-chip ${currentPersonFilter === 'all' ? 'active' : ''}" data-person="all">전체</button>`;
+    visiblePeople.forEach(p => {
+        html += `<button class="filter-chip ${currentPersonFilter === p ? 'active' : ''}" data-person="${p}">${p}</button>`;
+    });
+    container.innerHTML = html;
+
+    // 이벤트 바인딩
+    container.querySelectorAll('[data-person]').forEach(chip => {
+        chip.addEventListener('click', () => {
+            container.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            currentPersonFilter = chip.dataset.person;
+            renderDaily();
+        });
+    });
+}
+
 function renderDaily() {
     const todayStr = fmtDate(currentDate);
     const days = ['일', '월', '화', '수', '목', '금', '토'];
@@ -431,10 +463,17 @@ function renderDaily() {
     document.getElementById('currentDateDisplay').textContent =
         `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
 
-    const people = ['이현주', '김현호', '유지은', '구정두'];
+    renderDailyPersonFilter();
+
+    const visiblePeople = getVisiblePeople();
+    // 현재 필터가 볼 수 없는 사람이면 전체로 리셋
+    if (currentPersonFilter !== 'all' && !visiblePeople.includes(currentPersonFilter)) {
+        currentPersonFilter = 'all';
+        renderDailyPersonFilter();
+    }
     const displayPeople = currentPersonFilter === 'all'
-        ? people
-        : people.filter(p => p === currentPersonFilter);
+        ? visiblePeople
+        : visiblePeople.filter(p => p === currentPersonFilter);
 
     const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
