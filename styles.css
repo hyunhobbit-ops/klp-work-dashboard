@@ -1162,10 +1162,9 @@ body {
    DAILY PLAN
    ============================ */
 .daily-top-layout { display: flex; gap: 20px; }
-.daily-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
-.daily-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.daily-memo-panel { }
-.daily-sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
+.daily-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex: 1; min-width: 0; }
+.daily-memo-panel { width: 300px; flex-shrink: 0; }
+.daily-sidebar { width: 260px; flex-shrink: 0; display: flex; flex-direction: column; gap: 16px; }
 
 /* Sidebar cards */
 .sidebar-card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-xs); padding: 20px; }
@@ -1447,6 +1446,7 @@ body {
     .summary-row { grid-template-columns: repeat(2, 1fr); }
     .dash-grid { grid-template-columns: 1fr; }
     .daily-top-layout { flex-direction: column; }
+    .daily-memo-panel { width: 100%; }
     .daily-sidebar { width: 100%; }
     .daily-columns { grid-template-columns: 1fr; }
     .quick-menu { grid-template-columns: repeat(3, 1fr); }

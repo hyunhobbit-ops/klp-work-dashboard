@@ -641,11 +641,13 @@ function renderDailyMemo() {
     const panel = document.getElementById('dailyMemoPanel');
     if (!panel) return;
     const todayStr = fmtDate(currentDate);
-    const memoValue = dailyMemos[todayStr] || '';
+    const userName = currentUser ? currentUser.name : 'guest';
+    const memoKey = `${userName}_${todayStr}`;
+    const memoValue = dailyMemos[memoKey] || '';
     panel.innerHTML = `
         <div class="memo-card">
-            <h4 class="memo-card-title">📝 메모</h4>
-            <textarea class="memo-textarea" id="dailyMemoText" placeholder="오늘의 메모, 회의 내용, 전달사항 등을 자유롭게 작성하세요..." oninput="saveMemo('${todayStr}', this.value)">${memoValue}</textarea>
+            <h4 class="memo-card-title">📝 ${userName}의 메모</h4>
+            <textarea class="memo-textarea" id="dailyMemoText" placeholder="오늘의 메모, 회의 내용, 전달사항 등을 자유롭게 작성하세요..." oninput="saveMemo('${memoKey}', this.value)">${memoValue}</textarea>
         </div>`;
 }
 
