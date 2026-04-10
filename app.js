@@ -83,9 +83,12 @@ function showLogin() {
     document.getElementById('app').style.display = 'none';
 }
 
-function showApp() {
+async function showApp() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
+    // 프로필 목록 로드 (임원 구분용)
+    const { data } = await sb.from('profiles').select('name, role');
+    if (data) allProfiles = data;
     renderAll();
 }
 
@@ -419,6 +422,14 @@ function renderProjects() {
 // 권한 등급 매핑
 const ADMIN_ROLES = ['관리자', '부장', '대표'];
 const EXEC_ROLES = ['임원', '차장', '과장'];
+let allProfiles = []; // {name, role} - Supabase에서 로드
+
+function getExecPeople() {
+    // Supabase profiles에서 임원급+관리자급 사람 이름 목록
+    return allProfiles
+        .filter(p => ADMIN_ROLES.includes(p.role) || EXEC_ROLES.includes(p.role))
+        .map(p => p.name);
+}
 
 function getVisiblePeople() {
     const allPeople = ['이현주', '김현호', '유지은', '구정두'];
@@ -432,12 +443,28 @@ function getVisiblePeople() {
     return allPeople.filter(p => p === currentUser.name);
 }
 
+function getPeopleForFilter(filter) {
+    const allPeople = ['이현주', '김현호', '유지은', '구정두'];
+    if (filter === 'all') return getVisiblePeople();
+    if (filter === 'exec') return getExecPeople().filter(p => allPeople.includes(p));
+    return allPeople.filter(p => p === filter);
+}
+
 function renderDailyPersonFilter() {
     const container = document.getElementById('dailyPersonFilter');
     if (!container) return;
 
+    const role = currentUser ? currentUser.role : '';
+    const isAdminOrExec = ADMIN_ROLES.includes(role) || EXEC_ROLES.includes(role);
     const visiblePeople = getVisiblePeople();
+
     let html = `<button class="filter-chip ${currentPersonFilter === 'all' ? 'active' : ''}" data-person="all">전체</button>`;
+
+    // 임원급 이상만 임원 탭 표시
+    if (isAdminOrExec) {
+        html += `<button class="filter-chip ${currentPersonFilter === 'exec' ? 'active' : ''}" data-person="exec">임원</button>`;
+    }
+
     visiblePeople.forEach(p => {
         html += `<button class="filter-chip ${currentPersonFilter === p ? 'active' : ''}" data-person="${p}">${p}</button>`;
     });
@@ -465,13 +492,11 @@ function renderDaily() {
 
     const visiblePeople = getVisiblePeople();
     // 현재 필터가 볼 수 없는 사람이면 전체로 리셋
-    if (currentPersonFilter !== 'all' && !visiblePeople.includes(currentPersonFilter)) {
+    if (currentPersonFilter !== 'all' && currentPersonFilter !== 'exec' && !visiblePeople.includes(currentPersonFilter)) {
         currentPersonFilter = 'all';
         renderDailyPersonFilter();
     }
-    const displayPeople = currentPersonFilter === 'all'
-        ? visiblePeople
-        : visiblePeople.filter(p => p === currentPersonFilter);
+    const displayPeople = getPeopleForFilter(currentPersonFilter);
 
     const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
