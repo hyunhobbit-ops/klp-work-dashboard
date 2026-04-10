@@ -1114,6 +1114,9 @@ body {
 }
 .daily-inline-input::placeholder { color: var(--gray-400); }
 
+/* Deadline label */
+.daily-deadline { font-size: 11px; color: var(--red); font-weight: 600; }
+
 /* Inline cell editing */
 /* Toolbar buttons */
 .toolbar-buttons { display: flex; gap: 10px; align-items: center; }

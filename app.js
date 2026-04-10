@@ -535,13 +535,14 @@ function renderDaily() {
         sorted.forEach(t => {
             const tagClass = t.priority.includes('긴급') ? 'tag-urgent' : t.priority.includes('낮음') ? 'tag-low' : 'tag-normal';
             const tagLabel = t.priority.includes('긴급') ? '긴급' : t.priority.includes('낮음') ? '낮음' : '보통';
+            const deadlineStr = t.deadline ? `마감 ${fmtDisplay(t.deadline)}` : '';
             itemsHtml += `<div class="daily-item ${t.done ? 'completed' : ''}">
                 <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="toggleTask(${t.id})">${checkSvg}</div>
                 <div class="daily-info">
                     <div class="daily-title">${t.task}</div>
                     <div class="daily-meta">
                         <span class="daily-tag ${tagClass}">${tagLabel}</span>
-                        <span class="daily-target">${t.target}</span>
+                        ${deadlineStr ? `<span class="daily-deadline">${deadlineStr}</span>` : ''}
                     </div>
                 </div>
             </div>`;
@@ -608,9 +609,9 @@ function openQuickTask(assignee) {
         <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="quickTaskName" placeholder="할 일 입력" autofocus></div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="quickTaskDate" value="${fmtDate(currentDate)}"></div>
-            <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="quickTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
+            <div class="form-group"><label class="form-label">마감일</label><input type="date" class="form-input" id="quickTaskDeadline"></div>
         </div>
-        <div class="form-group"><label class="form-label">대상</label><select class="form-select" id="quickTaskTarget"><option value="본사">본사</option><option value="거래처">거래처</option><option value="회계">회계</option><option value="개인">개인</option><option value="유튜브">유튜브</option></select></div>
+        <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="quickTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
         <button class="form-submit" onclick="addQuickTask('${assignee}')">할 일 추가</button>`;
     document.getElementById('modalOverlay').classList.add('show');
 }
@@ -622,7 +623,8 @@ function addQuickTask(assignee) {
         id: Date.now(), task,
         date: document.getElementById('quickTaskDate').value,
         assignee: assignee,
-        target: document.getElementById('quickTaskTarget').value,
+        deadline: document.getElementById('quickTaskDeadline').value || '',
+        target: '',
         priority: document.getElementById('quickTaskPriority').value,
         done: false
     });
@@ -960,14 +962,12 @@ function openModal(type) {
         title.textContent = '새 할 일';
         body.innerHTML = `
             <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="newTaskName" placeholder="할 일 입력"></div>
+            <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="newTaskAssignee"><option value="전체">전체 (공통)</option><option value="임원">임원</option><option value="대표님">대표님</option><option value="이현주">이현주</option><option value="김현호">김현호</option><option value="유지은">유지은</option><option value="구정두">구정두</option></select></div>
             <div class="form-row">
-                <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="newTaskAssignee"><option value="전체">전체 (공통)</option><option value="임원">임원</option><option value="대표님">대표님</option><option value="이현주">이현주</option><option value="김현호">김현호</option><option value="유지은">유지은</option><option value="구정두">구정두</option></select></div>
                 <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="newTaskDate" value="${fmtDate(currentDate)}"></div>
+                <div class="form-group"><label class="form-label">마감일</label><input type="date" class="form-input" id="newTaskDeadline"></div>
             </div>
-            <div class="form-row">
-                <div class="form-group"><label class="form-label">대상</label><select class="form-select" id="newTaskTarget"><option value="본사">본사</option><option value="거래처">거래처</option><option value="회계">회계</option><option value="개인">개인</option><option value="유튜브">유튜브</option></select></div>
-                <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="newTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
-            </div>
+            <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="newTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
             <button class="form-submit" onclick="addDailyTask()">할 일 추가</button>`;
     } else if (type === 'delivery') {
         title.textContent = '새 택배';
@@ -1063,7 +1063,8 @@ function addDailyTask() {
         id: Date.now(), task,
         date: document.getElementById('newTaskDate').value,
         assignee: document.getElementById('newTaskAssignee').value,
-        target: document.getElementById('newTaskTarget').value,
+        deadline: document.getElementById('newTaskDeadline').value || '',
+        target: '',
         priority: document.getElementById('newTaskPriority').value,
         done: false
     });
