@@ -857,7 +857,8 @@ function renderMonthlyCalendar(person) {
             const checkClass = t.done ? 'mc-check checked' : 'mc-check';
             tasksHtml += `<div class="mc-task ${t.done ? 'mc-task-done' : ''} ${isDeadline ? 'mc-task-deadline' : ''}" onclick="event.stopPropagation();openEditTask(${t.id})">
                 <div class="${checkClass}" onclick="event.stopPropagation();toggleTask(${t.id})"><svg width="8" height="8" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
-                <span class="mc-task-text">${isDeadline ? '🔥 ' : ''}${t.task.replace(/\s*\(마감일\)\s*$/, '')}</span>
+                <span class="mc-task-text">${t.task.replace(/\s*\(마감일\)\s*$/, '')}</span>
+                ${isDeadline ? '<span class="mc-deadline-badge">🔥 마감일</span>' : ''}
             </div>`;
         });
 

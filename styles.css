@@ -1278,24 +1278,25 @@ body {
 .mc-today { background: #eff6ff; }
 
 .mc-cell-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.mc-date { font-size: 13px; font-weight: 600; color: var(--gray-700); }
-.mc-date-today { background: var(--blue); color: var(--white); width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
-.mc-count { font-size: 10px; font-weight: 600; color: var(--gray-400); background: var(--gray-100); padding: 1px 5px; border-radius: 8px; }
+.mc-date { font-size: 14px; font-weight: 700; color: var(--gray-700); }
+.mc-date-today { background: var(--blue); color: var(--white); width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.mc-count { font-size: 11px; font-weight: 600; color: var(--gray-400); background: var(--gray-100); padding: 2px 6px; border-radius: 8px; }
 
-.mc-cell-body { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.mc-task { display: flex; align-items: center; gap: 4px; padding: 2px 4px; border-radius: 4px; cursor: pointer; transition: background 0.15s; }
+.mc-cell-body { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.mc-task { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 5px; cursor: pointer; transition: background 0.15s; }
 .mc-task:hover { background: rgba(0,0,0,0.05); }
 .mc-task-done { opacity: 0.4; }
 .mc-task-done .mc-task-text { text-decoration: line-through; }
 .mc-task-deadline { background: #fff5f5; border-left: 2px solid var(--red); }
 
-.mc-check { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--gray-300); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: all var(--transition); }
+.mc-check { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--gray-300); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: all var(--transition); }
 .mc-check:hover { border-color: var(--blue); }
 .mc-check.checked { border-color: var(--blue); background: var(--blue); }
 .mc-check svg { opacity: 0; }
 .mc-check.checked svg { opacity: 1; }
 
-.mc-task-text { font-size: 11px; font-weight: 500; color: var(--gray-700); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-task-text { font-size: 13px; font-weight: 600; color: var(--gray-700); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.mc-deadline-badge { flex-shrink: 0; margin-left: auto; font-size: 11px; font-weight: 700; color: var(--red); background: #fee2e2; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
 
 /* 월간 캘린더 모바일 반응형 */
 @media (max-width: 768px) {
