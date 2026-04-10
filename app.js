@@ -515,7 +515,7 @@ function renderDaily() {
     const isExecUser = EXEC_ROLES.includes(userRole);
 
     const showCommonColumn = (currentPersonFilter === 'all' || currentPersonFilter === 'viewall');
-    const showExecColumn = (currentPersonFilter === 'exec' || (currentPersonFilter === 'viewall' && (isAdminUser || isExecUser)));
+    const showExecColumn = (currentPersonFilter === 'exec');
     const showCeoColumn = (currentPersonFilter === 'ceo' || (currentPersonFilter === 'viewall' && isAdminUser));
 
     const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
