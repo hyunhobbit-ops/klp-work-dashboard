@@ -625,14 +625,16 @@ function renderDaily() {
         calendarWrap.style.display = 'none';
     }
 
-    renderDailyMemo();
-
-    // 사이드바: 전체보기 외에서만 표시
+    // 전체보기 외에서만 메모 + 사이드바 표시
+    const memoPanel = document.getElementById('dailyMemoPanel');
     const sidebarEl = document.getElementById('dailySidebar');
     if (currentPersonFilter !== 'viewall') {
+        memoPanel.style.display = 'block';
         sidebarEl.style.display = 'flex';
+        renderDailyMemo();
         renderDailySidebar();
     } else {
+        memoPanel.style.display = 'none';
         sidebarEl.style.display = 'none';
     }
 }
@@ -641,13 +643,14 @@ function renderDailyMemo() {
     const panel = document.getElementById('dailyMemoPanel');
     if (!panel) return;
     const todayStr = fmtDate(currentDate);
-    const userName = currentUser ? currentUser.name : 'guest';
-    const memoKey = `${userName}_${todayStr}`;
+    const tabName = currentPersonFilter === 'all' ? '전체' : currentPersonFilter === 'exec' ? '임원' : currentPersonFilter === 'ceo' ? '대표님' : currentPersonFilter;
+    const memoKey = `${tabName}_${todayStr}`;
     const memoValue = dailyMemos[memoKey] || '';
+    const titleLabel = tabName === '전체' ? '전체 (공통)' : tabName;
     panel.innerHTML = `
         <div class="memo-card">
-            <h4 class="memo-card-title">📝 ${userName}의 메모</h4>
-            <textarea class="memo-textarea" id="dailyMemoText" placeholder="오늘의 메모, 회의 내용, 전달사항 등을 자유롭게 작성하세요..." oninput="saveMemo('${memoKey}', this.value)">${memoValue}</textarea>
+            <h4 class="memo-card-title">📝 ${titleLabel} 메모</h4>
+            <textarea class="memo-textarea" id="dailyMemoText" placeholder="메모, 회의 내용, 전달사항 등을 자유롭게 작성하세요..." oninput="saveMemo('${memoKey}', this.value)">${memoValue}</textarea>
         </div>`;
 }
 
