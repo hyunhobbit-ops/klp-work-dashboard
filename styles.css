@@ -1075,6 +1075,25 @@ body {
 .date-filter-select:focus { border-color: var(--blue); }
 
 /* Inline cell editing */
+/* Toolbar buttons */
+.toolbar-buttons { display: flex; gap: 10px; align-items: center; }
+.btn-export {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 18px;
+    border: 1px solid var(--green);
+    border-radius: var(--radius-xs);
+    background: var(--green-light);
+    color: var(--green);
+    font-size: 13px; font-weight: 700; font-family: inherit;
+    cursor: pointer; transition: all var(--transition); white-space: nowrap;
+}
+.btn-export:hover { background: var(--green); color: var(--white); }
+.btn-export svg { flex-shrink: 0; }
+
+/* Checkbox column */
+.th-check, .td-check { width: 40px; text-align: center; }
+.td-check input, .th-check input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--blue); }
+
 .cell-editable { cursor: default; }
 .cell-editable:hover { background: var(--blue-light) !important; cursor: cell; }
 .cell-edit-input, .cell-edit-select {

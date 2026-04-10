@@ -8,6 +8,7 @@
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <!-- Login Screen -->
@@ -387,15 +388,22 @@
                             </div>
                         </div>
                     </div>
-                    <button class="btn-primary" onclick="openModal('delivery')">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
-                        새 택배
-                    </button>
+                    <div class="toolbar-buttons">
+                        <button class="btn-export" onclick="exportLozen()">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m0 0l-6-6m6 6l6-6M4 4h16"/></svg>
+                            로젠택배 내보내기
+                        </button>
+                        <button class="btn-primary" onclick="openModal('delivery')">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                            새 택배
+                        </button>
+                    </div>
                 </div>
                 <div class="table-wrap">
                     <table class="data-table" id="deliveryTable">
                         <thead>
                             <tr>
+                                <th class="th-check"><input type="checkbox" id="deliveryCheckAll" onchange="toggleAllDeliveryCheck(this.checked)"></th>
                                 <th>날짜</th>
                                 <th>종류</th>
                                 <th>발송인</th>

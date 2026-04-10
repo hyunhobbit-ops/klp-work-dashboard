@@ -527,6 +527,7 @@ function renderDeliveries() {
         </div>`;
 
         tableHtml += `<tr>
+            <td class="td-check"><input type="checkbox" class="delivery-check" data-id="${d.id}" ${d._checked ? 'checked' : ''}></td>
             <td class="cell-editable" data-id="${d.id}" data-field="date" data-type="date">${fmtDisplay(d.date)}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="type" data-type="select" data-options="일반,중고,번개,당근,GS반택,ETSY"><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
             <td class="cell-editable" data-id="${d.id}" data-field="sender" data-type="select" data-options="케이엘피코리아,김관택,이현주,김현호,유지은,구정두">${d.sender}</td>
@@ -976,6 +977,72 @@ function categoryBadgeClass(c) {
     const map = { '국내 주문': 'badge-blue', '해외 주문': 'badge-purple', '자체 브랜드': 'badge-green', 'IP 콜라보': 'badge-orange', '유튜브': 'badge-red', '기타': 'badge-gray' };
     return map[c] || 'badge-gray';
 }
+
+// ===== Delivery Checkbox & Export =====
+function toggleAllDeliveryCheck(checked) {
+    document.querySelectorAll('.delivery-check').forEach(cb => {
+        const id = Number(cb.dataset.id);
+        const d = deliveries.find(x => x.id === id);
+        if (d) d._checked = checked;
+        cb.checked = checked;
+    });
+}
+
+function exportLozen() {
+    const selected = deliveries.filter(d => d._checked);
+    if (selected.length === 0) {
+        showToast('내보낼 택배를 체크해주세요');
+        return;
+    }
+
+    const header = ['수화주', '우편번호', '주소', '전화번호', '휴대폰번호', '택배수량', '택배금액', '선/착불', '상품명', '상품옵션', '비고'];
+    const rows = selected.map(d => [
+        d.recipient,        // 수화주
+        d.zipcode,          // 우편번호
+        d.address,          // 주소
+        '',                 // 전화번호 (빈칸)
+        d.phone,            // 휴대폰번호
+        1,                  // 택배수량 고정
+        2750,               // 택배금액 고정
+        d.payment,          // 선/착불
+        d.product,          // 상품명
+        '',                 // 상품옵션
+        d.memo              // 비고
+    ]);
+
+    const wsData = [header, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // 열 너비 설정
+    ws['!cols'] = [
+        { wch: 12 }, { wch: 8 }, { wch: 40 }, { wch: 15 }, { wch: 15 },
+        { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 20 }, { wch: 15 }, { wch: 20 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '택배주소');
+
+    const today = new Date();
+    const fname = `로젠택배_${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}.xlsx`;
+    XLSX.writeFile(wb, fname);
+
+    // 체크 해제
+    selected.forEach(d => d._checked = false);
+    renderDeliveries();
+    const checkAll = document.getElementById('deliveryCheckAll');
+    if (checkAll) checkAll.checked = false;
+
+    showToast(`${selected.length}건 엑셀 내보내기 완료`);
+}
+
+// 체크박스 클릭 시 상태 저장
+document.addEventListener('change', (e) => {
+    if (e.target.classList.contains('delivery-check')) {
+        const id = Number(e.target.dataset.id);
+        const d = deliveries.find(x => x.id === id);
+        if (d) d._checked = e.target.checked;
+    }
+});
 
 // ===== Inline Cell Editing (double-click) =====
 document.addEventListener('dblclick', (e) => {
