@@ -851,20 +851,17 @@ function renderMonthlyCalendar(person) {
         const doneCount = tasks.filter(t => t.done).length;
 
         let tasksHtml = '';
-        const maxShow = 3;
-        tasks.slice(0, maxShow).forEach(t => {
+        const sorted = [...tasks].sort((a, b) => a.done - b.done);
+        sorted.forEach(t => {
             const isDeadline = t.isDeadlineCopy;
-            const dotClass = t.priority.includes('긴급') ? 'mc-dot-urgent' : t.priority.includes('낮음') ? 'mc-dot-low' : 'mc-dot-normal';
+            const checkClass = t.done ? 'mc-check checked' : 'mc-check';
             tasksHtml += `<div class="mc-task ${t.done ? 'mc-task-done' : ''} ${isDeadline ? 'mc-task-deadline' : ''}" onclick="event.stopPropagation();openEditTask(${t.id})">
-                <span class="mc-dot ${dotClass}"></span>
+                <div class="${checkClass}" onclick="event.stopPropagation();toggleTask(${t.id})"><svg width="8" height="8" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
                 <span class="mc-task-text">${isDeadline ? '🔥 ' : ''}${t.task.replace(/\s*\(마감일\)\s*$/, '')}</span>
             </div>`;
         });
-        if (tasks.length > maxShow) {
-            tasksHtml += `<div class="mc-more">+${tasks.length - maxShow}개 더</div>`;
-        }
 
-        html += `<div class="mc-cell ${isCurrentMonth ? '' : 'mc-other-month'} ${isToday ? 'mc-today' : ''} ${isWeekend ? 'mc-weekend' : ''}">
+        html += `<div class="mc-cell ${isCurrentMonth ? '' : 'mc-other-month'} ${isToday ? 'mc-today' : ''} ${isWeekend ? 'mc-weekend' : ''}" ondblclick="openCalendarAdd('${person}','${dateStr}')">
             <div class="mc-cell-header">
                 <span class="mc-date ${isToday ? 'mc-date-today' : ''}">${d.getDate()}</span>
                 ${tasks.length > 0 ? `<span class="mc-count">${doneCount}/${tasks.length}</span>` : ''}
@@ -875,6 +872,32 @@ function renderMonthlyCalendar(person) {
 
     html += `</div>`;
     document.getElementById('monthlyCalendar').innerHTML = html;
+}
+
+function openCalendarAdd(person, dateStr) {
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    const label = person === '전체' ? '전체 (공통)' : person;
+    title.textContent = `새 할 일 — ${label} (${fmtDisplay(dateStr)})`;
+
+    const assigneeOptions = ['전체', '임원', '대표님', '이현주', '김현호', '유지은', '구정두'];
+    const assigneeHtml = assigneeOptions.map(a => `<option value="${a}" ${a === person ? 'selected' : ''}>${a === '전체' ? '전체 (공통)' : a}</option>`).join('');
+
+    const labelOptions = ['개인', '회사 업무', '거래처 업무', '마케팅 업무'];
+    const labelHtml = labelOptions.map(l => `<option value="${l}">${l}</option>`).join('');
+
+    body.innerHTML = `
+        <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="quickTaskName" placeholder="할 일 입력" autofocus></div>
+        <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="quickTaskAssignee">${assigneeHtml}</select></div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="quickTaskDate" value="${dateStr}"></div>
+            <div class="form-group"><label class="form-label">마감일</label><input type="date" class="form-input" id="quickTaskDeadline"></div>
+        </div>
+        <div class="form-group"><label class="form-label">라벨</label><select class="form-select" id="quickTaskLabel">${labelHtml}</select></div>
+        <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="quickTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
+        <div class="form-group"><label class="form-label">거래처</label><select class="form-select" id="quickTaskClient"><option value="">선택 안함</option></select><p class="form-hint" style="color:var(--text-tertiary);font-size:12px;margin-top:4px;">추후 고객사 DB 연동 예정</p></div>
+        <button class="form-submit" onclick="addQuickTask()">할 일 추가</button>`;
+    document.getElementById('modalOverlay').classList.add('show');
 }
 
 function switchDailyFilter(filter) {
