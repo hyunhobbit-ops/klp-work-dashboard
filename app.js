@@ -646,6 +646,11 @@ function inlineAddTask(input, assignee) {
     renderDaily();
     renderHome();
     showToast('할 일이 추가되었습니다');
+    // 렌더링 후 같은 컬럼의 인라인 입력에 포커스 유지
+    const inputs = document.querySelectorAll('.daily-inline-input');
+    inputs.forEach(el => {
+        if (el.getAttribute('onkeydown').includes(`'${assignee}'`)) el.focus();
+    });
 }
 
 function toggleTask(id) {
