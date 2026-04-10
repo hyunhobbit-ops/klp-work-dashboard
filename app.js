@@ -557,7 +557,12 @@ function renderDaily() {
                     <button class="daily-add-btn" onclick="openQuickTask('${assignee}')">+</button>
                 </div>
             </div>
-            <div class="daily-col-body">${itemsHtml || empty('할 일 없음')}</div>
+            <div class="daily-col-body">
+                ${itemsHtml}
+                <div class="daily-inline-add">
+                    <input type="text" class="daily-inline-input" placeholder="할 일 입력 후 Enter" onkeydown="if(event.key==='Enter')inlineAddTask(this,'${assignee}')">
+                </div>
+            </div>
         </div>`;
     }
 
@@ -622,6 +627,22 @@ function addQuickTask(assignee) {
         done: false
     });
     closeModal(); renderDaily(); renderHome();
+    showToast('할 일이 추가되었습니다');
+}
+
+function inlineAddTask(input, assignee) {
+    const task = input.value.trim();
+    if (!task) return;
+    dailyTasks.push({
+        id: Date.now(), task,
+        date: fmtDate(currentDate),
+        assignee: assignee,
+        target: '본사',
+        priority: '🟡 보통',
+        done: false
+    });
+    renderDaily();
+    renderHome();
     showToast('할 일이 추가되었습니다');
 }
 

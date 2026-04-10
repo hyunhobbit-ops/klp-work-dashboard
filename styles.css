@@ -1092,6 +1092,28 @@ body {
 }
 .daily-add-btn:hover { background: var(--blue); color: var(--white); border-color: var(--blue); }
 
+/* Inline task input */
+.daily-inline-add { padding: 8px 0; }
+.daily-inline-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px dashed var(--gray-300);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--gray-800);
+    background: var(--gray-50);
+    outline: none;
+    transition: all var(--transition);
+}
+.daily-inline-input:focus {
+    border-style: solid;
+    border-color: var(--blue);
+    background: var(--white);
+    box-shadow: 0 0 0 3px rgba(49,130,246,0.1);
+}
+.daily-inline-input::placeholder { color: var(--gray-400); }
+
 /* Inline cell editing */
 /* Toolbar buttons */
 .toolbar-buttons { display: flex; gap: 10px; align-items: center; }
