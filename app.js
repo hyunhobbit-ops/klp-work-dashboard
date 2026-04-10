@@ -142,6 +142,7 @@ const deliveries = [
 // ===== State =====
 let currentDate = new Date(2026, 3, 9);
 let currentPersonFilter = 'viewall';
+let weekOffset = 0;
 let currentProjectFilter = 'all';
 let currentDeliveryTypeFilter = 'all';
 let currentDeliverySearch = '';
@@ -489,6 +490,7 @@ function renderDailyPersonFilter() {
             container.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
             currentPersonFilter = chip.dataset.person;
+            weekOffset = 0;
             renderDaily();
         });
     });
@@ -604,19 +606,20 @@ function renderDaily() {
 
     document.getElementById('dailyColumns').innerHTML = html;
 
-    // 개인 탭이면 주간 칸반보드 표시
+    // 전체보기 외 모든 탭에서 주간 칸반보드 표시
     const kanbanWrap = document.getElementById('weeklyKanban');
-    const allPeople = ['이현주', '김현호', '유지은', '구정두'];
-    if (allPeople.includes(currentPersonFilter)) {
+    if (currentPersonFilter !== 'viewall') {
         kanbanWrap.style.display = 'block';
-        renderWeeklyKanban(currentPersonFilter);
+        const kanbanAssignee = currentPersonFilter === 'all' ? '전체' : currentPersonFilter === 'exec' ? '임원' : currentPersonFilter === 'ceo' ? '대표님' : currentPersonFilter;
+        renderWeeklyKanban(kanbanAssignee);
     } else {
         kanbanWrap.style.display = 'none';
     }
 }
 
-function getWeekDates(baseDate) {
+function getWeekDates(baseDate, offset) {
     const d = new Date(baseDate);
+    d.setDate(d.getDate() + (offset || 0) * 7);
     const day = d.getDay(); // 0=일, 1=월 ...
     const monday = new Date(d);
     monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
@@ -629,14 +632,34 @@ function getWeekDates(baseDate) {
     return dates;
 }
 
+function changeWeek(dir) {
+    weekOffset += dir;
+    renderDaily();
+}
+
+function resetWeek() {
+    weekOffset = 0;
+    renderDaily();
+}
+
 function renderWeeklyKanban(person) {
-    const weekDates = getWeekDates(currentDate);
+    const weekDates = getWeekDates(currentDate, weekOffset);
     const dayNames = ['월', '화', '수', '목', '금', '토', '일'];
-    const todayStr = fmtDate(currentDate);
+    const todayStr = fmtDate(new Date());
+
+    const titleLabel = person === '전체' ? '전체 (공통)' : person === '임원' ? '임원' : person === '대표님' ? '대표님' : `${person}님의`;
+    const weekLabel = weekOffset === 0 ? '이번 주' : weekOffset === -1 ? '지난 주' : weekOffset === 1 ? '다음 주' : '';
 
     let html = `<div class="weekly-kanban-header">
-        <h3 class="weekly-kanban-title">📅 ${person}님의 주간 계획</h3>
-        <span class="weekly-kanban-range">${fmtDisplay(fmtDate(weekDates[0]))} ~ ${fmtDisplay(fmtDate(weekDates[6]))}</span>
+        <div class="wk-header-left">
+            <h3 class="weekly-kanban-title">${titleLabel} 주간 계획</h3>
+            <span class="weekly-kanban-range">${fmtDisplay(fmtDate(weekDates[0]))} ~ ${fmtDisplay(fmtDate(weekDates[6]))}${weekLabel ? ' (' + weekLabel + ')' : ''}</span>
+        </div>
+        <div class="wk-nav-btns">
+            <button class="wk-nav-btn" onclick="changeWeek(-1)">← 전주</button>
+            <button class="wk-nav-btn wk-nav-today ${weekOffset === 0 ? 'active' : ''}" onclick="resetWeek()">이번 주</button>
+            <button class="wk-nav-btn" onclick="changeWeek(1)">차주 →</button>
+        </div>
     </div>`;
     html += `<div class="weekly-kanban-board">`;
 

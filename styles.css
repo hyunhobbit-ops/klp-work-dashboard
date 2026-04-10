@@ -1209,9 +1209,14 @@ body {
    WEEKLY KANBAN BOARD
    ============================ */
 .weekly-kanban-wrap { margin-top: 24px; }
-.weekly-kanban-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 4px; }
+.weekly-kanban-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 4px; flex-wrap: wrap; gap: 8px; }
+.wk-header-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .weekly-kanban-title { font-size: 16px; font-weight: 700; color: var(--gray-900); }
 .weekly-kanban-range { font-size: 13px; font-weight: 500; color: var(--gray-400); }
+.wk-nav-btns { display: flex; gap: 4px; }
+.wk-nav-btn { padding: 6px 14px; border: 1px solid var(--gray-200); border-radius: 8px; background: var(--white); color: var(--gray-600); font-size: 13px; font-weight: 600; cursor: pointer; transition: all var(--transition); }
+.wk-nav-btn:hover { background: var(--gray-50); border-color: var(--blue); color: var(--blue); }
+.wk-nav-btn.wk-nav-today.active { background: var(--blue); color: var(--white); border-color: var(--blue); }
 .weekly-kanban-board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
 .wk-day-col { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-xs); overflow: hidden; min-height: 200px; display: flex; flex-direction: column; }
 .wk-day-col.wk-today { box-shadow: 0 0 0 2px var(--blue), var(--shadow-xs); }
