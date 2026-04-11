@@ -517,8 +517,8 @@ function renderDaily() {
 
     // 전체 컬럼: 항상 표시
     const showCommonColumn = true;
-    // 임원 컬럼: 임원 계정의 개인탭 또는 전체보기에서 표시
-    const showExecColumn = (admin || exec) && currentPersonFilter !== 'ceo';
+    // 임원 컬럼: 관리자 또는 임원 계정에게만 표시 (대표님 탭 포함)
+    const showExecColumn = (admin || exec);
     const showCeoColumn = (currentPersonFilter === 'ceo' || (currentPersonFilter === 'viewall' && (admin || exec)));
 
     const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
