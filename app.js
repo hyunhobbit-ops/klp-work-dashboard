@@ -456,7 +456,6 @@ function getVisiblePeople() {
 function getPeopleForFilter(filter) {
     const allPeople = ['이현주', '김현호', '유지은', '구정두'];
     if (filter === 'viewall') return getVisiblePeople();
-    if (filter === 'exec') return [];
     if (filter === 'ceo') return [];
     return allPeople.filter(p => p === filter);
 }
@@ -473,11 +472,6 @@ function renderDailyPersonFilter() {
 
     // 전체보기 탭: 모든 사용자에게 표시
     html += `<button class="filter-chip ${currentPersonFilter === 'viewall' ? 'active' : ''}" data-person="viewall">전체보기</button>`;
-
-    // 관리자 또는 임원만 임원 탭 표시
-    if (admin || exec) {
-        html += `<button class="filter-chip ${currentPersonFilter === 'exec' ? 'active' : ''}" data-person="exec">임원</button>`;
-    }
 
     // 관리자 또는 임원만 대표님 탭 표시
     if (admin || exec) {
@@ -513,7 +507,7 @@ function renderDaily() {
 
     const visiblePeople = getVisiblePeople();
     // 현재 필터가 볼 수 없는 사람이면 전체보기로 리셋
-    if (currentPersonFilter !== 'exec' && currentPersonFilter !== 'viewall' && currentPersonFilter !== 'ceo' && !visiblePeople.includes(currentPersonFilter)) {
+    if (currentPersonFilter !== 'viewall' && currentPersonFilter !== 'ceo' && !visiblePeople.includes(currentPersonFilter)) {
         currentPersonFilter = 'viewall';
         renderDailyPersonFilter();
     }
@@ -521,17 +515,18 @@ function renderDaily() {
     const admin = isAdminUser();
     const exec = isExecUser();
 
-    // 전체 컬럼: 항상 표시 (전체보기, 개인탭, 임원탭, 대표님탭 모두)
+    // 전체 컬럼: 항상 표시
     const showCommonColumn = true;
-    const showExecColumn = (currentPersonFilter === 'exec' || (currentPersonFilter === 'viewall' && (admin || exec)));
+    // 임원 컬럼: 임원 계정의 개인탭 또는 전체보기에서 표시
+    const showExecColumn = (admin || exec) && currentPersonFilter !== 'ceo';
     const showCeoColumn = (currentPersonFilter === 'ceo' || (currentPersonFilter === 'viewall' && (admin || exec)));
 
     const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
     // 컬럼 제목 → 탭 필터 매핑
     function getTitleFilter(title) {
-        if (title === '전체 (공통)') return null; // 전체 컬럼은 탭 이동 없음
-        if (title === '임원') return 'exec';
+        if (title === '전체 (공통)') return null;
+        if (title === '임원') return null;
         if (title === '대표님') return 'ceo';
         return title; // 개인 이름은 그대로
     }
@@ -620,7 +615,7 @@ function renderDaily() {
     if (currentPersonFilter !== 'viewall') {
         kanbanWrap.style.display = 'block';
         calendarWrap.style.display = 'block';
-        const kanbanAssignee = currentPersonFilter === 'exec' ? '임원' : currentPersonFilter === 'ceo' ? '대표님' : currentPersonFilter;
+        const kanbanAssignee = currentPersonFilter === 'ceo' ? '대표님' : currentPersonFilter;
         renderWeeklyKanban(kanbanAssignee);
         renderMonthlyCalendar(kanbanAssignee);
     } else {
@@ -675,29 +670,32 @@ function renderWeeklyKanban(person) {
     </div>`;
     html += `<div class="weekly-kanban-board">`;
 
-    // 전체 자신을 제외한 모든 탭에서 전체 할 일도 함께 표시
+    // 공유 할 일 표시 여부
     const showCommonInKanban = (person !== '전체');
+    const showExecInKanban = (person !== '전체' && person !== '임원') && (isAdminUser() || isExecUser());
 
     weekDates.forEach((date, i) => {
         const dateStr = fmtDate(date);
         const isToday = dateStr === todayStr;
         const isWeekend = i >= 5;
 
-        // 전체 할 일 (맨 위 고정) + 개인 할 일
+        // 전체 할 일 (맨 위) + 임원 할 일 + 개인 할 일
         const commonTasks = showCommonInKanban ? dailyTasks.filter(t => t.date === dateStr && t.assignee === '전체') : [];
+        const execTasks = showExecInKanban ? dailyTasks.filter(t => t.date === dateStr && t.assignee === '임원') : [];
         const personalTasks = dailyTasks.filter(t => t.date === dateStr && t.assignee === person);
         const sortedCommon = [...commonTasks].sort((a, b) => a.done - b.done);
+        const sortedExec = [...execTasks].sort((a, b) => a.done - b.done);
         const sortedPersonal = [...personalTasks].sort((a, b) => a.done - b.done);
 
         let itemsHtml = '';
 
-        // 전체 할 일 먼저 (맨 위 고정, <전체> 라벨 표시)
-        sortedCommon.forEach(t => {
+        // 공유 할 일 렌더 헬퍼 (전체/임원 공통)
+        function renderSharedTask(t, labelText, cssClass) {
             const tagClass = t.priority.includes('긴급') ? 'tag-urgent' : t.priority.includes('낮음') ? 'tag-low' : 'tag-normal';
             const tagLabel = t.priority.includes('긴급') ? '긴급' : t.priority.includes('낮음') ? '낮음' : '보통';
             const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
             const wkIsDeadline = t.isDeadlineCopy;
-            itemsHtml += `<div class="wk-task wk-task-common ${t.done ? 'completed' : ''} ${wkIsDeadline ? 'deadline-item' : ''}" draggable="true" data-task-id="${t.id}" onclick="openEditTask(${t.id})">
+            return `<div class="wk-task ${cssClass} ${t.done ? 'completed' : ''} ${wkIsDeadline ? 'deadline-item' : ''}" draggable="true" data-task-id="${t.id}" onclick="openEditTask(${t.id})">
                 <div class="wk-task-top">
                     <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">
                         <svg width="12" height="12" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
@@ -705,13 +703,19 @@ function renderWeeklyKanban(person) {
                     <span class="wk-task-name">${t.task}</span>
                 </div>
                 <div class="wk-task-tags">
-                    <span class="wk-common-label">전체</span>
+                    <span class="wk-common-label ${cssClass === 'wk-task-exec' ? 'wk-exec-label' : ''}">${labelText}</span>
                     <span class="daily-tag ${tagClass}">${tagLabel}</span>
                     ${labelStr}
                     ${wkIsDeadline ? `<span class="deadline-badge-lg wk-deadline-right">🔥 마감일</span>` : ''}
                 </div>
             </div>`;
-        });
+        }
+
+        // 전체 할 일 (맨 위 고정)
+        sortedCommon.forEach(t => { itemsHtml += renderSharedTask(t, '전체', 'wk-task-common'); });
+
+        // 임원 할 일 (전체 다음)
+        sortedExec.forEach(t => { itemsHtml += renderSharedTask(t, '임원', 'wk-task-exec'); });
 
         // 개인 할 일
         sortedPersonal.forEach(t => {
@@ -734,7 +738,7 @@ function renderWeeklyKanban(person) {
             </div>`;
         });
 
-        const allTasks = [...commonTasks, ...personalTasks];
+        const allTasks = [...commonTasks, ...execTasks, ...personalTasks];
         html += `<div class="wk-day-col ${isToday ? 'wk-today' : ''} ${isWeekend ? 'wk-weekend' : ''}" data-date="${dateStr}">
             <div class="wk-day-header">
                 <span class="wk-day-name">${dayNames[i]}</span>
@@ -877,8 +881,9 @@ function renderMonthlyCalendar(person) {
         html += `<div class="mc-dow ${weekendClass}">${d}</div>`;
     });
 
-    // 전체 자신을 제외한 모든 탭에서 전체 할 일도 함께 표시
+    // 공유 할 일 표시 여부
     const showCommonInCalendar = (person !== '전체');
+    const showExecInCalendar = (person !== '전체' && person !== '임원') && (isAdminUser() || isExecUser());
 
     // 날짜 셀
     cells.forEach((d, i) => {
@@ -888,24 +893,32 @@ function renderMonthlyCalendar(person) {
         const isWeekend = i % 7 >= 5;
 
         const commonTasks = showCommonInCalendar ? dailyTasks.filter(t => t.date === dateStr && t.assignee === '전체') : [];
+        const execTasks = showExecInCalendar ? dailyTasks.filter(t => t.date === dateStr && t.assignee === '임원') : [];
         const personalTasks = dailyTasks.filter(t => t.date === dateStr && t.assignee === person);
-        const allTasks = [...commonTasks, ...personalTasks];
+        const allTasks = [...commonTasks, ...execTasks, ...personalTasks];
         const doneCount = allTasks.filter(t => t.done).length;
 
         let tasksHtml = '';
 
-        // 전체 할 일 먼저 (맨 위 고정, <전체> 라벨 표시)
-        const sortedCommon = [...commonTasks].sort((a, b) => a.done - b.done);
-        sortedCommon.forEach(t => {
+        // 공유 할 일 렌더 헬퍼
+        function renderSharedCalTask(t, labelText, cssClass) {
             const isDeadline = t.isDeadlineCopy;
             const checkClass = t.done ? 'mc-check checked' : 'mc-check';
-            tasksHtml += `<div class="mc-task mc-task-common ${t.done ? 'mc-task-done' : ''} ${isDeadline ? 'mc-task-deadline' : ''}" onclick="event.stopPropagation();openEditTask(${t.id})">
+            return `<div class="mc-task ${cssClass} ${t.done ? 'mc-task-done' : ''} ${isDeadline ? 'mc-task-deadline' : ''}" onclick="event.stopPropagation();openEditTask(${t.id})">
                 <div class="${checkClass}" onclick="event.stopPropagation();toggleTask(${t.id})"><svg width="8" height="8" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
-                <span class="mc-common-label">전체</span>
+                <span class="mc-common-label ${cssClass === 'mc-task-exec' ? 'mc-exec-label' : ''}">${labelText}</span>
                 <span class="mc-task-text">${t.task.replace(/\s*\(마감일\)\s*$/, '')}</span>
                 ${isDeadline ? '<span class="mc-deadline-badge">🔥 마감일</span>' : ''}
             </div>`;
-        });
+        }
+
+        // 전체 할 일 (맨 위 고정)
+        const sortedCommon = [...commonTasks].sort((a, b) => a.done - b.done);
+        sortedCommon.forEach(t => { tasksHtml += renderSharedCalTask(t, '전체', 'mc-task-common'); });
+
+        // 임원 할 일 (전체 다음)
+        const sortedExec = [...execTasks].sort((a, b) => a.done - b.done);
+        sortedExec.forEach(t => { tasksHtml += renderSharedCalTask(t, '임원', 'mc-task-exec'); });
 
         // 개인 할 일
         const sortedPersonal = [...personalTasks].sort((a, b) => a.done - b.done);

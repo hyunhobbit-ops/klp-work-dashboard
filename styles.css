@@ -1250,21 +1250,31 @@ body {
 
 /* 전체(공통) 라벨 — 주간 칸반 */
 .wk-task-common { border-left: 3px solid var(--blue-500); }
+.wk-task-exec { border-left: 3px solid #a855f7; }
 .wk-common-label {
     display: inline-flex; align-items: center; justify-content: center;
     font-size: 10px; font-weight: 700; color: var(--blue-500);
     background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3);
     border-radius: 4px; padding: 1px 5px; line-height: 1.4; white-space: nowrap;
 }
+.wk-common-label.wk-exec-label {
+    color: #a855f7;
+    background: rgba(168,85,247,0.1); border-color: rgba(168,85,247,0.3);
+}
 
 /* 전체(공통) 라벨 — 월간 캘린더 */
 .mc-task-common { border-left: 2px solid var(--blue-500); }
+.mc-task-exec { border-left: 2px solid #a855f7; }
 .mc-common-label {
     display: inline-flex; align-items: center; justify-content: center;
     font-size: 9px; font-weight: 700; color: var(--blue-500);
     background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3);
     border-radius: 3px; padding: 0 3px; line-height: 1.4; white-space: nowrap;
     flex-shrink: 0;
+}
+.mc-common-label.mc-exec-label {
+    color: #a855f7;
+    background: rgba(168,85,247,0.1); border-color: rgba(168,85,247,0.3);
 }
 
 /* 주간 칸반 모바일 반응형 */
