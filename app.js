@@ -672,15 +672,46 @@ function renderWeeklyKanban(person) {
     </div>`;
     html += `<div class="weekly-kanban-board">`;
 
+    // 개인 탭일 때 전체 할 일도 함께 표시
+    const showCommonInKanban = (person !== '전체' && person !== '임원' && person !== '대표님');
+
     weekDates.forEach((date, i) => {
         const dateStr = fmtDate(date);
         const isToday = dateStr === todayStr;
         const isWeekend = i >= 5;
-        const tasks = dailyTasks.filter(t => t.date === dateStr && t.assignee === person);
-        const sorted = [...tasks].sort((a, b) => a.done - b.done);
+
+        // 전체 할 일 (맨 위 고정) + 개인 할 일
+        const commonTasks = showCommonInKanban ? dailyTasks.filter(t => t.date === dateStr && t.assignee === '전체') : [];
+        const personalTasks = dailyTasks.filter(t => t.date === dateStr && t.assignee === person);
+        const sortedCommon = [...commonTasks].sort((a, b) => a.done - b.done);
+        const sortedPersonal = [...personalTasks].sort((a, b) => a.done - b.done);
 
         let itemsHtml = '';
-        sorted.forEach(t => {
+
+        // 전체 할 일 먼저 (맨 위 고정, <전체> 라벨 표시)
+        sortedCommon.forEach(t => {
+            const tagClass = t.priority.includes('긴급') ? 'tag-urgent' : t.priority.includes('낮음') ? 'tag-low' : 'tag-normal';
+            const tagLabel = t.priority.includes('긴급') ? '긴급' : t.priority.includes('낮음') ? '낮음' : '보통';
+            const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
+            const wkIsDeadline = t.isDeadlineCopy;
+            itemsHtml += `<div class="wk-task wk-task-common ${t.done ? 'completed' : ''} ${wkIsDeadline ? 'deadline-item' : ''}" draggable="true" data-task-id="${t.id}" onclick="openEditTask(${t.id})">
+                <div class="wk-task-top">
+                    <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">
+                        <svg width="12" height="12" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+                    </div>
+                    <span class="wk-task-name">${t.task}</span>
+                </div>
+                <div class="wk-task-tags">
+                    <span class="wk-common-label">전체</span>
+                    <span class="daily-tag ${tagClass}">${tagLabel}</span>
+                    ${labelStr}
+                    ${wkIsDeadline ? `<span class="deadline-badge-lg wk-deadline-right">🔥 마감일</span>` : ''}
+                </div>
+            </div>`;
+        });
+
+        // 개인 할 일
+        sortedPersonal.forEach(t => {
             const tagClass = t.priority.includes('긴급') ? 'tag-urgent' : t.priority.includes('낮음') ? 'tag-low' : 'tag-normal';
             const tagLabel = t.priority.includes('긴급') ? '긴급' : t.priority.includes('낮음') ? '낮음' : '보통';
             const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
@@ -700,6 +731,7 @@ function renderWeeklyKanban(person) {
             </div>`;
         });
 
+        const allTasks = [...commonTasks, ...personalTasks];
         html += `<div class="wk-day-col ${isToday ? 'wk-today' : ''} ${isWeekend ? 'wk-weekend' : ''}" data-date="${dateStr}">
             <div class="wk-day-header">
                 <span class="wk-day-name">${dayNames[i]}</span>
@@ -842,18 +874,39 @@ function renderMonthlyCalendar(person) {
         html += `<div class="mc-dow ${weekendClass}">${d}</div>`;
     });
 
+    // 개인 탭일 때 전체 할 일도 함께 표시
+    const showCommonInCalendar = (person !== '전체' && person !== '임원' && person !== '대표님');
+
     // 날짜 셀
     cells.forEach((d, i) => {
         const dateStr = fmtDate(d);
         const isCurrentMonth = d.getMonth() === month;
         const isToday = dateStr === todayStr;
         const isWeekend = i % 7 >= 5;
-        const tasks = dailyTasks.filter(t => t.date === dateStr && t.assignee === person);
-        const doneCount = tasks.filter(t => t.done).length;
+
+        const commonTasks = showCommonInCalendar ? dailyTasks.filter(t => t.date === dateStr && t.assignee === '전체') : [];
+        const personalTasks = dailyTasks.filter(t => t.date === dateStr && t.assignee === person);
+        const allTasks = [...commonTasks, ...personalTasks];
+        const doneCount = allTasks.filter(t => t.done).length;
 
         let tasksHtml = '';
-        const sorted = [...tasks].sort((a, b) => a.done - b.done);
-        sorted.forEach(t => {
+
+        // 전체 할 일 먼저 (맨 위 고정, <전체> 라벨 표시)
+        const sortedCommon = [...commonTasks].sort((a, b) => a.done - b.done);
+        sortedCommon.forEach(t => {
+            const isDeadline = t.isDeadlineCopy;
+            const checkClass = t.done ? 'mc-check checked' : 'mc-check';
+            tasksHtml += `<div class="mc-task mc-task-common ${t.done ? 'mc-task-done' : ''} ${isDeadline ? 'mc-task-deadline' : ''}" onclick="event.stopPropagation();openEditTask(${t.id})">
+                <div class="${checkClass}" onclick="event.stopPropagation();toggleTask(${t.id})"><svg width="8" height="8" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+                <span class="mc-common-label">전체</span>
+                <span class="mc-task-text">${t.task.replace(/\s*\(마감일\)\s*$/, '')}</span>
+                ${isDeadline ? '<span class="mc-deadline-badge">🔥 마감일</span>' : ''}
+            </div>`;
+        });
+
+        // 개인 할 일
+        const sortedPersonal = [...personalTasks].sort((a, b) => a.done - b.done);
+        sortedPersonal.forEach(t => {
             const isDeadline = t.isDeadlineCopy;
             const checkClass = t.done ? 'mc-check checked' : 'mc-check';
             tasksHtml += `<div class="mc-task ${t.done ? 'mc-task-done' : ''} ${isDeadline ? 'mc-task-deadline' : ''}" onclick="event.stopPropagation();openEditTask(${t.id})">
@@ -866,7 +919,7 @@ function renderMonthlyCalendar(person) {
         html += `<div class="mc-cell ${isCurrentMonth ? '' : 'mc-other-month'} ${isToday ? 'mc-today' : ''} ${isWeekend ? 'mc-weekend' : ''}" ondblclick="openCalendarAdd('${person}','${dateStr}')">
             <div class="mc-cell-header">
                 <span class="mc-date ${isToday ? 'mc-date-today' : ''}">${d.getDate()}</span>
-                ${tasks.length > 0 ? `<span class="mc-count">${doneCount}/${tasks.length}</span>` : ''}
+                ${allTasks.length > 0 ? `<span class="mc-count">${doneCount}/${allTasks.length}</span>` : ''}
             </div>
             <div class="mc-cell-body">${tasksHtml}</div>
         </div>`;
