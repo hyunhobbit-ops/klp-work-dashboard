@@ -418,12 +418,14 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
         const checksArr = Object.values(p.checks);
         const checkDots = checksArr.map(v => `<div class="check-dot ${v ? 'done' : ''}">${v ? checkSvg : ''}</div>`).join('');
 
+        const revenueStr = (p.revenue || 0).toLocaleString() + '원';
+
         tableHtml += `<tr onclick="showProjectDetail(${p.id})">
-            <td><strong>${p.name}</strong></td>
+            <td><strong>${p.client || '-'}</strong></td>
+            <td>${p.name}</td>
             <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
-            <td>${p.priority}</td>
-            <td><span class="badge ${categoryBadgeClass(p.category)}">${p.category}</span></td>
             <td>${p.assignees.join(', ')}</td>
+            <td>${revenueStr}</td>
             <td>${p.deadline ? fmtDisplay(p.deadline) : '-'}</td>
             <td><div class="progress-cell"><div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div><span class="progress-pct">${p.progress}</span></div></td>
             <td><div class="checks-row">${checkDots}</div></td>
@@ -431,12 +433,12 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
         cardHtml += `<div class="resp-card" onclick="showProjectDetail(${p.id})">
             <div class="resp-card-top">
-                <div class="resp-card-title">${p.name}</div>
+                <div class="resp-card-title">${p.client || '-'} — ${p.name}</div>
                 <span class="badge ${statusBadgeClass(p.status)}">${p.status}</span>
             </div>
             <div class="resp-card-meta">
-                <div class="resp-card-row">${p.priority} · <span class="badge ${categoryBadgeClass(p.category)}">${p.category}</span></div>
-                <div class="resp-card-row"><strong>${p.assignees.join(', ')}</strong> · 마감 ${p.deadline ? fmtDisplay(p.deadline) : '-'}</div>
+                <div class="resp-card-row"><strong>${p.assignees.join(', ')}</strong> · 매출 ${revenueStr}</div>
+                <div class="resp-card-row">마감 ${p.deadline ? fmtDisplay(p.deadline) : '-'}</div>
                 <div class="resp-card-row" style="margin-top:4px"><div class="progress-cell" style="flex:1"><div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div><span class="progress-pct">${p.progress}</span></div></div>
             </div>
         </div>`;
@@ -1474,19 +1476,34 @@ function showProjectDetail(id) {
         </div>`;
     });
 
+    const revenueStr = (p.revenue || 0).toLocaleString() + '원';
+    const unitPriceStr = p.unitPrice ? p.unitPrice.toLocaleString() + '원' : '-';
+    const vatStr = p.vat === 'exclude' ? '(VAT 별도)' : p.vat === 'include' ? '(VAT 포함)' : '';
+    const printCostStr = p.printCost ? p.printCost.toLocaleString() + '원' : '-';
+    const packCostStr = p.packCost ? p.packCost.toLocaleString() + '원' : '-';
+    const shipCostStr = p.shipCost ? p.shipCost.toLocaleString() + '원' : '-';
+
     document.getElementById('detailPanelTitle').textContent = '프로젝트 상세';
     document.getElementById('detailContent').innerHTML = `
-        <h2 class="detail-title">${p.name}</h2>
+        <h2 class="detail-title">${p.client || ''} — ${p.name}</h2>
         <div class="detail-section">
             <div class="detail-section-title">기본 정보</div>
-            <div class="detail-row"><span class="detail-label">상태</span><span class="detail-value"><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></span></div>
-            <div class="detail-row"><span class="detail-label">우선순위</span><span class="detail-value">${p.priority}</span></div>
-            <div class="detail-row"><span class="detail-label">카테고리</span><span class="detail-value">${p.category}</span></div>
-            <div class="detail-row"><span class="detail-label">담당</span><span class="detail-value">${p.assignees.join(', ')}</span></div>
             <div class="detail-row"><span class="detail-label">거래처</span><span class="detail-value">${p.client || '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">품목명</span><span class="detail-value">${p.name}</span></div>
+            <div class="detail-row"><span class="detail-label">상태</span><span class="detail-value"><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></span></div>
+            <div class="detail-row"><span class="detail-label">담당</span><span class="detail-value">${p.assignees.join(', ')}</span></div>
             <div class="detail-row"><span class="detail-label">시작일</span><span class="detail-value">${p.startDate ? fmtDisplay(p.startDate) : '-'}</span></div>
             <div class="detail-row"><span class="detail-label">마감일</span><span class="detail-value">${p.deadline ? fmtDisplay(p.deadline) : '-'}</span></div>
             <div class="detail-row"><span class="detail-label">진행률</span><span class="detail-value">${p.progress}</span></div>
+        </div>
+        <div class="detail-section">
+            <div class="detail-section-title">금액 정보</div>
+            <div class="detail-row"><span class="detail-label">단가</span><span class="detail-value">${unitPriceStr} ${vatStr}</span></div>
+            <div class="detail-row"><span class="detail-label">수량</span><span class="detail-value">${p.qty || '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">매출액</span><span class="detail-value" style="font-weight:700;color:var(--blue)">${revenueStr}</span></div>
+            <div class="detail-row"><span class="detail-label">인쇄비</span><span class="detail-value">${printCostStr}</span></div>
+            <div class="detail-row"><span class="detail-label">포장비</span><span class="detail-value">${packCostStr}</span></div>
+            <div class="detail-row"><span class="detail-label">배송비</span><span class="detail-value">${shipCostStr}</span></div>
         </div>
         <div class="detail-section">
             <div class="detail-section-title">체크리스트</div>
@@ -1522,16 +1539,23 @@ function openModal(type) {
         title.textContent = isDomestic ? '새 국내 프로젝트' : '새 해외 프로젝트';
         const addType = isDomestic ? 'domestic' : 'overseas';
         body.innerHTML = `
-            <div class="form-group"><label class="form-label">프로젝트명</label><input type="text" class="form-input" id="newProjectName" placeholder="프로젝트명 입력"></div>
-            <div class="form-row">
-                <div class="form-group"><label class="form-label">카테고리</label><select class="form-select" id="newProjectCategory"><option value="국내 주문">국내 주문</option><option value="해외 주문">해외 주문</option><option value="자체 브랜드">자체 브랜드</option><option value="IP 콜라보">IP 콜라보</option><option value="유튜브">유튜브</option><option value="기타">기타</option></select></div>
-                <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="newProjectPriority"><option value="🟢 보통">보통</option><option value="🟡 높음">높음</option><option value="🔴 긴급">긴급</option><option value="⚪ 낮음">낮음</option></select></div>
+            <div class="form-group"><label class="form-label">거래처</label><input type="text" class="form-input" id="newProjectClient" placeholder="거래처명 입력"></div>
+            <div class="form-group"><label class="form-label">품목명</label><input type="text" class="form-input" id="newProjectName" placeholder="품목명 입력"></div>
+            <div class="form-row" style="grid-template-columns:1fr auto 1fr">
+                <div class="form-group"><label class="form-label">단가</label><input type="number" class="form-input" id="newProjectUnitPrice" placeholder="0" oninput="calcProjectRevenue()"></div>
+                <div class="form-group"><label class="form-label">VAT</label><select class="form-select" id="newProjectVat" onchange="calcProjectRevenue()" style="min-width:90px"><option value="include">포함</option><option value="exclude">별도</option></select></div>
+                <div class="form-group"><label class="form-label">수량</label><input type="number" class="form-input" id="newProjectQty" placeholder="0" oninput="calcProjectRevenue()"></div>
             </div>
-            <div class="form-group"><label class="form-label">거래처</label><input type="text" class="form-input" id="newProjectClient" placeholder="거래처명"></div>
-            <div class="form-row">
-                <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="newProjectAssignee"><option value="김현호">김현호</option><option value="이현주">이현주</option><option value="대표님">대표님</option><option value="유지은">유지은</option><option value="구정두">구정두</option></select></div>
-                <div class="form-group"><label class="form-label">마감일</label><input type="date" class="form-input" id="newProjectDeadline"></div>
+            <div class="form-group">
+                <label class="form-label">매출액 (자동계산)</label>
+                <div class="form-input" id="newProjectRevenueDisplay" style="background:var(--gray-50);color:var(--gray-700);font-weight:700">0 원</div>
             </div>
+            <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="form-group"><label class="form-label">인쇄비</label><input type="number" class="form-input" id="newProjectPrintCost" placeholder="0"></div>
+                <div class="form-group"><label class="form-label">포장비</label><input type="number" class="form-input" id="newProjectPackCost" placeholder="0"></div>
+                <div class="form-group"><label class="form-label">배송비</label><input type="number" class="form-input" id="newProjectShipCost" placeholder="0"></div>
+            </div>
+            <div class="form-group"><label class="form-label">마감일</label><input type="date" class="form-input" id="newProjectDeadline"></div>
             <div class="form-group"><label class="form-label">메모</label><input type="text" class="form-input" id="newProjectMemo" placeholder="특이사항"></div>
             <button class="form-submit" onclick="addProject('${addType}')">프로젝트 추가</button>`;
     } else if (type === 'daily') {
@@ -1608,6 +1632,15 @@ function openModal(type) {
     document.getElementById('modalOverlay').classList.add('show');
 }
 
+function calcProjectRevenue() {
+    const price = parseInt(document.getElementById('newProjectUnitPrice').value) || 0;
+    const qty = parseInt(document.getElementById('newProjectQty').value) || 0;
+    const vat = document.getElementById('newProjectVat').value;
+    let revenue = price * qty;
+    if (vat === 'exclude') revenue = Math.round(revenue * 1.1); // VAT 별도면 10% 추가
+    document.getElementById('newProjectRevenueDisplay').textContent = revenue.toLocaleString() + ' 원';
+}
+
 function closeModal() {
     document.getElementById('modalOverlay').classList.remove('show');
 }
@@ -1615,15 +1648,29 @@ function closeModal() {
 // ===== Add Handlers =====
 function addProject(type) {
     const name = document.getElementById('newProjectName').value.trim();
-    if (!name) { showToast('프로젝트명을 입력해주세요'); return; }
+    const client = document.getElementById('newProjectClient').value.trim();
+    if (!name) { showToast('품목명을 입력해주세요'); return; }
+    if (!client) { showToast('거래처를 입력해주세요'); return; }
+
+    const unitPrice = parseInt(document.getElementById('newProjectUnitPrice').value) || 0;
+    const qty = parseInt(document.getElementById('newProjectQty').value) || 0;
+    const vat = document.getElementById('newProjectVat').value;
+    let revenue = unitPrice * qty;
+    if (vat === 'exclude') revenue = Math.round(revenue * 1.1);
+
+    const assignee = currentUser ? currentUser.name : '';
+
     const newProject = {
-        id: Date.now(), name,
-        client: document.getElementById('newProjectClient').value.trim(),
+        id: Date.now(), name, client,
         supplier: "", status: "시작 전",
-        priority: document.getElementById('newProjectPriority').value,
-        category: document.getElementById('newProjectCategory').value,
-        assignees: [document.getElementById('newProjectAssignee').value],
-        progress: "0%", revenue: 0, startDate: fmtDate(currentDate),
+        priority: "🟢 보통", category: type === 'overseas' ? '해외 주문' : '국내 주문',
+        assignees: [assignee],
+        progress: "0%",
+        unitPrice, qty, vat, revenue,
+        printCost: parseInt(document.getElementById('newProjectPrintCost').value) || 0,
+        packCost: parseInt(document.getElementById('newProjectPackCost').value) || 0,
+        shipCost: parseInt(document.getElementById('newProjectShipCost').value) || 0,
+        startDate: fmtDate(new Date()),
         deadline: document.getElementById('newProjectDeadline').value,
         checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
         memo: document.getElementById('newProjectMemo').value.trim()
