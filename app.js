@@ -124,6 +124,9 @@ const dailyTasks = [
     { id: 10, task: "각 중고 채널별 사업자 가입", date: "2026-04-08", assignee: "김현호", target: "개인", priority: "🟡 보통", done: false },
     { id: 11, task: "거래처 견적서 발송", date: "2026-04-10", assignee: "이현주", target: "거래처", priority: "🟡 보통", done: false },
     { id: 12, task: "유튜브 촬영 스케줄 조율", date: "2026-04-10", assignee: "김현호", target: "유튜브", priority: "🔵 낮음", done: false },
+    { id: 13, task: "주간 회의 준비", date: "2026-04-09", assignee: "전체", target: "본사", priority: "🟡 보통", done: false },
+    { id: 14, task: "월간 보고서 제출", date: "2026-04-10", assignee: "전체", target: "본사", priority: "🔴 긴급", done: false },
+    { id: 15, task: "사무실 정리", date: "2026-04-11", assignee: "전체", target: "본사", priority: "🔵 낮음", done: false },
 ];
 
 const deliveries = [
