@@ -110,16 +110,24 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ===== Data =====
-const projects = [
+// 국내 프로젝트
+const domesticProjects = [
     { id: 1, name: "러쉬 성수동 제안", client: "러쉬", supplier: "", status: "진행 중", priority: "🔴 긴급", category: "국내 주문", assignees: ["이현주"], progress: "25%", revenue: 0, startDate: "2026-04-07", deadline: "2026-04-10", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "내일까지 제안서 준다고 함" },
     { id: 2, name: "지플러스타워 골드바 감사패", client: "지플러스타워", supplier: "", status: "진행 중", priority: "🟡 높음", category: "국내 주문", assignees: ["김현호"], progress: "50%", revenue: 0, startDate: "2026-03-19", deadline: "2026-04-15", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "견적 발송 완료" },
     { id: 3, name: "미니클락 스토어팜 판매 계획", client: "자체", supplier: "", status: "진행 중", priority: "🟢 보통", category: "자체 브랜드", assignees: ["이현주", "김현호"], progress: "50%", revenue: 0, startDate: "2026-03-10", deadline: "2026-04-30", checks: { design: true, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "빈티지 시계 + 미니클락 상세 계획 작성" },
     { id: 4, name: "굿즈덕 클로드 리뉴얼", client: "자체", supplier: "", status: "진행 중", priority: "🟢 보통", category: "자체 브랜드", assignees: ["김현호"], progress: "25%", revenue: 0, startDate: "2026-04-01", deadline: "2026-04-30", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "" },
-    { id: 5, name: "해외 PO 시스템 구축", client: "본사", supplier: "", status: "진행 중", priority: "🟡 높음", category: "해외 주문", assignees: ["이현주"], progress: "75%", revenue: 0, startDate: "2026-03-20", deadline: "2026-04-12", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "해외 PO 만들기 진행 중" },
     { id: 6, name: "빵 주문서 양식 제작", client: "본사", supplier: "", status: "완료", priority: "🟢 보통", category: "기타", assignees: ["김현호"], progress: "100%", revenue: 0, startDate: "2026-03-25", deadline: "2026-03-31", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: true, invoice: true, supplierPayment: true, delivered: true }, memo: "완료" },
     { id: 7, name: "회사 재고 소진 프로젝트", client: "자체", supplier: "", status: "진행 중", priority: "🟡 높음", category: "자체 브랜드", assignees: ["이현주", "김현호"], progress: "25%", revenue: 0, startDate: "2026-03-12", deadline: "2026-12-31", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "2026년 재고소진의 해" },
     { id: 8, name: "제안서 DB 구축", client: "본사", supplier: "", status: "시작 전", priority: "🟢 보통", category: "기타", assignees: ["이현주"], progress: "0%", revenue: 0, startDate: "", deadline: "2026-04-20", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "" },
 ];
+
+// 해외 프로젝트
+const overseasProjects = [
+    { id: 5, name: "해외 PO 시스템 구축", client: "본사", supplier: "", status: "진행 중", priority: "🟡 높음", category: "해외 주문", assignees: ["이현주"], progress: "75%", revenue: 0, startDate: "2026-03-20", deadline: "2026-04-12", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "해외 PO 만들기 진행 중" },
+];
+
+// 홈 등에서 전체 프로젝트 참조용
+const projects = [...domesticProjects, ...overseasProjects];
 
 const dailyTasks = [
     { id: 1, task: "해외 PO 만들기", date: "2026-04-09", assignee: "이현주", target: "본사", priority: "🔴 긴급", done: false },
@@ -157,7 +165,8 @@ let currentDate = new Date(2026, 3, 9);
 let currentPersonFilter = 'viewall';
 let weekOffset = 0;
 let monthOffset = 0;
-let currentProjectFilter = 'all';
+let currentDomesticFilter = 'all';
+let currentOverseasFilter = 'all';
 let currentDeliveryTypeFilter = 'all';
 let currentDeliverySearch = '';
 let currentDeliveryYear = 'all';
@@ -166,7 +175,8 @@ let currentDeliveryMonth = 'all';
 // ===== Page Titles =====
 const pageTitles = {
     home: '홈',
-    projects: '프로젝트 진행사항',
+    'projects-domestic': '프로젝트 진행사항 — 국내',
+    'projects-overseas': '프로젝트 진행사항 — 해외',
     daily: '일일계획표',
     delivery: '택배 관리',
     docs: '회사 문서',
@@ -242,12 +252,20 @@ function switchTab(tabId) {
 
 // ===== Filters =====
 function setupFilters() {
-    document.querySelectorAll('[data-filter]').forEach(chip => {
+    document.querySelectorAll('[data-dfilter]').forEach(chip => {
         chip.addEventListener('click', () => {
             chip.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
-            currentProjectFilter = chip.dataset.filter;
-            renderProjects();
+            currentDomesticFilter = chip.dataset.dfilter;
+            renderDomesticProjects();
+        });
+    });
+    document.querySelectorAll('[data-ofilter]').forEach(chip => {
+        chip.addEventListener('click', () => {
+            chip.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            currentOverseasFilter = chip.dataset.ofilter;
+            renderOverseasProjects();
         });
     });
     document.querySelectorAll('[data-dtype]').forEach(chip => {
@@ -389,11 +407,8 @@ function renderHome() {
 // =====================================
 // PROJECTS
 // =====================================
-function renderProjects() {
-    const filtered = currentProjectFilter === 'all'
-        ? projects
-        : projects.filter(p => p.status === currentProjectFilter);
-
+function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
+    const filtered = filter === 'all' ? dataArr : dataArr.filter(p => p.status === filter);
     const checkSvg = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
     let tableHtml = '';
@@ -427,8 +442,21 @@ function renderProjects() {
         </div>`;
     });
 
-    document.getElementById('projectTableBody').innerHTML = tableHtml;
-    document.getElementById('projectCardGrid').innerHTML = cardHtml;
+    document.getElementById(tableBodyId).innerHTML = tableHtml;
+    document.getElementById(cardGridId).innerHTML = cardHtml;
+}
+
+function renderDomesticProjects() {
+    renderProjectList(domesticProjects, currentDomesticFilter, 'domesticProjectTableBody', 'domesticProjectCardGrid');
+}
+
+function renderOverseasProjects() {
+    renderProjectList(overseasProjects, currentOverseasFilter, 'overseasProjectTableBody', 'overseasProjectCardGrid');
+}
+
+function renderProjects() {
+    renderDomesticProjects();
+    renderOverseasProjects();
 }
 
 // =====================================
@@ -1489,8 +1517,10 @@ function openModal(type) {
     const title = document.getElementById('modalTitle');
     const body = document.getElementById('modalBody');
 
-    if (type === 'project') {
-        title.textContent = '새 프로젝트';
+    if (type === 'project-domestic' || type === 'project-overseas') {
+        const isDomestic = type === 'project-domestic';
+        title.textContent = isDomestic ? '새 국내 프로젝트' : '새 해외 프로젝트';
+        const addType = isDomestic ? 'domestic' : 'overseas';
         body.innerHTML = `
             <div class="form-group"><label class="form-label">프로젝트명</label><input type="text" class="form-input" id="newProjectName" placeholder="프로젝트명 입력"></div>
             <div class="form-row">
@@ -1499,11 +1529,11 @@ function openModal(type) {
             </div>
             <div class="form-group"><label class="form-label">거래처</label><input type="text" class="form-input" id="newProjectClient" placeholder="거래처명"></div>
             <div class="form-row">
-                <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="newProjectAssignee"><option value="김현호">김현호</option><option value="이현주">이현주</option><option value="사장님">사장님</option></select></div>
+                <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="newProjectAssignee"><option value="김현호">김현호</option><option value="이현주">이현주</option><option value="대표님">대표님</option><option value="유지은">유지은</option><option value="구정두">구정두</option></select></div>
                 <div class="form-group"><label class="form-label">마감일</label><input type="date" class="form-input" id="newProjectDeadline"></div>
             </div>
             <div class="form-group"><label class="form-label">메모</label><input type="text" class="form-input" id="newProjectMemo" placeholder="특이사항"></div>
-            <button class="form-submit" onclick="addProject()">프로젝트 추가</button>`;
+            <button class="form-submit" onclick="addProject('${addType}')">프로젝트 추가</button>`;
     } else if (type === 'daily') {
         title.textContent = '새 할 일';
         body.innerHTML = `
@@ -1583,10 +1613,10 @@ function closeModal() {
 }
 
 // ===== Add Handlers =====
-function addProject() {
+function addProject(type) {
     const name = document.getElementById('newProjectName').value.trim();
     if (!name) { showToast('프로젝트명을 입력해주세요'); return; }
-    projects.unshift({
+    const newProject = {
         id: Date.now(), name,
         client: document.getElementById('newProjectClient').value.trim(),
         supplier: "", status: "시작 전",
@@ -1597,7 +1627,13 @@ function addProject() {
         deadline: document.getElementById('newProjectDeadline').value,
         checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
         memo: document.getElementById('newProjectMemo').value.trim()
-    });
+    };
+    if (type === 'overseas') {
+        overseasProjects.unshift(newProject);
+    } else {
+        domesticProjects.unshift(newProject);
+    }
+    projects.unshift(newProject);
     closeModal(); renderProjects(); renderHome();
     showToast('프로젝트가 추가되었습니다');
 }

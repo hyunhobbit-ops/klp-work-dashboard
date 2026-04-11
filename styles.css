@@ -281,6 +281,19 @@ body {
     color: var(--blue);
 }
 
+/* 하위 메뉴 (프로젝트 국내/해외) */
+.nav-sub-group { margin: 0; }
+.nav-sub-label {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 14px 4px;
+    font-size: 14px; font-weight: 600; color: var(--gray-500);
+}
+.nav-sub-item {
+    padding-left: 46px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+}
+
 /* External link nav items */
 .nav-external {
     position: relative;

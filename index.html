@@ -54,10 +54,18 @@
                 <!-- 업무 그룹 -->
                 <div class="nav-group">
                     <div class="nav-group-label">업무</div>
-                    <button class="nav-item" data-tab="projects">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                        <span>프로젝트 진행사항</span>
-                    </button>
+                    <div class="nav-sub-group">
+                        <div class="nav-sub-label">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                            <span>프로젝트 진행사항</span>
+                        </div>
+                        <button class="nav-item nav-sub-item" data-tab="projects-domestic">
+                            <span>국내</span>
+                        </button>
+                        <button class="nav-item nav-sub-item" data-tab="projects-overseas">
+                            <span>해외</span>
+                        </button>
+                    </div>
                     <button class="nav-item" data-tab="daily">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span>일일계획표</span>
@@ -305,21 +313,22 @@
             </main>
 
             <!-- ===== Projects ===== -->
-            <main class="content" id="tab-projects">
+            <!-- ===== 국내 프로젝트 ===== -->
+            <main class="content" id="tab-projects-domestic">
                 <div class="content-toolbar">
-                    <div class="filter-bar">
-                        <button class="filter-chip active" data-filter="all">전체</button>
-                        <button class="filter-chip" data-filter="진행 중">진행 중</button>
-                        <button class="filter-chip" data-filter="시작 전">시작 전</button>
-                        <button class="filter-chip" data-filter="완료">완료</button>
+                    <div class="filter-bar" id="domesticFilterBar">
+                        <button class="filter-chip active" data-dfilter="all">전체</button>
+                        <button class="filter-chip" data-dfilter="진행 중">진행 중</button>
+                        <button class="filter-chip" data-dfilter="시작 전">시작 전</button>
+                        <button class="filter-chip" data-dfilter="완료">완료</button>
                     </div>
-                    <button class="btn-primary" onclick="openModal('project')">
+                    <button class="btn-primary" onclick="openModal('project-domestic')">
                         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
                         새 프로젝트
                     </button>
                 </div>
                 <div class="table-wrap">
-                    <table class="data-table" id="projectTable">
+                    <table class="data-table" id="domesticProjectTable">
                         <thead>
                             <tr>
                                 <th>프로젝트명</th>
@@ -332,10 +341,44 @@
                                 <th>체크리스트</th>
                             </tr>
                         </thead>
-                        <tbody id="projectTableBody"></tbody>
+                        <tbody id="domesticProjectTableBody"></tbody>
                     </table>
                 </div>
-                <div class="card-grid" id="projectCardGrid"></div>
+                <div class="card-grid" id="domesticProjectCardGrid"></div>
+            </main>
+
+            <!-- ===== 해외 프로젝트 ===== -->
+            <main class="content" id="tab-projects-overseas">
+                <div class="content-toolbar">
+                    <div class="filter-bar" id="overseasFilterBar">
+                        <button class="filter-chip active" data-ofilter="all">전체</button>
+                        <button class="filter-chip" data-ofilter="진행 중">진행 중</button>
+                        <button class="filter-chip" data-ofilter="시작 전">시작 전</button>
+                        <button class="filter-chip" data-ofilter="완료">완료</button>
+                    </div>
+                    <button class="btn-primary" onclick="openModal('project-overseas')">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                        새 프로젝트
+                    </button>
+                </div>
+                <div class="table-wrap">
+                    <table class="data-table" id="overseasProjectTable">
+                        <thead>
+                            <tr>
+                                <th>프로젝트명</th>
+                                <th>상태</th>
+                                <th>우선순위</th>
+                                <th>카테고리</th>
+                                <th>담당</th>
+                                <th>마감일</th>
+                                <th>진행률</th>
+                                <th>체크리스트</th>
+                            </tr>
+                        </thead>
+                        <tbody id="overseasProjectTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="card-grid" id="overseasProjectCardGrid"></div>
             </main>
 
             <!-- ===== Daily Plan ===== -->
