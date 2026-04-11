@@ -10,10 +10,19 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null; // { id, name, role }
 
 // ===== Auth =====
+// 표시 이름 매핑 (김관택 → 대표님)
+const DISPLAY_NAME_MAP = { '김관택': '대표님' };
+
 async function checkAuth() {
     const saved = localStorage.getItem('klp_user');
     if (saved) {
         currentUser = JSON.parse(saved);
+        // 기존 세션에서도 표시 이름 매핑 적용
+        if (DISPLAY_NAME_MAP[currentUser.name]) {
+            currentUser.loginName = currentUser.name;
+            currentUser.name = DISPLAY_NAME_MAP[currentUser.name];
+            localStorage.setItem('klp_user', JSON.stringify(currentUser));
+        }
         updateSidebarUser();
         showApp();
     } else {
@@ -66,7 +75,8 @@ async function handleLogin() {
         return;
     }
 
-    currentUser = { id: data.id, name: data.name, role: data.role };
+    const displayName = DISPLAY_NAME_MAP[data.name] || data.name;
+    currentUser = { id: data.id, name: displayName, loginName: data.name, role: data.role };
     localStorage.setItem('klp_user', JSON.stringify(currentUser));
     updateSidebarUser();
     showApp();
@@ -425,8 +435,8 @@ function renderProjects() {
 // DAILY PLAN
 // =====================================
 // 권한 등급 매핑 (사용자별 직접 매핑)
-const ADMIN_USERS = ['김현호']; // 관리자 계정: 모든 데이터 조회
-const EXEC_USERS = ['대표님', '이현주']; // 임원 계정: 전체 + 임원 + 대표님 + 본인
+const ADMIN_USERS = ['김현호', '대표님']; // 관리자 계정: 모든 데이터 조회
+const EXEC_USERS = ['이현주']; // 임원 계정: 전체 + 임원 + 본인
 // 일반 계정: 유지은, 구정두 → 전체 + 본인만
 
 // 기존 role 기반 호환용
