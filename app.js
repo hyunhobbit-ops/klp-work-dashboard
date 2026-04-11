@@ -517,8 +517,9 @@ function renderDaily() {
 
     // 전체 컬럼: 항상 표시
     const showCommonColumn = true;
-    // 임원 컬럼: 관리자 또는 임원 계정에게만 표시 (대표님 탭 포함)
-    const showExecColumn = (admin || exec);
+    // 임원 컬럼: 김현호, 대표님, 이현주에게만 표시. 유지은/구정두(일반)에게는 숨김
+    const userName = currentUser ? currentUser.name : '';
+    const showExecColumn = ADMIN_USERS.includes(userName) || EXEC_USERS.includes(userName);
     const showCeoColumn = (currentPersonFilter === 'ceo' || (currentPersonFilter === 'viewall' && (admin || exec)));
 
     const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
