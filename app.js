@@ -421,25 +421,30 @@ function renderProjects() {
 // =====================================
 // DAILY PLAN
 // =====================================
-// 권한 등급 매핑
+// 권한 등급 매핑 (사용자별 직접 매핑)
+const ADMIN_USERS = ['김현호']; // 관리자 계정: 모든 데이터 조회
+const EXEC_USERS = ['대표님', '이현주']; // 임원 계정: 전체 + 임원 + 대표님 + 본인
+// 일반 계정: 유지은, 구정두 → 전체 + 본인만
+
+// 기존 role 기반 호환용
 const ADMIN_ROLES = ['관리자', '부장', '대표'];
 const EXEC_ROLES = ['임원', '차장', '과장'];
 let allProfiles = []; // {name, role} - Supabase에서 로드
 
-function getExecPeople() {
-    // Supabase profiles에서 임원급+관리자급 사람 이름 목록
-    return allProfiles
-        .filter(p => ADMIN_ROLES.includes(p.role) || EXEC_ROLES.includes(p.role))
-        .map(p => p.name);
+function isAdminUser() {
+    return currentUser && ADMIN_USERS.includes(currentUser.name);
+}
+
+function isExecUser() {
+    return currentUser && EXEC_USERS.includes(currentUser.name);
 }
 
 function getVisiblePeople() {
     const allPeople = ['이현주', '김현호', '유지은', '구정두'];
     if (!currentUser) return allPeople;
 
-    const role = currentUser.role;
-    if (ADMIN_ROLES.includes(role)) return allPeople;
-    if (EXEC_ROLES.includes(role)) return allPeople.filter(p => p === currentUser.name);
+    if (isAdminUser()) return allPeople;
+    if (isExecUser()) return allPeople.filter(p => p === currentUser.name);
 
     // 일반: 자기 자신만
     return allPeople.filter(p => p === currentUser.name);
@@ -448,8 +453,7 @@ function getVisiblePeople() {
 function getPeopleForFilter(filter) {
     const allPeople = ['이현주', '김현호', '유지은', '구정두'];
     if (filter === 'viewall') return getVisiblePeople();
-    if (filter === 'all') return [];
-    if (filter === 'exec') return getExecPeople().filter(p => allPeople.includes(p));
+    if (filter === 'exec') return [];
     if (filter === 'ceo') return [];
     return allPeople.filter(p => p === filter);
 }
@@ -458,25 +462,22 @@ function renderDailyPersonFilter() {
     const container = document.getElementById('dailyPersonFilter');
     if (!container) return;
 
-    const role = currentUser ? currentUser.role : '';
-    const isAdmin = ADMIN_ROLES.includes(role);
-    const isAdminOrExec = isAdmin || EXEC_ROLES.includes(role);
     const visiblePeople = getVisiblePeople();
+    const admin = isAdminUser();
+    const exec = isExecUser();
 
     let html = '';
 
     // 전체보기 탭: 모든 사용자에게 표시
     html += `<button class="filter-chip ${currentPersonFilter === 'viewall' ? 'active' : ''}" data-person="viewall">전체보기</button>`;
 
-    html += `<button class="filter-chip ${currentPersonFilter === 'all' ? 'active' : ''}" data-person="all">전체</button>`;
-
-    // 임원급 이상만 임원 탭 표시
-    if (isAdminOrExec) {
+    // 관리자 또는 임원만 임원 탭 표시
+    if (admin || exec) {
         html += `<button class="filter-chip ${currentPersonFilter === 'exec' ? 'active' : ''}" data-person="exec">임원</button>`;
     }
 
-    // 관리자만 대표님 탭 표시
-    if (isAdmin) {
+    // 관리자 또는 임원만 대표님 탭 표시
+    if (admin || exec) {
         html += `<button class="filter-chip ${currentPersonFilter === 'ceo' ? 'active' : ''}" data-person="ceo">대표님</button>`;
     }
 
@@ -509,24 +510,24 @@ function renderDaily() {
 
     const visiblePeople = getVisiblePeople();
     // 현재 필터가 볼 수 없는 사람이면 전체보기로 리셋
-    if (currentPersonFilter !== 'all' && currentPersonFilter !== 'exec' && currentPersonFilter !== 'viewall' && currentPersonFilter !== 'ceo' && !visiblePeople.includes(currentPersonFilter)) {
-        currentPersonFilter = 'all';
+    if (currentPersonFilter !== 'exec' && currentPersonFilter !== 'viewall' && currentPersonFilter !== 'ceo' && !visiblePeople.includes(currentPersonFilter)) {
+        currentPersonFilter = 'viewall';
         renderDailyPersonFilter();
     }
     const displayPeople = getPeopleForFilter(currentPersonFilter);
-    const userRole = currentUser ? currentUser.role : '';
-    const isAdminUser = ADMIN_ROLES.includes(userRole);
-    const isExecUser = EXEC_ROLES.includes(userRole);
+    const admin = isAdminUser();
+    const exec = isExecUser();
 
-    const showCommonColumn = (currentPersonFilter === 'all' || currentPersonFilter === 'viewall');
-    const showExecColumn = (currentPersonFilter === 'exec');
-    const showCeoColumn = (currentPersonFilter === 'ceo' || (currentPersonFilter === 'viewall' && isAdminUser));
+    // 전체 컬럼: 항상 표시 (전체보기, 개인탭, 임원탭, 대표님탭 모두)
+    const showCommonColumn = true;
+    const showExecColumn = (currentPersonFilter === 'exec' || (currentPersonFilter === 'viewall' && (admin || exec)));
+    const showCeoColumn = (currentPersonFilter === 'ceo' || (currentPersonFilter === 'viewall' && (admin || exec)));
 
     const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
     // 컬럼 제목 → 탭 필터 매핑
     function getTitleFilter(title) {
-        if (title === '전체 (공통)') return 'all';
+        if (title === '전체 (공통)') return null; // 전체 컬럼은 탭 이동 없음
         if (title === '임원') return 'exec';
         if (title === '대표님') return 'ceo';
         return title; // 개인 이름은 그대로
@@ -563,8 +564,8 @@ function renderDaily() {
             </div>`;
         });
         const filterKey = getTitleFilter(title);
-        const clickable = currentPersonFilter === 'viewall' ? `onclick="switchDailyFilter('${filterKey}')"` : '';
-        const titleClass = currentPersonFilter === 'viewall' ? 'daily-col-title clickable' : 'daily-col-title';
+        const clickable = (currentPersonFilter === 'viewall' && filterKey) ? `onclick="switchDailyFilter('${filterKey}')"` : '';
+        const titleClass = (currentPersonFilter === 'viewall' && filterKey) ? 'daily-col-title clickable' : 'daily-col-title';
         return `<div class="daily-column">
             <div class="daily-col-header">
                 <span class="${titleClass}" ${clickable}>${title}</span>
@@ -616,7 +617,7 @@ function renderDaily() {
     if (currentPersonFilter !== 'viewall') {
         kanbanWrap.style.display = 'block';
         calendarWrap.style.display = 'block';
-        const kanbanAssignee = currentPersonFilter === 'all' ? '전체' : currentPersonFilter === 'exec' ? '임원' : currentPersonFilter === 'ceo' ? '대표님' : currentPersonFilter;
+        const kanbanAssignee = currentPersonFilter === 'exec' ? '임원' : currentPersonFilter === 'ceo' ? '대표님' : currentPersonFilter;
         renderWeeklyKanban(kanbanAssignee);
         renderMonthlyCalendar(kanbanAssignee);
     } else {
@@ -912,7 +913,7 @@ function openQuickTask(assignee) {
     title.textContent = `새 할 일 — ${assignee === '전체' ? '전체 (공통)' : assignee}`;
 
     // 담당자 기본값: 관리자급은 '전체', 나머지는 로그인 계정명
-    const defaultAssignee = currentUser && ADMIN_ROLES.includes(currentUser.role) ? '전체' : (currentUser ? currentUser.name : assignee);
+    const defaultAssignee = isAdminUser() ? '전체' : (currentUser ? currentUser.name : assignee);
     const assigneeOptions = ['전체', '임원', '대표님', '이현주', '김현호', '유지은', '구정두'];
     const assigneeHtml = assigneeOptions.map(a => `<option value="${a}" ${a === defaultAssignee ? 'selected' : ''}>${a === '전체' ? '전체 (공통)' : a}</option>`).join('');
 
