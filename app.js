@@ -675,8 +675,8 @@ function renderWeeklyKanban(person) {
     </div>`;
     html += `<div class="weekly-kanban-board">`;
 
-    // 개인 탭일 때 전체 할 일도 함께 표시
-    const showCommonInKanban = (person !== '전체' && person !== '임원' && person !== '대표님');
+    // 전체 자신을 제외한 모든 탭에서 전체 할 일도 함께 표시
+    const showCommonInKanban = (person !== '전체');
 
     weekDates.forEach((date, i) => {
         const dateStr = fmtDate(date);
@@ -877,8 +877,8 @@ function renderMonthlyCalendar(person) {
         html += `<div class="mc-dow ${weekendClass}">${d}</div>`;
     });
 
-    // 개인 탭일 때 전체 할 일도 함께 표시
-    const showCommonInCalendar = (person !== '전체' && person !== '임원' && person !== '대표님');
+    // 전체 자신을 제외한 모든 탭에서 전체 할 일도 함께 표시
+    const showCommonInCalendar = (person !== '전체');
 
     // 날짜 셀
     cells.forEach((d, i) => {
