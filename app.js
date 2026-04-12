@@ -1480,72 +1480,246 @@ function updateDeliveryRating(id, value) {
 // DETAIL PANELS
 // =====================================
 function showProjectDetail(id) {
+    openEditProject(id);
+}
+
+function openEditProject(id) {
     const p = projects.find(x => x.id === id);
     if (!p) return;
+    const isDomestic = p.category !== '해외 주문';
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    title.textContent = isDomestic ? '국내 프로젝트 수정' : '해외 프로젝트 수정';
+
     const checkLabels = { design: '디확 컨펌', workOrder: '작지 발송', advancePayment: '선금 입금', finalPayment: '잔금 입금', invoice: '계산서 발행', supplierPayment: '공급처 송금', delivered: '납품 완료' };
+    const statusOpts = ['시작 전', '진행 중', '완료'];
+    const progressOpts = ['0%', '25%', '50%', '75%', '100%'];
+    const vatCurrent = p.vat === 'include' ? 'include' : 'exclude';
 
-    let checksHtml = '';
-    Object.entries(p.checks).forEach(([key, val]) => {
-        checksHtml += `<div class="detail-row">
-            <span class="detail-label">${checkLabels[key]}</span>
-            <span class="detail-value" style="color:${val ? 'var(--green)' : 'var(--gray-400)'};font-weight:700">${val ? '✓ 완료' : '미완료'}</span>
-        </div>`;
-    });
+    const checksHtml = Object.entries(checkLabels).map(([key, label]) => `
+        <label style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;font-size:14px">
+            <input type="checkbox" id="editCheck-${key}" ${p.checks && p.checks[key] ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer">
+            <span>${label}</span>
+        </label>`).join('');
 
-    const revenueStr = (p.revenue || 0).toLocaleString() + '원';
-    const unitPriceStr = p.unitPrice ? p.unitPrice.toLocaleString() + '원' : '-';
-    const vatStr = p.vat === 'exclude' ? '(VAT 별도)' : p.vat === 'include' ? '(VAT 포함)' : '';
-    const printCostStr = p.printCost ? p.printCost.toLocaleString() + '원' : '-';
-    const packCostStr = p.packCost ? p.packCost.toLocaleString() + '원' : '-';
-    const shipCostStr = p.shipCost ? p.shipCost.toLocaleString() + '원' : '-';
-
-    document.getElementById('detailPanelTitle').textContent = '프로젝트 상세';
-    const row = (label, value) => value ? `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${value}</span></div>` : '';
-    document.getElementById('detailContent').innerHTML = `
-        <h2 class="detail-title">${p.client || ''} — ${p.name}</h2>
-        <div class="detail-section">
-            <div class="detail-section-title">기본 정보</div>
-            <div class="detail-row"><span class="detail-label">거래처</span><span class="detail-value">${p.client || '-'}</span></div>
-            ${row('거래처 담당자', p.contactPerson)}
-            ${row('제목', p.title)}
-            ${row('본사 담당자', p.manager)}
-            <div class="detail-row"><span class="detail-label">품명</span><span class="detail-value">${p.name}</span></div>
-            <div class="detail-row"><span class="detail-label">상태</span><span class="detail-value"><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></span></div>
-            <div class="detail-row"><span class="detail-label">담당</span><span class="detail-value">${p.assignees.join(', ')}</span></div>
-            <div class="detail-row"><span class="detail-label">시작일</span><span class="detail-value">${p.startDate ? fmtDisplay(p.startDate) : '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">납기일</span><span class="detail-value">${p.deadline ? fmtDisplay(p.deadline) : '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">진행률</span><span class="detail-value">${p.progress}</span></div>
+    body.innerHTML = `
+        <div class="form-section-title">📋 기본 정보</div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">거래처 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="editProjectClient" value="${p.client || ''}"></div>
+            <div class="form-group"><label class="form-label">거래처 담당자</label><input type="text" class="form-input" id="editProjectContact" value="${p.contactPerson || ''}"></div>
         </div>
-        <div class="detail-section">
-            <div class="detail-section-title">금액 정보</div>
-            <div class="detail-row"><span class="detail-label">단가</span><span class="detail-value">${unitPriceStr} ${vatStr}</span></div>
-            <div class="detail-row"><span class="detail-label">수량</span><span class="detail-value">${p.qty ? p.qty + ' ' + (p.unit || '개') : '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">매출액</span><span class="detail-value" style="font-weight:700;color:var(--blue)">${revenueStr}</span></div>
-            <div class="detail-row"><span class="detail-label">인쇄비</span><span class="detail-value">${printCostStr}</span></div>
-            <div class="detail-row"><span class="detail-label">포장비</span><span class="detail-value">${packCostStr}</span></div>
-            ${row('배송비', shipCostStr !== '-' ? shipCostStr : null)}
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">제목</label><input type="text" class="form-input" id="editProjectTitle" value="${p.title || ''}"></div>
+            <div class="form-group"><label class="form-label">본사 담당자</label>
+                <select class="form-select" id="editProjectManager">
+                    ${['이현주 실장','김현호 팀장','유지은 대리'].map(m=>`<option ${p.manager===m?'selected':''}>${m}</option>`).join('')}
+                </select>
+            </div>
         </div>
-        ${(p.color || p.printColorSize || p.printMethod || p.packaging) ? `
-        <div class="detail-section">
-            <div class="detail-section-title">제품 사양</div>
-            ${row('색상', p.color)}
-            ${row('인쇄 색상/사이즈', p.printColorSize)}
-            ${row('인쇄 방법', p.printMethod)}
-            ${row('포장', p.packaging)}
-        </div>` : ''}
-        ${(p.recipient || p.phone || p.address) ? `
-        <div class="detail-section">
-            <div class="detail-section-title">배송 정보</div>
-            ${row('수령인', p.recipient)}
-            ${row('핸드폰', p.phone)}
-            ${row('주소', p.address)}
-        </div>` : ''}
-        <div class="detail-section">
-            <div class="detail-section-title">체크리스트</div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">상태</label>
+                <select class="form-select" id="editProjectStatus">
+                    ${statusOpts.map(s=>`<option ${p.status===s?'selected':''}>${s}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group"><label class="form-label">진행률</label>
+                <select class="form-select" id="editProjectProgress">
+                    ${progressOpts.map(s=>`<option ${p.progress===s?'selected':''}>${s}</option>`).join('')}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-section-title">📦 제품 정보</div>
+        <div class="form-group"><label class="form-label">품명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="editProjectName" value="${p.name || ''}"></div>
+        <div class="form-row" style="grid-template-columns:2fr 1fr">
+            <div class="form-group"><label class="form-label">수량</label><input type="number" class="form-input" id="editProjectQty" value="${p.qty || ''}" oninput="calcEditProjectRevenue()"></div>
+            <div class="form-group"><label class="form-label">단위</label>
+                <select class="form-select" id="editProjectUnit">
+                    ${['개','세트','장','박스','EA'].map(u=>`<option ${p.unit===u?'selected':''}>${u}</option>`).join('')}
+                </select>
+            </div>
+        </div>
+        <div class="form-row" style="grid-template-columns:2fr 1fr">
+            <div class="form-group"><label class="form-label">단가</label><input type="number" class="form-input" id="editProjectUnitPrice" value="${p.unitPrice || ''}" oninput="calcEditProjectRevenue()"></div>
+            <div class="form-group"><label class="form-label">VAT</label>
+                <select class="form-select" id="editProjectVat" onchange="calcEditProjectRevenue()">
+                    <option value="exclude" ${vatCurrent==='exclude'?'selected':''}>VAT 별도</option>
+                    <option value="include" ${vatCurrent==='include'?'selected':''}>VAT 포함</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">매출액 (자동계산)</label>
+            <div class="form-input" id="editProjectRevenueDisplay" style="background:var(--gray-50);color:var(--gray-700);font-weight:700">${(p.revenue||0).toLocaleString()} 원</div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">색상</label><input type="text" class="form-input" id="editProjectColor" value="${p.color || '-'}"></div>
+            <div class="form-group"><label class="form-label">인쇄 색상/사이즈</label><input type="text" class="form-input" id="editProjectPrintColorSize" value="${p.printColorSize || ''}"></div>
+        </div>
+
+        <div class="form-section-title">🖨️ 인쇄 / 포장</div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">인쇄 방법</label>
+                <select class="form-select" id="editProjectPrintMethod">
+                    ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u=>`<option ${p.printMethod===u?'selected':''}>${u}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group"><label class="form-label">인쇄비</label><input type="number" class="form-input" id="editProjectPrintFee" value="${p.printFee || p.printCost || ''}"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">포장</label>
+                <select class="form-select" id="editProjectPackaging">
+                    ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u=>`<option ${p.packaging===u?'selected':''}>${u}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group"><label class="form-label">포장비</label><input type="number" class="form-input" id="editProjectPackFee" value="${p.packagingFee || p.packCost || ''}"></div>
+        </div>
+
+        <div class="form-section-title">🚚 납기 및 배송</div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">납기일</label><input type="date" class="form-input" id="editProjectDeadline" value="${p.deadline || ''}"></div>
+            <div class="form-group"><label class="form-label">수령인</label><input type="text" class="form-input" id="editProjectRecipient" value="${p.recipient || ''}"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">핸드폰</label><input type="text" class="form-input" id="editProjectPhone" value="${p.phone || ''}"></div>
+            <div class="form-group"><label class="form-label">주소</label><input type="text" class="form-input" id="editProjectAddress" value="${p.address || ''}"></div>
+        </div>
+
+        <div class="form-section-title">✅ 체크리스트</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;margin-bottom:8px">
             ${checksHtml}
         </div>
-        ${p.memo ? `<div class="detail-section"><div class="detail-section-title">메모</div><p style="font-size:14px;color:var(--gray-700);line-height:1.7">${p.memo}</p></div>` : ''}`;
-    document.getElementById('detailOverlay').classList.add('show');
+
+        <div class="form-group" style="margin-top:16px"><label class="form-label">메모</label><input type="text" class="form-input" id="editProjectMemo" value="${(p.memo || '').replace(/"/g, '&quot;')}"></div>
+
+        <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="form-submit" style="flex:1;background:var(--red)" onclick="deleteProject(${p.id})">🗑️ 삭제</button>
+            <button class="form-submit" style="flex:2" onclick="updateProject(${p.id})">💾 수정 저장</button>
+        </div>`;
+    document.getElementById('modalOverlay').classList.add('show');
+}
+
+function calcEditProjectRevenue() {
+    const price = parseInt(document.getElementById('editProjectUnitPrice').value) || 0;
+    const qty = parseInt(document.getElementById('editProjectQty').value) || 0;
+    const vat = document.getElementById('editProjectVat').value;
+    let revenue = price * qty;
+    if (vat === 'exclude') revenue = Math.round(revenue * 1.1);
+    document.getElementById('editProjectRevenueDisplay').textContent = revenue.toLocaleString() + ' 원';
+}
+
+async function updateProject(id) {
+    const p = projects.find(x => x.id === id);
+    if (!p) return;
+    const getVal = (k) => { const el = document.getElementById(k); return el ? el.value.trim() : ''; };
+    const getInt = (k) => parseInt(getVal(k)) || 0;
+
+    const name = getVal('editProjectName');
+    const client = getVal('editProjectClient');
+    if (!name) { showToast('품명을 입력해주세요'); return; }
+    if (!client) { showToast('거래처를 입력해주세요'); return; }
+
+    const unitPrice = getInt('editProjectUnitPrice');
+    const qty = getInt('editProjectQty');
+    const vat = getVal('editProjectVat');
+    let revenue = unitPrice * qty;
+    if (vat === 'exclude') revenue = Math.round(revenue * 1.1);
+
+    const newChecks = {};
+    Object.keys(p.checks || {}).forEach(k => {
+        const el = document.getElementById(`editCheck-${k}`);
+        newChecks[k] = el ? el.checked : false;
+    });
+
+    Object.assign(p, {
+        name, client,
+        contactPerson: getVal('editProjectContact'),
+        title: getVal('editProjectTitle'),
+        manager: getVal('editProjectManager'),
+        status: getVal('editProjectStatus'),
+        progress: getVal('editProjectProgress'),
+        unitPrice, qty, vat, revenue,
+        unit: getVal('editProjectUnit'),
+        color: getVal('editProjectColor'),
+        printColorSize: getVal('editProjectPrintColorSize'),
+        printMethod: getVal('editProjectPrintMethod'),
+        printFee: getInt('editProjectPrintFee'),
+        printCost: getInt('editProjectPrintFee'),
+        packaging: getVal('editProjectPackaging'),
+        packagingFee: getInt('editProjectPackFee'),
+        packCost: getInt('editProjectPackFee'),
+        deadline: getVal('editProjectDeadline'),
+        recipient: getVal('editProjectRecipient'),
+        phone: getVal('editProjectPhone'),
+        address: getVal('editProjectAddress'),
+        checks: newChecks,
+        memo: getVal('editProjectMemo')
+    });
+
+    if (p.category !== '해외 주문') {
+        try {
+            const { error } = await sb.from('projects_domestic').update({
+                client: p.client,
+                contact_person: p.contactPerson,
+                title: p.title,
+                manager: p.manager,
+                product_name: p.name,
+                quantity: p.qty,
+                unit: p.unit,
+                unit_price: p.unitPrice,
+                unit_price_vat: vat === 'exclude' ? 'VAT 별도' : 'VAT 포함',
+                color: p.color,
+                print_color_size: p.printColorSize,
+                print_method: p.printMethod,
+                print_fee: p.printFee,
+                packaging: p.packaging,
+                packaging_fee: p.packagingFee,
+                delivery_date: p.deadline || null,
+                recipient: p.recipient,
+                phone: p.phone,
+                address: p.address,
+                revenue: p.revenue,
+                status: p.status,
+                progress: p.progress,
+                checks: p.checks,
+                memo: p.memo
+            }).eq('id', id);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Supabase 수정 실패:', err);
+            showToast('DB 수정 실패: ' + err.message);
+        }
+    }
+
+    closeModal(); renderProjects(); renderHome();
+    showToast('프로젝트가 수정되었습니다');
+}
+
+async function deleteProject(id) {
+    const p = projects.find(x => x.id === id);
+    if (!p) return;
+    if (!confirm(`"${p.name}" 프로젝트를 삭제하시겠습니까?`)) return;
+
+    if (p.category !== '해외 주문') {
+        try {
+            const { error } = await sb.from('projects_domestic').delete().eq('id', id);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Supabase 삭제 실패:', err);
+            showToast('DB 삭제 실패: ' + err.message);
+            return;
+        }
+    }
+
+    const dIdx = domesticProjects.findIndex(x => x.id === id);
+    if (dIdx >= 0) domesticProjects.splice(dIdx, 1);
+    const oIdx = overseasProjects.findIndex(x => x.id === id);
+    if (oIdx >= 0) overseasProjects.splice(oIdx, 1);
+    const pIdx = projects.findIndex(x => x.id === id);
+    if (pIdx >= 0) projects.splice(pIdx, 1);
+
+    closeModal(); renderProjects(); renderHome();
+    showToast('프로젝트가 삭제되었습니다');
 }
 
 function showDeliveryDetail(id) {
