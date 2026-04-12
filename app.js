@@ -423,6 +423,16 @@ function renderHome() {
 // =====================================
 // PROJECTS
 // =====================================
+const CHECK_ITEMS = [
+    { key: 'design', label: '디확 컨펌', short: '디확' },
+    { key: 'workOrder', label: '작지 발송', short: '작지' },
+    { key: 'advancePayment', label: '선금 입금', short: '선금' },
+    { key: 'finalPayment', label: '잔금 입금', short: '잔금' },
+    { key: 'invoice', label: '계산서 발행', short: '계산' },
+    { key: 'supplierPayment', label: '공급처 송금', short: '공급' },
+    { key: 'delivered', label: '납품 완료', short: '납품' }
+];
+
 function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
     const filtered = filter === 'all' ? dataArr : dataArr.filter(p => p.status === filter);
     const checkSvg = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
@@ -431,8 +441,11 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
     let cardHtml = '';
     filtered.forEach(p => {
         const pNum = parseInt(p.progress) || 0;
-        const checksArr = Object.values(p.checks);
-        const checkDots = checksArr.map(v => `<div class="check-dot ${v ? 'done' : ''}">${v ? checkSvg : ''}</div>`).join('');
+        const checks = p.checks || {};
+        const checkDots = CHECK_ITEMS.map(item => {
+            const v = checks[item.key];
+            return `<div class="check-item"><div class="check-dot ${v ? 'done' : ''}" title="${item.label}">${v ? checkSvg : ''}</div><span class="check-label">${item.short}</span></div>`;
+        }).join('');
 
         const revenueStr = (p.revenue || 0).toLocaleString() + '원';
 
@@ -1491,15 +1504,26 @@ function openEditProject(id) {
     const body = document.getElementById('modalBody');
     title.textContent = isDomestic ? '국내 프로젝트 수정' : '해외 프로젝트 수정';
 
-    const checkLabels = { design: '디확 컨펌', workOrder: '작지 발송', advancePayment: '선금 입금', finalPayment: '잔금 입금', invoice: '계산서 발행', supplierPayment: '공급처 송금', delivered: '납품 완료' };
+    const checkDetails = {
+        design: { label: '디확 컨펌', desc: '디자인 확인서 컨펌 완료' },
+        workOrder: { label: '작지 발송', desc: '작업 지시서 발송 완료' },
+        advancePayment: { label: '선금 입금', desc: '선금(계약금) 입금 확인' },
+        finalPayment: { label: '잔금 입금', desc: '잔금 입금 확인' },
+        invoice: { label: '계산서 발행', desc: '세금계산서 발행 완료' },
+        supplierPayment: { label: '공급처 송금', desc: '공급처(협력업체) 대금 송금' },
+        delivered: { label: '납품 완료', desc: '최종 납품 완료' }
+    };
     const statusOpts = ['시작 전', '진행 중', '완료'];
     const progressOpts = ['0%', '25%', '50%', '75%', '100%'];
     const vatCurrent = p.vat === 'include' ? 'include' : 'exclude';
 
-    const checksHtml = Object.entries(checkLabels).map(([key, label]) => `
-        <label style="display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;font-size:14px">
-            <input type="checkbox" id="editCheck-${key}" ${p.checks && p.checks[key] ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer">
-            <span>${label}</span>
+    const checksHtml = Object.entries(checkDetails).map(([key, info]) => `
+        <label style="display:flex;align-items:flex-start;gap:10px;padding:10px;cursor:pointer;font-size:14px;border:1px solid var(--gray-100);border-radius:8px;background:var(--gray-50)">
+            <input type="checkbox" id="editCheck-${key}" ${p.checks && p.checks[key] ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;margin-top:2px">
+            <div style="flex:1">
+                <div style="font-weight:700;color:var(--gray-900)">${info.label}</div>
+                <div style="font-size:12px;color:var(--gray-500);margin-top:2px">${info.desc}</div>
+            </div>
         </label>`).join('');
 
     body.innerHTML = `
