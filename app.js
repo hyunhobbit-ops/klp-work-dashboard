@@ -99,7 +99,23 @@ async function showApp() {
     // 프로필 목록 로드 (임원 구분용)
     const { data } = await sb.from('profiles').select('name, role');
     if (data) allProfiles = data;
+    await loadDomesticProjectsFromDb();
     renderAll();
+    // URL 해시 → 탭 전환 (문서생성기에서 이동해온 경우 등)
+    const hash = location.hash.replace('#', '');
+    if (hash && document.getElementById('tab-' + hash)) {
+        switchTab(hash);
+    }
+    // 문서생성기에서 넘어온 프로젝트 프리필 처리
+    try {
+        const pending = localStorage.getItem('klp_project_prefill');
+        if (pending) {
+            localStorage.removeItem('klp_project_prefill');
+            window._projectPrefill = JSON.parse(pending);
+            switchTab('projects-domestic');
+            openModal('project-domestic');
+        }
+    } catch (e) { console.error(e); }
 }
 
 // Enter key to login
@@ -1484,27 +1500,46 @@ function showProjectDetail(id) {
     const shipCostStr = p.shipCost ? p.shipCost.toLocaleString() + '원' : '-';
 
     document.getElementById('detailPanelTitle').textContent = '프로젝트 상세';
+    const row = (label, value) => value ? `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${value}</span></div>` : '';
     document.getElementById('detailContent').innerHTML = `
         <h2 class="detail-title">${p.client || ''} — ${p.name}</h2>
         <div class="detail-section">
             <div class="detail-section-title">기본 정보</div>
             <div class="detail-row"><span class="detail-label">거래처</span><span class="detail-value">${p.client || '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">품목명</span><span class="detail-value">${p.name}</span></div>
+            ${row('거래처 담당자', p.contactPerson)}
+            ${row('제목', p.title)}
+            ${row('본사 담당자', p.manager)}
+            <div class="detail-row"><span class="detail-label">품명</span><span class="detail-value">${p.name}</span></div>
             <div class="detail-row"><span class="detail-label">상태</span><span class="detail-value"><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></span></div>
             <div class="detail-row"><span class="detail-label">담당</span><span class="detail-value">${p.assignees.join(', ')}</span></div>
             <div class="detail-row"><span class="detail-label">시작일</span><span class="detail-value">${p.startDate ? fmtDisplay(p.startDate) : '-'}</span></div>
-            <div class="detail-row"><span class="detail-label">마감일</span><span class="detail-value">${p.deadline ? fmtDisplay(p.deadline) : '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">납기일</span><span class="detail-value">${p.deadline ? fmtDisplay(p.deadline) : '-'}</span></div>
             <div class="detail-row"><span class="detail-label">진행률</span><span class="detail-value">${p.progress}</span></div>
         </div>
         <div class="detail-section">
             <div class="detail-section-title">금액 정보</div>
             <div class="detail-row"><span class="detail-label">단가</span><span class="detail-value">${unitPriceStr} ${vatStr}</span></div>
-            <div class="detail-row"><span class="detail-label">수량</span><span class="detail-value">${p.qty || '-'}</span></div>
+            <div class="detail-row"><span class="detail-label">수량</span><span class="detail-value">${p.qty ? p.qty + ' ' + (p.unit || '개') : '-'}</span></div>
             <div class="detail-row"><span class="detail-label">매출액</span><span class="detail-value" style="font-weight:700;color:var(--blue)">${revenueStr}</span></div>
             <div class="detail-row"><span class="detail-label">인쇄비</span><span class="detail-value">${printCostStr}</span></div>
             <div class="detail-row"><span class="detail-label">포장비</span><span class="detail-value">${packCostStr}</span></div>
-            <div class="detail-row"><span class="detail-label">배송비</span><span class="detail-value">${shipCostStr}</span></div>
+            ${row('배송비', shipCostStr !== '-' ? shipCostStr : null)}
         </div>
+        ${(p.color || p.printColorSize || p.printMethod || p.packaging) ? `
+        <div class="detail-section">
+            <div class="detail-section-title">제품 사양</div>
+            ${row('색상', p.color)}
+            ${row('인쇄 색상/사이즈', p.printColorSize)}
+            ${row('인쇄 방법', p.printMethod)}
+            ${row('포장', p.packaging)}
+        </div>` : ''}
+        ${(p.recipient || p.phone || p.address) ? `
+        <div class="detail-section">
+            <div class="detail-section-title">배송 정보</div>
+            ${row('수령인', p.recipient)}
+            ${row('핸드폰', p.phone)}
+            ${row('주소', p.address)}
+        </div>` : ''}
         <div class="detail-section">
             <div class="detail-section-title">체크리스트</div>
             ${checksHtml}
@@ -1538,26 +1573,110 @@ function openModal(type) {
         const isDomestic = type === 'project-domestic';
         title.textContent = isDomestic ? '새 국내 프로젝트' : '새 해외 프로젝트';
         const addType = isDomestic ? 'domestic' : 'overseas';
-        body.innerHTML = `
-            <div class="form-group"><label class="form-label">거래처</label><input type="text" class="form-input" id="newProjectClient" placeholder="거래처명 입력"></div>
-            <div class="form-group"><label class="form-label">품목명</label><input type="text" class="form-input" id="newProjectName" placeholder="품목명 입력"></div>
-            <div class="form-row" style="grid-template-columns:1fr auto 1fr">
-                <div class="form-group"><label class="form-label">단가</label><input type="number" class="form-input" id="newProjectUnitPrice" placeholder="0" oninput="calcProjectRevenue()"></div>
-                <div class="form-group"><label class="form-label">VAT</label><select class="form-select" id="newProjectVat" onchange="calcProjectRevenue()" style="min-width:90px"><option value="include">포함</option><option value="exclude">별도</option></select></div>
-                <div class="form-group"><label class="form-label">수량</label><input type="number" class="form-input" id="newProjectQty" placeholder="0" oninput="calcProjectRevenue()"></div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">매출액 (자동계산)</label>
-                <div class="form-input" id="newProjectRevenueDisplay" style="background:var(--gray-50);color:var(--gray-700);font-weight:700">0 원</div>
-            </div>
-            <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
-                <div class="form-group"><label class="form-label">인쇄비</label><input type="number" class="form-input" id="newProjectPrintCost" placeholder="0"></div>
-                <div class="form-group"><label class="form-label">포장비</label><input type="number" class="form-input" id="newProjectPackCost" placeholder="0"></div>
-                <div class="form-group"><label class="form-label">배송비</label><input type="number" class="form-input" id="newProjectShipCost" placeholder="0"></div>
-            </div>
-            <div class="form-group"><label class="form-label">마감일</label><input type="date" class="form-input" id="newProjectDeadline"></div>
-            <div class="form-group"><label class="form-label">메모</label><input type="text" class="form-input" id="newProjectMemo" placeholder="특이사항"></div>
-            <button class="form-submit" onclick="addProject('${addType}')">프로젝트 추가</button>`;
+        const prefill = window._projectPrefill || {};
+        window._projectPrefill = null;
+        const v = (k, d = '') => (prefill[k] != null ? prefill[k] : d);
+
+        if (isDomestic) {
+            body.innerHTML = `
+                <div class="form-section-title">📋 기본 정보</div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">거래처 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="newProjectClient" placeholder="거래처명" value="${v('client')}"></div>
+                    <div class="form-group"><label class="form-label">거래처 담당자</label><input type="text" class="form-input" id="newProjectContact" placeholder="담당자" value="${v('contactPerson')}"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">제목</label><input type="text" class="form-input" id="newProjectTitle" placeholder="예: 상패 시안" value="${v('title')}"></div>
+                    <div class="form-group"><label class="form-label">본사 담당자</label>
+                        <select class="form-select" id="newProjectManager">
+                            <option ${v('manager')==='이현주 실장'?'selected':''}>이현주 실장</option>
+                            <option ${v('manager')==='김현호 팀장'||!v('manager')?'selected':''}>김현호 팀장</option>
+                            <option ${v('manager')==='유지은 대리'?'selected':''}>유지은 대리</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-section-title">📦 제품 정보</div>
+                <div class="form-group"><label class="form-label">품명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="newProjectName" placeholder="품명 입력" value="${v('productName') || v('name')}"></div>
+                <div class="form-row" style="grid-template-columns:2fr 1fr">
+                    <div class="form-group"><label class="form-label">수량</label><input type="number" class="form-input" id="newProjectQty" placeholder="0" value="${v('quantity')}" oninput="calcProjectRevenue()"></div>
+                    <div class="form-group"><label class="form-label">단위</label>
+                        <select class="form-select" id="newProjectUnit">
+                            ${['개','세트','장','박스','EA'].map(u=>`<option ${v('unit')===u?'selected':''}>${u}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row" style="grid-template-columns:2fr 1fr">
+                    <div class="form-group"><label class="form-label">단가</label><input type="number" class="form-input" id="newProjectUnitPrice" placeholder="0" value="${v('unitPrice')}" oninput="calcProjectRevenue()"></div>
+                    <div class="form-group"><label class="form-label">VAT</label>
+                        <select class="form-select" id="newProjectVat" onchange="calcProjectRevenue()">
+                            <option value="exclude" ${v('unitPriceVat')==='VAT 별도'||v('vat')==='exclude'||!v('vat')?'selected':''}>VAT 별도</option>
+                            <option value="include" ${v('unitPriceVat')==='VAT 포함'||v('vat')==='include'?'selected':''}>VAT 포함</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">매출액 (자동계산)</label>
+                    <div class="form-input" id="newProjectRevenueDisplay" style="background:var(--gray-50);color:var(--gray-700);font-weight:700">0 원</div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">색상</label><input type="text" class="form-input" id="newProjectColor" value="${v('color') || '-'}"></div>
+                    <div class="form-group"><label class="form-label">인쇄 색상/사이즈</label><input type="text" class="form-input" id="newProjectPrintColorSize" value="${v('printColorSize') || '시안 확인'}"></div>
+                </div>
+
+                <div class="form-section-title">🖨️ 인쇄 / 포장</div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">인쇄 방법</label>
+                        <select class="form-select" id="newProjectPrintMethod">
+                            ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u=>`<option ${v('printMethod')===u?'selected':''}>${u}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">인쇄비</label><input type="number" class="form-input" id="newProjectPrintFee" placeholder="0" value="${v('printFee')}"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">포장</label>
+                        <select class="form-select" id="newProjectPackaging">
+                            ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u=>`<option ${v('packaging')===u?'selected':''}>${u}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">포장비</label><input type="number" class="form-input" id="newProjectPackFee" placeholder="0" value="${v('packagingFee')}"></div>
+                </div>
+
+                <div class="form-section-title">🚚 납기 및 배송</div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">납기일</label><input type="date" class="form-input" id="newProjectDeadline" value="${v('deliveryDate') || v('deadline')}"></div>
+                    <div class="form-group"><label class="form-label">수령인</label><input type="text" class="form-input" id="newProjectRecipient" value="${v('recipient')}"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">핸드폰</label><input type="text" class="form-input" id="newProjectPhone" placeholder="010-0000-0000" value="${v('phone')}"></div>
+                    <div class="form-group"><label class="form-label">주소</label><input type="text" class="form-input" id="newProjectAddress" value="${v('address')}"></div>
+                </div>
+
+                <div class="form-group"><label class="form-label">메모</label><input type="text" class="form-input" id="newProjectMemo" placeholder="특이사항" value="${v('memo')}"></div>
+                <button class="form-submit" onclick="addProject('${addType}')">프로젝트 추가</button>`;
+            setTimeout(calcProjectRevenue, 0);
+        } else {
+            // 해외: 기존 간단 폼 유지
+            body.innerHTML = `
+                <div class="form-group"><label class="form-label">거래처</label><input type="text" class="form-input" id="newProjectClient" placeholder="거래처명 입력"></div>
+                <div class="form-group"><label class="form-label">품목명</label><input type="text" class="form-input" id="newProjectName" placeholder="품목명 입력"></div>
+                <div class="form-row" style="grid-template-columns:1fr auto 1fr">
+                    <div class="form-group"><label class="form-label">단가</label><input type="number" class="form-input" id="newProjectUnitPrice" placeholder="0" oninput="calcProjectRevenue()"></div>
+                    <div class="form-group"><label class="form-label">VAT</label><select class="form-select" id="newProjectVat" onchange="calcProjectRevenue()" style="min-width:90px"><option value="include">포함</option><option value="exclude">별도</option></select></div>
+                    <div class="form-group"><label class="form-label">수량</label><input type="number" class="form-input" id="newProjectQty" placeholder="0" oninput="calcProjectRevenue()"></div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">매출액 (자동계산)</label>
+                    <div class="form-input" id="newProjectRevenueDisplay" style="background:var(--gray-50);color:var(--gray-700);font-weight:700">0 원</div>
+                </div>
+                <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
+                    <div class="form-group"><label class="form-label">인쇄비</label><input type="number" class="form-input" id="newProjectPrintFee" placeholder="0"></div>
+                    <div class="form-group"><label class="form-label">포장비</label><input type="number" class="form-input" id="newProjectPackFee" placeholder="0"></div>
+                    <div class="form-group"><label class="form-label">배송비</label><input type="number" class="form-input" id="newProjectShipCost" placeholder="0"></div>
+                </div>
+                <div class="form-group"><label class="form-label">마감일</label><input type="date" class="form-input" id="newProjectDeadline"></div>
+                <div class="form-group"><label class="form-label">메모</label><input type="text" class="form-input" id="newProjectMemo" placeholder="특이사항"></div>
+                <button class="form-submit" onclick="addProject('${addType}')">프로젝트 추가</button>`;
+        }
     } else if (type === 'daily') {
         title.textContent = '새 할 일';
         body.innerHTML = `
@@ -1633,12 +1752,17 @@ function openModal(type) {
 }
 
 function calcProjectRevenue() {
-    const price = parseInt(document.getElementById('newProjectUnitPrice').value) || 0;
-    const qty = parseInt(document.getElementById('newProjectQty').value) || 0;
-    const vat = document.getElementById('newProjectVat').value;
+    const priceEl = document.getElementById('newProjectUnitPrice');
+    const qtyEl = document.getElementById('newProjectQty');
+    const vatEl = document.getElementById('newProjectVat');
+    const displayEl = document.getElementById('newProjectRevenueDisplay');
+    if (!priceEl || !qtyEl || !displayEl) return;
+    const price = parseInt(priceEl.value) || 0;
+    const qty = parseInt(qtyEl.value) || 0;
+    const vat = vatEl ? vatEl.value : 'exclude';
     let revenue = price * qty;
-    if (vat === 'exclude') revenue = Math.round(revenue * 1.1); // VAT 별도면 10% 추가
-    document.getElementById('newProjectRevenueDisplay').textContent = revenue.toLocaleString() + ' 원';
+    if (vat === 'exclude') revenue = Math.round(revenue * 1.1);
+    displayEl.textContent = revenue.toLocaleString() + ' 원';
 }
 
 function closeModal() {
@@ -1646,10 +1770,10 @@ function closeModal() {
 }
 
 // ===== Add Handlers =====
-function addProject(type) {
+async function addProject(type) {
     const name = document.getElementById('newProjectName').value.trim();
     const client = document.getElementById('newProjectClient').value.trim();
-    if (!name) { showToast('품목명을 입력해주세요'); return; }
+    if (!name) { showToast('품명을 입력해주세요'); return; }
     if (!client) { showToast('거래처를 입력해주세요'); return; }
 
     const unitPrice = parseInt(document.getElementById('newProjectUnitPrice').value) || 0;
@@ -1659,30 +1783,138 @@ function addProject(type) {
     if (vat === 'exclude') revenue = Math.round(revenue * 1.1);
 
     const assignee = currentUser ? currentUser.name : '';
+    const getVal = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const getInt = (id) => parseInt(getVal(id)) || 0;
 
     const newProject = {
         id: Date.now(), name, client,
+        contactPerson: getVal('newProjectContact'),
+        title: getVal('newProjectTitle'),
+        manager: getVal('newProjectManager'),
         supplier: "", status: "시작 전",
         priority: "🟢 보통", category: type === 'overseas' ? '해외 주문' : '국내 주문',
         assignees: [assignee],
         progress: "0%",
         unitPrice, qty, vat, revenue,
-        printCost: parseInt(document.getElementById('newProjectPrintCost').value) || 0,
-        packCost: parseInt(document.getElementById('newProjectPackCost').value) || 0,
-        shipCost: parseInt(document.getElementById('newProjectShipCost').value) || 0,
+        unit: getVal('newProjectUnit') || '개',
+        color: getVal('newProjectColor'),
+        printColorSize: getVal('newProjectPrintColorSize'),
+        printMethod: getVal('newProjectPrintMethod'),
+        printFee: getInt('newProjectPrintFee'),
+        packaging: getVal('newProjectPackaging'),
+        packagingFee: getInt('newProjectPackFee'),
+        printCost: getInt('newProjectPrintFee'),
+        packCost: getInt('newProjectPackFee'),
+        shipCost: getInt('newProjectShipCost'),
         startDate: fmtDate(new Date()),
         deadline: document.getElementById('newProjectDeadline').value,
+        recipient: getVal('newProjectRecipient'),
+        phone: getVal('newProjectPhone'),
+        address: getVal('newProjectAddress'),
         checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
-        memo: document.getElementById('newProjectMemo').value.trim()
+        memo: getVal('newProjectMemo')
     };
-    if (type === 'overseas') {
-        overseasProjects.unshift(newProject);
-    } else {
+
+    if (type === 'domestic') {
+        try {
+            const { data, error } = await sb.from('projects_domestic').insert({
+                client: newProject.client,
+                contact_person: newProject.contactPerson,
+                title: newProject.title,
+                manager: newProject.manager,
+                product_name: newProject.name,
+                quantity: newProject.qty,
+                unit: newProject.unit,
+                unit_price: newProject.unitPrice,
+                unit_price_vat: vat === 'exclude' ? 'VAT 별도' : 'VAT 포함',
+                color: newProject.color,
+                print_color_size: newProject.printColorSize,
+                print_method: newProject.printMethod,
+                print_fee: newProject.printFee,
+                packaging: newProject.packaging,
+                packaging_fee: newProject.packagingFee,
+                delivery_date: newProject.deadline || null,
+                recipient: newProject.recipient,
+                phone: newProject.phone,
+                address: newProject.address,
+                revenue: newProject.revenue,
+                status: newProject.status,
+                priority: newProject.priority,
+                category: newProject.category,
+                assignees: newProject.assignees,
+                progress: newProject.progress,
+                start_date: newProject.startDate || null,
+                checks: newProject.checks,
+                memo: newProject.memo
+            }).select().single();
+            if (error) throw error;
+            if (data) newProject.id = data.id;
+        } catch (err) {
+            console.error('Supabase 저장 실패:', err);
+            showToast('DB 저장 실패 (로컬만 저장됨): ' + err.message);
+        }
         domesticProjects.unshift(newProject);
+    } else {
+        overseasProjects.unshift(newProject);
     }
     projects.unshift(newProject);
     closeModal(); renderProjects(); renderHome();
     showToast('프로젝트가 추가되었습니다');
+}
+
+// Supabase에서 국내 프로젝트 로드
+async function loadDomesticProjectsFromDb() {
+    try {
+        const { data, error } = await sb.from('projects_domestic').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        if (!data) return;
+        // DB 데이터로 치환
+        domesticProjects.length = 0;
+        data.forEach(r => {
+            domesticProjects.push({
+                id: r.id,
+                name: r.product_name || '',
+                client: r.client || '',
+                contactPerson: r.contact_person || '',
+                title: r.title || '',
+                manager: r.manager || '',
+                supplier: '',
+                status: r.status || '시작 전',
+                priority: r.priority || '🟢 보통',
+                category: r.category || '국내 주문',
+                assignees: r.assignees || [],
+                progress: r.progress || '0%',
+                unitPrice: r.unit_price || 0,
+                qty: r.quantity || 0,
+                unit: r.unit || '개',
+                vat: r.unit_price_vat === 'VAT 포함' ? 'include' : 'exclude',
+                revenue: r.revenue || 0,
+                color: r.color || '',
+                printColorSize: r.print_color_size || '',
+                printMethod: r.print_method || '',
+                printFee: r.print_fee || 0,
+                packaging: r.packaging || '',
+                packagingFee: r.packaging_fee || 0,
+                printCost: r.print_fee || 0,
+                packCost: r.packaging_fee || 0,
+                shipCost: 0,
+                startDate: r.start_date || '',
+                deadline: r.delivery_date || '',
+                recipient: r.recipient || '',
+                phone: r.phone || '',
+                address: r.address || '',
+                checks: r.checks || { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
+                memo: r.memo || '',
+                sourceDocNumber: r.source_doc_number || ''
+            });
+        });
+        // projects 전체 재구성
+        projects.length = 0;
+        domesticProjects.forEach(p => projects.push(p));
+        overseasProjects.forEach(p => projects.push(p));
+    } catch (err) {
+        console.error('국내 프로젝트 로드 실패 (테이블 미생성?):', err.message);
+    }
 }
 
 function addDailyTask() {

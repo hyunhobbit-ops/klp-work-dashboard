@@ -211,6 +211,7 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
   <div class="section"><div class="section-title">💬 결제 조건 안내 문구</div><div class="toggle-wrap"><label class="toggle-switch"><input type="checkbox" id="showPaymentNotice" checked onchange="togglePayPreview()"><span class="toggle-slider"></span></label><span class="toggle-label">확인서에 결제 조건 문구 표시</span></div><div id="payPreview" class="toggle-preview">제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.</div></div>
   <div class="warn hidden" id="warnBox"></div>
   <button class="btn-preview" onclick="saveAndPreview()">💾 저장 & 미리보기 →</button>
+  <button type="button" onclick="exportToDomesticProject()" style="width:100%;padding:13px;margin-top:8px;border:1.5px solid var(--klp-blue);border-radius:12px;background:var(--klp-light-blue);color:var(--klp-blue);font-size:15px;font-weight:800;cursor:pointer;font-family:inherit">📊 프로젝트 진행사항(국내)으로 내보내기</button>
 </div>
 
 <!-- DC PREVIEW -->
@@ -219,6 +220,7 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
     <button class="btn-back" onclick="showDcTab('form')">← 수정하기</button>
     <button class="btn-dl png" id="btnJpg" onclick="dl('jpg')">📷 JPG</button>
     <button class="btn-dl pdf" id="btnPdf" onclick="dl('pdf')">📄 PDF</button>
+    <button type="button" onclick="exportToDomesticProject()" style="padding:12px 24px;border:1.5px solid var(--klp-blue);border-radius:12px;background:var(--klp-light-blue);color:var(--klp-blue);font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">📊 프로젝트로 내보내기</button>
   </div>
   <div class="preview-wrap"><div id="docEl"></div></div>
 </div>
@@ -857,6 +859,58 @@ async function saveWrToDb(){
 }
 
 async function getNextSeq(){try{var res=await sbFetch('confirmations?select=doc_number&order=created_at.desc&limit=1','GET');if(res&&res.length>0){var last=res[0].doc_number||'';var parts=last.split('_');if(parts.length===2)return parseInt(parts[1])+1}return 1}catch(e){return 1}}
+
+/* === 프로젝트 진행사항(국내)으로 내보내기 === */
+async function exportToDomesticProject(){
+  if(!validate())return;
+  var e=window._est;
+  var seq=Math.max(1,parseInt(document.getElementById('docSeq').value)||1);
+  var docNum=Y+'_'+String(seq).padStart(4,'0');
+  var revenue=e?e.grand:0;
+  var payload={
+    client:val('companyName'),
+    contact_person:val('contactPerson'),
+    title:val('title'),
+    manager:val('manager'),
+    product_name:val('productName'),
+    quantity:toNum(val('quantity'))||0,
+    unit:val('unit'),
+    unit_price:toNum(val('unitPrice'))||0,
+    unit_price_vat:val('unitPriceVat'),
+    color:val('color'),
+    print_color_size:val('printColorSize'),
+    print_method:val('printMethod'),
+    print_fee:toNum(val('printFee'))||0,
+    print_fee_vat:val('printFeeVat'),
+    print_fee_apply:val('printFeeApply'),
+    packaging:val('packaging'),
+    packaging_fee:toNum(val('packagingFee'))||0,
+    packaging_fee_vat:val('packagingFeeVat'),
+    packaging_fee_apply:val('packagingFeeApply'),
+    delivery_date:val('deliveryDate')||null,
+    recipient:val('dcRecipient'),
+    phone:val('dcPhone'),
+    address:val('dcAddress'),
+    revenue:revenue,
+    status:'시작 전',
+    priority:'🟢 보통',
+    category:'국내 주문',
+    progress:'0%',
+    start_date:val('date')||null,
+    memo:'',
+    source_doc_number:docNum
+  };
+  try{
+    var res=await sbFetch('projects_domestic','POST',payload);
+    if(res&&res.error){throw new Error(res.message||res.error)}
+    showMsg('✅ 프로젝트 진행사항으로 내보냈습니다! ('+val('companyName')+' — '+val('productName')+')');
+    if(confirm('프로젝트 진행사항 페이지로 이동할까요?')){
+      location.href='index.html#projects-domestic';
+    }
+  }catch(err){
+    showMsg('❌ 내보내기 실패: '+err.message+' (projects_domestic 테이블이 생성되었는지 확인하세요)',true);
+  }
+}
 
 /* FIX #3: 새로 입력 = 모든 데이터 초기화 */
 async function newDoc(){

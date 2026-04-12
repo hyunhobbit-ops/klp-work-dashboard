@@ -1421,6 +1421,8 @@ body {
 .form-input, .form-select { width: 100%; padding: 11px 14px; border: 1px solid var(--gray-200); border-radius: var(--radius-xs); font-size: 14px; font-family: inherit; color: var(--gray-900); background: var(--gray-50); outline: none; transition: border-color var(--transition), background var(--transition); }
 .form-input:focus, .form-select:focus { border-color: var(--blue); background: var(--white); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-section-title { font-size: 13px; font-weight: 800; color: var(--gray-900); margin: 18px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--gray-100); }
+.form-section-title:first-child { margin-top: 0; }
 .form-submit { width: 100%; padding: 13px; border: none; border-radius: var(--radius-xs); background: var(--blue); color: white; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 8px; transition: all var(--transition); }
 .form-submit:hover { background: var(--blue-dark); }
 
