@@ -468,17 +468,21 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
             return `<div class="check-item" onclick="event.stopPropagation();toggleProjectCheck(${p.id},'${item.key}')" style="cursor:pointer"><div class="check-dot ${v ? 'done' : ''}" title="${item.label} (클릭하여 토글)">${v ? checkSvg : ''}</div><span class="check-label">${item.short}</span></div>`;
         }).join('');
 
-        const revenueStr = (p.revenue || 0).toLocaleString() + '원';
-
-        // 매입액 / 마진 계산 (통합 모델)
+        // 매출액 / 매입액 / 마진 — 컬러 강조 pill 스타일
         const purchaseTotal = p.supplierRevenue || 0;
         const marginVal = (p.revenue || 0) - purchaseTotal;
         const marginPctVal = p.revenue > 0 ? Math.round((marginVal / p.revenue) * 100) : 0;
         const supplierDisplay = p.supplier || '-';
-        const purchaseStr = purchaseTotal > 0 ? purchaseTotal.toLocaleString() + '원' : '-';
+        const pill = (bg, fg, text) => `<span style="display:inline-block;padding:4px 10px;border-radius:6px;background:${bg};color:${fg};font-weight:800;font-size:13px;white-space:nowrap">${text}</span>`;
+        const revenueStr = pill('#E8F4FD', '#1B64DA', (p.revenue || 0).toLocaleString() + '원');
+        const purchaseStr = purchaseTotal > 0
+            ? pill('#FFF2E6', '#E67E22', purchaseTotal.toLocaleString() + '원')
+            : '<span style="color:var(--text-tertiary)">-</span>';
         const marginStr = purchaseTotal > 0
-            ? `<span style="color:${marginVal >= 0 ? 'var(--blue)' : 'var(--red)'};font-weight:700">${marginVal.toLocaleString()}원 (${marginPctVal}%)</span>`
-            : '-';
+            ? (marginVal >= 0
+                ? pill('#E8F8EF', '#12B76A', marginVal.toLocaleString() + '원 (' + marginPctVal + '%)')
+                : pill('#FEECEC', '#E03131', marginVal.toLocaleString() + '원 (' + marginPctVal + '%)'))
+            : '<span style="color:var(--text-tertiary)">-</span>';
 
         const ownerStr = p.manager || (p.assignees && p.assignees.length ? p.assignees.join(', ') : '-');
         tableHtml += `<tr onclick="projectRowClick(${p.id})" ondblclick="projectRowDblClick(${p.id})" style="cursor:pointer">
@@ -502,7 +506,10 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
             </div>
             <div class="resp-card-meta">
                 ${p.supplier ? `<div class="resp-card-row">매입처: ${p.supplier}</div>` : ''}
-                <div class="resp-card-row"><strong>${p.assignees.join(', ')}</strong> · 매출 ${revenueStr}</div>
+                <div class="resp-card-row"><strong>${p.assignees.join(', ')}</strong></div>
+                <div class="resp-card-row" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+                    ${revenueStr}${purchaseTotal > 0 ? purchaseStr + marginStr : ''}
+                </div>
                 <div class="resp-card-row">마감 ${p.deadline ? fmtDisplay(p.deadline) : '-'}</div>
             </div>
         </div>`;
