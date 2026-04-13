@@ -498,7 +498,7 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
             : '-';
 
         const ownerStr = p.manager || (p.assignees && p.assignees.length ? p.assignees.join(', ') : '-');
-        tableHtml += `<tr>
+        tableHtml += `<tr onclick="projectRowClick(${p.id})" ondblclick="projectRowDblClick(${p.id})" style="cursor:pointer">
             <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
             <td><strong>${p.client || '-'}</strong>${supplierBadge}</td>
             <td>${supplierDisplay}</td>
@@ -509,7 +509,7 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
             <td>${marginStr}</td>
             <td>${p.deadline ? fmtDisplay(p.deadline) : '-'}</td>
             <td><div class="checks-row">${checkDots}</div></td>
-            <td><button class="edit-btn" onclick="openEditProject(${p.id})">편집</button></td>
+            <td><button class="edit-btn" onclick="event.stopPropagation();openEditProject(${p.id})">편집</button></td>
         </tr>`;
 
         cardHtml += `<div class="resp-card" onclick="showProjectDetail(${p.id})">
@@ -528,6 +528,19 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
     document.getElementById(tableBodyId).innerHTML = tableHtml;
     document.getElementById(cardGridId).innerHTML = cardHtml;
+}
+
+let _projectRowClickTimer = null;
+function projectRowClick(id) {
+    if (_projectRowClickTimer) clearTimeout(_projectRowClickTimer);
+    _projectRowClickTimer = setTimeout(() => {
+        _projectRowClickTimer = null;
+        showProjectDetail(id);
+    }, 250);
+}
+function projectRowDblClick(id) {
+    if (_projectRowClickTimer) { clearTimeout(_projectRowClickTimer); _projectRowClickTimer = null; }
+    openEditProject(id);
 }
 
 async function toggleProjectCheck(id, key) {
