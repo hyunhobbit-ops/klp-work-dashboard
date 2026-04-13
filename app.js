@@ -1786,9 +1786,11 @@ async function showProjectDetail(id) {
             ${imagesPlaceholder}
         </div>
 
-        <div style="display:flex;gap:8px;margin-top:16px">
-            <button class="form-submit" style="flex:1" onclick="openEditProject(${id})">✏️ 편집</button>
-            <button class="form-submit" style="flex:1;background:var(--gray-200);color:var(--gray-800)" onclick="closeModal()">닫기</button>
+        <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+            <button class="form-submit" style="flex:1 1 180px;background:var(--blue)" onclick="createDocFromProject(${id},'dc')">📄 디자인확인서 만들기</button>
+            <button class="form-submit" style="flex:1 1 180px;background:var(--klp-orange,#E67E22)" onclick="createDocFromProject(${id},'wr')">📋 작업요청서 만들기</button>
+            <button class="form-submit" style="flex:1 1 120px" onclick="openEditProject(${id})">✏️ 편집</button>
+            <button class="form-submit" style="flex:1 1 100px;background:var(--gray-200);color:var(--gray-800)" onclick="closeModal()">닫기</button>
         </div>`;
     const overlay = document.getElementById('modalOverlay');
     overlay.classList.add('show');
@@ -1830,6 +1832,60 @@ async function showProjectDetail(id) {
             if (area) area.innerHTML = `<div style="color:var(--red);font-size:13px">이미지 로드 실패: ${err.message}</div>`;
         }
     }
+}
+
+// =====================================
+// 프로젝트 → 문서생성기 (DC/WR) prefill 이동
+// =====================================
+function createDocFromProject(id, type) {
+    const p = projects.find(x => x.id === id);
+    if (!p) return;
+    if (type === 'wr' && !p.sourceDocNumber) {
+        showToast('먼저 디자인확인서를 만들어주세요');
+        return;
+    }
+    if (type === 'dc' && p.sourceDocNumber) {
+        if (!confirm(`이미 연결된 디자인확인서(${p.sourceDocNumber})가 있습니다.\n새로 만들면 프로젝트 연결이 새 문서로 변경됩니다.\n계속하시겠습니까?`)) return;
+    }
+    const prefill = {
+        type,
+        projectId: p.id,
+        linkedDcDocNumber: p.sourceDocNumber || null,
+        client: p.client || '',
+        contactPerson: p.contactPerson || '',
+        title: p.title || '',
+        manager: p.manager || '',
+        productName: p.name || '',
+        quantity: p.qty || '',
+        unit: p.unit || '개',
+        unitPrice: p.unitPrice || '',
+        unitPriceVat: p.vat === 'include' ? 'VAT 포함' : 'VAT 별도',
+        color: p.color || '-',
+        printColorSize: p.printColorSize || '시안 확인',
+        printMethod: p.printMethod || '없음',
+        printFee: p.printFee || 0,
+        printFeeVat: p.printFeeVat || 'VAT 별도',
+        printFeeApply: p.printFeeApply || '1개당',
+        packaging: p.packaging || '개별박스',
+        packagingFee: p.packagingFee || 0,
+        packagingFeeVat: p.packagingFeeVat || 'VAT 별도',
+        packagingFeeApply: p.packagingFeeApply || '1개당',
+        deliveryDate: p.deadline || '',
+        recipient: p.recipient || '',
+        phone: p.phone || '',
+        address: p.address || '',
+        startDate: p.startDate || '',
+        supplier: p.supplier || '',
+        supplierContact: p.supplierContact || ''
+    };
+    try {
+        localStorage.setItem('klp_doc_prefill', JSON.stringify(prefill));
+    } catch (e) {
+        console.error('prefill 저장 실패', e);
+        showToast('사전 입력 저장 실패');
+        return;
+    }
+    location.href = `doc-generator.html#${type}`;
 }
 
 function openEditProject(id) {

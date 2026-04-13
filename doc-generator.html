@@ -211,7 +211,6 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
   <div class="section"><div class="section-title">💬 결제 조건 안내 문구</div><div class="toggle-wrap"><label class="toggle-switch"><input type="checkbox" id="showPaymentNotice" checked onchange="togglePayPreview()"><span class="toggle-slider"></span></label><span class="toggle-label">확인서에 결제 조건 문구 표시</span></div><div id="payPreview" class="toggle-preview">제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.</div></div>
   <div class="warn hidden" id="warnBox"></div>
   <button class="btn-preview" onclick="saveAndPreview()">💾 저장 & 미리보기 →</button>
-  <button type="button" onclick="exportToDomesticProject()" style="width:100%;padding:13px;margin-top:8px;border:1.5px solid var(--klp-blue);border-radius:12px;background:var(--klp-light-blue);color:var(--klp-blue);font-size:15px;font-weight:800;cursor:pointer;font-family:inherit">📊 프로젝트 진행사항(국내)으로 내보내기</button>
 </div>
 
 <!-- DC PREVIEW -->
@@ -220,7 +219,6 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
     <button class="btn-back" onclick="showDcTab('form')">← 수정하기</button>
     <button class="btn-dl png" id="btnJpg" onclick="dl('jpg')">📷 JPG</button>
     <button class="btn-dl pdf" id="btnPdf" onclick="dl('pdf')">📄 PDF</button>
-    <button type="button" onclick="exportToDomesticProject()" style="padding:12px 24px;border:1.5px solid var(--klp-blue);border-radius:12px;background:var(--klp-light-blue);color:var(--klp-blue);font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">📊 프로젝트로 내보내기</button>
   </div>
   <div class="preview-wrap"><div id="docEl"></div></div>
 </div>
@@ -300,7 +298,6 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
 
   <div class="warn hidden" id="wrWarnBox"></div>
   <button class="btn-preview wr" onclick="saveAndPreviewWr()">💾 저장 & 작업요청서 미리보기 →</button>
-  <button type="button" onclick="exportWrToDomesticProject()" style="width:100%;padding:13px;margin-top:8px;border:1.5px solid var(--klp-orange);border-radius:12px;background:#FFF5F0;color:var(--klp-orange);font-size:15px;font-weight:800;cursor:pointer;font-family:inherit">📊 프로젝트 진행사항(국내)으로 내보내기 (매입처)</button>
 </div>
 
 <!-- WR PREVIEW -->
@@ -832,6 +829,17 @@ async function saveToDb(){if(!validate())return;var e=window._est;var seq=Math.m
       await sbFetch('confirmations','POST',data);
       showMsg('✅ 저장 완료! ('+docNum+')');
     }
+    /* 프로젝트에서 넘어온 경우: source_doc_number 자동 연결 */
+    if(window._fromProjectId){
+      try{
+        await sbFetch('projects_domestic?id=eq.'+window._fromProjectId,'PATCH',{source_doc_number:docNum});
+        showMsg('✅ 프로젝트에 자동 연결되었습니다 ('+docNum+')');
+      }catch(e){console.warn('프로젝트 연결 실패',e);showMsg('⚠️ 저장은 됐지만 프로젝트 연결 실패: '+e.message,true);}
+      window._fromProjectId=null;
+      if(confirm('프로젝트 진행사항으로 돌아갈까요?')){
+        location.href='index.html#projects-domestic';
+      }
+    }
   }catch(err){showMsg('❌ 저장 실패: '+err.message,true)}}
 
 /* === SUPABASE - WR 저장 (FIX #7, #10, #11: 문서번호 기준 덮어쓰기) === */
@@ -878,184 +886,17 @@ async function saveWrToDb(){
       await sbFetch('confirmations','POST',data);
       showMsg('✅ 작업요청서 저장 완료! ('+docNum+')');
     }
+    /* 프로젝트에서 넘어온 경우: 돌아가기 안내 */
+    if(window._fromProjectIdWr){
+      window._fromProjectIdWr=null;
+      if(confirm('프로젝트 진행사항으로 돌아갈까요?')){
+        location.href='index.html#projects-domestic';
+      }
+    }
   }catch(err){showMsg('❌ 저장 실패: '+err.message,true)}
 }
 
 async function getNextSeq(){try{var res=await sbFetch('confirmations?select=doc_number&order=created_at.desc&limit=1','GET');if(res&&res.length>0){var last=res[0].doc_number||'';var parts=last.split('_');if(parts.length===2)return parseInt(parts[1])+1}return 1}catch(e){return 1}}
-
-/* === 프로젝트 진행사항(국내)으로 내보내기 === */
-async function exportToDomesticProject(){
-  if(!validate())return;
-  var e=window._est;
-  var seq=Math.max(1,parseInt(document.getElementById('docSeq').value)||1);
-  var docNum=Y+'_'+String(seq).padStart(4,'0');
-  var revenue=e?e.grand:0;
-  var payload={
-    client:val('companyName'),
-    contact_person:val('contactPerson'),
-    title:val('title'),
-    manager:val('manager'),
-    product_name:val('productName'),
-    quantity:toNum(val('quantity'))||0,
-    unit:val('unit'),
-    unit_price:toNum(val('unitPrice'))||0,
-    unit_price_vat:val('unitPriceVat'),
-    color:val('color'),
-    print_color_size:val('printColorSize'),
-    print_method:val('printMethod'),
-    print_fee:toNum(val('printFee'))||0,
-    print_fee_vat:val('printFeeVat'),
-    print_fee_apply:val('printFeeApply'),
-    packaging:val('packaging'),
-    packaging_fee:toNum(val('packagingFee'))||0,
-    packaging_fee_vat:val('packagingFeeVat'),
-    packaging_fee_apply:val('packagingFeeApply'),
-    delivery_date:val('deliveryDate')||null,
-    recipient:val('dcRecipient'),
-    phone:val('dcPhone'),
-    address:val('dcAddress'),
-    revenue:revenue,
-    status:'시작 전',
-    priority:'🟢 보통',
-    category:'국내 주문',
-    progress:'0%',
-    start_date:val('date')||null,
-    memo:'',
-    source_doc_number:docNum
-  };
-  try{
-    var res=await sbFetch('projects_domestic','POST',payload);
-    if(res&&res.error){throw new Error(res.message||res.error)}
-    /* 프로젝트 마감일 기준 전체(공통) 일일 태스크 자동 생성 */
-    if(res&&res.length>0&&res[0].id&&payload.delivery_date){
-      var projId=res[0].id;
-      try{
-        await sbFetch('daily_tasks','POST',{
-          task:(payload.client||'')+' — '+(payload.product_name||'')+' 마감',
-          date:payload.delivery_date,
-          assignee:'전체',
-          target:'',
-          priority:'🔴 긴급',
-          done:false,
-          deadline:payload.delivery_date,
-          label:'거래처 업무',
-          client:payload.client||'',
-          project_id:projId,
-          is_deadline_copy:false
-        });
-      }catch(e){console.warn('daily_tasks insert failed',e);}
-    }
-    showMsg('✅ 프로젝트 진행사항으로 내보냈습니다! ('+val('companyName')+' — '+val('productName')+')');
-    if(confirm('프로젝트 진행사항 페이지로 이동할까요?')){
-      location.href='index.html#projects-domestic';
-    }
-  }catch(err){
-    showMsg('❌ 내보내기 실패: '+err.message+' (projects_domestic 테이블이 생성되었는지 확인하세요)',true);
-  }
-}
-
-/* === WR → 프로젝트 진행사항(국내) 내보내기 (매입처 행) === */
-async function sbReq(path,method,body){
-  var opts={method:method||'GET',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'}};
-  if(body)opts.body=JSON.stringify(body);
-  var res=await fetch(SB_URL+'/rest/v1/'+path,opts);
-  var text=await res.text();
-  var data=null;try{data=text?JSON.parse(text):null}catch(e){}
-  if(!res.ok){
-    var msg=(data&&(data.message||data.hint))||text||('HTTP '+res.status);
-    var err=new Error(msg);err.code=data&&data.code;err.status=res.status;throw err;
-  }
-  return data;
-}
-
-async function exportWrToDomesticProject(){
-  if(!validateWr())return;
-  if(!linkedDC){
-    showMsg('❌ 먼저 디자인확인서를 연동해주세요',true);
-    return;
-  }
-  /* WR이 아직 저장되지 않았다면 먼저 저장 */
-  var wrDocNum=val('wrDocNum');
-  if(!wrDocNum){
-    showMsg('💾 작업요청서를 먼저 저장합니다...');
-    await saveWrToDb();
-    wrDocNum=val('wrDocNum');
-    if(!wrDocNum){showMsg('❌ 작업요청서 저장 실패',true);return;}
-  }
-  var we=window._wrEst;
-  var dcDocNum=linkedDC.doc_number;
-
-  /* 부모 프로젝트 찾기: source_doc_number = DC doc_number */
-  var parentRes;
-  try{
-    parentRes=await sbReq('projects_domestic?source_doc_number=eq.'+encodeURIComponent(dcDocNum)+'&select=id','GET');
-  }catch(e){
-    showMsg('❌ 부모 프로젝트 조회 실패: '+e.message,true);return;
-  }
-  if(!parentRes||parentRes.length===0){
-    showMsg('❌ 연동된 디자인확인서의 프로젝트가 없습니다. 디자인확인서 탭에서 먼저 "프로젝트로 내보내기"를 실행해주세요.',true);
-    return;
-  }
-  var parentId=parentRes[0].id;
-
-  var revenue=we?we.grand:0;
-  var payload={
-    client:linkedDC.company_name||'',
-    supplier:val('wrCompany'),
-    contact_person:linkedDC.contact_person||'',
-    supplier_contact:val('wrContact'),
-    title:val('wrTitle'),
-    manager:val('wrRequester'),
-    product_name:val('wrProduct'),
-    quantity:toNum(val('wrQty'))||0,
-    unit:val('wrUnit'),
-    unit_price:toNum(val('wrUnitPrice'))||0,
-    unit_price_vat:val('wrUnitPriceVat'),
-    color:val('wrColor'),
-    print_color_size:val('wrPrintColorSize'),
-    print_method:val('wrPrintMethod'),
-    print_fee:toNum(val('wrPrintFee'))||0,
-    print_fee_vat:val('wrPrintFeeVat'),
-    print_fee_apply:val('wrPrintFeeApply'),
-    packaging:val('wrPackaging'),
-    packaging_fee:toNum(val('wrPkgFee'))||0,
-    packaging_fee_vat:val('wrPkgFeeVat'),
-    packaging_fee_apply:val('wrPkgFeeApply'),
-    delivery_date:val('wrDeliveryDate')||null,
-    recipient:val('wrRecipient'),
-    phone:val('wrPhone'),
-    address:val('wrAddress'),
-    revenue:revenue,
-    status:'시작 전',
-    priority:'🟢 보통',
-    category:'국내 주문',
-    progress:'0%',
-    start_date:val('wrDate')||null,
-    memo:'[작업요청서] '+wrDocNum,
-    source_doc_number:wrDocNum,
-    parent_project_id:parentId
-  };
-  try{
-    var existing=await sbReq('projects_domestic?source_doc_number=eq.'+encodeURIComponent(wrDocNum)+'&select=id','GET');
-    if(existing&&existing.length>0){
-      await sbReq('projects_domestic?id=eq.'+existing[0].id,'PATCH',payload);
-      showMsg('✅ 매입처 행 업데이트 완료! ('+val('wrCompany')+')');
-    }else{
-      await sbReq('projects_domestic','POST',payload);
-      showMsg('✅ 프로젝트 진행사항에 매입처로 추가했습니다! ('+val('wrCompany')+')');
-    }
-    if(confirm('프로젝트 진행사항 페이지로 이동할까요?')){
-      location.href='index.html#projects-domestic';
-    }
-  }catch(err){
-    var hint='';
-    if(err.code==='42703'||/parent_project_id/.test(err.message||'')){
-      hint='\n\n→ Supabase에서 다음 SQL을 실행해주세요:\nalter table public.projects_domestic add column if not exists parent_project_id bigint;';
-    }
-    showMsg('❌ 내보내기 실패: '+err.message+hint,true);
-    console.error('export WR error',err);
-  }
-}
 
 /* FIX #3: 새로 입력 = 모든 데이터 초기화 */
 async function newDoc(){
@@ -1377,6 +1218,88 @@ document.getElementById('date').value=new Date().toISOString().split('T')[0];
 document.getElementById('yearPrefix').textContent=Y+'_';
 (async function(){var n=await getNextSeqSafe();document.getElementById('docSeq').value=n;updateDocNum()})();
 loadClientsDatalist();
+
+/* === 프로젝트 진행사항에서 넘어온 prefill 처리 === */
+(async function applyProjectPrefill(){
+  try{
+    var raw=localStorage.getItem('klp_doc_prefill');
+    if(!raw)return;
+    var pf=JSON.parse(raw);
+    localStorage.removeItem('klp_doc_prefill');
+    if(!pf||!pf.type)return;
+    var setVal=function(id,v){var el=document.getElementById(id);if(el&&v!=null&&v!=='')el.value=v;};
+    if(pf.type==='dc'){
+      switchMode('dc');
+      window._fromProjectId=pf.projectId||null;
+      setVal('companyName',pf.client);
+      setVal('contactPerson',pf.contactPerson);
+      setVal('title',pf.title);
+      setVal('manager',pf.manager);
+      setVal('productName',pf.productName);
+      setVal('quantity',pf.quantity);
+      setVal('unit',pf.unit);
+      setVal('unitPrice',pf.unitPrice);
+      setVal('unitPriceVat',pf.unitPriceVat);
+      setVal('color',pf.color);
+      setVal('printColorSize',pf.printColorSize);
+      setVal('printMethod',pf.printMethod);
+      try{togglePrintFee();}catch(e){}
+      setVal('printFee',pf.printFee);
+      setVal('printFeeVat',pf.printFeeVat);
+      setVal('printFeeApply',pf.printFeeApply);
+      setVal('packaging',pf.packaging);
+      setVal('packagingFee',pf.packagingFee);
+      setVal('packagingFeeVat',pf.packagingFeeVat);
+      setVal('packagingFeeApply',pf.packagingFeeApply);
+      setVal('deliveryDate',pf.deliveryDate);
+      setVal('dcRecipient',pf.recipient);
+      setVal('dcPhone',pf.phone);
+      setVal('dcAddress',pf.address);
+      if(pf.startDate)setVal('date',pf.startDate);
+      try{calcEst();}catch(e){}
+      showMsg('✅ 프로젝트 데이터를 불러왔습니다. 시안 이미지 첨부 후 저장해주세요.');
+    }else if(pf.type==='wr'){
+      switchMode('wr');
+      window._fromProjectIdWr=pf.projectId||null;
+      /* 부모 DC 자동 연동 (문서번호 생성용) */
+      if(pf.linkedDcDocNumber){
+        try{
+          var dcRes=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(pf.linkedDcDocNumber)+'&select=id','GET');
+          if(dcRes&&dcRes.length>0){
+            await selectLinkedDC(dcRes[0].id);
+          }
+        }catch(e){console.warn('DC 자동 연동 실패',e);}
+      }
+      /* 프로젝트의 매입처 정보로 덮어쓰기 */
+      setVal('wrCompany',pf.supplier);
+      setVal('wrContact',pf.supplierContact);
+      setVal('wrTitle',pf.title);
+      setVal('wrRequester',pf.manager);
+      setVal('wrProduct',pf.productName);
+      setVal('wrQty',pf.quantity);
+      setVal('wrUnit',pf.unit);
+      setVal('wrUnitPrice',pf.unitPrice);
+      setVal('wrUnitPriceVat',pf.unitPriceVat);
+      setVal('wrColor',pf.color);
+      setVal('wrPrintColorSize',pf.printColorSize);
+      setVal('wrPrintMethod',pf.printMethod);
+      try{toggleWrPrintFee();}catch(e){}
+      setVal('wrPrintFee',pf.printFee);
+      setVal('wrPrintFeeVat',pf.printFeeVat);
+      setVal('wrPrintFeeApply',pf.printFeeApply);
+      setVal('wrPackaging',pf.packaging);
+      setVal('wrPkgFee',pf.packagingFee);
+      setVal('wrPkgFeeVat',pf.packagingFeeVat);
+      setVal('wrPkgFeeApply',pf.packagingFeeApply);
+      setVal('wrDeliveryDate',pf.deliveryDate);
+      setVal('wrRecipient',pf.recipient);
+      setVal('wrPhone',pf.phone);
+      setVal('wrAddress',pf.address);
+      try{calcWrEst();}catch(e){}
+      showMsg('✅ 프로젝트 데이터를 불러왔습니다. 확인 후 저장해주세요.');
+    }
+  }catch(e){console.error('prefill 적용 실패',e);}
+})();
 
 /* === 로그인 사용자 기반 본사 담당자 자동 선택 === */
 function getLoginManager(){
