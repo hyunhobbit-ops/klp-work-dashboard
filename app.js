@@ -157,7 +157,7 @@ let clientPage = 1;
 const CLIENTS_PER_PAGE = 50;
 
 // ===== State =====
-let currentDate = new Date(2026, 3, 9);
+let currentDate = new Date();
 let currentPersonFilter = 'viewall';
 let weekOffset = 0;
 let monthOffset = 0;
@@ -206,7 +206,7 @@ function setupShortcuts() {
 
 // ===== Topbar =====
 function setupTopbar() {
-    const now = new Date(2026, 3, 9);
+    const now = new Date();
     const days = ['일', '월', '화', '수', '목', '금', '토'];
     document.getElementById('topbarDate').textContent =
         `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 (${days[now.getDay()]})`;
