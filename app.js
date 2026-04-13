@@ -102,6 +102,7 @@ async function showApp() {
     await loadDomesticProjectsFromDb();
     await loadDailyTasksFromDb();
     await loadDeliveriesFromDb();
+    subscribeDailyTasks();
     renderAll();
     // URL 해시 → 탭 전환 (문서생성기에서 이동해온 경우 등)
     const hash = location.hash.replace('#', '');
@@ -2173,6 +2174,35 @@ async function loadDailyTasksFromDb() {
         console.error('일일계획 로드 실패:', err.message);
         showToast('일일계획 로드 실패: ' + err.message);
     }
+}
+
+let dailyTasksChannel = null;
+function subscribeDailyTasks() {
+    if (dailyTasksChannel) {
+        sb.removeChannel(dailyTasksChannel);
+        dailyTasksChannel = null;
+    }
+    dailyTasksChannel = sb.channel('daily_tasks_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_tasks' }, (payload) => {
+            if (payload.eventType === 'INSERT') {
+                const row = taskFromDb(payload.new);
+                if (!dailyTasks.find(t => t.id === row.id)) {
+                    dailyTasks.push(row);
+                }
+            } else if (payload.eventType === 'UPDATE') {
+                const row = taskFromDb(payload.new);
+                const idx = dailyTasks.findIndex(t => t.id === row.id);
+                if (idx !== -1) dailyTasks[idx] = row;
+                else dailyTasks.push(row);
+            } else if (payload.eventType === 'DELETE') {
+                const oldId = payload.old && payload.old.id;
+                const idx = dailyTasks.findIndex(t => t.id === oldId);
+                if (idx !== -1) dailyTasks.splice(idx, 1);
+            }
+            renderDaily();
+            renderHome();
+        })
+        .subscribe();
 }
 async function dbInsertTask(t) {
     const { data, error } = await sb.from('daily_tasks').insert(taskToDb(t)).select().single();
