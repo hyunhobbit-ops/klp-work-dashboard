@@ -775,29 +775,37 @@ function renderDaily() {
 
     let html = '';
 
-    // "전체" 공통 할 일 컬럼 (담당자가 '전체'인 항목)
-    if (showCommonColumn) {
-        const commonTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '전체');
-        html += renderColumn('전체 (공통)', commonTasks, '전체');
-    }
+    // 개인별 탭일 때: 개인 컬럼을 맨 앞에, 그 다음 전체/임원/대표님 순
+    const isPersonalTab = currentPersonFilter !== 'viewall' && currentPersonFilter !== 'ceo';
 
-    // "임원" 컬럼 (담당자가 '임원'인 항목)
-    if (showExecColumn) {
-        const execTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '임원');
-        html += renderColumn('임원', execTasks, '임원');
-    }
-
-    // "대표님" 컬럼 (담당자가 '대표님'인 항목)
-    if (showCeoColumn) {
-        const ceoTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '대표님');
-        html += renderColumn('대표님', ceoTasks, '대표님');
-    }
-
-    // 개인별 컬럼
-    displayPeople.forEach(person => {
+    const renderCommonCols = () => {
+        let h = '';
+        if (showCommonColumn) {
+            const commonTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '전체');
+            h += renderColumn('전체 (공통)', commonTasks, '전체');
+        }
+        if (showExecColumn) {
+            const execTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '임원');
+            h += renderColumn('임원', execTasks, '임원');
+        }
+        if (showCeoColumn) {
+            const ceoTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '대표님');
+            h += renderColumn('대표님', ceoTasks, '대표님');
+        }
+        return h;
+    };
+    const renderPersonalCols = () => displayPeople.map(person => {
         const tasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === person);
-        html += renderColumn(person, tasks, person);
-    });
+        return renderColumn(person, tasks, person);
+    }).join('');
+
+    if (isPersonalTab) {
+        html += renderPersonalCols();
+        html += renderCommonCols();
+    } else {
+        html += renderCommonCols();
+        html += renderPersonalCols();
+    }
 
     document.getElementById('dailyColumns').innerHTML = html;
 
