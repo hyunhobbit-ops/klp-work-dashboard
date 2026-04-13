@@ -2455,12 +2455,13 @@ function renderClients() {
     const esc = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 
     const catBadge = (cat) => {
-        if (cat === '매입처') return `<span class="badge badge-purple">매입</span> `;
-        if (cat === '매출처') return `<span class="badge badge-blue">매출</span> `;
-        return '';
+        if (cat === '매입처') return `<span class="badge badge-purple">매입처</span>`;
+        if (cat === '매출처') return `<span class="badge badge-blue">매출처</span>`;
+        return '-';
     };
     tbody.innerHTML = pageItems.map(c => `<tr onclick="openEditClient(${c.id})" style="cursor:pointer">
-        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${catBadge(c.category)}<strong>${esc(c.companyName)}</strong></td>
+        <td>${catBadge(c.category)}</td>
+        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><strong>${esc(c.companyName)}</strong></td>
         <td>${esc(c.ceo) || '-'}</td>
         <td>${esc(c.phone) || '-'}</td>
         <td>${esc(c.mobile) || '-'}</td>
@@ -2468,7 +2469,7 @@ function renderClients() {
         <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.address) || '-'}</td>
         <td>${esc(c.staffName) || '-'}</td>
         <td>${esc(c.grade) || '-'}</td>
-    </tr>`).join('') || `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
 
     // 페이지네이션
     const pag = document.getElementById('clientPagination');
