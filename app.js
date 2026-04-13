@@ -376,6 +376,37 @@ function renderHome() {
     document.getElementById('qDaily').textContent = `오늘 ${myTodayItems.length}건`;
     document.getElementById('qDelivery').textContent = `이번달 ${monthDel}건`;
 
+    // 마감임박 (D-3) — 프로젝트 마감일이 오늘부터 3일 이내, 완료 제외
+    const today0 = new Date(todayStr + 'T00:00:00');
+    const deadlineSoon = projects
+        .filter(p => p.status !== '완료' && p.deadline)
+        .map(p => {
+            const d = new Date(p.deadline + 'T00:00:00');
+            const diff = Math.round((d - today0) / 86400000);
+            return { p, diff };
+        })
+        .filter(x => x.diff >= 0 && x.diff <= 3)
+        .sort((a, b) => a.diff - b.diff);
+    const deadlineEl = document.getElementById('deadlineSoonList');
+    const deadlineCountEl = document.getElementById('deadlineSoonCount');
+    if (deadlineCountEl) deadlineCountEl.textContent = deadlineSoon.length;
+    if (deadlineEl) {
+        if (deadlineSoon.length === 0) {
+            deadlineEl.innerHTML = `<div style="color:var(--text-tertiary);font-size:13px;padding:8px 2px">마감임박 항목이 없습니다</div>`;
+        } else {
+            deadlineEl.innerHTML = deadlineSoon.map(({ p, diff }) => {
+                const dLabel = diff === 0 ? 'D-DAY' : 'D-' + diff;
+                const dColor = diff === 0 ? '#E03131' : (diff === 1 ? '#E67E22' : '#1B64DA');
+                return `<div class="deadline-soon-item" onclick="showProjectDetail(${p.id})">
+                    <span class="deadline-soon-dday" style="background:${dColor}1a;color:${dColor}">${dLabel}</span>
+                    <span class="deadline-soon-name">${p.name}</span>
+                    <span class="deadline-soon-client">${p.client || '-'}</span>
+                    <span class="deadline-soon-date">${fmtDisplay(p.deadline)}</span>
+                </div>`;
+            }).join('');
+        }
+    }
+
     // Urgent
     const urgentProjects = projects.filter(p => p.priority.includes('긴급') && p.status !== '완료');
     const urgentTasks = dailyTasks.filter(t => t.priority.includes('긴급') && !t.done && t.date <= todayStr);
