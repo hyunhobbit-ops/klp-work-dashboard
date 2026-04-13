@@ -100,6 +100,8 @@ async function showApp() {
     const { data } = await sb.from('profiles').select('name, role');
     if (data) allProfiles = data;
     await loadDomesticProjectsFromDb();
+    await loadDailyTasksFromDb();
+    await loadDeliveriesFromDb();
     renderAll();
     // URL 해시 → 탭 전환 (문서생성기에서 이동해온 경우 등)
     const hash = location.hash.replace('#', '');
@@ -145,36 +147,8 @@ const overseasProjects = [
 // 홈 등에서 전체 프로젝트 참조용
 const projects = [...domesticProjects, ...overseasProjects];
 
-const dailyTasks = [
-    { id: 1, task: "해외 PO 만들기", date: "2026-04-09", assignee: "이현주", target: "본사", priority: "🔴 긴급", done: false },
-    { id: 2, task: "빔프로젝터 알아보기", date: "2026-04-09", assignee: "이현주", target: "본사", priority: "🟡 보통", done: false },
-    { id: 3, task: "세무 재고자산 리스트 보내기", date: "2026-04-09", assignee: "이현주", target: "회계", priority: "🔴 긴급", done: false },
-    { id: 4, task: "제안서 DB만들기", date: "2026-04-09", assignee: "이현주", target: "본사", priority: "🟡 보통", done: false },
-    { id: 5, task: "러쉬성수동 제안서 작성", date: "2026-04-09", assignee: "이현주", target: "거래처", priority: "🔴 긴급", done: false },
-    { id: 6, task: "굿즈덕 클로드 리뉴얼 진행", date: "2026-04-09", assignee: "김현호", target: "본사", priority: "🟡 보통", done: false },
-    { id: 7, task: "중고나라 사업자 가입 확인", date: "2026-04-09", assignee: "김현호", target: "개인", priority: "🔵 낮음", done: true },
-    { id: 8, task: "세무사 최종 마감 결산 보고", date: "2026-04-08", assignee: "이현주", target: "회계", priority: "🔴 긴급", done: true },
-    { id: 9, task: "스토어팜 상세페이지 작업", date: "2026-04-08", assignee: "김현호", target: "본사", priority: "🟡 보통", done: true },
-    { id: 10, task: "각 중고 채널별 사업자 가입", date: "2026-04-08", assignee: "김현호", target: "개인", priority: "🟡 보통", done: false },
-    { id: 11, task: "거래처 견적서 발송", date: "2026-04-10", assignee: "이현주", target: "거래처", priority: "🟡 보통", done: false },
-    { id: 12, task: "유튜브 촬영 스케줄 조율", date: "2026-04-10", assignee: "김현호", target: "유튜브", priority: "🔵 낮음", done: false },
-    { id: 13, task: "주간 회의 준비", date: "2026-04-09", assignee: "전체", target: "본사", priority: "🟡 보통", done: false },
-    { id: 14, task: "월간 보고서 제출", date: "2026-04-10", assignee: "전체", target: "본사", priority: "🔴 긴급", done: false },
-    { id: 15, task: "사무실 정리", date: "2026-04-11", assignee: "전체", target: "본사", priority: "🔵 낮음", done: false },
-];
-
-const deliveries = [
-    { id: 1, recipient: "이기석", date: "2026-04-08", type: "일반", sender: "케이엘피코리아", zipcode: "06234", address: "서울 강남구 역삼동 123-4", phone: "010-1234-5678", payment: "선불", product: "미니클락 골드", tracking: "6012345678901", memo: "", price: 85000, rating: "A 단골가능", seller: "1", author: "김현호" },
-    { id: 2, recipient: "최자회", date: "2026-04-08", type: "일반", sender: "케이엘피코리아", zipcode: "13487", address: "경기 성남시 분당구 판교로 256", phone: "010-9876-5432", payment: "선불", product: "대통령 시계 세트", tracking: "6012345678902", memo: "부재시 경비실", price: 150000, rating: "B 대통령시계", seller: "1", author: "김현호" },
-    { id: 3, recipient: "김상모", date: "2026-04-08", type: "번개", sender: "김현호", zipcode: "04523", address: "서울 중구 남대문로 1가", phone: "010-5555-1234", payment: "착불", product: "빈티지 세이코 다이버", tracking: "6012345678903", memo: "", price: 280000, rating: "A 단골가능", seller: "2", author: "김현호" },
-    { id: 4, recipient: "김윤정", date: "2026-04-07", type: "중고", sender: "이현주", zipcode: "08376", address: "서울 구로구 디지털로 300", phone: "010-3333-4444", payment: "선불", product: "카시오 빈티지", tracking: "6012345678904", memo: "", price: 45000, rating: "C 평범", seller: "1", author: "이현주" },
-    { id: 5, recipient: "김석진", date: "2026-04-08", type: "당근", sender: "이현주", zipcode: "03722", address: "서울 서대문구 연세로 50", phone: "010-7777-8888", payment: "선불", product: "벽시계 빈티지", tracking: "", memo: "직거래 예정", price: 35000, rating: "", seller: "1", author: "이현주" },
-    { id: 6, recipient: "이서윤", date: "2026-04-03", type: "ETSY", sender: "케이엘피코리아", zipcode: "", address: "CA 90001, Los Angeles", phone: "", payment: "선불", product: "Korean Clock Set", tracking: "EV123456789KR", memo: "해외배송 EMS", price: 120000, rating: "", seller: "1", author: "이현주" },
-    { id: 7, recipient: "이재호", date: "2026-04-07", type: "일반", sender: "구정두", zipcode: "41256", address: "대구 동구 동대구로 550", phone: "010-2222-3333", payment: "선불", product: "미니클락 실버", tracking: "6012345678906", memo: "", price: 85000, rating: "C 평범", seller: "1", author: "구정두" },
-    { id: 8, recipient: "이영찬", date: "2026-04-07", type: "번개", sender: "김현호", zipcode: "48058", address: "부산 해운대구 해운대로 100", phone: "010-6666-9999", payment: "착불", product: "롤렉스 빈티지", tracking: "6012345678907", memo: "시간 약속 필수", price: 450000, rating: "A 단골가능", seller: "2", author: "김현호" },
-    { id: 9, recipient: "김윤수", date: "2026-04-07", type: "일반", sender: "케이엘피코리아", zipcode: "06611", address: "서울 서초구 강남대로 27", phone: "010-1111-2222", payment: "선불", product: "기업 감사패 시계", tracking: "6012345678908", memo: "법인 배송", price: 300000, rating: "A 단골가능", seller: "1", author: "이현주" },
-    { id: 10, recipient: "김연지", date: "2026-04-06", type: "GS반택", sender: "이현주", zipcode: "10326", address: "경기 고양시 일산서구 중앙로", phone: "010-4444-5555", payment: "선불", product: "미니클락 핑크", tracking: "", memo: "GS 반택 접수", price: 65000, rating: "", seller: "1", author: "이현주" },
-];
+let dailyTasks = [];
+let deliveries = [];
 
 // ===== State =====
 let currentDate = new Date(2026, 3, 9);
@@ -830,17 +804,15 @@ function renderWeeklyKanban(person) {
     initKanbanDragDrop();
 }
 
-function inlineAddWeeklyTask(input, person, dateStr) {
+async function inlineAddWeeklyTask(input, person, dateStr) {
     const task = input.value.trim();
     if (!task) return;
-    dailyTasks.push({
-        id: Date.now(), task,
-        date: dateStr,
-        assignee: person,
-        target: '',
-        priority: '🟡 보통',
-        done: false
+    const saved = await dbInsertTask({
+        task, date: dateStr, assignee: person, target: '',
+        priority: '🟡 보통', done: false
     });
+    if (!saved) return;
+    dailyTasks.push(saved);
     renderDaily();
     renderHome();
     showToast('할 일이 추가되었습니다');
@@ -885,6 +857,7 @@ function initKanbanDragDrop() {
             const task = dailyTasks.find(t => t.id === taskId);
             if (task && task.date !== newDate) {
                 task.date = newDate;
+                dbUpdateTask(task.id, { date: newDate });
                 renderDaily();
                 renderHome();
                 showToast('할 일이 이동되었습니다');
@@ -1074,7 +1047,7 @@ function openQuickTask(assignee) {
     document.getElementById('modalOverlay').classList.add('show');
 }
 
-function addQuickTask() {
+async function addQuickTask() {
     const task = document.getElementById('quickTaskName').value.trim();
     if (!task) { showToast('할 일을 입력해주세요'); return; }
     const assignee = document.getElementById('quickTaskAssignee').value;
@@ -1085,19 +1058,21 @@ function addQuickTask() {
     const priority = document.getElementById('quickTaskPriority').value;
     const groupId = deadline && deadline !== date ? Date.now() : null;
 
-    dailyTasks.push({
-        id: Date.now(), task,
-        date, assignee, deadline, label, client, target: '', priority, done: false,
-        linkedGroup: groupId
+    const saved = await dbInsertTask({
+        task, date, assignee, deadline, label, client, target: '',
+        priority, done: false, linkedGroup: groupId
     });
+    if (!saved) return;
+    dailyTasks.push(saved);
 
     // 마감일이 시작일과 다르면 마감일에도 연동 태스크 생성
     if (groupId) {
-        dailyTasks.push({
-            id: Date.now() + 1, task: `${task} (마감일)`,
-            date: deadline, assignee, deadline, label, client, target: '', priority, done: false,
-            linkedGroup: groupId, isDeadlineCopy: true
+        const savedCopy = await dbInsertTask({
+            task: `${task} (마감일)`,
+            date: deadline, assignee, deadline, label, client, target: '',
+            priority, done: false, linkedGroup: groupId, isDeadlineCopy: true
         });
+        if (savedCopy) dailyTasks.push(savedCopy);
     }
 
     closeModal(); renderDaily(); renderHome();
@@ -1155,7 +1130,7 @@ function openEditTask(id) {
     document.getElementById('modalOverlay').classList.add('show');
 }
 
-function saveEditTask(id) {
+async function saveEditTask(id) {
     const t = dailyTasks.find(x => x.id === id);
     if (!t) return;
     const name = document.getElementById('editTaskName').value.trim();
@@ -1172,7 +1147,14 @@ function saveEditTask(id) {
 
     // 연동된 태스크들도 업데이트
     if (t.linkedGroup) {
-        dailyTasks.filter(x => x.linkedGroup === t.linkedGroup).forEach(linked => {
+        // 공통 필드는 그룹 일괄 업데이트
+        await dbUpdateTasksByGroup(t.linkedGroup, {
+            assignee: newAssignee, deadline: newDeadline,
+            label: newLabel, client: newClient, priority: newPriority
+        });
+        // task 이름/date는 isDeadlineCopy 여부로 달라짐 → 개별 업데이트
+        const linkedList = dailyTasks.filter(x => x.linkedGroup === t.linkedGroup);
+        for (const linked of linkedList) {
             linked.assignee = newAssignee;
             linked.deadline = newDeadline;
             linked.label = newLabel;
@@ -1181,10 +1163,12 @@ function saveEditTask(id) {
             if (linked.isDeadlineCopy) {
                 linked.task = `${baseName} (마감일)`;
                 if (newDeadline) linked.date = newDeadline;
+                await dbUpdateTask(linked.id, { task: linked.task, date: linked.date });
             } else {
                 linked.task = baseName;
+                await dbUpdateTask(linked.id, { task: linked.task });
             }
-        });
+        }
     } else {
         t.task = name;
         t.assignee = newAssignee;
@@ -1194,16 +1178,23 @@ function saveEditTask(id) {
         t.client = newClient;
         t.priority = newPriority;
 
+        await dbUpdateTask(id, {
+            task: name, assignee: newAssignee, date: newDate,
+            deadline: newDeadline, label: newLabel, client: newClient, priority: newPriority
+        });
+
         // 마감일이 새로 추가된 경우 연동 태스크 생성
         if (newDeadline && newDeadline !== newDate) {
             const groupId = Date.now();
             t.linkedGroup = groupId;
-            dailyTasks.push({
-                id: Date.now() + 1, task: `${name} (마감일)`,
+            await dbUpdateTask(id, { linkedGroup: groupId });
+            const saved = await dbInsertTask({
+                task: `${name} (마감일)`,
                 date: newDeadline, assignee: newAssignee, deadline: newDeadline,
                 label: newLabel, client: newClient, target: '', priority: newPriority,
                 done: t.done, linkedGroup: groupId, isDeadlineCopy: true
             });
+            if (saved) dailyTasks.push(saved);
         }
     }
 
@@ -1211,15 +1202,17 @@ function saveEditTask(id) {
     showToast('할 일이 수정되었습니다');
 }
 
-function deleteTask(id) {
+async function deleteTask(id) {
     const t = dailyTasks.find(x => x.id === id);
     if (!t) return;
     // 연동된 태스크도 함께 삭제
     if (t.linkedGroup) {
+        await dbDeleteTasksByGroup(t.linkedGroup);
         for (let i = dailyTasks.length - 1; i >= 0; i--) {
             if (dailyTasks[i].linkedGroup === t.linkedGroup) dailyTasks.splice(i, 1);
         }
     } else {
+        await dbDeleteTask(id);
         const idx = dailyTasks.findIndex(x => x.id === id);
         if (idx !== -1) dailyTasks.splice(idx, 1);
     }
@@ -1227,17 +1220,15 @@ function deleteTask(id) {
     showToast('할 일이 삭제되었습니다');
 }
 
-function inlineAddTask(input, assignee) {
+async function inlineAddTask(input, assignee) {
     const task = input.value.trim();
     if (!task) return;
-    dailyTasks.push({
-        id: Date.now(), task,
-        date: fmtDate(currentDate),
-        assignee: assignee,
-        target: '본사',
-        priority: '🟡 보통',
-        done: false
+    const saved = await dbInsertTask({
+        task, date: fmtDate(currentDate), assignee,
+        target: '본사', priority: '🟡 보통', done: false
     });
+    if (!saved) return;
+    dailyTasks.push(saved);
     renderDaily();
     renderHome();
     showToast('할 일이 추가되었습니다');
@@ -1248,18 +1239,20 @@ function inlineAddTask(input, assignee) {
     });
 }
 
-function toggleTask(id) {
+async function toggleTask(id) {
     const task = dailyTasks.find(t => t.id === id);
-    if (task) {
-        const newDone = !task.done;
-        task.done = newDone;
-        // 연동된 태스크도 동일하게 체크/해제
-        if (task.linkedGroup) {
-            dailyTasks.filter(t => t.linkedGroup === task.linkedGroup).forEach(t => t.done = newDone);
-        }
-        renderDaily();
-        renderHome();
+    if (!task) return;
+    const newDone = !task.done;
+    task.done = newDone;
+    // 연동된 태스크도 동일하게 체크/해제
+    if (task.linkedGroup) {
+        dailyTasks.filter(t => t.linkedGroup === task.linkedGroup).forEach(t => t.done = newDone);
+        await dbUpdateTasksByGroup(task.linkedGroup, { done: newDone });
+    } else {
+        await dbUpdateTask(id, { done: newDone });
     }
+    renderDaily();
+    renderHome();
 }
 
 // =====================================
@@ -1431,28 +1424,33 @@ function openEditDelivery(id) {
     document.getElementById('modalOverlay').classList.add('show');
 }
 
-function saveEditDelivery(id) {
+async function saveEditDelivery(id) {
     const d = deliveries.find(x => x.id === id);
     if (!d) return;
-    d.date = document.getElementById('editDelDate').value;
-    d.recipient = document.getElementById('editDelRecipient').value.trim();
-    d.phone = document.getElementById('editDelPhone').value.trim();
-    d.zipcode = document.getElementById('editDelZipcode').value.trim();
-    d.address = document.getElementById('editDelAddress').value.trim();
-    d.type = document.getElementById('editDelType').value;
-    d.sender = document.getElementById('editDelSender').value;
-    d.payment = document.getElementById('editDelPayment').value;
-    d.product = document.getElementById('editDelProduct').value.trim();
-    d.price = parseInt(document.getElementById('editDelPrice').value) || 0;
-    d.memo = document.getElementById('editDelMemo').value.trim();
+    const patch = {
+        date: document.getElementById('editDelDate').value,
+        recipient: document.getElementById('editDelRecipient').value.trim(),
+        phone: document.getElementById('editDelPhone').value.trim(),
+        zipcode: document.getElementById('editDelZipcode').value.trim(),
+        address: document.getElementById('editDelAddress').value.trim(),
+        type: document.getElementById('editDelType').value,
+        sender: document.getElementById('editDelSender').value,
+        payment: document.getElementById('editDelPayment').value,
+        product: document.getElementById('editDelProduct').value.trim(),
+        price: parseInt(document.getElementById('editDelPrice').value) || 0,
+        memo: document.getElementById('editDelMemo').value.trim()
+    };
+    Object.assign(d, patch);
+    await dbUpdateDelivery(id, patch);
     closeModal();
     renderDeliveries();
     renderHome();
     showToast('택배가 수정되었습니다');
 }
 
-function deleteDelivery(id) {
+async function deleteDelivery(id) {
     if (!confirm('정말 삭제하시겠습니까?')) return;
+    await dbDeleteDelivery(id);
     const idx = deliveries.findIndex(x => x.id === id);
     if (idx !== -1) deliveries.splice(idx, 1);
     closeModal();
@@ -1465,27 +1463,30 @@ function copyTracking(num) {
     navigator.clipboard.writeText(num).then(() => showToast('운송장번호가 복사되었습니다')).catch(() => showToast('복사 실패'));
 }
 
-function saveTracking(id) {
+async function saveTracking(id) {
     const d = deliveries.find(x => x.id === id);
     if (!d) return;
     const input = document.getElementById(`track-${id}`);
     d.tracking = input.value.trim();
+    await dbUpdateDelivery(id, { tracking: d.tracking });
     showToast('운송장번호가 저장되었습니다');
 }
 
-function saveDetailTracking(id) {
+async function saveDetailTracking(id) {
     const d = deliveries.find(x => x.id === id);
     if (!d) return;
     const input = document.getElementById(`detail-track-${id}`);
     d.tracking = input.value.trim();
+    await dbUpdateDelivery(id, { tracking: d.tracking });
     renderDeliveries();
     showToast('운송장번호가 저장되었습니다');
 }
 
-function updateDeliveryRating(id, value) {
+async function updateDeliveryRating(id, value) {
     const d = deliveries.find(x => x.id === id);
     if (!d) return;
     d.rating = value;
+    await dbUpdateDelivery(id, { rating: value });
     showToast('평가가 저장되었습니다');
 }
 
@@ -2115,11 +2116,168 @@ async function loadDomesticProjectsFromDb() {
     }
 }
 
-function addDailyTask() {
+// =====================================
+// Supabase: daily_tasks & deliveries
+// =====================================
+function taskToDb(t) {
+    return {
+        task: t.task,
+        date: t.date,
+        assignee: t.assignee,
+        target: t.target || '',
+        priority: t.priority || '🟡 보통',
+        done: !!t.done,
+        deadline: t.deadline || null,
+        label: t.label || '',
+        client: t.client || '',
+        linked_group: t.linkedGroup || null,
+        is_deadline_copy: !!t.isDeadlineCopy
+    };
+}
+function taskFromDb(r) {
+    return {
+        id: r.id,
+        task: r.task,
+        date: r.date,
+        assignee: r.assignee,
+        target: r.target || '',
+        priority: r.priority || '🟡 보통',
+        done: !!r.done,
+        deadline: r.deadline || '',
+        label: r.label || '',
+        client: r.client || '',
+        linkedGroup: r.linked_group || null,
+        isDeadlineCopy: !!r.is_deadline_copy
+    };
+}
+async function loadDailyTasksFromDb() {
+    try {
+        const { data, error } = await sb.from('daily_tasks').select('*').order('id', { ascending: true });
+        if (error) throw error;
+        dailyTasks.length = 0;
+        (data || []).forEach(r => dailyTasks.push(taskFromDb(r)));
+    } catch (err) {
+        console.error('일일계획 로드 실패:', err.message);
+        showToast('일일계획 로드 실패: ' + err.message);
+    }
+}
+async function dbInsertTask(t) {
+    const { data, error } = await sb.from('daily_tasks').insert(taskToDb(t)).select().single();
+    if (error) { console.error(error); showToast('DB 저장 실패: ' + error.message); return null; }
+    return taskFromDb(data);
+}
+async function dbUpdateTask(id, patch) {
+    const map = { task:'task', date:'date', assignee:'assignee', target:'target', priority:'priority',
+        done:'done', deadline:'deadline', label:'label', client:'client',
+        linkedGroup:'linked_group', isDeadlineCopy:'is_deadline_copy' };
+    const dbPatch = {};
+    for (const [k, v] of Object.entries(patch)) {
+        if (!map[k]) continue;
+        dbPatch[map[k]] = (k === 'deadline' && !v) ? null : v;
+    }
+    if (Object.keys(dbPatch).length === 0) return;
+    const { error } = await sb.from('daily_tasks').update(dbPatch).eq('id', id);
+    if (error) { console.error(error); showToast('DB 수정 실패: ' + error.message); }
+}
+async function dbUpdateTasksByGroup(groupId, patch) {
+    const map = { task:'task', date:'date', assignee:'assignee', target:'target', priority:'priority',
+        done:'done', deadline:'deadline', label:'label', client:'client' };
+    const dbPatch = {};
+    for (const [k, v] of Object.entries(patch)) {
+        if (!map[k]) continue;
+        dbPatch[map[k]] = (k === 'deadline' && !v) ? null : v;
+    }
+    if (Object.keys(dbPatch).length === 0) return;
+    const { error } = await sb.from('daily_tasks').update(dbPatch).eq('linked_group', groupId);
+    if (error) { console.error(error); showToast('DB 수정 실패: ' + error.message); }
+}
+async function dbDeleteTask(id) {
+    const { error } = await sb.from('daily_tasks').delete().eq('id', id);
+    if (error) { console.error(error); showToast('DB 삭제 실패: ' + error.message); }
+}
+async function dbDeleteTasksByGroup(groupId) {
+    const { error } = await sb.from('daily_tasks').delete().eq('linked_group', groupId);
+    if (error) { console.error(error); showToast('DB 삭제 실패: ' + error.message); }
+}
+
+function deliveryToDb(d) {
+    return {
+        date: d.date,
+        type: d.type || '일반',
+        sender: d.sender || '',
+        recipient: d.recipient,
+        phone: d.phone || '',
+        product: d.product || '',
+        zipcode: d.zipcode || '',
+        address: d.address || '',
+        payment: d.payment || '선불',
+        price: d.price || 0,
+        memo: d.memo || '',
+        tracking: d.tracking || '',
+        rating: d.rating || '',
+        seller: d.seller || '1',
+        author: d.author || ''
+    };
+}
+function deliveryFromDb(r) {
+    return {
+        id: r.id,
+        date: r.date,
+        type: r.type || '일반',
+        sender: r.sender || '',
+        recipient: r.recipient || '',
+        phone: r.phone || '',
+        product: r.product || '',
+        zipcode: r.zipcode || '',
+        address: r.address || '',
+        payment: r.payment || '선불',
+        price: r.price || 0,
+        memo: r.memo || '',
+        tracking: r.tracking || '',
+        rating: r.rating || '',
+        seller: r.seller || '1',
+        author: r.author || ''
+    };
+}
+async function loadDeliveriesFromDb() {
+    try {
+        const { data, error } = await sb.from('deliveries').select('*').order('date', { ascending: false }).order('id', { ascending: false });
+        if (error) throw error;
+        deliveries.length = 0;
+        (data || []).forEach(r => deliveries.push(deliveryFromDb(r)));
+    } catch (err) {
+        console.error('택배 로드 실패:', err.message);
+        showToast('택배 로드 실패: ' + err.message);
+    }
+}
+async function dbInsertDelivery(d) {
+    const { data, error } = await sb.from('deliveries').insert(deliveryToDb(d)).select().single();
+    if (error) { console.error(error); showToast('DB 저장 실패: ' + error.message); return null; }
+    return deliveryFromDb(data);
+}
+async function dbUpdateDelivery(id, patch) {
+    const map = { date:'date', type:'type', sender:'sender', recipient:'recipient',
+        phone:'phone', product:'product', zipcode:'zipcode', address:'address',
+        payment:'payment', price:'price', memo:'memo', tracking:'tracking',
+        rating:'rating', seller:'seller', author:'author' };
+    const dbPatch = {};
+    for (const [k, v] of Object.entries(patch)) {
+        if (map[k]) dbPatch[map[k]] = v;
+    }
+    if (Object.keys(dbPatch).length === 0) return;
+    const { error } = await sb.from('deliveries').update(dbPatch).eq('id', id);
+    if (error) { console.error(error); showToast('DB 수정 실패: ' + error.message); }
+}
+async function dbDeleteDelivery(id) {
+    const { error } = await sb.from('deliveries').delete().eq('id', id);
+    if (error) { console.error(error); showToast('DB 삭제 실패: ' + error.message); }
+}
+
+async function addDailyTask() {
     const task = document.getElementById('newTaskName').value.trim();
     if (!task) { showToast('할 일을 입력해주세요'); return; }
-    dailyTasks.push({
-        id: Date.now(), task,
+    const saved = await dbInsertTask({
+        task,
         date: document.getElementById('newTaskDate').value,
         assignee: document.getElementById('newTaskAssignee').value,
         deadline: document.getElementById('newTaskDeadline').value || '',
@@ -2127,18 +2285,20 @@ function addDailyTask() {
         priority: document.getElementById('newTaskPriority').value,
         done: false
     });
+    if (!saved) return;
+    dailyTasks.push(saved);
     closeModal(); renderDaily(); renderHome();
     showToast('할 일이 추가되었습니다');
 }
 
-function addDelivery() {
+async function addDelivery() {
     const recipient = document.getElementById('newDelRecipient').value.trim();
     if (!recipient) { showToast('받는이를 입력해주세요'); return; }
     const typeSelect = document.getElementById('newDelType').value;
     const typeCustom = document.getElementById('newDelTypeCustom').value.trim();
     const type = typeSelect === '__custom' ? (typeCustom || '기타') : typeSelect;
-    deliveries.unshift({
-        id: Date.now(), recipient,
+    const saved = await dbInsertDelivery({
+        recipient,
         date: document.getElementById('newDelDate').value || fmtDate(new Date()),
         type,
         sender: document.getElementById('newDelSender').value,
@@ -2153,6 +2313,8 @@ function addDelivery() {
         rating: "", seller: "1",
         author: currentUser ? currentUser.name : '-'
     });
+    if (!saved) return;
+    deliveries.unshift(saved);
     closeModal(); renderDeliveries(); renderHome();
     showToast('택배가 추가되었습니다');
 }
@@ -2306,8 +2468,9 @@ document.addEventListener('dblclick', (e) => {
         cell.appendChild(select);
         select.focus();
 
-        const save = () => {
+        const save = async () => {
             d[field] = select.value;
+            await dbUpdateDelivery(id, { [field]: select.value });
             renderDeliveries();
             showToast('수정되었습니다');
         };
@@ -2322,8 +2485,11 @@ document.addEventListener('dblclick', (e) => {
         cell.appendChild(input);
         input.focus();
 
-        const save = () => {
-            if (input.value) d[field] = input.value;
+        const save = async () => {
+            if (input.value) {
+                d[field] = input.value;
+                await dbUpdateDelivery(id, { [field]: input.value });
+            }
             renderDeliveries();
             showToast('수정되었습니다');
         };
@@ -2339,12 +2505,13 @@ document.addEventListener('dblclick', (e) => {
         input.focus();
         input.select();
 
-        const save = () => {
+        const save = async () => {
             if (type === 'number') {
                 d[field] = parseInt(input.value) || 0;
             } else {
                 d[field] = input.value.trim();
             }
+            await dbUpdateDelivery(id, { [field]: d[field] });
             renderDeliveries();
             showToast('수정되었습니다');
         };
