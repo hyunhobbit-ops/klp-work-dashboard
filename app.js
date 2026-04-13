@@ -1058,7 +1058,7 @@ function openCalendarAdd(person, dateStr) {
         </div>
         <div class="form-group"><label class="form-label">라벨</label><select class="form-select" id="quickTaskLabel">${labelHtml}</select></div>
         <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="quickTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
-        <div class="form-group"><label class="form-label">거래처</label><select class="form-select" id="quickTaskClient"><option value="">선택 안함</option></select><p class="form-hint" style="color:var(--text-tertiary);font-size:12px;margin-top:4px;">추후 고객사 DB 연동 예정</p></div>
+        <div class="form-group"><label class="form-label">고객사</label>${buildClientDatalistField('quickTaskClient', '', 'quickClientList')}</div>
         <button class="form-submit" onclick="addQuickTask()">할 일 추가</button>`;
     document.getElementById('modalOverlay').classList.add('show');
 }
@@ -1091,7 +1091,7 @@ function openQuickTask(assignee) {
         </div>
         <div class="form-group"><label class="form-label">라벨</label><select class="form-select" id="quickTaskLabel">${labelHtml}</select></div>
         <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="quickTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
-        <div class="form-group"><label class="form-label">거래처</label><select class="form-select" id="quickTaskClient"><option value="">선택 안함</option></select><p class="form-hint" style="color:var(--text-tertiary);font-size:12px;margin-top:4px;">추후 고객사 DB 연동 예정</p></div>
+        <div class="form-group"><label class="form-label">고객사</label>${buildClientDatalistField('quickTaskClient', '', 'quickClientList')}</div>
         <button class="form-submit" onclick="addQuickTask()">할 일 추가</button>`;
     document.getElementById('modalOverlay').classList.add('show');
 }
@@ -1126,6 +1126,18 @@ async function addQuickTask() {
 
     closeModal(); renderDaily(); renderHome();
     showToast('할 일이 추가되었습니다');
+}
+
+function buildClientDatalistField(inputId, currentValue, listId) {
+    const escAttr = (s) => (s || '').toString().replace(/"/g, '&quot;');
+    const names = clients
+        .map(c => c.companyName)
+        .filter(Boolean)
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .sort((a, b) => a.localeCompare(b));
+    const opts = names.map(n => `<option value="${escAttr(n)}"></option>`).join('');
+    return `<input type="text" class="form-input" id="${inputId}" list="${listId}" value="${escAttr(currentValue)}" placeholder="고객사 검색/선택" autocomplete="off">
+        <datalist id="${listId}">${opts}</datalist>`;
 }
 
 function getDday(dateStr) {
@@ -1171,7 +1183,7 @@ function openEditTask(id) {
         </div>
         <div class="form-group"><label class="form-label">라벨</label><select class="form-select" id="editTaskLabel">${labelHtml}</select></div>
         <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="editTaskPriority">${priorityHtml}</select></div>
-        <div class="form-group"><label class="form-label">거래처</label><select class="form-select" id="editTaskClient"><option value="">선택 안함</option></select><p class="form-hint" style="color:var(--text-tertiary);font-size:12px;margin-top:4px;">추후 고객사 DB 연동 예정</p></div>
+        <div class="form-group"><label class="form-label">고객사</label>${buildClientDatalistField('editTaskClient', t.client || '', 'editClientList')}</div>
         <div style="display:flex;gap:8px;">
             <button class="form-submit" style="flex:1;" onclick="saveEditTask(${id})">수정 완료</button>
             <button class="form-submit" style="flex:0;background:var(--red);min-width:80px;" onclick="deleteTask(${id})">삭제</button>
