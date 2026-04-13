@@ -2083,7 +2083,11 @@ function openEditProject(id) {
             <div class="form-group"><label class="form-label">메모</label><input type="text" class="form-input" id="editProjectMemo" value="${(p.memo || '').replace(/"/g, '&quot;')}"></div>
         `)}
 
-        <div style="display:flex;gap:8px;margin-top:12px">
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <button class="form-submit" style="flex:1 1 180px;background:var(--blue)" onclick="createDocFromProject(${p.id},'dc')">📄 디자인확인서 만들기</button>
+            <button class="form-submit" style="flex:1 1 180px;background:var(--klp-orange,#E67E22)" onclick="createDocFromProject(${p.id},'wr')">📋 작업요청서 만들기</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
             <button class="form-submit" style="flex:1;background:var(--red)" onclick="deleteProject(${p.id})">🗑️ 삭제</button>
             <button class="form-submit" style="flex:2" onclick="updateProject(${p.id})">💾 수정 저장</button>
         </div>`;
