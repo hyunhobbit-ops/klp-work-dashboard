@@ -2502,8 +2502,9 @@ function renderClients() {
         ${ed('bizItem', 'text', esc(c.bizItem) || '-')}
         ${ed('staffName', 'text', esc(c.staffName) || '-')}
         ${ed('grade', 'text', esc(c.grade) || '-')}
+        <td><button class="edit-btn" onclick="event.stopPropagation();openEditClient(${c.id})">편집</button></td>
     </tr>`;
-    }).join('') || `<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
+    }).join('') || `<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
 
     // 페이지네이션
     const pag = document.getElementById('clientPagination');
@@ -2630,8 +2631,92 @@ function clientRowClick(id) {
     if (_clientRowClickTimer) clearTimeout(_clientRowClickTimer);
     _clientRowClickTimer = setTimeout(() => {
         _clientRowClickTimer = null;
-        openEditClient(id);
+        openClientDetail(id);
     }, 250);
+}
+
+function openClientDetail(id) {
+    const c = clients.find(x => x.id === id);
+    if (!c) return;
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    title.textContent = `${c.companyName} — 상세`;
+
+    const esc = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    const cat = c.category === '매입처' ? `<span class="badge badge-purple">매입처</span>`
+              : c.category === '매출처' ? `<span class="badge badge-blue">매출처</span>` : '';
+
+    // 연동된 일일계획표 (client 필드가 회사명과 일치)
+    const linkedTasks = dailyTasks
+        .filter(t => t.client && t.client === c.companyName)
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+    // 연동된 프로젝트 (project.client 가 회사명과 일치)
+    const linkedProjects = projects
+        .filter(p => p.client && p.client === c.companyName)
+        .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
+
+    const tasksHtml = linkedTasks.length === 0
+        ? `<div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">연동된 일일계획표가 없습니다</div>`
+        : `<table class="data-table" style="margin-top:8px">
+            <thead><tr><th style="width:100px">날짜</th><th>할 일</th><th style="width:90px">담당자</th><th style="width:60px">완료</th></tr></thead>
+            <tbody>${linkedTasks.map(t => `<tr onclick="closeModal();switchTab('daily');setTimeout(()=>openEditTask(${t.id}),100)" style="cursor:pointer">
+                <td>${esc(t.date)}</td>
+                <td>${esc(t.task)}</td>
+                <td>${esc(t.assignee)}</td>
+                <td>${t.done ? '✅' : '⬜'}</td>
+            </tr>`).join('')}</tbody>
+        </table>`;
+
+    const projectsHtml = linkedProjects.length === 0
+        ? `<div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">연동된 프로젝트가 없습니다</div>`
+        : `<table class="data-table" style="margin-top:8px">
+            <thead><tr><th>품명</th><th style="width:100px">상태</th><th style="width:100px">진행률</th><th style="width:120px">납기</th><th style="width:120px">매출액</th></tr></thead>
+            <tbody>${linkedProjects.map(p => `<tr onclick="closeModal();switchTab('${p.category === '해외 주문' ? 'projects-overseas' : 'projects-domestic'}');setTimeout(()=>openEditProject(${p.id}),100)" style="cursor:pointer">
+                <td><strong>${esc(p.name)}</strong></td>
+                <td>${esc(p.status)}</td>
+                <td>${esc(p.progress)}</td>
+                <td>${esc(p.deadline) || '-'}</td>
+                <td>${(p.revenue || 0).toLocaleString()}원</td>
+            </tr>`).join('')}</tbody>
+        </table>`;
+
+    const row = (label, val) => `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--gray-100)"><div style="width:100px;color:var(--text-tertiary);font-size:13px">${label}</div><div style="flex:1;font-size:14px">${esc(val) || '-'}</div></div>`;
+
+    body.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+            ${cat}
+            <h3 style="margin:0;font-size:18px">${esc(c.companyName)}</h3>
+        </div>
+        <div class="form-section-title">📋 기본 정보</div>
+        <div style="background:var(--gray-50);border-radius:8px;padding:8px 14px;margin-bottom:12px">
+            ${row('대표자', c.ceo)}
+            ${row('사업자번호', c.businessNo)}
+            ${row('전화', c.phone)}
+            ${row('팩스', c.fax)}
+            ${row('핸드폰', c.mobile)}
+            ${row('이메일', c.email)}
+            ${row('우편번호', c.zipcode)}
+            ${row('주소', c.address)}
+            ${row('업태', c.bizType)}
+            ${row('업종', c.bizItem)}
+            ${row('등급', c.grade)}
+        </div>
+        <div class="form-section-title">👤 담당직원</div>
+        <div style="background:var(--gray-50);border-radius:8px;padding:8px 14px;margin-bottom:12px">
+            ${row('이름', c.staffName)}
+            ${row('핸드폰', c.staffMobile)}
+            ${row('이메일', c.staffEmail)}
+        </div>
+        <div class="form-section-title">📅 연동된 일일계획표 (${linkedTasks.length}건)</div>
+        ${tasksHtml}
+        <div class="form-section-title" style="margin-top:16px">📦 연동된 프로젝트 (${linkedProjects.length}건)</div>
+        ${projectsHtml}
+        <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="form-submit" style="flex:1" onclick="openEditClient(${id})">✏️ 편집</button>
+            <button class="form-submit" style="flex:1;background:var(--gray-200);color:var(--gray-800)" onclick="closeModal()">닫기</button>
+        </div>`;
+    document.getElementById('modalOverlay').classList.add('show');
 }
 
 async function saveEditClient(id) {
