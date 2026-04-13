@@ -1224,85 +1224,93 @@ document.getElementById('yearPrefix').textContent=Y+'_';
 (async function(){var n=await getNextSeqSafe();document.getElementById('docSeq').value=n;updateDocNum()})();
 loadClientsDatalist();
 
-/* === 프로젝트 진행사항에서 넘어온 prefill 처리 === */
+/* === 프로젝트 진행사항에서 넘어온 prefill 데이터 적용 (신규 + 편집 공용) === */
+async function applyProjectPrefillData(pf, opts){
+  opts=opts||{};
+  var setVal=function(id,v){var el=document.getElementById(id);if(el&&v!=null&&v!=='')el.value=v;};
+  if(pf.type==='dc'){
+    if(!opts.skipModeSwitch)switchMode('dc');
+    window._fromProjectId=pf.projectId||null;
+    setVal('companyName',pf.client);
+    setVal('contactPerson',pf.contactPerson);
+    setVal('title',pf.title);
+    setVal('manager',pf.manager);
+    setVal('productName',pf.productName);
+    setVal('quantity',pf.quantity);
+    setVal('unit',pf.unit);
+    setVal('unitPrice',pf.unitPrice);
+    setVal('unitPriceVat',pf.unitPriceVat);
+    setVal('color',pf.color);
+    setVal('printColorSize',pf.printColorSize);
+    setVal('printMethod',pf.printMethod);
+    try{togglePrintFee();}catch(e){}
+    setVal('printFee',pf.printFee);
+    setVal('printFeeVat',pf.printFeeVat);
+    setVal('printFeeApply',pf.printFeeApply);
+    setVal('packaging',pf.packaging);
+    setVal('packagingFee',pf.packagingFee);
+    setVal('packagingFeeVat',pf.packagingFeeVat);
+    setVal('packagingFeeApply',pf.packagingFeeApply);
+    setVal('deliveryDate',pf.deliveryDate);
+    setVal('dcRecipient',pf.recipient);
+    setVal('dcPhone',pf.phone);
+    setVal('dcAddress',pf.address);
+    if(pf.startDate&&!opts.skipDate)setVal('date',pf.startDate);
+    try{calcEst();}catch(e){}
+  }else if(pf.type==='wr'){
+    if(!opts.skipModeSwitch)switchMode('wr');
+    window._fromProjectIdWr=pf.projectId||null;
+    /* 부모 DC 자동 연동 — 편집 모드에서는 이미 wrDocNum이 확정되어 있으므로 스킵 */
+    if(!opts.skipLinkedDcReload&&pf.linkedDcDocNumber){
+      try{
+        var dcRes=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(pf.linkedDcDocNumber)+'&select=id','GET');
+        if(dcRes&&dcRes.length>0){
+          await selectLinkedDC(dcRes[0].id);
+        }
+      }catch(e){console.warn('DC 자동 연동 실패',e);}
+    }
+    setVal('wrCompany',pf.supplier);
+    setVal('wrContact',pf.supplierContact);
+    setVal('wrTitle',pf.title);
+    setVal('wrRequester',pf.manager);
+    setVal('wrProduct',pf.productName);
+    setVal('wrQty',pf.quantity);
+    setVal('wrUnit',pf.unit);
+    setVal('wrUnitPrice',pf.unitPrice);
+    setVal('wrUnitPriceVat',pf.unitPriceVat);
+    setVal('wrColor',pf.color);
+    setVal('wrPrintColorSize',pf.printColorSize);
+    setVal('wrPrintMethod',pf.printMethod);
+    try{toggleWrPrintFee();}catch(e){}
+    setVal('wrPrintFee',pf.printFee);
+    setVal('wrPrintFeeVat',pf.printFeeVat);
+    setVal('wrPrintFeeApply',pf.printFeeApply);
+    setVal('wrPackaging',pf.packaging);
+    setVal('wrPkgFee',pf.packagingFee);
+    setVal('wrPkgFeeVat',pf.packagingFeeVat);
+    setVal('wrPkgFeeApply',pf.packagingFeeApply);
+    setVal('wrDeliveryDate',pf.deliveryDate);
+    setVal('wrRecipient',pf.recipient);
+    setVal('wrPhone',pf.phone);
+    setVal('wrAddress',pf.address);
+    try{calcWrEst();}catch(e){}
+  }
+}
+
+/* === 프로젝트 진행사항에서 넘어온 prefill 처리 (신규 생성 경로) === */
 (async function applyProjectPrefill(){
   try{
+    /* 편집 모드면 applyEditHash에서 loadRecord 이후에 덮어쓴다 */
+    var hash=(location.hash||'').replace(/^#/,'');
+    if(hash.startsWith('edit-'))return;
     var raw=localStorage.getItem('klp_doc_prefill');
     if(!raw)return;
     var pf=JSON.parse(raw);
     localStorage.removeItem('klp_doc_prefill');
     if(!pf||!pf.type)return;
-    var setVal=function(id,v){var el=document.getElementById(id);if(el&&v!=null&&v!=='')el.value=v;};
-    if(pf.type==='dc'){
-      switchMode('dc');
-      window._fromProjectId=pf.projectId||null;
-      setVal('companyName',pf.client);
-      setVal('contactPerson',pf.contactPerson);
-      setVal('title',pf.title);
-      setVal('manager',pf.manager);
-      setVal('productName',pf.productName);
-      setVal('quantity',pf.quantity);
-      setVal('unit',pf.unit);
-      setVal('unitPrice',pf.unitPrice);
-      setVal('unitPriceVat',pf.unitPriceVat);
-      setVal('color',pf.color);
-      setVal('printColorSize',pf.printColorSize);
-      setVal('printMethod',pf.printMethod);
-      try{togglePrintFee();}catch(e){}
-      setVal('printFee',pf.printFee);
-      setVal('printFeeVat',pf.printFeeVat);
-      setVal('printFeeApply',pf.printFeeApply);
-      setVal('packaging',pf.packaging);
-      setVal('packagingFee',pf.packagingFee);
-      setVal('packagingFeeVat',pf.packagingFeeVat);
-      setVal('packagingFeeApply',pf.packagingFeeApply);
-      setVal('deliveryDate',pf.deliveryDate);
-      setVal('dcRecipient',pf.recipient);
-      setVal('dcPhone',pf.phone);
-      setVal('dcAddress',pf.address);
-      if(pf.startDate)setVal('date',pf.startDate);
-      try{calcEst();}catch(e){}
-      showMsg('✅ 프로젝트 데이터를 불러왔습니다. 시안 이미지 첨부 후 저장해주세요.');
-    }else if(pf.type==='wr'){
-      switchMode('wr');
-      window._fromProjectIdWr=pf.projectId||null;
-      /* 부모 DC 자동 연동 (문서번호 생성용) */
-      if(pf.linkedDcDocNumber){
-        try{
-          var dcRes=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(pf.linkedDcDocNumber)+'&select=id','GET');
-          if(dcRes&&dcRes.length>0){
-            await selectLinkedDC(dcRes[0].id);
-          }
-        }catch(e){console.warn('DC 자동 연동 실패',e);}
-      }
-      /* 프로젝트의 매입처 정보로 덮어쓰기 */
-      setVal('wrCompany',pf.supplier);
-      setVal('wrContact',pf.supplierContact);
-      setVal('wrTitle',pf.title);
-      setVal('wrRequester',pf.manager);
-      setVal('wrProduct',pf.productName);
-      setVal('wrQty',pf.quantity);
-      setVal('wrUnit',pf.unit);
-      setVal('wrUnitPrice',pf.unitPrice);
-      setVal('wrUnitPriceVat',pf.unitPriceVat);
-      setVal('wrColor',pf.color);
-      setVal('wrPrintColorSize',pf.printColorSize);
-      setVal('wrPrintMethod',pf.printMethod);
-      try{toggleWrPrintFee();}catch(e){}
-      setVal('wrPrintFee',pf.printFee);
-      setVal('wrPrintFeeVat',pf.printFeeVat);
-      setVal('wrPrintFeeApply',pf.printFeeApply);
-      setVal('wrPackaging',pf.packaging);
-      setVal('wrPkgFee',pf.packagingFee);
-      setVal('wrPkgFeeVat',pf.packagingFeeVat);
-      setVal('wrPkgFeeApply',pf.packagingFeeApply);
-      setVal('wrDeliveryDate',pf.deliveryDate);
-      setVal('wrRecipient',pf.recipient);
-      setVal('wrPhone',pf.phone);
-      setVal('wrAddress',pf.address);
-      try{calcWrEst();}catch(e){}
-      showMsg('✅ 프로젝트 데이터를 불러왔습니다. 확인 후 저장해주세요.');
-    }
+    await applyProjectPrefillData(pf);
+    if(pf.type==='dc'){showMsg('✅ 프로젝트 데이터를 불러왔습니다. 시안 이미지 첨부 후 저장해주세요.');}
+    else{showMsg('✅ 프로젝트 데이터를 불러왔습니다. 확인 후 저장해주세요.');}
   }catch(e){console.error('prefill 적용 실패',e);}
 })();
 
@@ -1316,6 +1324,18 @@ loadClientsDatalist();
     var res=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(docNum),'GET');
     if(!res||res.length===0){showMsg('❌ 문서를 찾을 수 없습니다: '+docNum,true);return;}
     await loadRecord(res[0].id);
+    /* 프로젝트 prefill이 함께 들어왔으면 DB 로드 후 현재 프로젝트 데이터로 덮어쓰기 */
+    var raw=localStorage.getItem('klp_doc_prefill');
+    if(raw){
+      try{
+        var pf=JSON.parse(raw);
+        localStorage.removeItem('klp_doc_prefill');
+        if(pf&&pf.type){
+          await applyProjectPrefillData(pf,{skipModeSwitch:true,skipLinkedDcReload:true,skipDate:true});
+          showMsg('✅ 프로젝트 데이터로 내용을 업데이트했습니다. 확인 후 저장해주세요.');
+        }
+      }catch(pe){console.error('edit prefill 적용 실패',pe);}
+    }
   }catch(e){console.error('edit load failed',e);showMsg('❌ 불러오기 실패: '+e.message,true);}
 })();
 

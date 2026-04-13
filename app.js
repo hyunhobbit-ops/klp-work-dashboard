@@ -1938,15 +1938,7 @@ async function createDocFromProject(id, type) {
     const p = projects.find(x => x.id === id);
     if (!p) return;
 
-    // DC: 이미 연결된 DC가 있으면 편집 화면으로 이동
-    if (type === 'dc' && p.sourceDocNumber) {
-        if (confirm(`이미 연결된 디자인확인서(${p.sourceDocNumber})가 있습니다.\n디자인확인서 편집 화면으로 이동할까요?`)) {
-            location.href = 'doc-generator.html#edit-' + encodeURIComponent(p.sourceDocNumber);
-        }
-        return;
-    }
-
-    // WR: 사전 조건 체크
+    // WR 사전 조건 체크
     if (type === 'wr') {
         if (!p.sourceDocNumber) {
             showToast('먼저 디자인확인서를 만들어주세요');
@@ -1956,6 +1948,16 @@ async function createDocFromProject(id, type) {
             showToast('매입 단가가 없습니다. 편집에서 매입처 상세를 먼저 입력해주세요');
             return;
         }
+    }
+
+    // 편집 모드로 갈지 신규 모드로 갈지 먼저 결정
+    let editDocNumber = null;
+    if (type === 'dc' && p.sourceDocNumber) {
+        if (!confirm(`이미 연결된 디자인확인서(${p.sourceDocNumber})가 있습니다.\n프로젝트의 현재 데이터로 내용을 덮어써서 편집할까요?`)) {
+            return;
+        }
+        editDocNumber = p.sourceDocNumber;
+    } else if (type === 'wr') {
         // 기존 WR 있으면 편집 화면으로 이동
         try {
             const prefix = p.sourceDocNumber + '_';
@@ -1967,12 +1969,10 @@ async function createDocFromProject(id, type) {
             if (wrs.length > 0) {
                 const latest = wrs[0];
                 const msg = wrs.length === 1
-                    ? `이미 연결된 작업요청서(${latest.doc_number})가 있습니다.\n작업요청서 편집 화면으로 이동할까요?`
-                    : `이미 작업요청서 ${wrs.length}건이 있습니다.\n가장 최근 작업요청서(${latest.doc_number}) 편집 화면으로 이동할까요?`;
-                if (confirm(msg)) {
-                    location.href = 'doc-generator.html#edit-' + encodeURIComponent(latest.doc_number);
-                }
-                return;
+                    ? `이미 연결된 작업요청서(${latest.doc_number})가 있습니다.\n프로젝트의 현재 데이터로 내용을 덮어써서 편집할까요?`
+                    : `이미 작업요청서 ${wrs.length}건이 있습니다.\n가장 최근 작업요청서(${latest.doc_number}) 내용을 프로젝트의 현재 데이터로 덮어써서 편집할까요?`;
+                if (!confirm(msg)) return;
+                editDocNumber = latest.doc_number;
             }
         } catch (e) {
             console.warn('WR 조회 실패', e);
@@ -2019,7 +2019,11 @@ async function createDocFromProject(id, type) {
         showToast('사전 입력 저장 실패');
         return;
     }
-    location.href = `doc-generator.html#${type}`;
+    if (editDocNumber) {
+        location.href = 'doc-generator.html#edit-' + encodeURIComponent(editDocNumber);
+    } else {
+        location.href = `doc-generator.html#${type}`;
+    }
 }
 
 function openEditProject(id) {
