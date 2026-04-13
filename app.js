@@ -2692,9 +2692,9 @@ async function syncProjectDeadlineTask(p) {
             .select('id').eq('project_id', p.id).limit(1);
         if (selErr) throw selErr;
         if (!p.deadline) {
-            // 마감일 없으면 기존 태스크 삭제
             if (existing && existing.length > 0) {
-                await sb.from('daily_tasks').delete().eq('project_id', p.id);
+                const { error: delErr } = await sb.from('daily_tasks').delete().eq('project_id', p.id);
+                if (delErr) throw delErr;
             }
             return;
         }
@@ -2712,13 +2712,24 @@ async function syncProjectDeadlineTask(p) {
             project_id: p.id,
             is_deadline_copy: false
         };
+        let opErr;
         if (existing && existing.length > 0) {
-            await sb.from('daily_tasks').update(payload).eq('id', existing[0].id);
+            ({ error: opErr } = await sb.from('daily_tasks').update(payload).eq('id', existing[0].id));
         } else {
-            await sb.from('daily_tasks').insert(payload);
+            ({ error: opErr } = await sb.from('daily_tasks').insert(payload));
         }
+        if (opErr) throw opErr;
+        // 로컬 배열도 즉시 반영 (구독이 늦게 올 수 있음)
+        await loadDailyTasksFromDb();
+        renderDaily();
+        renderHome();
     } catch (err) {
         console.error('프로젝트 마감일 동기화 실패', err);
+        let hint = '';
+        if (/project_id/.test(err.message || '') || err.code === '42703' || err.code === 'PGRST204') {
+            hint = '\n\nSupabase에서 다음 SQL을 실행해주세요:\nalter table public.daily_tasks add column if not exists project_id bigint;';
+        }
+        showToast('마감일 일정 동기화 실패: ' + err.message + hint);
     }
 }
 async function deleteProjectDeadlineTask(projectId) {
