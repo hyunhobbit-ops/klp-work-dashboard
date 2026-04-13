@@ -497,12 +497,13 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
             ? `<span style="color:${marginVal >= 0 ? 'var(--blue)' : 'var(--red)'};font-weight:700">${marginVal.toLocaleString()}원 (${marginPctVal}%)</span>`
             : '-';
 
+        const ownerStr = p.manager || (p.assignees && p.assignees.length ? p.assignees.join(', ') : '-');
         tableHtml += `<tr>
             <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
             <td><strong>${p.client || '-'}</strong>${supplierBadge}</td>
             <td>${supplierDisplay}</td>
             <td>${p.name}</td>
-            <td>${p.assignees.join(', ')}</td>
+            <td>${ownerStr}</td>
             <td>${revenueStr}</td>
             <td>${purchaseStr}</td>
             <td>${marginStr}</td>
