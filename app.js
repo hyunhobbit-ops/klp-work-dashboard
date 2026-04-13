@@ -155,6 +155,7 @@ let clients = [];
 let clientSearch = '';
 let clientPage = 1;
 const CLIENTS_PER_PAGE = 50;
+const expandedProjectIds = new Set();
 
 // ===== State =====
 let currentDate = new Date();
@@ -461,10 +462,18 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
         childCountByParent[c.parentProjectId] = (childCountByParent[c.parentProjectId] || 0) + 1;
     });
 
+    // 부모별 자식 목록 캐싱
+    const childrenByParent = {};
+    dataArr.filter(p => p.parentProjectId).forEach(c => {
+        (childrenByParent[c.parentProjectId] = childrenByParent[c.parentProjectId] || []).push(c);
+    });
+
     let tableHtml = '';
     let cardHtml = '';
     filtered.forEach(p => {
         const childCount = childCountByParent[p.id] || 0;
+        const isExpanded = expandedProjectIds.has(p.id);
+        const expandIcon = childCount > 0 ? `<span style="display:inline-block;width:14px;color:var(--klp-orange,#E67E22);font-weight:700;transition:transform .2s;${isExpanded ? 'transform:rotate(90deg)' : ''}">▶</span> ` : '<span style="display:inline-block;width:14px"></span> ';
         const supplierBadge = childCount > 0 ? ` <span class="badge badge-orange" style="font-size:10px">매입 ${childCount}</span>` : '';
         const pNum = parseInt(p.progress) || 0;
         const checks = p.checks || {};
@@ -475,8 +484,8 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
         const revenueStr = (p.revenue || 0).toLocaleString() + '원';
 
-        tableHtml += `<tr onclick="showProjectDetail(${p.id})" style="cursor:pointer">
-            <td><strong>${p.client || '-'}</strong>${supplierBadge}</td>
+        tableHtml += `<tr onclick="toggleProjectExpand(${p.id})" style="cursor:pointer">
+            <td>${expandIcon}<strong>${p.client || '-'}</strong>${supplierBadge}</td>
             <td>${p.supplier || '-'}</td>
             <td>${p.name}</td>
             <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
@@ -485,8 +494,42 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
             <td>${p.deadline ? fmtDisplay(p.deadline) : '-'}</td>
             <td><div class="progress-cell"><div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div><span class="progress-pct">${p.progress}</span></div></td>
             <td><div class="checks-row">${checkDots}</div></td>
-            <td><button class="edit-btn" onclick="event.stopPropagation();openEditProject(${p.id})">편집</button></td>
+            <td>
+                <button class="edit-btn" onclick="event.stopPropagation();showProjectDetail(${p.id})" style="margin-right:4px">상세</button>
+                <button class="edit-btn" onclick="event.stopPropagation();openEditProject(${p.id})">편집</button>
+            </td>
         </tr>`;
+
+        // 확장된 상태면 자식 행을 부모 바로 아래에 렌더
+        if (isExpanded && childCount > 0) {
+            const children = childrenByParent[p.id] || [];
+            const totalCost = children.reduce((s, c) => s + (c.revenue || 0), 0);
+            const margin = (p.revenue || 0) - totalCost;
+            const marginPct = p.revenue > 0 ? Math.round((margin / p.revenue) * 100) : 0;
+            children.forEach(c => {
+                const cNum = parseInt(c.progress) || 0;
+                tableHtml += `<tr onclick="event.stopPropagation();showProjectDetail(${c.id})" style="cursor:pointer;background:#FFF8F2">
+                    <td style="padding-left:32px"><span style="color:var(--klp-orange,#E67E22);font-weight:700;margin-right:6px">↳ 매입</span><strong>${c.supplier || '-'}</strong></td>
+                    <td>—</td>
+                    <td>${c.name || '-'}</td>
+                    <td><span class="badge ${statusBadgeClass(c.status)}">${c.status}</span></td>
+                    <td>${(c.assignees || []).join(', ')}</td>
+                    <td>${(c.revenue || 0).toLocaleString()}원<span style="font-size:11px;color:var(--text-tertiary)"> (매입가)</span></td>
+                    <td>${c.deadline ? fmtDisplay(c.deadline) : '-'}</td>
+                    <td><div class="progress-cell"><div class="progress-bar"><div class="progress-fill pf-${cNum}"></div></div><span class="progress-pct">${c.progress}</span></div></td>
+                    <td>${c.sourceDocNumber ? `<span style="font-size:11px;color:var(--text-tertiary)">${c.sourceDocNumber}</span>` : '-'}</td>
+                    <td><button class="edit-btn" onclick="event.stopPropagation();openEditProject(${c.id})">편집</button></td>
+                </tr>`;
+            });
+            // 합계 행
+            tableHtml += `<tr style="background:#FFF5F0">
+                <td colspan="10" style="padding:8px 16px;font-size:13px">
+                    <span style="color:var(--text-tertiary);margin-right:16px">매출 합계 <strong style="color:var(--text-primary)">${(p.revenue || 0).toLocaleString()}원</strong></span>
+                    <span style="color:var(--text-tertiary);margin-right:16px">매입 합계 <strong style="color:var(--text-primary)">${totalCost.toLocaleString()}원</strong></span>
+                    <span style="color:var(--text-tertiary)">마진 <strong style="color:${margin >= 0 ? 'var(--blue)' : 'var(--red)'}">${margin.toLocaleString()}원 (${marginPct}%)</strong></span>
+                </td>
+            </tr>`;
+        }
 
         cardHtml += `<div class="resp-card" onclick="showProjectDetail(${p.id})">
             <div class="resp-card-top">
@@ -504,6 +547,15 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
     document.getElementById(tableBodyId).innerHTML = tableHtml;
     document.getElementById(cardGridId).innerHTML = cardHtml;
+}
+
+function toggleProjectExpand(id) {
+    if (expandedProjectIds.has(id)) {
+        expandedProjectIds.delete(id);
+    } else {
+        expandedProjectIds.add(id);
+    }
+    renderProjects();
 }
 
 function renderDomesticProjects() {
