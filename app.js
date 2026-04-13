@@ -357,20 +357,23 @@ function renderAll() {
 function renderHome() {
     const todayStr = fmtDate(currentDate);
     const activeCount = projects.filter(p => p.status === '진행 중').length;
-    const todayItems = dailyTasks.filter(t => t.date === todayStr);
-    const todayDone = todayItems.filter(t => t.done).length;
-    const rate = todayItems.length ? Math.round((todayDone / todayItems.length) * 100) : 0;
-    const monthDel = deliveries.filter(d => d.date.startsWith('2026-04')).length;
+    // 오늘 할 일 / 완료율은 로그인 사용자 본인 할 일 기준
+    const myName = currentUser ? currentUser.name : null;
+    const allTodayItems = dailyTasks.filter(t => t.date === todayStr);
+    const myTodayItems = myName ? allTodayItems.filter(t => t.assignee === myName) : [];
+    const myTodayDone = myTodayItems.filter(t => t.done).length;
+    const rate = myTodayItems.length ? Math.round((myTodayDone / myTodayItems.length) * 100) : 0;
+    const monthPrefix = todayStr.substring(0, 7); // YYYY-MM
+    const monthDel = deliveries.filter(d => (d.date || '').startsWith(monthPrefix)).length;
 
-    // Summary cards
+    // Summary cards (이번 달 택배 카드는 HTML에서 제거됨)
     document.getElementById('activeProjects').textContent = activeCount;
-    document.getElementById('todayTasks').textContent = todayItems.length;
+    document.getElementById('todayTasks').textContent = myTodayItems.length;
     document.getElementById('completionRate').textContent = rate + '%';
-    document.getElementById('monthDelivery').textContent = monthDel;
 
     // Quick menu counts
     document.getElementById('qProjects').textContent = `${activeCount}건 진행`;
-    document.getElementById('qDaily').textContent = `오늘 ${todayItems.length}건`;
+    document.getElementById('qDaily').textContent = `오늘 ${myTodayItems.length}건`;
     document.getElementById('qDelivery').textContent = `이번달 ${monthDel}건`;
 
     // Urgent
