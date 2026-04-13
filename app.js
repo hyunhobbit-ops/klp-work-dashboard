@@ -541,8 +541,10 @@ function renderDailyPersonFilter() {
 
     let html = '';
 
-    // 전체보기 탭: 모든 사용자에게 표시
-    html += `<button class="filter-chip ${currentPersonFilter === 'viewall' ? 'active' : ''}" data-person="viewall">전체보기</button>`;
+    // 전체보기 탭: 관리자에게만 표시
+    if (admin) {
+        html += `<button class="filter-chip ${currentPersonFilter === 'viewall' ? 'active' : ''}" data-person="viewall">전체보기</button>`;
+    }
 
     // 관리자 또는 임원만 대표님 탭 표시
     if (admin || exec) {
@@ -574,12 +576,17 @@ function renderDaily() {
     document.getElementById('currentDateDisplay').textContent =
         `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
 
+    // 관리자가 아닌데 전체보기 상태면 본인 탭으로 전환
+    if (!isAdminUser() && currentPersonFilter === 'viewall') {
+        currentPersonFilter = currentUser ? currentUser.name : 'viewall';
+    }
+
     renderDailyPersonFilter();
 
     const visiblePeople = getVisiblePeople();
-    // 현재 필터가 볼 수 없는 사람이면 전체보기로 리셋
+    // 현재 필터가 볼 수 없는 사람이면 기본 탭으로 리셋 (관리자: 전체보기, 그외: 본인)
     if (currentPersonFilter !== 'viewall' && currentPersonFilter !== 'ceo' && !visiblePeople.includes(currentPersonFilter)) {
-        currentPersonFilter = 'viewall';
+        currentPersonFilter = isAdminUser() ? 'viewall' : (currentUser ? currentUser.name : visiblePeople[0]);
         renderDailyPersonFilter();
     }
     const displayPeople = getPeopleForFilter(currentPersonFilter);
