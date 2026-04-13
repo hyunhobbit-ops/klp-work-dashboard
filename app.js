@@ -3586,10 +3586,17 @@ function openClientDetail(id) {
         .filter(t => t.client && t.client === c.companyName)
         .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
-    // 연동된 프로젝트 (project.client 가 회사명과 일치)
-    const linkedProjects = projects
-        .filter(p => p.client && p.client === c.companyName)
-        .sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
+    // 연동된 프로젝트 — 매출처(project.client) + 매입처(project.supplier) 양쪽 매칭
+    const linkedProjectsMap = new Map();
+    projects.forEach(p => {
+        const asClient = p.client && p.client === c.companyName;
+        const asSupplier = p.supplier && p.supplier === c.companyName;
+        if (!asClient && !asSupplier) return;
+        const role = asClient && asSupplier ? '매출+매입' : (asClient ? '매출' : '매입');
+        linkedProjectsMap.set(p.id, { p, role });
+    });
+    const linkedProjects = Array.from(linkedProjectsMap.values())
+        .sort((a, b) => (b.p.startDate || '').localeCompare(a.p.startDate || ''));
 
     const tasksHtml = linkedTasks.length === 0
         ? `<div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">연동된 일일계획표가 없습니다</div>`
@@ -3603,16 +3610,25 @@ function openClientDetail(id) {
             </tr>`).join('')}</tbody>
         </table>`;
 
+    const roleBadge = role => {
+        if (role === '매출+매입') return `<span class="badge badge-purple">매출+매입</span>`;
+        if (role === '매입') return `<span class="badge badge-purple">매입</span>`;
+        return `<span class="badge badge-blue">매출</span>`;
+    };
     const projectsHtml = linkedProjects.length === 0
         ? `<div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">연동된 프로젝트가 없습니다</div>`
         : `<table class="data-table" style="margin-top:8px">
-            <thead><tr><th>품명</th><th style="width:100px">상태</th><th style="width:120px">납기</th><th style="width:120px">매출액</th></tr></thead>
-            <tbody>${linkedProjects.map(p => `<tr onclick="closeModal();switchTab('${p.category === '해외 주문' ? 'projects-overseas' : 'projects-domestic'}');setTimeout(()=>openEditProject(${p.id}),100)" style="cursor:pointer">
-                <td><strong>${esc(p.name)}</strong></td>
-                <td>${esc(p.status)}</td>
-                <td>${esc(p.deadline) || '-'}</td>
-                <td>${(p.revenue || 0).toLocaleString()}원</td>
-            </tr>`).join('')}</tbody>
+            <thead><tr><th style="width:90px">역할</th><th>품명</th><th style="width:100px">상태</th><th style="width:120px">납기</th><th style="width:120px">금액</th></tr></thead>
+            <tbody>${linkedProjects.map(({ p, role }) => {
+                const amount = role === '매입' ? (p.supplierRevenue || 0) : (p.revenue || 0);
+                return `<tr onclick="closeModal();switchTab('${p.category === '해외 주문' ? 'projects-overseas' : 'projects-domestic'}');setTimeout(()=>showProjectDetail(${p.id}),100)" style="cursor:pointer">
+                    <td>${roleBadge(role)}</td>
+                    <td><strong>${esc(p.name)}</strong></td>
+                    <td>${esc(p.status)}</td>
+                    <td>${esc(p.deadline) || '-'}</td>
+                    <td>${amount.toLocaleString()}원</td>
+                </tr>`;
+            }).join('')}</tbody>
         </table>`;
 
     const row = (label, val) => `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--gray-100)"><div style="width:100px;color:var(--text-tertiary);font-size:13px">${label}</div><div style="flex:1;font-size:14px">${esc(val) || '-'}</div></div>`;
