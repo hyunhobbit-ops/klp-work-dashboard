@@ -1358,6 +1358,28 @@ document.getElementById('yearPrefix').textContent=Y+'_';
 (async function(){var n=await getNextSeqSafe();document.getElementById('docSeq').value=n;updateDocNum()})();
 loadClientsDatalist();
 
+/* === 로그인 사용자 기반 본사 담당자 자동 선택 === */
+(function(){
+  try{
+    var saved=localStorage.getItem('klp_user');
+    if(!saved)return;
+    var u=JSON.parse(saved);
+    var nameMap={'이현주':'이현주 실장','김현호':'김현호 팀장','유지은':'유지은 대리'};
+    var loginName=u.loginName||u.name;
+    var mapped=nameMap[loginName]||nameMap[u.name];
+    if(!mapped)return;
+    function setSel(id){
+      var sel=document.getElementById(id);
+      if(!sel)return;
+      for(var i=0;i<sel.options.length;i++){
+        if(sel.options[i].value===mapped||sel.options[i].text===mapped){sel.selectedIndex=i;break;}
+      }
+    }
+    setSel('manager');
+    setSel('wrRequester');
+  }catch(e){console.warn('manager auto-select failed',e);}
+})();
+
 /* === NEW WR DOC === */
 function newWrDoc(){
   linkedDC=null;wrMainImg=null;wrSubImgs=[];
