@@ -182,8 +182,21 @@ document.addEventListener('DOMContentLoaded', () => {
     setupFilters();
     setupDateNav();
     setupSearch();
+    setupShortcuts();
     checkAuth();
 });
+
+function setupShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'F2') {
+            const deliveryTab = document.getElementById('tab-delivery');
+            if (deliveryTab && deliveryTab.classList.contains('active')) {
+                e.preventDefault();
+                openModal('delivery');
+            }
+        }
+    });
+}
 
 // ===== Topbar =====
 function setupTopbar() {
@@ -1387,7 +1400,7 @@ function openEditDelivery(id) {
         <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="editDelDate" value="${d.date}"></div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">받는이</label><input type="text" class="form-input" id="editDelRecipient" value="${d.recipient}"></div>
-            <div class="form-group"><label class="form-label">연락처</label><input type="text" class="form-input" id="editDelPhone" value="${d.phone}" placeholder="010-0000-0000" maxlength="13"></div>
+            <div class="form-group"><label class="form-label">연락처</label><input type="text" class="form-input" id="editDelPhone" value="${d.phone}" placeholder="010-0000-0000" maxlength="14"></div>
         </div>
         <div class="form-row" style="grid-template-columns:100px 1fr">
             <div class="form-group"><label class="form-label">우편번호</label><input type="text" class="form-input" id="editDelZipcode" value="${d.zipcode}" placeholder="00000" maxlength="5"></div>
@@ -1893,7 +1906,7 @@ function openModal(type) {
             <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="newDelDate" value="${fmtDate(new Date())}"></div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">받는이</label><input type="text" class="form-input" id="newDelRecipient" placeholder="받는이"></div>
-                <div class="form-group"><label class="form-label">연락처</label><input type="text" class="form-input" id="newDelPhone" placeholder="010-0000-0000" maxlength="13"></div>
+                <div class="form-group"><label class="form-label">연락처</label><input type="text" class="form-input" id="newDelPhone" placeholder="010-0000-0000" maxlength="14"></div>
             </div>
             <div class="form-row" style="grid-template-columns:100px 1fr">
                 <div class="form-group"><label class="form-label">우편번호</label><input type="text" class="form-input" id="newDelZipcode" placeholder="00000" maxlength="5"></div>
@@ -2336,12 +2349,23 @@ function formatPhoneInput(e) {
     const input = e.target;
     const digits = input.value.replace(/\D/g, '');
     let formatted = '';
-    if (digits.length <= 3) {
-        formatted = digits;
-    } else if (digits.length <= 7) {
-        formatted = digits.slice(0, 3) + '-' + digits.slice(3);
+    // 0502로 시작하는 번호는 4-4-4 양식 (0000-0000-0000)
+    if (digits.startsWith('0502')) {
+        if (digits.length <= 4) {
+            formatted = digits;
+        } else if (digits.length <= 8) {
+            formatted = digits.slice(0, 4) + '-' + digits.slice(4);
+        } else {
+            formatted = digits.slice(0, 4) + '-' + digits.slice(4, 8) + '-' + digits.slice(8, 12);
+        }
     } else {
-        formatted = digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
+        if (digits.length <= 3) {
+            formatted = digits;
+        } else if (digits.length <= 7) {
+            formatted = digits.slice(0, 3) + '-' + digits.slice(3);
+        } else {
+            formatted = digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
+        }
     }
     input.value = formatted;
 }
