@@ -1861,24 +1861,8 @@ async function showProjectDetail(id) {
             const titleColor = kind === 'DC' ? 'var(--blue)' : 'var(--klp-orange,#E67E22)';
             const bg = kind === 'DC' ? '#F5FBFF' : '#FFF8F2';
             const brd = kind === 'DC' ? '#CFE3F5' : '#FFE0CC';
-            let imgs = null;
-            try { imgs = r.images_data ? JSON.parse(r.images_data) : null; } catch(e) {}
-            const hasMain = imgs && imgs.main;
-            const hasSubs = imgs && imgs.subs && imgs.subs.length > 0;
-            let imgHtml = '';
-            if (hasMain) {
-                imgHtml += `<div style="margin-bottom:6px"><img src="${imgs.main}" style="max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--gray-200);cursor:pointer" onclick="window.open('${imgs.main}','_blank')"></div>`;
-            }
-            if (hasSubs) {
-                imgHtml += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:4px">`;
-                imgs.subs.forEach(s => {
-                    imgHtml += `<img src="${s}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--gray-200);cursor:pointer" onclick="window.open('${s}','_blank')">`;
-                });
-                imgHtml += `</div>`;
-            }
-            if (!hasMain && !hasSubs) {
-                imgHtml = `<div style="color:var(--text-tertiary);font-size:12px;padding:8px 0">첨부된 시안 이미지가 없습니다</div>`;
-            }
+            const viewUrl = `doc-generator.html#view-${encodeURIComponent(r.doc_number)}`;
+            const imgHtml = `<div style="border-radius:8px;overflow:hidden;border:1px solid var(--gray-200);background:#fff"><iframe src="${viewUrl}" style="width:100%;height:560px;border:0;display:block;background:#fff" loading="lazy" title="${escFn(r.doc_number)}"></iframe><div style="padding:6px 10px;background:var(--gray-50);border-top:1px solid var(--gray-200);text-align:right"><a href="${viewUrl}" target="_blank" style="font-size:11px;color:${titleColor};text-decoration:none;font-weight:700">새 탭에서 크게 보기 ↗</a></div></div>`;
             const clientLine = `${escFn(r.company_name || '')}${r.title ? ' — ' + escFn(r.title) : ''}`;
             return `<div style="background:${bg};border:1px solid ${brd};border-radius:10px;padding:12px 14px;margin-bottom:10px">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;flex-wrap:wrap">

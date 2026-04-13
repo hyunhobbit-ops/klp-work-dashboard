@@ -175,6 +175,11 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
 .mode-bar{padding:20px 64px}
 .sub-bar{padding:12px 64px}
 }
+/* === 외부 임베드용 view-mode (#view-DOCNUM) === */
+body.view-mode{background:#fff}
+body.view-mode .mode-bar,body.view-mode .sub-bar,body.view-mode .action-bar{display:none!important}
+body.view-mode .preview-area{padding:0}
+body.view-mode .preview-wrap{box-shadow:none;border-radius:0;max-width:100%;margin:0}
 </style>
 </head>
 <body>
@@ -1339,6 +1344,23 @@ loadClientsDatalist();
       await dl(fmt);
     }
   }catch(e){console.error('auto-dl failed',e);showMsg('❌ 다운로드 실패: '+e.message,true);}
+})();
+
+/* === URL 해시 기반 임베드 뷰 (#view-DOCNUM) — 외부 페이지에서 iframe으로 문서만 렌더 === */
+(async function applyViewHash(){
+  var hash=(location.hash||'').replace(/^#/,'');
+  if(!hash.startsWith('view-'))return;
+  var docNum=decodeURIComponent(hash.substring(5));
+  document.body.classList.add('view-mode');
+  try{
+    var res=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(docNum),'GET');
+    if(!res||res.length===0){document.body.innerHTML='<div style="padding:20px;color:#888;font-size:13px;text-align:center;font-family:sans-serif">문서를 찾을 수 없습니다: '+docNum+'</div>';return;}
+    var r=res[0];
+    await loadRecord(r.id);
+    await new Promise(function(resolve){setTimeout(resolve,300);});
+    if(r.status==='작업요청서'){showWrTab('preview');}
+    else{showDcTab('preview');}
+  }catch(e){console.error('view load failed',e);document.body.innerHTML='<div style="padding:20px;color:#c00;font-size:13px;font-family:sans-serif">로드 실패: '+e.message+'</div>';}
 })();
 
 /* === 로그인 사용자 기반 본사 담당자 자동 선택 === */
