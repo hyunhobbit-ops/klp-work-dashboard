@@ -1301,6 +1301,19 @@ loadClientsDatalist();
   }catch(e){console.error('prefill 적용 실패',e);}
 })();
 
+/* === URL 해시 기반 기존 문서 편집 (#edit-DOCNUM) === */
+(async function applyEditHash(){
+  var hash=(location.hash||'').replace(/^#/,'');
+  if(!hash.startsWith('edit-'))return;
+  var docNum=decodeURIComponent(hash.substring(5));
+  history.replaceState(null,'',location.pathname);
+  try{
+    var res=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(docNum),'GET');
+    if(!res||res.length===0){showMsg('❌ 문서를 찾을 수 없습니다: '+docNum,true);return;}
+    await loadRecord(res[0].id);
+  }catch(e){console.error('edit load failed',e);showMsg('❌ 불러오기 실패: '+e.message,true);}
+})();
+
 /* === URL 해시 기반 자동 다운로드 (#dl-jpg-DOCNUM 또는 #dl-pdf-DOCNUM) === */
 (async function applyDownloadHash(){
   var hash=(location.hash||'').replace(/^#/,'');

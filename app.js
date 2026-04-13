@@ -1950,20 +1950,51 @@ function downloadDoc(docNum, fmt) {
 // =====================================
 // 프로젝트 → 문서생성기 (DC/WR) prefill 이동
 // =====================================
-function createDocFromProject(id, type) {
+async function createDocFromProject(id, type) {
     const p = projects.find(x => x.id === id);
     if (!p) return;
-    if (type === 'wr' && !p.sourceDocNumber) {
-        showToast('먼저 디자인확인서를 만들어주세요');
-        return;
-    }
-    if (type === 'wr' && !p.supplierUnitPrice) {
-        showToast('매입 단가가 없습니다. 편집에서 매입처 상세를 먼저 입력해주세요');
-        return;
-    }
+
+    // DC: 이미 연결된 DC가 있으면 편집 화면으로 이동
     if (type === 'dc' && p.sourceDocNumber) {
-        if (!confirm(`이미 연결된 디자인확인서(${p.sourceDocNumber})가 있습니다.\n새로 만들면 프로젝트 연결이 새 문서로 변경됩니다.\n계속하시겠습니까?`)) return;
+        if (confirm(`이미 연결된 디자인확인서(${p.sourceDocNumber})가 있습니다.\n디자인확인서 편집 화면으로 이동할까요?`)) {
+            location.href = 'doc-generator.html#edit-' + encodeURIComponent(p.sourceDocNumber);
+        }
+        return;
     }
+
+    // WR: 사전 조건 체크
+    if (type === 'wr') {
+        if (!p.sourceDocNumber) {
+            showToast('먼저 디자인확인서를 만들어주세요');
+            return;
+        }
+        if (!p.supplierUnitPrice) {
+            showToast('매입 단가가 없습니다. 편집에서 매입처 상세를 먼저 입력해주세요');
+            return;
+        }
+        // 기존 WR 있으면 편집 화면으로 이동
+        try {
+            const prefix = p.sourceDocNumber + '_';
+            const { data } = await sb.from('confirmations')
+                .select('doc_number,created_at,status')
+                .like('doc_number', prefix + '%')
+                .order('created_at', { ascending: false });
+            const wrs = (data || []).filter(d => d.doc_number && d.doc_number.startsWith(prefix) && d.status === '작업요청서');
+            if (wrs.length > 0) {
+                const latest = wrs[0];
+                const msg = wrs.length === 1
+                    ? `이미 연결된 작업요청서(${latest.doc_number})가 있습니다.\n작업요청서 편집 화면으로 이동할까요?`
+                    : `이미 작업요청서 ${wrs.length}건이 있습니다.\n가장 최근 작업요청서(${latest.doc_number}) 편집 화면으로 이동할까요?`;
+                if (confirm(msg)) {
+                    location.href = 'doc-generator.html#edit-' + encodeURIComponent(latest.doc_number);
+                }
+                return;
+            }
+        } catch (e) {
+            console.warn('WR 조회 실패', e);
+        }
+    }
+
     const isWr = type === 'wr';
     const prefill = {
         type,
