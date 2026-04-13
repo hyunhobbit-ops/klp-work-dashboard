@@ -2029,7 +2029,9 @@ function calcProjectRevenue() {
 }
 
 function closeModal() {
-    document.getElementById('modalOverlay').classList.remove('show');
+    const overlay = document.getElementById('modalOverlay');
+    overlay.classList.remove('show');
+    overlay.classList.remove('modal-wide');
 }
 
 // ===== Add Handlers =====
@@ -2684,39 +2686,47 @@ function openClientDetail(id) {
     const row = (label, val) => `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--gray-100)"><div style="width:100px;color:var(--text-tertiary);font-size:13px">${label}</div><div style="flex:1;font-size:14px">${esc(val) || '-'}</div></div>`;
 
     body.innerHTML = `
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
             ${cat}
-            <h3 style="margin:0;font-size:18px">${esc(c.companyName)}</h3>
+            <h3 style="margin:0;font-size:20px">${esc(c.companyName)}</h3>
         </div>
-        <div class="form-section-title">📋 기본 정보</div>
-        <div style="background:var(--gray-50);border-radius:8px;padding:8px 14px;margin-bottom:12px">
-            ${row('대표자', c.ceo)}
-            ${row('사업자번호', c.businessNo)}
-            ${row('전화', c.phone)}
-            ${row('팩스', c.fax)}
-            ${row('핸드폰', c.mobile)}
-            ${row('이메일', c.email)}
-            ${row('우편번호', c.zipcode)}
-            ${row('주소', c.address)}
-            ${row('업태', c.bizType)}
-            ${row('업종', c.bizItem)}
-            ${row('등급', c.grade)}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+            <div>
+                <div class="form-section-title">📋 기본 정보</div>
+                <div style="background:var(--gray-50);border-radius:8px;padding:8px 14px;margin-bottom:12px">
+                    ${row('대표자', c.ceo)}
+                    ${row('사업자번호', c.businessNo)}
+                    ${row('전화', c.phone)}
+                    ${row('팩스', c.fax)}
+                    ${row('핸드폰', c.mobile)}
+                    ${row('이메일', c.email)}
+                    ${row('우편번호', c.zipcode)}
+                    ${row('주소', c.address)}
+                    ${row('업태', c.bizType)}
+                    ${row('업종', c.bizItem)}
+                    ${row('등급', c.grade)}
+                </div>
+            </div>
+            <div>
+                <div class="form-section-title">👤 담당직원</div>
+                <div style="background:var(--gray-50);border-radius:8px;padding:8px 14px;margin-bottom:16px">
+                    ${row('이름', c.staffName)}
+                    ${row('핸드폰', c.staffMobile)}
+                    ${row('이메일', c.staffEmail)}
+                </div>
+                <div class="form-section-title">📅 연동된 일일계획표 (${linkedTasks.length}건)</div>
+                ${tasksHtml}
+                <div class="form-section-title" style="margin-top:16px">📦 연동된 프로젝트 (${linkedProjects.length}건)</div>
+                ${projectsHtml}
+            </div>
         </div>
-        <div class="form-section-title">👤 담당직원</div>
-        <div style="background:var(--gray-50);border-radius:8px;padding:8px 14px;margin-bottom:12px">
-            ${row('이름', c.staffName)}
-            ${row('핸드폰', c.staffMobile)}
-            ${row('이메일', c.staffEmail)}
-        </div>
-        <div class="form-section-title">📅 연동된 일일계획표 (${linkedTasks.length}건)</div>
-        ${tasksHtml}
-        <div class="form-section-title" style="margin-top:16px">📦 연동된 프로젝트 (${linkedProjects.length}건)</div>
-        ${projectsHtml}
-        <div style="display:flex;gap:8px;margin-top:16px">
+        <div style="display:flex;gap:8px;margin-top:20px">
             <button class="form-submit" style="flex:1" onclick="openEditClient(${id})">✏️ 편집</button>
             <button class="form-submit" style="flex:1;background:var(--gray-200);color:var(--gray-800)" onclick="closeModal()">닫기</button>
         </div>`;
-    document.getElementById('modalOverlay').classList.add('show');
+    const overlay = document.getElementById('modalOverlay');
+    overlay.classList.add('show');
+    overlay.classList.add('modal-wide');
 }
 
 async function saveEditClient(id) {
