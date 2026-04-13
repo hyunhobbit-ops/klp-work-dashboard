@@ -1648,29 +1648,51 @@ async function showProjectDetail(id) {
     title.textContent = `${p.client || ''} — ${p.name}`;
 
     const escFn = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
-    const row = (label, val) => `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--gray-100)"><div style="width:110px;color:var(--text-tertiary);font-size:13px">${label}</div><div style="flex:1;font-size:14px">${escFn(val) || '-'}</div></div>`;
+    const row = (label, val) => `<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--gray-100)"><div style="width:100px;color:var(--text-tertiary);font-size:12px;font-weight:600">${label}</div><div style="flex:1;font-size:14px;color:var(--text-primary)">${escFn(val) || '-'}</div></div>`;
 
-    // 매입처 데이터 (통합 모델: 같은 행의 supplier_* 컬럼)
+    // 금액 계산
+    const revenue = p.revenue || 0;
     const purchaseTotal = p.supplierRevenue || 0;
-    const margin = (p.revenue || 0) - purchaseTotal;
-    const marginPct = p.revenue > 0 ? Math.round((margin / p.revenue) * 100) : 0;
-
+    const margin = revenue - purchaseTotal;
+    const marginPct = revenue > 0 ? Math.round((margin / revenue) * 100) : 0;
     const hasSupplier = !!(p.supplier && p.supplierUnitPrice);
-    const suppliersHtml = !hasSupplier
-        ? `<div style="color:var(--text-tertiary);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">등록된 매입처가 없습니다. 프로젝트 편집에서 매입처 정보를 추가할 수 있습니다.</div>`
-        : `<div style="border:1px solid #FFE0CC;border-radius:8px;padding:14px;background:#FFF8F2">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-                <div style="font-size:15px"><strong style="color:var(--klp-orange,#E67E22)">🏭 ${escFn(p.supplier)}</strong>${p.supplierContact ? ` <span style="color:var(--text-tertiary);font-size:12px;margin-left:6px">${escFn(p.supplierContact)}</span>` : ''}</div>
-            </div>
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px 14px;font-size:13px;color:var(--text-secondary)">
-                <div>매입단가: <strong>${(p.supplierUnitPrice || 0).toLocaleString()}원</strong> <span style="font-size:11px;color:var(--text-tertiary)">(${p.supplierUnitPriceVat || 'VAT 별도'})</span></div>
-                <div>수량: <strong>${(p.qty || 0).toLocaleString()}${p.unit || ''}</strong></div>
-                <div>매입액(총): <strong style="color:var(--klp-orange,#E67E22)">${purchaseTotal.toLocaleString()}원</strong></div>
-                ${p.supplierPrintFee ? `<div>매입 인쇄비: ${(p.supplierPrintFee).toLocaleString()}원</div>` : '<div></div>'}
-                ${p.supplierPackagingFee ? `<div>매입 포장비: ${(p.supplierPackagingFee).toLocaleString()}원</div>` : '<div></div>'}
-                <div></div>
-            </div>
-        </div>`;
+    const qty = p.qty || 0;
+
+    // 부가비용 환산
+    const feeCompute = (fee, vatLabel, applyLabel) => {
+        if (!fee) return 0;
+        const perUnit = (applyLabel || '1개당') !== '일괄';
+        let total = perUnit ? fee * qty : fee;
+        if ((vatLabel || 'VAT 별도') === 'VAT 별도') total = Math.round(total * 1.1);
+        return total;
+    };
+
+    // 매출 내역
+    const salesVatLabel = p.vat === 'include' ? 'VAT 포함' : 'VAT 별도';
+    const salesProduct = salesVatLabel === 'VAT 별도'
+        ? Math.round((p.unitPrice || 0) * qty * 1.1)
+        : (p.unitPrice || 0) * qty;
+    const salesPrint = feeCompute(p.printFee, p.printFeeVat, p.printFeeApply);
+    const salesPack = feeCompute(p.packagingFee, p.packagingFeeVat, p.packagingFeeApply);
+
+    // 매입 내역
+    const supVatLabel = p.supplierUnitPriceVat || 'VAT 별도';
+    const supProduct = supVatLabel === 'VAT 별도'
+        ? Math.round((p.supplierUnitPrice || 0) * qty * 1.1)
+        : (p.supplierUnitPrice || 0) * qty;
+    const supPrint = feeCompute(p.supplierPrintFee, p.supplierPrintFeeVat, p.supplierPrintFeeApply);
+    const supPack = feeCompute(p.supplierPackagingFee, p.supplierPackagingFeeVat, p.supplierPackagingFeeApply);
+
+    // D-Day
+    let dday = '';
+    if (p.deadline) {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const d = new Date(p.deadline);
+        const diff = Math.round((d - today) / 86400000);
+        if (diff > 0) dday = `D-${diff}`;
+        else if (diff === 0) dday = 'D-DAY';
+        else dday = `D+${-diff}`;
+    }
 
     // 체크리스트
     const checks = p.checks || {};
@@ -1682,80 +1704,145 @@ async function showProjectDetail(id) {
         </div>`;
     }).join('');
 
-    // 이미지 placeholder
     const imagesPlaceholder = p.sourceDocNumber
         ? `<div id="dcImagesArea"><div style="color:var(--text-tertiary);font-size:13px">디자인확인서 이미지 로딩 중...</div></div>`
         : `<div style="color:var(--text-tertiary);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">연결된 디자인확인서가 없습니다</div>`;
 
-    const sectionTitle = (icon, text) => `<div style="display:flex;align-items:center;gap:6px;font-size:15px;font-weight:800;color:var(--text-primary);padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--gray-200)">${icon} ${text}</div>`;
+    const secTitle = (icon, text) => `<div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:var(--text-primary);padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--gray-200)">${icon} ${text}</div>`;
+    const cardBase = 'background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:14px 18px;margin-bottom:14px';
+    const brLine = (label, val) => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span style="color:var(--text-secondary)">${label}</span><strong style="color:var(--text-primary)">${val.toLocaleString()}원</strong></div>`;
 
     body.innerHTML = `
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap">
-            <span class="badge ${statusBadgeClass(p.status)}">${p.status}</span>
-            <span class="badge ${categoryBadgeClass(p.category)}">${p.category}</span>
-            <h3 style="margin:0;font-size:20px">${escFn(p.client)} — ${escFn(p.name)}</h3>
+        <!-- 헤더 -->
+        <div style="margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+                <span class="badge ${statusBadgeClass(p.status)}">${p.status}</span>
+                <span class="badge ${categoryBadgeClass(p.category)}">${p.category}</span>
+                ${p.sourceDocNumber ? `<span class="badge" style="background:#E8F4FD;color:var(--blue)">DC ${escFn(p.sourceDocNumber)}</span>` : ''}
+            </div>
+            <h3 style="margin:0;font-size:20px;font-weight:800;color:var(--text-primary)">${escFn(p.client)}</h3>
+            <div style="font-size:14px;color:var(--text-secondary);margin-top:2px">${escFn(p.name)}</div>
         </div>
 
-        <!-- 섹션 1: 프로젝트 기본정보 -->
-        <div style="background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:16px;margin-bottom:16px">
-            ${sectionTitle('📋', '프로젝트 기본정보')}
+        <!-- 요약 스트립 -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+            <div style="background:#E8F4FD;border:1px solid #CFE3F5;border-radius:10px;padding:12px;text-align:center">
+                <div style="font-size:11px;color:var(--text-tertiary);font-weight:700;margin-bottom:4px">매출</div>
+                <div style="font-size:17px;font-weight:800;color:var(--blue)">${revenue.toLocaleString()}<span style="font-size:12px">원</span></div>
+            </div>
+            <div style="background:${hasSupplier ? '#FFF5F0' : 'var(--gray-50)'};border:1px solid ${hasSupplier ? '#FFE0CC' : 'var(--gray-200)'};border-radius:10px;padding:12px;text-align:center">
+                <div style="font-size:11px;color:var(--text-tertiary);font-weight:700;margin-bottom:4px">매입</div>
+                <div style="font-size:17px;font-weight:800;color:${hasSupplier ? 'var(--klp-orange,#E67E22)' : 'var(--text-tertiary)'}">${hasSupplier ? purchaseTotal.toLocaleString() + '<span style="font-size:12px">원</span>' : '-'}</div>
+            </div>
+            <div style="background:${hasSupplier ? (margin >= 0 ? '#E8F8F0' : '#FDECEC') : 'var(--gray-50)'};border:1px solid ${hasSupplier ? (margin >= 0 ? '#B7E4C7' : '#F5B4B4') : 'var(--gray-200)'};border-radius:10px;padding:12px;text-align:center">
+                <div style="font-size:11px;color:var(--text-tertiary);font-weight:700;margin-bottom:4px">마진 ${hasSupplier ? `(${marginPct}%)` : ''}</div>
+                <div style="font-size:17px;font-weight:800;color:${hasSupplier ? (margin >= 0 ? '#16A34A' : 'var(--red)') : 'var(--text-tertiary)'}">${hasSupplier ? margin.toLocaleString() + '<span style="font-size:12px">원</span>' : '-'}</div>
+            </div>
+            <div style="background:#F5F5F7;border:1px solid var(--gray-200);border-radius:10px;padding:12px;text-align:center">
+                <div style="font-size:11px;color:var(--text-tertiary);font-weight:700;margin-bottom:4px">납기 ${dday ? `<span style="color:var(--blue)">${dday}</span>` : ''}</div>
+                <div style="font-size:14px;font-weight:800;color:var(--text-primary)">${p.deadline || '-'}</div>
+            </div>
+        </div>
+
+        <!-- 기본 정보 -->
+        <div style="${cardBase}">
+            ${secTitle('📋', '기본 정보')}
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
                 <div>
                     ${row('매출처', p.client)}
                     ${row('매출처 담당자', p.contactPerson)}
                     ${row('매입처', p.supplier)}
                     ${row('매입처 담당자', p.supplierContact)}
-                    ${row('본사 담당자', p.manager || (p.assignees || []).join(', '))}
-                    ${row('품명', p.name)}
-                    ${row('수량', `${(p.qty || 0).toLocaleString()} ${p.unit || ''}`)}
-                    ${row('단가', (p.unitPrice || 0).toLocaleString() + '원')}
-                    ${row('VAT', p.vat === 'include' ? 'VAT 포함' : 'VAT 별도')}
-                    ${row('매출액', (p.revenue || 0).toLocaleString() + '원')}
                 </div>
                 <div>
+                    ${row('본사 담당자', p.manager || (p.assignees || []).join(', '))}
+                    ${row('상태', p.status)}
+                    ${row('시작일', p.startDate)}
+                    ${row('납기일', p.deadline)}
+                </div>
+            </div>
+        </div>
+
+        <!-- 제품 정보 -->
+        <div style="${cardBase}">
+            ${secTitle('📦', '제품 정보')}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
+                <div>
+                    ${row('품명', p.name)}
+                    ${row('수량', `${qty.toLocaleString()} ${p.unit || ''}`)}
                     ${row('색상', p.color)}
+                </div>
+                <div>
                     ${row('인쇄 색상/사이즈', p.printColorSize)}
                     ${row('인쇄 방법', p.printMethod)}
                     ${row('포장', p.packaging)}
-                    ${row('시작일', p.startDate)}
+                </div>
+            </div>
+        </div>
+
+        <!-- 금액 상세 (매출·매입 나란히) -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+            <div style="background:#F5FBFF;border:1.5px solid #CFE3F5;border-left:4px solid var(--blue);border-radius:10px;padding:14px 16px">
+                <div style="font-size:14px;font-weight:800;color:var(--blue);padding-bottom:8px;margin-bottom:8px;border-bottom:2px solid #CFE3F5">💰 매출 상세</div>
+                <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px">단가 ${(p.unitPrice||0).toLocaleString()}원 × ${qty.toLocaleString()}${p.unit||''} (${salesVatLabel})</div>
+                ${brLine('제품 합계', salesProduct)}
+                ${brLine('＋ 인쇄비', salesPrint)}
+                ${brLine('＋ 포장비', salesPack)}
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-top:8px;background:#E8F4FD;border-radius:8px">
+                    <span style="font-weight:800;color:var(--blue);font-size:13px">매출액</span>
+                    <strong style="font-size:18px;color:var(--blue)">${revenue.toLocaleString()}원</strong>
+                </div>
+            </div>
+            <div style="background:${hasSupplier ? '#FFF8F2' : 'var(--gray-50)'};border:1.5px solid ${hasSupplier ? '#FFE0CC' : 'var(--gray-200)'};border-left:4px solid ${hasSupplier ? 'var(--klp-orange,#E67E22)' : 'var(--gray-300)'};border-radius:10px;padding:14px 16px">
+                <div style="font-size:14px;font-weight:800;color:${hasSupplier ? 'var(--klp-orange,#E67E22)' : 'var(--text-tertiary)'};padding-bottom:8px;margin-bottom:8px;border-bottom:2px solid ${hasSupplier ? '#FFE0CC' : 'var(--gray-200)'}">🏭 매입 상세</div>
+                ${!hasSupplier ? `<div style="color:var(--text-tertiary);font-size:13px;padding:20px 0;text-align:center">매입처 정보 없음</div>` : `
+                    <div style="font-size:13px;color:var(--text-primary);margin-bottom:4px"><strong>${escFn(p.supplier)}</strong>${p.supplierContact ? `<span style="color:var(--text-tertiary);font-size:12px"> · ${escFn(p.supplierContact)}</span>` : ''}</div>
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px">매입단가 ${(p.supplierUnitPrice||0).toLocaleString()}원 × ${qty.toLocaleString()}${p.unit||''} (${supVatLabel})</div>
+                    ${brLine('제품 합계', supProduct)}
+                    ${brLine('＋ 매입 인쇄비', supPrint)}
+                    ${brLine('＋ 매입 포장비', supPack)}
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-top:8px;background:#fff;border:1px solid #FFE0CC;border-radius:8px">
+                        <span style="font-weight:800;color:var(--klp-orange,#E67E22);font-size:13px">매입액</span>
+                        <strong style="font-size:18px;color:var(--klp-orange,#E67E22)">${purchaseTotal.toLocaleString()}원</strong>
+                    </div>
+                `}
+            </div>
+        </div>
+
+        <!-- 납기 및 배송 -->
+        <div style="${cardBase}">
+            ${secTitle('🚚', '납기 및 배송')}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
+                <div>
                     ${row('납기일', p.deadline)}
                     ${row('수령인', p.recipient)}
-                    ${row('주소', `${p.address || ''}${p.phone ? ` (${p.phone})` : ''}`)}
+                </div>
+                <div>
+                    ${row('연락처', p.phone)}
+                    ${row('주소', p.address)}
                 </div>
             </div>
-            ${p.memo ? `<div style="margin-top:12px;background:var(--gray-50);border-radius:8px;padding:10px 14px;font-size:13px;white-space:pre-wrap"><span style="color:var(--text-tertiary);font-weight:700">메모</span><br>${escFn(p.memo)}</div>` : ''}
         </div>
 
-        <!-- 섹션 2: 매입처 정보 -->
-        <div style="background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:16px;margin-bottom:16px">
-            ${sectionTitle('🏭', `매입처 정보${hasSupplier ? '' : ' (없음)'}`)}
-            ${suppliersHtml}
+        <!-- 체크리스트 -->
+        <div style="${cardBase}">
+            ${secTitle('✅', '진행 체크리스트')}
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">${checksHtml}</div>
         </div>
 
-        <!-- 섹션 3: 체크리스트 + 비용 요약 + 시안 이미지 -->
-        <div style="background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:16px;margin-bottom:16px">
-            ${sectionTitle('✅', '체크리스트 및 비용 요약')}
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">${checksHtml}</div>
-
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
-                <div style="background:#E8F4FD;border-radius:8px;padding:14px;text-align:center">
-                    <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:4px">매출 합계</div>
-                    <div style="font-size:18px;font-weight:800;color:var(--blue)">${(p.revenue || 0).toLocaleString()}원</div>
-                </div>
-                <div style="background:#FFF5F0;border-radius:8px;padding:14px;text-align:center">
-                    <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:4px">매입 합계</div>
-                    <div style="font-size:18px;font-weight:800;color:var(--klp-orange,#E67E22)">${purchaseTotal.toLocaleString()}원</div>
-                </div>
-                <div style="background:${margin >= 0 ? '#E8F8F0' : '#FDECEC'};border-radius:8px;padding:14px;text-align:center">
-                    <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:4px">마진 (${marginPct}%)</div>
-                    <div style="font-size:18px;font-weight:800;color:${margin >= 0 ? 'var(--green,#16A34A)' : 'var(--red)'}">${margin.toLocaleString()}원</div>
-                </div>
-            </div>
-
-            <div style="font-size:13px;font-weight:700;color:var(--text-secondary);margin-bottom:8px">🖼️ 디자인확인서 시안 이미지</div>
+        <!-- 디자인확인서 이미지 -->
+        <div style="${cardBase}">
+            ${secTitle('🖼️', '디자인확인서 시안')}
             ${imagesPlaceholder}
         </div>
 
+        ${p.memo ? `
+        <div style="background:#FFFBF0;border:1px solid #FDE68A;border-left:4px solid #F59E0B;border-radius:10px;padding:12px 16px;margin-bottom:14px">
+            <div style="font-size:11px;color:#92400E;font-weight:800;margin-bottom:4px">📝 메모</div>
+            <div style="font-size:13px;white-space:pre-wrap;color:var(--text-primary)">${escFn(p.memo)}</div>
+        </div>` : ''}
+
+        <!-- 액션 버튼 -->
         <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
             <button class="form-submit" style="flex:1 1 180px;background:var(--blue)" onclick="createDocFromProject(${id},'dc')">📄 디자인확인서 만들기</button>
             <button class="form-submit" style="flex:1 1 180px;background:var(--klp-orange,#E67E22)" onclick="createDocFromProject(${id},'wr')">📋 작업요청서 만들기</button>
