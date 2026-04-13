@@ -472,14 +472,12 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
     let cardHtml = '';
     filtered.forEach(p => {
         const childCount = childCountByParent[p.id] || 0;
-        const isExpanded = expandedProjectIds.has(p.id);
-        const expandIcon = childCount > 0 ? `<span style="display:inline-block;width:14px;color:var(--klp-orange,#E67E22);font-weight:700;transition:transform .2s;${isExpanded ? 'transform:rotate(90deg)' : ''}">▶</span> ` : '<span style="display:inline-block;width:14px"></span> ';
         const supplierBadge = childCount > 0 ? ` <span class="badge badge-orange" style="font-size:10px">매입 ${childCount}</span>` : '';
         const pNum = parseInt(p.progress) || 0;
         const checks = p.checks || {};
         const checkDots = CHECK_ITEMS.map(item => {
             const v = checks[item.key];
-            return `<div class="check-item"><div class="check-dot ${v ? 'done' : ''}" title="${item.label}">${v ? checkSvg : ''}</div><span class="check-label">${item.short}</span></div>`;
+            return `<div class="check-item" onclick="event.stopPropagation();toggleProjectCheck(${p.id},'${item.key}')" style="cursor:pointer"><div class="check-dot ${v ? 'done' : ''}" title="${item.label} (클릭하여 토글)">${v ? checkSvg : ''}</div><span class="check-label">${item.short}</span></div>`;
         }).join('');
 
         const revenueStr = (p.revenue || 0).toLocaleString() + '원';
@@ -494,9 +492,9 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
             ? `<span style="color:${marginVal >= 0 ? 'var(--blue)' : 'var(--red)'};font-weight:700">${marginVal.toLocaleString()}원 (${marginPctVal}%)</span>`
             : '-';
 
-        tableHtml += `<tr onclick="toggleProjectExpand(${p.id})" style="cursor:pointer">
+        tableHtml += `<tr>
             <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
-            <td>${expandIcon}<strong>${p.client || '-'}</strong>${supplierBadge}</td>
+            <td><strong>${p.client || '-'}</strong>${supplierBadge}</td>
             <td>${p.supplier || '-'}</td>
             <td>${p.name}</td>
             <td>${p.assignees.join(', ')}</td>
@@ -505,27 +503,8 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
             <td>${marginStr}</td>
             <td>${p.deadline ? fmtDisplay(p.deadline) : '-'}</td>
             <td><div class="checks-row">${checkDots}</div></td>
-            <td><button class="edit-btn" onclick="event.stopPropagation();openEditProject(${p.id})">편집</button></td>
+            <td><button class="edit-btn" onclick="openEditProject(${p.id})">편집</button></td>
         </tr>`;
-
-        // 확장된 상태면 자식 행을 부모 바로 아래에 렌더
-        if (isExpanded && childCount > 0) {
-            childrenForP.forEach(c => {
-                tableHtml += `<tr onclick="event.stopPropagation();openEditProject(${c.id})" style="cursor:pointer;background:#FFF8F2">
-                    <td><span class="badge ${statusBadgeClass(c.status)}">${c.status}</span></td>
-                    <td style="padding-left:32px"><span style="color:var(--klp-orange,#E67E22);font-weight:700">↳ 매입</span></td>
-                    <td><strong>${c.supplier || '-'}</strong></td>
-                    <td>${c.name || '-'}</td>
-                    <td>${(c.assignees || []).join(', ')}</td>
-                    <td>—</td>
-                    <td>${(c.revenue || 0).toLocaleString()}원</td>
-                    <td>—</td>
-                    <td>${c.deadline ? fmtDisplay(c.deadline) : '-'}</td>
-                    <td>—</td>
-                    <td><button class="edit-btn" onclick="event.stopPropagation();openEditProject(${c.id})">편집</button></td>
-                </tr>`;
-            });
-        }
 
         cardHtml += `<div class="resp-card" onclick="showProjectDetail(${p.id})">
             <div class="resp-card-top">
@@ -543,6 +522,23 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
     document.getElementById(tableBodyId).innerHTML = tableHtml;
     document.getElementById(cardGridId).innerHTML = cardHtml;
+}
+
+async function toggleProjectCheck(id, key) {
+    const p = projects.find(x => x.id === id);
+    if (!p) return;
+    if (!p.checks) p.checks = {};
+    p.checks[key] = !p.checks[key];
+    renderProjects();
+    if (p.category !== '해외 주문') {
+        try {
+            const { error } = await sb.from('projects_domestic').update({ checks: p.checks }).eq('id', id);
+            if (error) throw error;
+        } catch (err) {
+            console.error('체크 저장 실패', err);
+            showToast('DB 저장 실패: ' + err.message);
+        }
+    }
 }
 
 function toggleProjectExpand(id) {
