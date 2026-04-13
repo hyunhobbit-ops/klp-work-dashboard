@@ -1394,6 +1394,11 @@ body {
 .modal { background: var(--white); width: 520px; max-width: 95vw; border-radius: var(--radius); box-shadow: var(--shadow-lg); max-height: 85vh; overflow-y: auto; animation: modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
 .modal-overlay.modal-wide .modal { width: 1100px; max-width: 95vw; max-height: 92vh; }
 .modal-overlay.modal-wide .modal-body { padding: 16px 28px 24px; }
+.modal-overlay.modal-wide .form-input,
+.modal-overlay.modal-wide .form-select { padding: 12px 14px; font-size: 15px; height: 48px; }
+.modal-overlay.modal-wide .form-label { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.modal-overlay.modal-wide .form-section-title { font-size: 15px; font-weight: 800; padding: 12px 0 10px; border-bottom: 2px solid var(--gray-200); margin: 16px 0 14px; }
+.modal-overlay.modal-wide .form-group { margin-bottom: 14px; }
 @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 24px 28px 0; }
 .modal-title { font-size: 18px; font-weight: 700; }
