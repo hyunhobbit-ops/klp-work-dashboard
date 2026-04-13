@@ -1614,7 +1614,6 @@ async function showProjectDetail(id) {
                     ${row('매입처(공장)', p.supplier)}
                     ${row('거래처 담당자', p.contactPerson)}
                     ${row('본사 담당자', p.manager || (p.assignees || []).join(', '))}
-                    ${row('제목', p.title)}
                     ${row('진행률', p.progress)}
                     ${row('우선순위', p.priority)}
                 </div>
@@ -1739,7 +1738,6 @@ function openEditProject(id) {
         </div>
         <datalist id="clientsListDoc">${clients.map(c => `<option value="${(c.companyName || '').replace(/"/g, '&quot;')}"></option>`).join('')}</datalist>
         <div class="form-row">
-            <div class="form-group"><label class="form-label">제목</label><input type="text" class="form-input" id="editProjectTitle" value="${p.title || ''}"></div>
             <div class="form-group"><label class="form-label">본사 담당자</label>
                 <select class="form-select" id="editProjectManager">
                     ${['이현주 실장','김현호 팀장','유지은 대리'].map(m=>`<option ${p.manager===m?'selected':''}>${m}</option>`).join('')}
@@ -1865,7 +1863,7 @@ async function updateProject(id) {
         name, client,
         supplier: getVal('editProjectSupplier'),
         contactPerson: getVal('editProjectContact'),
-        title: getVal('editProjectTitle'),
+        title: '',
         manager: getVal('editProjectManager'),
         status: getVal('editProjectStatus'),
         progress: getVal('editProjectProgress'),
@@ -1995,7 +1993,6 @@ function openModal(type) {
                 </div>
                 <datalist id="clientsListDoc">${clients.map(c => `<option value="${(c.companyName || '').replace(/"/g, '&quot;')}"></option>`).join('')}</datalist>
                 <div class="form-row">
-                    <div class="form-group"><label class="form-label">제목</label><input type="text" class="form-input" id="newProjectTitle" placeholder="예: 상패 시안" value="${v('title')}"></div>
                     <div class="form-group"><label class="form-label">본사 담당자</label>
                         <select class="form-select" id="newProjectManager">
                             <option ${v('manager')==='이현주 실장'?'selected':''}>이현주 실장</option>
@@ -2204,7 +2201,7 @@ async function addProject(type) {
     const newProject = {
         id: Date.now(), name, client,
         contactPerson: getVal('newProjectContact'),
-        title: getVal('newProjectTitle'),
+        title: '',
         manager: getVal('newProjectManager'),
         supplier: getVal('newProjectSupplier'), status: "시작 전",
         priority: "🟢 보통", category: type === 'overseas' ? '해외 주문' : '국내 주문',
