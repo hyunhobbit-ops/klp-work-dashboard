@@ -523,22 +523,31 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
     const colspan = 11;
     if (filter === 'all') {
         // 전체보기 — 시작 전 / 진행 중 / 완료 세 섹션으로 나눠서 출력
+        const normalize = s => (s || '').replace(/\s+/g, '');
         const sections = [
             { key: '시작 전', color: '#8B95A1', bg: '#F1F3F5' },
             { key: '진행 중', color: '#1B64DA', bg: '#E8F4FD' },
             { key: '완료', color: '#12B76A', bg: '#E8F8EF' }
         ];
+        // 정규화 매칭으로 버킷 분류 — 알 수 없는 상태는 '시작 전'에 합류
+        const buckets = { '시작 전': [], '진행 중': [], '완료': [] };
+        filtered.forEach(p => {
+            const n = normalize(p.status);
+            if (n === normalize('진행 중')) buckets['진행 중'].push(p);
+            else if (n === normalize('완료')) buckets['완료'].push(p);
+            else buckets['시작 전'].push(p);
+        });
         sections.forEach(sec => {
-            const group = filtered.filter(p => p.status === sec.key);
-            tableHtml += `<tr class="section-header-row"><td colspan="${colspan}" style="background:${sec.bg};color:${sec.color};font-weight:800;font-size:13px;padding:10px 14px;border-top:2px solid ${sec.color};border-bottom:1px solid ${sec.color}">${sec.key} <span style="opacity:.7;font-weight:700">(${group.length})</span></td></tr>`;
+            const group = buckets[sec.key];
+            tableHtml += `<tr class="section-divider"><td colspan="${colspan}" style="padding:0;border:none"><div style="background:${sec.bg};color:${sec.color};font-weight:800;font-size:15px;padding:14px 18px;border-left:6px solid ${sec.color};border-top:2px solid ${sec.color};border-bottom:2px solid ${sec.color};letter-spacing:.3px;display:flex;align-items:center;gap:10px"><span>${sec.key}</span><span style="background:${sec.color};color:#fff;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:800">${group.length}건</span></div></td></tr>`;
             if (group.length === 0) {
-                tableHtml += `<tr><td colspan="${colspan}" style="color:var(--text-tertiary);font-size:12px;padding:10px 14px;text-align:center">해당 상태의 프로젝트가 없습니다</td></tr>`;
+                tableHtml += `<tr class="section-empty"><td colspan="${colspan}" style="color:var(--text-tertiary);font-size:12px;padding:14px;text-align:center;background:#fff">해당 상태의 프로젝트가 없습니다</td></tr>`;
             } else {
                 group.forEach(p => { tableHtml += rowHtmlById.get(p.id); });
             }
-            cardHtml += `<div class="card-section-header" style="grid-column:1/-1;background:${sec.bg};color:${sec.color};font-weight:800;padding:10px 14px;border-radius:8px;margin-top:8px;border:1px solid ${sec.color}">${sec.key} <span style="opacity:.7">(${group.length})</span></div>`;
+            cardHtml += `<div class="card-section-header" style="grid-column:1/-1;background:${sec.bg};color:${sec.color};font-weight:800;font-size:15px;padding:14px 18px;border-radius:10px;margin-top:10px;border-left:6px solid ${sec.color};display:flex;align-items:center;gap:10px"><span>${sec.key}</span><span style="background:${sec.color};color:#fff;padding:2px 10px;border-radius:20px;font-size:12px">${group.length}건</span></div>`;
             if (group.length === 0) {
-                cardHtml += `<div style="grid-column:1/-1;color:var(--text-tertiary);font-size:12px;padding:6px 14px">해당 상태의 프로젝트가 없습니다</div>`;
+                cardHtml += `<div style="grid-column:1/-1;color:var(--text-tertiary);font-size:12px;padding:8px 14px">해당 상태의 프로젝트가 없습니다</div>`;
             } else {
                 group.forEach(p => { cardHtml += cardHtmlById.get(p.id); });
             }

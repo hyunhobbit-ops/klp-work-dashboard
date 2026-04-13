@@ -986,6 +986,8 @@ body {
 
 .data-table tbody tr:hover { background: var(--gray-50); }
 .data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr.section-divider, .data-table tbody tr.section-empty { cursor: default; }
+.data-table tbody tr.section-divider:hover, .data-table tbody tr.section-empty:hover { background: transparent; }
 
 /* Badges */
 .badge {
