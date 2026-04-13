@@ -1728,7 +1728,7 @@ async function showProjectDetail(id) {
 
         <!-- 섹션 2: 매입처 정보 -->
         <div style="background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:16px;margin-bottom:16px">
-            ${sectionTitle('🏭', `매입처 정보 (${children.length}건)`)}
+            ${sectionTitle('🏭', `매입처 정보${hasSupplier ? '' : ' (없음)'}`)}
             ${suppliersHtml}
         </div>
 
