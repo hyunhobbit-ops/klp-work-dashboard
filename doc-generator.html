@@ -255,7 +255,7 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
   <div class="section" style="text-align:center;border-color:var(--klp-orange)">
     <div style="font-size:15px;font-weight:800;color:var(--klp-orange);margin-bottom:8px">📎 디자인확인서 연동</div>
     <div style="font-size:12px;color:#888;margin-bottom:14px">히스토리에 저장된 디자인확인서를 불러와서 작업요청서를 만듭니다</div>
-    <button onclick="openLinkModal()" style="padding:12px 30px;border-radius:10px;border:none;background:var(--klp-orange);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">📋 디자인확인서 연동하기</button>
+    <button id="wrLinkBtn" onclick="openLinkModal()" style="padding:12px 30px;border-radius:10px;border:none;background:var(--klp-orange);color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">📋 디자인확인서 연동하기</button>
     <div id="wrLinkedInfo" class="hidden" style="margin-top:12px;padding:10px 16px;background:var(--klp-orange-light);border-radius:8px;font-size:12px;color:#8B4513;font-weight:600"></div>
   </div>
 
@@ -674,6 +674,7 @@ async function selectLinkedDC(id){
   info.classList.remove('hidden');
   var imgNote=(!mainImg&&subImgs.length===0)?'<br>⚠️ 시안 이미지는 디자인확인서에 먼저 첨부하거나, 여기서 직접 첨부해주세요.':'';
   info.innerHTML='✅ 연동 완료: <b>'+esc(r.doc_number)+'</b> — '+esc(r.title)+' ('+esc(r.company_name)+')'+imgNote;
+  document.getElementById('wrLinkBtn').classList.add('hidden');
 
   calcWrEst();
   showMsg('✅ 디자인확인서 연동 완료!')}catch(err){showMsg('❌ 연동 실패',true)}
@@ -1175,6 +1176,16 @@ async function loadRecord(id){
           if(dcRes&&dcRes.length>0){linkedDC=dcRes[0];}
         }
       }catch(e){console.warn('linked DC restore failed',e);}
+      var wrLinkBtnEl=document.getElementById('wrLinkBtn');
+      var wrLinkInfoEl=document.getElementById('wrLinkedInfo');
+      if(linkedDC){
+        wrLinkBtnEl.classList.add('hidden');
+        wrLinkInfoEl.classList.remove('hidden');
+        wrLinkInfoEl.innerHTML='✅ 연동 완료: <b>'+esc(linkedDC.doc_number)+'</b> — '+esc(linkedDC.title||'')+' ('+esc(linkedDC.company_name||'')+')';
+      }else{
+        wrLinkBtnEl.classList.remove('hidden');
+        wrLinkInfoEl.classList.add('hidden');
+      }
       calcWrEst();
       showWrTab('form');
       showMsg(linkedDC?'📄 작업요청서 불러오기 완료! (디자인확인서 연동됨)':'📄 작업요청서 불러오기 완료!');
@@ -1262,6 +1273,7 @@ function newWrDoc(){
   document.getElementById('wrPrintFeeMargin').classList.add('hidden');
   document.getElementById('wrPkgFeeMargin').classList.add('hidden');
   document.getElementById('wrLinkedInfo').classList.add('hidden');
+  document.getElementById('wrLinkBtn').classList.remove('hidden');
   showWrTab('form');
 }
 
