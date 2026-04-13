@@ -1044,7 +1044,7 @@ async function newDoc(){
   document.getElementById('date').value=new Date().toISOString().split('T')[0];
   ['companyName','contactPerson','title','productName','quantity','unitPrice','printFee','packagingFee','deliveryDate','dcRecipient','dcPhone','dcAddress'].forEach(function(id){document.getElementById(id).value=''});
   document.getElementById('color').value='-';document.getElementById('printColorSize').value='시안 확인';
-  document.getElementById('manager').value='김현호 팀장';
+  document.getElementById('manager').value=getLoginManager()||'김현호 팀장';
   document.getElementById('unit').value='개';document.getElementById('unitPriceVat').value='VAT 별도';
   document.getElementById('printMethod').value='없음';togglePrintFee();
   document.getElementById('packaging').value='개별박스';
@@ -1359,26 +1359,28 @@ document.getElementById('yearPrefix').textContent=Y+'_';
 loadClientsDatalist();
 
 /* === 로그인 사용자 기반 본사 담당자 자동 선택 === */
-(function(){
+function getLoginManager(){
   try{
     var saved=localStorage.getItem('klp_user');
-    if(!saved)return;
+    if(!saved)return null;
     var u=JSON.parse(saved);
     var nameMap={'이현주':'이현주 실장','김현호':'김현호 팀장','유지은':'유지은 대리'};
     var loginName=u.loginName||u.name;
-    var mapped=nameMap[loginName]||nameMap[u.name];
-    if(!mapped)return;
-    function setSel(id){
-      var sel=document.getElementById(id);
-      if(!sel)return;
-      for(var i=0;i<sel.options.length;i++){
-        if(sel.options[i].value===mapped||sel.options[i].text===mapped){sel.selectedIndex=i;break;}
-      }
+    return nameMap[loginName]||nameMap[u.name]||null;
+  }catch(e){return null;}
+}
+function applyLoginManager(){
+  var mapped=getLoginManager();
+  if(!mapped)return;
+  ['manager','wrRequester'].forEach(function(id){
+    var sel=document.getElementById(id);
+    if(!sel)return;
+    for(var i=0;i<sel.options.length;i++){
+      if(sel.options[i].value===mapped||sel.options[i].text===mapped){sel.selectedIndex=i;break;}
     }
-    setSel('manager');
-    setSel('wrRequester');
-  }catch(e){console.warn('manager auto-select failed',e);}
-})();
+  });
+}
+applyLoginManager();
 
 /* === NEW WR DOC === */
 function newWrDoc(){
@@ -1390,7 +1392,7 @@ function newWrDoc(){
   document.getElementById('wrUnit').value='개';document.getElementById('wrUnitPriceVat').value='VAT 별도';
   document.getElementById('wrPrintMethod').value='없음';toggleWrPrintFee();
   document.getElementById('wrPackaging').value='개별박스';document.getElementById('wrDeliveryDate').value='';
-  document.getElementById('wrRequester').value='김현호 팀장';
+  document.getElementById('wrRequester').value=getLoginManager()||'김현호 팀장';
   renderWrMainThumb();renderWrSubThumbs();
   document.getElementById('wrEstCard').classList.add('hidden');
   document.getElementById('wrMarginCard').classList.add('hidden');
