@@ -132,18 +132,18 @@ document.addEventListener('keydown', (e) => {
 // ===== Data =====
 // 국내 프로젝트
 const domesticProjects = [
-    { id: 1, name: "러쉬 성수동 제안", client: "러쉬", supplier: "", status: "진행 중", priority: "🔴 긴급", category: "국내 주문", assignees: ["이현주"], progress: "25%", revenue: 0, startDate: "2026-04-07", deadline: "2026-04-10", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "내일까지 제안서 준다고 함" },
-    { id: 2, name: "지플러스타워 골드바 감사패", client: "지플러스타워", supplier: "", status: "진행 중", priority: "🟡 높음", category: "국내 주문", assignees: ["김현호"], progress: "50%", revenue: 0, startDate: "2026-03-19", deadline: "2026-04-15", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "견적 발송 완료" },
-    { id: 3, name: "미니클락 스토어팜 판매 계획", client: "자체", supplier: "", status: "진행 중", priority: "🟢 보통", category: "자체 브랜드", assignees: ["이현주", "김현호"], progress: "50%", revenue: 0, startDate: "2026-03-10", deadline: "2026-04-30", checks: { design: true, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "빈티지 시계 + 미니클락 상세 계획 작성" },
-    { id: 4, name: "굿즈덕 클로드 리뉴얼", client: "자체", supplier: "", status: "진행 중", priority: "🟢 보통", category: "자체 브랜드", assignees: ["김현호"], progress: "25%", revenue: 0, startDate: "2026-04-01", deadline: "2026-04-30", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "" },
-    { id: 6, name: "빵 주문서 양식 제작", client: "본사", supplier: "", status: "완료", priority: "🟢 보통", category: "기타", assignees: ["김현호"], progress: "100%", revenue: 0, startDate: "2026-03-25", deadline: "2026-03-31", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: true, invoice: true, supplierPayment: true, delivered: true }, memo: "완료" },
-    { id: 7, name: "회사 재고 소진 프로젝트", client: "자체", supplier: "", status: "진행 중", priority: "🟡 높음", category: "자체 브랜드", assignees: ["이현주", "김현호"], progress: "25%", revenue: 0, startDate: "2026-03-12", deadline: "2026-12-31", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "2026년 재고소진의 해" },
-    { id: 8, name: "제안서 DB 구축", client: "본사", supplier: "", status: "시작 전", priority: "🟢 보통", category: "기타", assignees: ["이현주"], progress: "0%", revenue: 0, startDate: "", deadline: "2026-04-20", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "" },
+    { id: 1, name: "러쉬 성수동 제안", client: "러쉬", supplier: "", status: "진행 중", priority: "🔴 긴급", category: "국내 주문", assignees: ["이현주"], revenue: 0, startDate: "2026-04-07", deadline: "2026-04-10", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "내일까지 제안서 준다고 함" },
+    { id: 2, name: "지플러스타워 골드바 감사패", client: "지플러스타워", supplier: "", status: "진행 중", priority: "🟡 높음", category: "국내 주문", assignees: ["김현호"], revenue: 0, startDate: "2026-03-19", deadline: "2026-04-15", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "견적 발송 완료" },
+    { id: 3, name: "미니클락 스토어팜 판매 계획", client: "자체", supplier: "", status: "진행 중", priority: "🟢 보통", category: "자체 브랜드", assignees: ["이현주", "김현호"], revenue: 0, startDate: "2026-03-10", deadline: "2026-04-30", checks: { design: true, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "빈티지 시계 + 미니클락 상세 계획 작성" },
+    { id: 4, name: "굿즈덕 클로드 리뉴얼", client: "자체", supplier: "", status: "진행 중", priority: "🟢 보통", category: "자체 브랜드", assignees: ["김현호"], revenue: 0, startDate: "2026-04-01", deadline: "2026-04-30", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "" },
+    { id: 6, name: "빵 주문서 양식 제작", client: "본사", supplier: "", status: "완료", priority: "🟢 보통", category: "기타", assignees: ["김현호"], revenue: 0, startDate: "2026-03-25", deadline: "2026-03-31", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: true, invoice: true, supplierPayment: true, delivered: true }, memo: "완료" },
+    { id: 7, name: "회사 재고 소진 프로젝트", client: "자체", supplier: "", status: "진행 중", priority: "🟡 높음", category: "자체 브랜드", assignees: ["이현주", "김현호"], revenue: 0, startDate: "2026-03-12", deadline: "2026-12-31", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "2026년 재고소진의 해" },
+    { id: 8, name: "제안서 DB 구축", client: "본사", supplier: "", status: "시작 전", priority: "🟢 보통", category: "기타", assignees: ["이현주"], revenue: 0, startDate: "", deadline: "2026-04-20", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "" },
 ];
 
 // 해외 프로젝트
 const overseasProjects = [
-    { id: 5, name: "해외 PO 시스템 구축", client: "본사", supplier: "", status: "진행 중", priority: "🟡 높음", category: "해외 주문", assignees: ["이현주"], progress: "75%", revenue: 0, startDate: "2026-03-20", deadline: "2026-04-12", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "해외 PO 만들기 진행 중" },
+    { id: 5, name: "해외 PO 시스템 구축", client: "본사", supplier: "", status: "진행 중", priority: "🟡 높음", category: "해외 주문", assignees: ["이현주"], revenue: 0, startDate: "2026-03-20", deadline: "2026-04-12", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "해외 PO 만들기 진행 중" },
 ];
 
 // 홈 등에서 전체 프로젝트 참조용
@@ -413,21 +413,14 @@ function renderHome() {
     });
     document.getElementById('todaySchedule').innerHTML = taskHtml || empty('오늘 할 일이 없습니다');
 
-    // Project progress
+    // Project list
     const activeProjects = projects.filter(p => p.status === '진행 중').slice(0, 5);
     let projHtml = '';
     activeProjects.forEach(p => {
-        const pNum = parseInt(p.progress) || 0;
         projHtml += `<div class="dash-proj-item" onclick="showProjectDetail(${p.id})">
             <div class="dash-proj-info">
                 <div class="dash-proj-name">${p.name}</div>
                 <div class="dash-proj-meta">${p.assignees.join(', ')} · ${p.category}</div>
-            </div>
-            <div class="dash-proj-progress">
-                <div class="progress-cell">
-                    <div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div>
-                    <span class="progress-pct">${p.progress}</span>
-                </div>
             </div>
         </div>`;
     });
@@ -469,7 +462,6 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
     let tableHtml = '';
     let cardHtml = '';
     filtered.forEach(p => {
-        const pNum = parseInt(p.progress) || 0;
         const checks = p.checks || {};
         const checkDots = CHECK_ITEMS.map(item => {
             const v = checks[item.key];
@@ -512,7 +504,6 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
                 ${p.supplier ? `<div class="resp-card-row">매입처: ${p.supplier}</div>` : ''}
                 <div class="resp-card-row"><strong>${p.assignees.join(', ')}</strong> · 매출 ${revenueStr}</div>
                 <div class="resp-card-row">마감 ${p.deadline ? fmtDisplay(p.deadline) : '-'}</div>
-                <div class="resp-card-row" style="margin-top:4px"><div class="progress-cell" style="flex:1"><div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div><span class="progress-pct">${p.progress}</span></div></div>
             </div>
         </div>`;
     });
@@ -2044,7 +2035,6 @@ function openEditProject(id) {
         delivered: { label: '납품 완료', desc: '최종 납품 완료' }
     };
     const statusOpts = ['시작 전', '진행 중', '완료'];
-    const progressOpts = ['0%', '25%', '50%', '75%', '100%'];
     const vatCurrent = p.vat === 'include' ? 'include' : 'exclude';
 
     const checksHtml = Object.entries(checkDetails).map(([key, info]) => `
@@ -2362,7 +2352,6 @@ async function updateProject(id) {
         title: '',
         manager: getVal('editProjectManager'),
         status: getVal('editProjectStatus'),
-        progress: p.progress || '0%',
         supplierContact: getVal('editProjectSupplierContact'),
         unitPrice, qty, vat, revenue,
         unit: getVal('editProjectUnit'),
@@ -2420,7 +2409,6 @@ async function updateProject(id) {
                 address: p.address,
                 revenue: p.revenue,
                 status: p.status,
-                progress: p.progress,
                 checks: p.checks,
                 memo: p.memo,
                 supplier: p.supplier,
@@ -2890,7 +2878,6 @@ async function addProject(type) {
         status: getVal('newProjectStatus') || "시작 전",
         priority: "🟢 보통", category: type === 'overseas' ? '해외 주문' : '국내 주문',
         assignees: [assignee],
-        progress: "0%",
         unitPrice, qty, vat, revenue,
         unit: getVal('newProjectUnit') || '개',
         color: getVal('newProjectColor'),
@@ -2967,7 +2954,6 @@ async function addProject(type) {
                 priority: newProject.priority,
                 category: newProject.category,
                 assignees: newProject.assignees,
-                progress: newProject.progress,
                 start_date: newProject.startDate || null,
                 checks: newProject.checks,
                 memo: newProject.memo,
@@ -3026,7 +3012,6 @@ async function loadDomesticProjectsFromDb() {
                 priority: r.priority || '🟢 보통',
                 category: r.category || '국내 주문',
                 assignees: r.assignees || [],
-                progress: r.progress || '0%',
                 unitPrice: r.unit_price || 0,
                 qty: r.quantity || 0,
                 unit: r.unit || '개',
@@ -3621,11 +3606,10 @@ function openClientDetail(id) {
     const projectsHtml = linkedProjects.length === 0
         ? `<div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">연동된 프로젝트가 없습니다</div>`
         : `<table class="data-table" style="margin-top:8px">
-            <thead><tr><th>품명</th><th style="width:100px">상태</th><th style="width:100px">진행률</th><th style="width:120px">납기</th><th style="width:120px">매출액</th></tr></thead>
+            <thead><tr><th>품명</th><th style="width:100px">상태</th><th style="width:120px">납기</th><th style="width:120px">매출액</th></tr></thead>
             <tbody>${linkedProjects.map(p => `<tr onclick="closeModal();switchTab('${p.category === '해외 주문' ? 'projects-overseas' : 'projects-domestic'}');setTimeout(()=>openEditProject(${p.id}),100)" style="cursor:pointer">
                 <td><strong>${esc(p.name)}</strong></td>
                 <td>${esc(p.status)}</td>
-                <td>${esc(p.progress)}</td>
                 <td>${esc(p.deadline) || '-'}</td>
                 <td>${(p.revenue || 0).toLocaleString()}원</td>
             </tr>`).join('')}</tbody>
