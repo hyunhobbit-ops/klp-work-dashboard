@@ -459,8 +459,9 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
     const filtered = filter === 'all' ? dataArr : dataArr.filter(p => p.status === filter);
     const checkSvg = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
-    let tableHtml = '';
-    let cardHtml = '';
+    // 각 프로젝트의 table row / card HTML 생성
+    const rowHtmlById = new Map();
+    const cardHtmlById = new Map();
     filtered.forEach(p => {
         const checks = p.checks || {};
         const checkDots = CHECK_ITEMS.map(item => {
@@ -487,7 +488,7 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
         const ownerStr = p.manager || (p.assignees && p.assignees.length ? p.assignees.join(', ') : '-');
         const statusCls = statusBadgeClass(p.status);
         const statusOptsHtml = ['시작 전', '진행 중', '완료'].map(s => `<option value="${s}"${s === p.status ? ' selected' : ''}>${s}</option>`).join('');
-        tableHtml += `<tr onclick="projectRowClick(${p.id})" ondblclick="projectRowDblClick(${p.id})" style="cursor:pointer">
+        rowHtmlById.set(p.id, `<tr onclick="projectRowClick(${p.id})" ondblclick="projectRowDblClick(${p.id})" style="cursor:pointer">
             <td><select class="status-select badge ${statusCls}" onclick="event.stopPropagation()" onchange="updateProjectStatus(${p.id}, this.value)">${statusOptsHtml}</select></td>
             <td><strong>${p.client || '-'}</strong></td>
             <td>${supplierDisplay}</td>
@@ -499,9 +500,9 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
             <td>${p.deadline ? fmtDisplay(p.deadline) : '-'}</td>
             <td><div class="checks-row">${checkDots}</div></td>
             <td><button class="edit-btn" onclick="event.stopPropagation();openEditProject(${p.id})">편집</button></td>
-        </tr>`;
+        </tr>`);
 
-        cardHtml += `<div class="resp-card" onclick="showProjectDetail(${p.id})">
+        cardHtmlById.set(p.id, `<div class="resp-card" onclick="showProjectDetail(${p.id})">
             <div class="resp-card-top">
                 <div class="resp-card-title">${p.client || '-'} — ${p.name}</div>
                 <span class="badge ${statusBadgeClass(p.status)}">${p.status}</span>
@@ -514,8 +515,40 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
                 </div>
                 <div class="resp-card-row">마감 ${p.deadline ? fmtDisplay(p.deadline) : '-'}</div>
             </div>
-        </div>`;
+        </div>`);
     });
+
+    let tableHtml = '';
+    let cardHtml = '';
+    const colspan = 11;
+    if (filter === 'all') {
+        // 전체보기 — 시작 전 / 진행 중 / 완료 세 섹션으로 나눠서 출력
+        const sections = [
+            { key: '시작 전', color: '#8B95A1', bg: '#F1F3F5' },
+            { key: '진행 중', color: '#1B64DA', bg: '#E8F4FD' },
+            { key: '완료', color: '#12B76A', bg: '#E8F8EF' }
+        ];
+        sections.forEach(sec => {
+            const group = filtered.filter(p => p.status === sec.key);
+            tableHtml += `<tr class="section-header-row"><td colspan="${colspan}" style="background:${sec.bg};color:${sec.color};font-weight:800;font-size:13px;padding:10px 14px;border-top:2px solid ${sec.color};border-bottom:1px solid ${sec.color}">${sec.key} <span style="opacity:.7;font-weight:700">(${group.length})</span></td></tr>`;
+            if (group.length === 0) {
+                tableHtml += `<tr><td colspan="${colspan}" style="color:var(--text-tertiary);font-size:12px;padding:10px 14px;text-align:center">해당 상태의 프로젝트가 없습니다</td></tr>`;
+            } else {
+                group.forEach(p => { tableHtml += rowHtmlById.get(p.id); });
+            }
+            cardHtml += `<div class="card-section-header" style="grid-column:1/-1;background:${sec.bg};color:${sec.color};font-weight:800;padding:10px 14px;border-radius:8px;margin-top:8px;border:1px solid ${sec.color}">${sec.key} <span style="opacity:.7">(${group.length})</span></div>`;
+            if (group.length === 0) {
+                cardHtml += `<div style="grid-column:1/-1;color:var(--text-tertiary);font-size:12px;padding:6px 14px">해당 상태의 프로젝트가 없습니다</div>`;
+            } else {
+                group.forEach(p => { cardHtml += cardHtmlById.get(p.id); });
+            }
+        });
+    } else {
+        filtered.forEach(p => {
+            tableHtml += rowHtmlById.get(p.id);
+            cardHtml += cardHtmlById.get(p.id);
+        });
+    }
 
     document.getElementById(tableBodyId).innerHTML = tableHtml;
     document.getElementById(cardGridId).innerHTML = cardHtml;
