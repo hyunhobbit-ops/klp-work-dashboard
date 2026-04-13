@@ -936,25 +936,45 @@ async function exportToDomesticProject(){
 }
 
 /* === WR → 프로젝트 진행사항(국내) 내보내기 (매입처 행) === */
+async function sbReq(path,method,body){
+  var opts={method:method||'GET',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'}};
+  if(body)opts.body=JSON.stringify(body);
+  var res=await fetch(SB_URL+'/rest/v1/'+path,opts);
+  var text=await res.text();
+  var data=null;try{data=text?JSON.parse(text):null}catch(e){}
+  if(!res.ok){
+    var msg=(data&&(data.message||data.hint))||text||('HTTP '+res.status);
+    var err=new Error(msg);err.code=data&&data.code;err.status=res.status;throw err;
+  }
+  return data;
+}
+
 async function exportWrToDomesticProject(){
   if(!validateWr())return;
   if(!linkedDC){
     showMsg('❌ 먼저 디자인확인서를 연동해주세요',true);
     return;
   }
-  var we=window._wrEst;
+  /* WR이 아직 저장되지 않았다면 먼저 저장 */
   var wrDocNum=val('wrDocNum');
+  if(!wrDocNum){
+    showMsg('💾 작업요청서를 먼저 저장합니다...');
+    await saveWrToDb();
+    wrDocNum=val('wrDocNum');
+    if(!wrDocNum){showMsg('❌ 작업요청서 저장 실패',true);return;}
+  }
+  var we=window._wrEst;
   var dcDocNum=linkedDC.doc_number;
 
   /* 부모 프로젝트 찾기: source_doc_number = DC doc_number */
   var parentRes;
   try{
-    parentRes=await sbFetch('projects_domestic?source_doc_number=eq.'+encodeURIComponent(dcDocNum)+'&select=id','GET');
+    parentRes=await sbReq('projects_domestic?source_doc_number=eq.'+encodeURIComponent(dcDocNum)+'&select=id','GET');
   }catch(e){
     showMsg('❌ 부모 프로젝트 조회 실패: '+e.message,true);return;
   }
   if(!parentRes||parentRes.length===0){
-    showMsg('❌ 연동된 디자인확인서의 프로젝트가 없습니다. 먼저 디자인확인서를 프로젝트로 내보내세요.',true);
+    showMsg('❌ 연동된 디자인확인서의 프로젝트가 없습니다. 디자인확인서 탭에서 먼저 "프로젝트로 내보내기"를 실행해주세요.',true);
     return;
   }
   var parentId=parentRes[0].id;
@@ -996,20 +1016,24 @@ async function exportWrToDomesticProject(){
     parent_project_id:parentId
   };
   try{
-    var existing=await sbFetch('projects_domestic?source_doc_number=eq.'+encodeURIComponent(wrDocNum)+'&select=id','GET');
+    var existing=await sbReq('projects_domestic?source_doc_number=eq.'+encodeURIComponent(wrDocNum)+'&select=id','GET');
     if(existing&&existing.length>0){
-      await sbFetch('projects_domestic?id=eq.'+existing[0].id,'PATCH',payload);
+      await sbReq('projects_domestic?id=eq.'+existing[0].id,'PATCH',payload);
       showMsg('✅ 매입처 행 업데이트 완료! ('+val('wrCompany')+')');
     }else{
-      var res=await sbFetch('projects_domestic','POST',payload);
-      if(res&&res.error){throw new Error(res.message||res.error)}
+      await sbReq('projects_domestic','POST',payload);
       showMsg('✅ 프로젝트 진행사항에 매입처로 추가했습니다! ('+val('wrCompany')+')');
     }
     if(confirm('프로젝트 진행사항 페이지로 이동할까요?')){
       location.href='index.html#projects-domestic';
     }
   }catch(err){
-    showMsg('❌ 내보내기 실패: '+err.message,true);
+    var hint='';
+    if(err.code==='42703'||/parent_project_id/.test(err.message||'')){
+      hint='\n\n→ Supabase에서 다음 SQL을 실행해주세요:\nalter table public.projects_domestic add column if not exists parent_project_id bigint;';
+    }
+    showMsg('❌ 내보내기 실패: '+err.message+hint,true);
+    console.error('export WR error',err);
   }
 }
 
