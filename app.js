@@ -453,9 +453,25 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
     const filtered = filter === 'all' ? dataArr : dataArr.filter(p => p.status === filter);
     const checkSvg = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
+    // 부모 → 자식 순으로 정렬 (자식은 부모 바로 아래)
+    const ordered = [];
+    const parents = filtered.filter(p => !p.parentProjectId);
+    const childrenByParent = {};
+    filtered.filter(p => p.parentProjectId).forEach(c => {
+        (childrenByParent[c.parentProjectId] = childrenByParent[c.parentProjectId] || []).push(c);
+    });
+    parents.forEach(p => {
+        ordered.push(p);
+        (childrenByParent[p.id] || []).forEach(c => ordered.push({ ...c, _isChild: true }));
+    });
+    // 부모가 다른 필터로 가려진 자식은 마지막에 표시
+    filtered.filter(p => p.parentProjectId && !parents.find(pp => pp.id === p.parentProjectId)).forEach(c => {
+        ordered.push({ ...c, _isChild: true });
+    });
+
     let tableHtml = '';
     let cardHtml = '';
-    filtered.forEach(p => {
+    ordered.forEach(p => {
         const pNum = parseInt(p.progress) || 0;
         const checks = p.checks || {};
         const checkDots = CHECK_ITEMS.map(item => {
@@ -465,8 +481,10 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
         const revenueStr = (p.revenue || 0).toLocaleString() + '원';
 
-        tableHtml += `<tr onclick="showProjectDetail(${p.id})" style="cursor:pointer">
-            <td><strong>${p.client || '-'}</strong></td>
+        const childIndent = p._isChild ? `<span style="color:var(--klp-orange,#E67E22);font-weight:700;margin-right:4px">↳ 매입</span>` : '';
+        const rowStyle = p._isChild ? 'cursor:pointer;background:#FFF8F2' : 'cursor:pointer';
+        tableHtml += `<tr onclick="showProjectDetail(${p.id})" style="${rowStyle}">
+            <td>${childIndent}<strong>${p.client || '-'}</strong></td>
             <td>${p.supplier || '-'}</td>
             <td>${p.name}</td>
             <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
@@ -2277,6 +2295,7 @@ async function loadDomesticProjectsFromDb() {
                 title: r.title || '',
                 manager: r.manager || '',
                 supplier: r.supplier || '',
+                parentProjectId: r.parent_project_id || null,
                 status: r.status || '시작 전',
                 priority: r.priority || '🟢 보통',
                 category: r.category || '국내 주문',

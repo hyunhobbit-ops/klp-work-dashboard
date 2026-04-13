@@ -300,6 +300,7 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
 
   <div class="warn hidden" id="wrWarnBox"></div>
   <button class="btn-preview wr" onclick="saveAndPreviewWr()">💾 저장 & 작업요청서 미리보기 →</button>
+  <button type="button" onclick="exportWrToDomesticProject()" style="width:100%;padding:13px;margin-top:8px;border:1.5px solid var(--klp-orange);border-radius:12px;background:#FFF5F0;color:var(--klp-orange);font-size:15px;font-weight:800;cursor:pointer;font-family:inherit">📊 프로젝트 진행사항(국내)으로 내보내기 (매입처)</button>
 </div>
 
 <!-- WR PREVIEW -->
@@ -931,6 +932,84 @@ async function exportToDomesticProject(){
     }
   }catch(err){
     showMsg('❌ 내보내기 실패: '+err.message+' (projects_domestic 테이블이 생성되었는지 확인하세요)',true);
+  }
+}
+
+/* === WR → 프로젝트 진행사항(국내) 내보내기 (매입처 행) === */
+async function exportWrToDomesticProject(){
+  if(!validateWr())return;
+  if(!linkedDC){
+    showMsg('❌ 먼저 디자인확인서를 연동해주세요',true);
+    return;
+  }
+  var we=window._wrEst;
+  var wrDocNum=val('wrDocNum');
+  var dcDocNum=linkedDC.doc_number;
+
+  /* 부모 프로젝트 찾기: source_doc_number = DC doc_number */
+  var parentRes;
+  try{
+    parentRes=await sbFetch('projects_domestic?source_doc_number=eq.'+encodeURIComponent(dcDocNum)+'&select=id','GET');
+  }catch(e){
+    showMsg('❌ 부모 프로젝트 조회 실패: '+e.message,true);return;
+  }
+  if(!parentRes||parentRes.length===0){
+    showMsg('❌ 연동된 디자인확인서의 프로젝트가 없습니다. 먼저 디자인확인서를 프로젝트로 내보내세요.',true);
+    return;
+  }
+  var parentId=parentRes[0].id;
+
+  var revenue=we?we.grand:0;
+  var payload={
+    client:linkedDC.company_name||'',
+    supplier:val('wrCompany'),
+    contact_person:val('wrContact'),
+    title:val('wrTitle'),
+    manager:val('wrRequester'),
+    product_name:val('wrProduct'),
+    quantity:toNum(val('wrQty'))||0,
+    unit:val('wrUnit'),
+    unit_price:toNum(val('wrUnitPrice'))||0,
+    unit_price_vat:val('wrUnitPriceVat'),
+    color:val('wrColor'),
+    print_color_size:val('wrPrintColorSize'),
+    print_method:val('wrPrintMethod'),
+    print_fee:toNum(val('wrPrintFee'))||0,
+    print_fee_vat:val('wrPrintFeeVat'),
+    print_fee_apply:val('wrPrintFeeApply'),
+    packaging:val('wrPackaging'),
+    packaging_fee:toNum(val('wrPkgFee'))||0,
+    packaging_fee_vat:val('wrPkgFeeVat'),
+    packaging_fee_apply:val('wrPkgFeeApply'),
+    delivery_date:val('wrDeliveryDate')||null,
+    recipient:val('wrRecipient'),
+    phone:val('wrPhone'),
+    address:val('wrAddress'),
+    revenue:revenue,
+    status:'시작 전',
+    priority:'🟢 보통',
+    category:'국내 주문',
+    progress:'0%',
+    start_date:val('wrDate')||null,
+    memo:'[작업요청서] '+wrDocNum,
+    source_doc_number:wrDocNum,
+    parent_project_id:parentId
+  };
+  try{
+    var existing=await sbFetch('projects_domestic?source_doc_number=eq.'+encodeURIComponent(wrDocNum)+'&select=id','GET');
+    if(existing&&existing.length>0){
+      await sbFetch('projects_domestic?id=eq.'+existing[0].id,'PATCH',payload);
+      showMsg('✅ 매입처 행 업데이트 완료! ('+val('wrCompany')+')');
+    }else{
+      var res=await sbFetch('projects_domestic','POST',payload);
+      if(res&&res.error){throw new Error(res.message||res.error)}
+      showMsg('✅ 프로젝트 진행사항에 매입처로 추가했습니다! ('+val('wrCompany')+')');
+    }
+    if(confirm('프로젝트 진행사항 페이지로 이동할까요?')){
+      location.href='index.html#projects-domestic';
+    }
+  }catch(err){
+    showMsg('❌ 내보내기 실패: '+err.message,true);
   }
 }
 
