@@ -2467,9 +2467,11 @@ function renderClients() {
         <td>${esc(c.mobile) || '-'}</td>
         <td>${esc(c.email) || '-'}</td>
         <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.address) || '-'}</td>
+        <td>${esc(c.bizType) || '-'}</td>
+        <td>${esc(c.bizItem) || '-'}</td>
         <td>${esc(c.staffName) || '-'}</td>
         <td>${esc(c.grade) || '-'}</td>
-    </tr>`).join('') || `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
 
     // 페이지네이션
     const pag = document.getElementById('clientPagination');
