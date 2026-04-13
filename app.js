@@ -484,6 +484,11 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
         // 매입액(자식 합계) / 마진 계산
         const childrenForP = childrenByParent[p.id] || [];
+        // 매입처: 자식 매입처 이름들 (없으면 부모 자체 supplier)
+        const childSuppliers = childrenForP.map(c => c.supplier).filter(Boolean);
+        const supplierDisplay = childSuppliers.length > 0
+            ? (childSuppliers.length <= 2 ? childSuppliers.join(', ') : `${childSuppliers[0]} 외 ${childSuppliers.length - 1}곳`)
+            : (p.supplier || '-');
         const purchaseTotal = childrenForP.reduce((s, c) => s + (c.revenue || 0), 0);
         const marginVal = (p.revenue || 0) - purchaseTotal;
         const marginPctVal = p.revenue > 0 ? Math.round((marginVal / p.revenue) * 100) : 0;
@@ -495,7 +500,7 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
         tableHtml += `<tr>
             <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
             <td><strong>${p.client || '-'}</strong>${supplierBadge}</td>
-            <td>${p.supplier || '-'}</td>
+            <td>${supplierDisplay}</td>
             <td>${p.name}</td>
             <td>${p.assignees.join(', ')}</td>
             <td>${revenueStr}</td>
