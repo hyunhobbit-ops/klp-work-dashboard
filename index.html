@@ -488,13 +488,44 @@
 
             <!-- ===== 고객사 리스트 ===== -->
             <main class="content" id="tab-clients">
-                <div class="placeholder-page">
-                    <div class="placeholder-icon">
-                        <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <div class="page-section">
+                    <div class="toolbar">
+                        <div class="toolbar-search">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                            <input type="text" class="search-input" id="clientSearch" placeholder="회사명, 대표자, 전화, 담당직원, 주소 검색">
+                        </div>
+                        <div class="toolbar-buttons">
+                            <input type="file" id="clientImportFile" accept=".xlsx,.xls" style="display:none" onchange="importClientsFromExcel(event)">
+                            <button class="btn-export" onclick="document.getElementById('clientImportFile').click()">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 19V5m0 0l-6 6m6-6l6 6M4 20h16"/></svg>
+                                엑셀 가져오기
+                            </button>
+                            <button class="btn-primary" onclick="openModal('client')">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                                새 고객사
+                            </button>
+                        </div>
                     </div>
-                    <h3 class="placeholder-title">고객사 리스트</h3>
-                    <p class="placeholder-desc">거래처 연락처, 담당자, 거래 이력을 한곳에서 관리합니다.<br>프로젝트와 연동하여 거래처별 현황 파악이 가능해집니다.</p>
-                    <span class="placeholder-badge">준비 중</span>
+                    <div class="client-stats" id="clientStats" style="padding:8px 16px;color:var(--text-secondary);font-size:14px"></div>
+                    <div class="table-wrap">
+                        <table class="data-table" id="clientTable">
+                            <thead>
+                                <tr>
+                                    <th>회사명</th>
+                                    <th>대표자</th>
+                                    <th>전화</th>
+                                    <th>핸드폰</th>
+                                    <th>이메일</th>
+                                    <th>주소</th>
+                                    <th>담당직원</th>
+                                    <th>등급</th>
+                                    <th>편집</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div id="clientPagination" style="display:flex;justify-content:center;gap:6px;padding:16px;flex-wrap:wrap"></div>
                 </div>
             </main>
         </div>

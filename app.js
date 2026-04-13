@@ -102,6 +102,7 @@ async function showApp() {
     await loadDomesticProjectsFromDb();
     await loadDailyTasksFromDb();
     await loadDeliveriesFromDb();
+    await loadClientsFromDb();
     subscribeDailyTasks();
     renderAll();
     // URL 해시 → 탭 전환 (문서생성기에서 이동해온 경우 등)
@@ -150,6 +151,10 @@ const projects = [...domesticProjects, ...overseasProjects];
 
 let dailyTasks = [];
 let deliveries = [];
+let clients = [];
+let clientSearch = '';
+let clientPage = 1;
+const CLIENTS_PER_PAGE = 50;
 
 // ===== State =====
 let currentDate = new Date(2026, 3, 9);
@@ -300,6 +305,14 @@ function setupSearch() {
         currentDeliverySearch = e.target.value.toLowerCase();
         renderDeliveries();
     });
+    const clientSearchEl = document.getElementById('clientSearch');
+    if (clientSearchEl) {
+        clientSearchEl.addEventListener('input', e => {
+            clientSearch = e.target.value;
+            clientPage = 1;
+            renderClients();
+        });
+    }
 }
 
 // ===== Render All =====
@@ -308,6 +321,7 @@ function renderAll() {
     renderProjects();
     renderDaily();
     renderDeliveries();
+    renderClients();
 }
 
 // =====================================
@@ -1960,6 +1974,9 @@ function openModal(type) {
             }
             priceGroup.style.display = priceTypes.includes(this.value) ? 'block' : 'none';
         });
+    } else if (type === 'client') {
+        openClientModal(null);
+        return;
     }
     document.getElementById('modalOverlay').classList.add('show');
 }
@@ -2314,6 +2331,371 @@ async function dbUpdateDelivery(id, patch) {
 async function dbDeleteDelivery(id) {
     const { error } = await sb.from('deliveries').delete().eq('id', id);
     if (error) { console.error(error); showToast('DB 삭제 실패: ' + error.message); }
+}
+
+// =====================================
+// Supabase: clients
+// =====================================
+function clientToDb(c) {
+    return {
+        business_no: c.businessNo || '',
+        company_name: c.companyName,
+        ceo: c.ceo || '',
+        phone: c.phone || '',
+        fax: c.fax || '',
+        mobile: c.mobile || '',
+        email: c.email || '',
+        zipcode: c.zipcode || '',
+        address: c.address || '',
+        biz_type: c.bizType || '',
+        biz_item: c.bizItem || '',
+        staff_name: c.staffName || '',
+        staff_mobile: c.staffMobile || '',
+        staff_email: c.staffEmail || '',
+        grade: c.grade || '',
+        category: c.category || ''
+    };
+}
+function clientFromDb(r) {
+    return {
+        id: r.id,
+        businessNo: r.business_no || '',
+        companyName: r.company_name || '',
+        ceo: r.ceo || '',
+        phone: r.phone || '',
+        fax: r.fax || '',
+        mobile: r.mobile || '',
+        email: r.email || '',
+        zipcode: r.zipcode || '',
+        address: r.address || '',
+        bizType: r.biz_type || '',
+        bizItem: r.biz_item || '',
+        staffName: r.staff_name || '',
+        staffMobile: r.staff_mobile || '',
+        staffEmail: r.staff_email || '',
+        grade: r.grade || '',
+        category: r.category || ''
+    };
+}
+async function loadClientsFromDb() {
+    try {
+        const all = [];
+        let from = 0;
+        const size = 1000;
+        while (true) {
+            const { data, error } = await sb.from('clients')
+                .select('*')
+                .order('company_name', { ascending: true })
+                .range(from, from + size - 1);
+            if (error) throw error;
+            if (!data || data.length === 0) break;
+            data.forEach(r => all.push(clientFromDb(r)));
+            if (data.length < size) break;
+            from += size;
+        }
+        clients.length = 0;
+        all.forEach(c => clients.push(c));
+    } catch (err) {
+        console.error('고객사 로드 실패:', err.message);
+        showToast('고객사 로드 실패: ' + err.message);
+    }
+}
+async function dbInsertClient(c) {
+    const { data, error } = await sb.from('clients').insert(clientToDb(c)).select().single();
+    if (error) { console.error(error); showToast('DB 저장 실패: ' + error.message); return null; }
+    return clientFromDb(data);
+}
+async function dbUpdateClient(id, patch) {
+    const dbPatch = clientToDb(patch);
+    // patch might be partial — strip undefined
+    Object.keys(dbPatch).forEach(k => { if (dbPatch[k] === undefined) delete dbPatch[k]; });
+    const { error } = await sb.from('clients').update(dbPatch).eq('id', id);
+    if (error) { console.error(error); showToast('DB 수정 실패: ' + error.message); }
+}
+async function dbDeleteClient(id) {
+    const { error } = await sb.from('clients').delete().eq('id', id);
+    if (error) { console.error(error); showToast('DB 삭제 실패: ' + error.message); }
+}
+
+function filterClients() {
+    if (!clientSearch) return clients;
+    const q = clientSearch.toLowerCase();
+    return clients.filter(c =>
+        (c.companyName || '').toLowerCase().includes(q) ||
+        (c.ceo || '').toLowerCase().includes(q) ||
+        (c.phone || '').toLowerCase().includes(q) ||
+        (c.mobile || '').toLowerCase().includes(q) ||
+        (c.staffName || '').toLowerCase().includes(q) ||
+        (c.address || '').toLowerCase().includes(q) ||
+        (c.email || '').toLowerCase().includes(q)
+    );
+}
+
+function renderClients() {
+    const tbody = document.getElementById('clientTableBody');
+    if (!tbody) return;
+    const filtered = filterClients();
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / CLIENTS_PER_PAGE));
+    if (clientPage > totalPages) clientPage = totalPages;
+    if (clientPage < 1) clientPage = 1;
+    const start = (clientPage - 1) * CLIENTS_PER_PAGE;
+    const pageItems = filtered.slice(start, start + CLIENTS_PER_PAGE);
+
+    const stats = document.getElementById('clientStats');
+    if (stats) stats.textContent = `총 ${total.toLocaleString()}개 고객사 · ${clientPage} / ${totalPages} 페이지`;
+
+    const esc = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+
+    tbody.innerHTML = pageItems.map(c => `<tr>
+        <td><strong>${esc(c.companyName)}</strong></td>
+        <td>${esc(c.ceo) || '-'}</td>
+        <td>${esc(c.phone) || '-'}</td>
+        <td>${esc(c.mobile) || '-'}</td>
+        <td>${esc(c.email) || '-'}</td>
+        <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.address) || '-'}</td>
+        <td>${esc(c.staffName) || '-'}</td>
+        <td>${esc(c.grade) || '-'}</td>
+        <td><button class="edit-btn" onclick="openEditClient(${c.id})">편집</button></td>
+    </tr>`).join('') || `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
+
+    // 페이지네이션
+    const pag = document.getElementById('clientPagination');
+    if (pag) {
+        if (totalPages <= 1) {
+            pag.innerHTML = '';
+        } else {
+            const btn = (label, page, disabled, active) =>
+                `<button class="filter-chip ${active ? 'active' : ''}" ${disabled ? 'disabled' : ''} onclick="gotoClientPage(${page})" style="min-width:36px">${label}</button>`;
+            let html = '';
+            html += btn('«', 1, clientPage === 1);
+            html += btn('‹', clientPage - 1, clientPage === 1);
+            const windowSize = 5;
+            let s = Math.max(1, clientPage - Math.floor(windowSize / 2));
+            let e = Math.min(totalPages, s + windowSize - 1);
+            s = Math.max(1, e - windowSize + 1);
+            for (let i = s; i <= e; i++) html += btn(i, i, false, i === clientPage);
+            html += btn('›', clientPage + 1, clientPage === totalPages);
+            html += btn('»', totalPages, clientPage === totalPages);
+            pag.innerHTML = html;
+        }
+    }
+}
+
+function gotoClientPage(p) {
+    clientPage = p;
+    renderClients();
+}
+
+function openClientModal(existing) {
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    const c = existing || {};
+    title.textContent = existing ? '고객사 수정' : '새 고객사';
+    const v = k => (c[k] || '').toString().replace(/"/g, '&quot;');
+    body.innerHTML = `
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">회사명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="cliCompanyName" value="${v('companyName')}" placeholder="회사명" autofocus></div>
+            <div class="form-group"><label class="form-label">대표자</label><input type="text" class="form-input" id="cliCeo" value="${v('ceo')}"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">사업자등록번호</label><input type="text" class="form-input" id="cliBusinessNo" value="${v('businessNo')}"></div>
+            <div class="form-group"><label class="form-label">구분</label><input type="text" class="form-input" id="cliCategory" value="${v('category')}"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">전화</label><input type="text" class="form-input" id="cliPhone" value="${v('phone')}"></div>
+            <div class="form-group"><label class="form-label">팩스</label><input type="text" class="form-input" id="cliFax" value="${v('fax')}"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">핸드폰</label><input type="text" class="form-input" id="cliMobile" value="${v('mobile')}"></div>
+            <div class="form-group"><label class="form-label">이메일</label><input type="text" class="form-input" id="cliEmail" value="${v('email')}"></div>
+        </div>
+        <div class="form-row" style="grid-template-columns:120px 1fr">
+            <div class="form-group"><label class="form-label">우편번호</label><input type="text" class="form-input" id="cliZipcode" value="${v('zipcode')}"></div>
+            <div class="form-group"><label class="form-label">주소</label><input type="text" class="form-input" id="cliAddress" value="${v('address')}"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">업태</label><input type="text" class="form-input" id="cliBizType" value="${v('bizType')}"></div>
+            <div class="form-group"><label class="form-label">업종</label><input type="text" class="form-input" id="cliBizItem" value="${v('bizItem')}"></div>
+        </div>
+        <div class="form-section-title">담당직원</div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">이름</label><input type="text" class="form-input" id="cliStaffName" value="${v('staffName')}"></div>
+            <div class="form-group"><label class="form-label">핸드폰</label><input type="text" class="form-input" id="cliStaffMobile" value="${v('staffMobile')}"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">이메일</label><input type="text" class="form-input" id="cliStaffEmail" value="${v('staffEmail')}"></div>
+            <div class="form-group"><label class="form-label">등급</label><input type="text" class="form-input" id="cliGrade" value="${v('grade')}"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+            ${existing ? `<button class="form-submit" style="flex:1;background:var(--red)" onclick="deleteClient(${c.id})">🗑️ 삭제</button>` : ''}
+            <button class="form-submit" style="flex:2" onclick="${existing ? `saveEditClient(${c.id})` : 'addClient()'}">💾 ${existing ? '수정 저장' : '추가'}</button>
+        </div>`;
+    document.getElementById('modalOverlay').classList.add('show');
+}
+
+function readClientForm() {
+    return {
+        companyName: document.getElementById('cliCompanyName').value.trim(),
+        ceo: document.getElementById('cliCeo').value.trim(),
+        businessNo: document.getElementById('cliBusinessNo').value.trim(),
+        category: document.getElementById('cliCategory').value.trim(),
+        phone: document.getElementById('cliPhone').value.trim(),
+        fax: document.getElementById('cliFax').value.trim(),
+        mobile: document.getElementById('cliMobile').value.trim(),
+        email: document.getElementById('cliEmail').value.trim(),
+        zipcode: document.getElementById('cliZipcode').value.trim(),
+        address: document.getElementById('cliAddress').value.trim(),
+        bizType: document.getElementById('cliBizType').value.trim(),
+        bizItem: document.getElementById('cliBizItem').value.trim(),
+        staffName: document.getElementById('cliStaffName').value.trim(),
+        staffMobile: document.getElementById('cliStaffMobile').value.trim(),
+        staffEmail: document.getElementById('cliStaffEmail').value.trim(),
+        grade: document.getElementById('cliGrade').value.trim()
+    };
+}
+
+async function addClient() {
+    const form = readClientForm();
+    if (!form.companyName) { showToast('회사명을 입력해주세요'); return; }
+    const saved = await dbInsertClient(form);
+    if (!saved) return;
+    clients.push(saved);
+    clients.sort((a, b) => (a.companyName || '').localeCompare(b.companyName || ''));
+    closeModal();
+    renderClients();
+    showToast('고객사가 추가되었습니다');
+}
+
+function openEditClient(id) {
+    const c = clients.find(x => x.id === id);
+    if (!c) return;
+    openClientModal(c);
+}
+
+async function saveEditClient(id) {
+    const c = clients.find(x => x.id === id);
+    if (!c) return;
+    const form = readClientForm();
+    if (!form.companyName) { showToast('회사명을 입력해주세요'); return; }
+    Object.assign(c, form);
+    await dbUpdateClient(id, form);
+    clients.sort((a, b) => (a.companyName || '').localeCompare(b.companyName || ''));
+    closeModal();
+    renderClients();
+    showToast('고객사가 수정되었습니다');
+}
+
+async function deleteClient(id) {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    await dbDeleteClient(id);
+    const idx = clients.findIndex(x => x.id === id);
+    if (idx !== -1) clients.splice(idx, 1);
+    closeModal();
+    renderClients();
+    showToast('고객사가 삭제되었습니다');
+}
+
+// 엑셀 가져오기 (거래처등록 시트 기준)
+async function importClientsFromExcel(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    const confirmMsg = `${file.name} 을 가져옵니다.\n\n기존 DB에 추가 병합됩니다. (회사명 + 사업자등록번호 동일 시 중복 건너뜀)\n진행할까요?`;
+    if (!confirm(confirmMsg)) { event.target.value = ''; return; }
+
+    showToast('엑셀 파일 읽는 중...');
+    try {
+        const ab = await file.arrayBuffer();
+        const wb = XLSX.read(ab, { type: 'array' });
+        const sheetName = wb.SheetNames.includes('거래처등록') ? '거래처등록' : wb.SheetNames[0];
+        const ws = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+        // 헤더 행 찾기 (회사명, 대표자 등이 포함된 행)
+        let headerRow = -1;
+        for (let i = 0; i < Math.min(rows.length, 10); i++) {
+            const r = rows[i].map(x => (x || '').toString());
+            if (r.includes('회사명') && r.includes('대표자')) { headerRow = i; break; }
+        }
+        if (headerRow === -1) { showToast('헤더(회사명/대표자)를 찾을 수 없습니다'); event.target.value = ''; return; }
+
+        const headers = rows[headerRow].map(x => (x || '').toString().trim());
+        const colIdx = {
+            businessNo: headers.indexOf('사업자등록번호'),
+            companyName: headers.indexOf('회사명'),
+            ceo: headers.indexOf('대표자'),
+            phone: headers.indexOf('전화'),
+            fax: headers.indexOf('팩스'),
+            mobile: headers.indexOf('핸드폰'),
+            email: headers.indexOf('이메일'),
+            zipcode: headers.indexOf('우편번호'),
+            address: headers.indexOf('주소'),
+            bizType: headers.indexOf('업태'),
+            bizItem: headers.indexOf('업종'),
+            staffName: headers.indexOf('담당직원'),
+            staffMobile: headers.indexOf('담당직원 핸드폰'),
+            staffEmail: headers.indexOf('담당직원 이메일'),
+            grade: headers.indexOf('등급'),
+            category: headers.indexOf('구분')
+        };
+
+        const dataRows = rows.slice(headerRow + 1);
+        const toInsert = [];
+        const existingKeys = new Set(clients.map(c => `${c.companyName}|${c.businessNo}`));
+
+        dataRows.forEach(r => {
+            const get = (k) => colIdx[k] >= 0 ? (r[colIdx[k]] || '').toString().trim() : '';
+            const companyName = get('companyName');
+            if (!companyName) return;
+            const businessNo = get('businessNo');
+            const key = `${companyName}|${businessNo}`;
+            if (existingKeys.has(key)) return;
+            existingKeys.add(key);
+            toInsert.push(clientToDb({
+                companyName, businessNo,
+                ceo: get('ceo'), phone: get('phone'), fax: get('fax'),
+                mobile: get('mobile'), email: get('email'),
+                zipcode: get('zipcode'), address: get('address'),
+                bizType: get('bizType'), bizItem: get('bizItem'),
+                staffName: get('staffName'), staffMobile: get('staffMobile'), staffEmail: get('staffEmail'),
+                grade: get('grade'), category: get('category')
+            }));
+        });
+
+        if (toInsert.length === 0) {
+            showToast('추가할 신규 고객사가 없습니다');
+            event.target.value = '';
+            return;
+        }
+
+        showToast(`${toInsert.length}건 업로드 중... (0/${toInsert.length})`);
+
+        // 500건씩 배치 insert
+        const batchSize = 500;
+        let inserted = 0;
+        for (let i = 0; i < toInsert.length; i += batchSize) {
+            const batch = toInsert.slice(i, i + batchSize);
+            const { data, error } = await sb.from('clients').insert(batch).select();
+            if (error) {
+                console.error(error);
+                showToast(`업로드 실패 (${inserted}건 저장됨): ` + error.message);
+                break;
+            }
+            (data || []).forEach(r => clients.push(clientFromDb(r)));
+            inserted += batch.length;
+            showToast(`업로드 중... (${inserted}/${toInsert.length})`);
+        }
+
+        clients.sort((a, b) => (a.companyName || '').localeCompare(b.companyName || ''));
+        clientPage = 1;
+        renderClients();
+        showToast(`${inserted}건 업로드 완료`);
+    } catch (err) {
+        console.error(err);
+        showToast('엑셀 가져오기 실패: ' + err.message);
+    } finally {
+        event.target.value = '';
+    }
 }
 
 async function addDailyTask() {
