@@ -208,6 +208,13 @@ function setupShortcuts() {
                 return;
             }
         }
+        if (e.key === 'Escape') {
+            const overlay = document.getElementById('modalOverlay');
+            if (overlay && overlay.classList.contains('show')) {
+                e.preventDefault();
+                closeModal();
+            }
+        }
     });
 }
 
