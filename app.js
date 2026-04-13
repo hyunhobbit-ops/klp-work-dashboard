@@ -463,28 +463,12 @@ const CHECK_ITEMS = [
 ];
 
 function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
-    // 매출처(부모) 행만 메인 목록에 표시. 매입처(자식) 행은 상세 모달에서 표시.
-    const baseList = dataArr.filter(p => !p.parentProjectId);
-    const filtered = filter === 'all' ? baseList : baseList.filter(p => p.status === filter);
+    const filtered = filter === 'all' ? dataArr : dataArr.filter(p => p.status === filter);
     const checkSvg = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
-
-    // 자식 개수 계산 (배지 표시용)
-    const childCountByParent = {};
-    dataArr.filter(p => p.parentProjectId).forEach(c => {
-        childCountByParent[c.parentProjectId] = (childCountByParent[c.parentProjectId] || 0) + 1;
-    });
-
-    // 부모별 자식 목록 캐싱
-    const childrenByParent = {};
-    dataArr.filter(p => p.parentProjectId).forEach(c => {
-        (childrenByParent[c.parentProjectId] = childrenByParent[c.parentProjectId] || []).push(c);
-    });
 
     let tableHtml = '';
     let cardHtml = '';
     filtered.forEach(p => {
-        const childCount = childCountByParent[p.id] || 0;
-        const supplierBadge = childCount > 0 ? ` <span class="badge badge-orange" style="font-size:10px">매입 ${childCount}</span>` : '';
         const pNum = parseInt(p.progress) || 0;
         const checks = p.checks || {};
         const checkDots = CHECK_ITEMS.map(item => {
@@ -494,16 +478,11 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
         const revenueStr = (p.revenue || 0).toLocaleString() + '원';
 
-        // 매입액(자식 합계) / 마진 계산
-        const childrenForP = childrenByParent[p.id] || [];
-        // 매입처: 자식 매입처 이름들 (없으면 부모 자체 supplier)
-        const childSuppliers = childrenForP.map(c => c.supplier).filter(Boolean);
-        const supplierDisplay = childSuppliers.length > 0
-            ? (childSuppliers.length <= 2 ? childSuppliers.join(', ') : `${childSuppliers[0]} 외 ${childSuppliers.length - 1}곳`)
-            : (p.supplier || '-');
-        const purchaseTotal = childrenForP.reduce((s, c) => s + (c.revenue || 0), 0);
+        // 매입액 / 마진 계산 (통합 모델)
+        const purchaseTotal = p.supplierRevenue || 0;
         const marginVal = (p.revenue || 0) - purchaseTotal;
         const marginPctVal = p.revenue > 0 ? Math.round((marginVal / p.revenue) * 100) : 0;
+        const supplierDisplay = p.supplier || '-';
         const purchaseStr = purchaseTotal > 0 ? purchaseTotal.toLocaleString() + '원' : '-';
         const marginStr = purchaseTotal > 0
             ? `<span style="color:${marginVal >= 0 ? 'var(--blue)' : 'var(--red)'};font-weight:700">${marginVal.toLocaleString()}원 (${marginPctVal}%)</span>`
@@ -512,7 +491,7 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
         const ownerStr = p.manager || (p.assignees && p.assignees.length ? p.assignees.join(', ') : '-');
         tableHtml += `<tr onclick="projectRowClick(${p.id})" ondblclick="projectRowDblClick(${p.id})" style="cursor:pointer">
             <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
-            <td><strong>${p.client || '-'}</strong>${supplierBadge}</td>
+            <td><strong>${p.client || '-'}</strong></td>
             <td>${supplierDisplay}</td>
             <td>${p.name}</td>
             <td>${ownerStr}</td>
@@ -1677,30 +1656,27 @@ async function showProjectDetail(id) {
     const escFn = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
     const row = (label, val) => `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--gray-100)"><div style="width:110px;color:var(--text-tertiary);font-size:13px">${label}</div><div style="flex:1;font-size:14px">${escFn(val) || '-'}</div></div>`;
 
-    // 자식(매입처) 데이터
-    const children = projects.filter(x => x.parentProjectId === p.id);
-    const purchaseTotal = children.reduce((s, c) => s + (c.revenue || 0), 0);
+    // 매입처 데이터 (통합 모델: 같은 행의 supplier_* 컬럼)
+    const purchaseTotal = p.supplierRevenue || 0;
     const margin = (p.revenue || 0) - purchaseTotal;
     const marginPct = p.revenue > 0 ? Math.round((margin / p.revenue) * 100) : 0;
 
-    // 매입처 카드
-    const suppliersHtml = children.length === 0
-        ? `<div style="color:var(--text-tertiary);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">등록된 매입처가 없습니다.<br>문서생성기 작업요청서에서 "프로젝트 진행사항(국내)으로 내보내기"로 추가할 수 있습니다.</div>`
-        : children.map(c => `<div style="border:1px solid #FFE0CC;border-radius:8px;padding:12px;margin-bottom:8px;background:#FFF8F2;cursor:pointer" onclick="event.stopPropagation();openEditProject(${c.id})">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                <div style="font-size:15px"><strong>${escFn(c.supplier || '-')}</strong> <span style="color:var(--text-tertiary);font-size:12px;margin-left:6px">${escFn(c.name || '')}</span></div>
-                <span class="badge ${statusBadgeClass(c.status)}">${escFn(c.status)}</span>
+    const hasSupplier = !!(p.supplier && p.supplierUnitPrice);
+    const suppliersHtml = !hasSupplier
+        ? `<div style="color:var(--text-tertiary);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">등록된 매입처가 없습니다. 프로젝트 편집에서 매입처 정보를 추가할 수 있습니다.</div>`
+        : `<div style="border:1px solid #FFE0CC;border-radius:8px;padding:14px;background:#FFF8F2">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <div style="font-size:15px"><strong style="color:var(--klp-orange,#E67E22)">🏭 ${escFn(p.supplier)}</strong>${p.supplierContact ? ` <span style="color:var(--text-tertiary);font-size:12px;margin-left:6px">${escFn(p.supplierContact)}</span>` : ''}</div>
             </div>
             <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px 14px;font-size:13px;color:var(--text-secondary)">
-                <div>매입가: <strong>${(c.unitPrice || 0).toLocaleString()}원</strong></div>
-                <div>수량: <strong>${(c.qty || 0).toLocaleString()}${c.unit || ''}</strong></div>
-                <div>매입 합계: <strong>${(c.revenue || 0).toLocaleString()}원</strong></div>
-                ${c.printFee ? `<div>인쇄비: ${(c.printFee).toLocaleString()}원</div>` : '<div></div>'}
-                ${c.packagingFee ? `<div>포장비: ${(c.packagingFee).toLocaleString()}원</div>` : '<div></div>'}
-                ${c.deadline ? `<div>납기: ${escFn(c.deadline)}</div>` : '<div></div>'}
-                ${c.sourceDocNumber ? `<div style="grid-column:1/-1;font-size:11px;color:var(--text-tertiary)">WR: ${escFn(c.sourceDocNumber)}</div>` : ''}
+                <div>매입단가: <strong>${(p.supplierUnitPrice || 0).toLocaleString()}원</strong> <span style="font-size:11px;color:var(--text-tertiary)">(${p.supplierUnitPriceVat || 'VAT 별도'})</span></div>
+                <div>수량: <strong>${(p.qty || 0).toLocaleString()}${p.unit || ''}</strong></div>
+                <div>매입액(총): <strong style="color:var(--klp-orange,#E67E22)">${purchaseTotal.toLocaleString()}원</strong></div>
+                ${p.supplierPrintFee ? `<div>매입 인쇄비: ${(p.supplierPrintFee).toLocaleString()}원</div>` : '<div></div>'}
+                ${p.supplierPackagingFee ? `<div>매입 포장비: ${(p.supplierPackagingFee).toLocaleString()}원</div>` : '<div></div>'}
+                <div></div>
             </div>
-        </div>`).join('');
+        </div>`;
 
     // 체크리스트
     const checks = p.checks || {};
@@ -1844,9 +1820,14 @@ function createDocFromProject(id, type) {
         showToast('먼저 디자인확인서를 만들어주세요');
         return;
     }
+    if (type === 'wr' && !p.supplierUnitPrice) {
+        showToast('매입 단가가 없습니다. 편집에서 매입처 상세를 먼저 입력해주세요');
+        return;
+    }
     if (type === 'dc' && p.sourceDocNumber) {
         if (!confirm(`이미 연결된 디자인확인서(${p.sourceDocNumber})가 있습니다.\n새로 만들면 프로젝트 연결이 새 문서로 변경됩니다.\n계속하시겠습니까?`)) return;
     }
+    const isWr = type === 'wr';
     const prefill = {
         type,
         projectId: p.id,
@@ -1858,18 +1839,19 @@ function createDocFromProject(id, type) {
         productName: p.name || '',
         quantity: p.qty || '',
         unit: p.unit || '개',
-        unitPrice: p.unitPrice || '',
-        unitPriceVat: p.vat === 'include' ? 'VAT 포함' : 'VAT 별도',
+        // DC = 매출 / WR = 매입 값 사용
+        unitPrice: isWr ? (p.supplierUnitPrice || '') : (p.unitPrice || ''),
+        unitPriceVat: isWr ? (p.supplierUnitPriceVat || 'VAT 별도') : (p.vat === 'include' ? 'VAT 포함' : 'VAT 별도'),
         color: p.color || '-',
         printColorSize: p.printColorSize || '시안 확인',
         printMethod: p.printMethod || '없음',
-        printFee: p.printFee || 0,
-        printFeeVat: p.printFeeVat || 'VAT 별도',
-        printFeeApply: p.printFeeApply || '1개당',
+        printFee: isWr ? (p.supplierPrintFee || 0) : (p.printFee || 0),
+        printFeeVat: isWr ? (p.supplierPrintFeeVat || 'VAT 별도') : (p.printFeeVat || 'VAT 별도'),
+        printFeeApply: isWr ? (p.supplierPrintFeeApply || '1개당') : (p.printFeeApply || '1개당'),
         packaging: p.packaging || '개별박스',
-        packagingFee: p.packagingFee || 0,
-        packagingFeeVat: p.packagingFeeVat || 'VAT 별도',
-        packagingFeeApply: p.packagingFeeApply || '1개당',
+        packagingFee: isWr ? (p.supplierPackagingFee || 0) : (p.packagingFee || 0),
+        packagingFeeVat: isWr ? (p.supplierPackagingFeeVat || 'VAT 별도') : (p.packagingFeeVat || 'VAT 별도'),
+        packagingFeeApply: isWr ? (p.supplierPackagingFeeApply || '1개당') : (p.packagingFeeApply || '1개당'),
         deliveryDate: p.deadline || '',
         recipient: p.recipient || '',
         phone: p.phone || '',
@@ -1923,6 +1905,11 @@ function openEditProject(id) {
     const printFeeApply = p.printFeeApply || '1개당';
     const packagingFeeVat = p.packagingFeeVat || 'VAT 별도';
     const packagingFeeApply = p.packagingFeeApply || '1개당';
+    const supVatCurrent = p.supplierVat === 'include' || p.supplierUnitPriceVat === 'VAT 포함' ? 'include' : 'exclude';
+    const supPrintFeeVat = p.supplierPrintFeeVat || 'VAT 별도';
+    const supPrintFeeApply = p.supplierPrintFeeApply || '1개당';
+    const supPackFeeVat = p.supplierPackagingFeeVat || 'VAT 별도';
+    const supPackFeeApply = p.supplierPackagingFeeApply || '1개당';
 
     body.innerHTML = `
         <datalist id="clientsListDoc">${clients.map(c => `<option value="${(c.companyName || '').replace(/"/g, '&quot;')}"></option>`).join('')}</datalist>
@@ -1934,7 +1921,7 @@ function openEditProject(id) {
                 <div class="form-group"><label class="form-label">매출처 담당자</label><input type="text" class="form-input" id="editProjectContact" value="${(p.contactPerson || '').replace(/"/g, '&quot;')}"></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label class="form-label">매입처 (작업요청서 발송 공장)</label><input type="text" class="form-input" id="editProjectSupplier" list="clientsListDoc" autocomplete="off" value="${(p.supplier || '').replace(/"/g, '&quot;')}" placeholder="공장/제작처"></div>
+                <div class="form-group"><label class="form-label">매입처 (작업요청서 발송 공장)</label><input type="text" class="form-input" id="editProjectSupplier" list="clientsListDoc" autocomplete="off" value="${(p.supplier || '').replace(/"/g, '&quot;')}" placeholder="공장/제작처 — 입력 시 매입처 상세 섹션이 나타납니다" oninput="toggleEditSupplierSection()"></div>
                 <div class="form-group"><label class="form-label">매입처 담당자</label><input type="text" class="form-input" id="editProjectSupplierContact" value="${(p.supplierContact || '').replace(/"/g, '&quot;')}" placeholder="공장 담당자명"></div>
             </div>
             <div class="form-row">
@@ -1955,7 +1942,7 @@ function openEditProject(id) {
             <div class="form-section-title">📦 제품 정보</div>
             <div class="form-group"><label class="form-label">품명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="editProjectName" value="${(p.name || '').replace(/"/g, '&quot;')}"></div>
             <div class="form-row" style="grid-template-columns:2fr 1fr">
-                <div class="form-group"><label class="form-label">수량</label><input type="text" inputmode="numeric" class="form-input" id="editProjectQty" value="${p.qty ? Number(p.qty).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcEditProjectRevenue()"></div>
+                <div class="form-group"><label class="form-label">수량</label><input type="text" inputmode="numeric" class="form-input" id="editProjectQty" value="${p.qty ? Number(p.qty).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcEditProjectRevenue();calcEditSupplierTotal()"></div>
                 <div class="form-group"><label class="form-label">단위</label>
                     <select class="form-select" id="editProjectUnit">
                         ${['개','세트','장','박스','EA'].map(u=>`<option ${p.unit===u?'selected':''}>${u}</option>`).join('')}
@@ -1963,17 +1950,13 @@ function openEditProject(id) {
                 </div>
             </div>
             <div class="form-row" style="grid-template-columns:2fr 1fr">
-                <div class="form-group"><label class="form-label">단가</label><input type="text" inputmode="numeric" class="form-input" id="editProjectUnitPrice" value="${p.unitPrice ? Number(p.unitPrice).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcEditProjectRevenue()"></div>
-                <div class="form-group"><label class="form-label">VAT</label>
+                <div class="form-group"><label class="form-label" style="color:var(--blue);font-weight:800">매출 단가</label><input type="text" inputmode="numeric" class="form-input" id="editProjectUnitPrice" value="${p.unitPrice ? Number(p.unitPrice).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcEditProjectRevenue()"></div>
+                <div class="form-group"><label class="form-label">매출 VAT</label>
                     <select class="form-select" id="editProjectVat" onchange="calcEditProjectRevenue()">
                         <option value="exclude" ${vatCurrent==='exclude'?'selected':''}>VAT 별도</option>
                         <option value="include" ${vatCurrent==='include'?'selected':''}>VAT 포함</option>
                     </select>
                 </div>
-            </div>
-            <div class="form-group">
-                <label class="form-label">매출액 (자동계산)</label>
-                <div class="form-input" id="editProjectRevenueDisplay" style="background:var(--gray-50);color:var(--blue);font-weight:800;font-size:18px">${(p.revenue||0).toLocaleString()} 원</div>
             </div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">색상</label><input type="text" class="form-input" id="editProjectColor" value="${(p.color || '-').replace(/"/g, '&quot;')}"></div>
@@ -1982,7 +1965,7 @@ function openEditProject(id) {
         `)}
 
         ${secCard(`
-            <div class="form-section-title">🖨️ 인쇄 / 포장</div>
+            <div class="form-section-title">🖨️ 인쇄 / 포장 <span style="font-size:12px;font-weight:600;color:var(--blue);margin-left:6px">(매출 기준)</span></div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">인쇄 방법</label>
                     <select class="form-select" id="editProjectPrintMethod">
@@ -1991,15 +1974,15 @@ function openEditProject(id) {
                 </div>
             </div>
             <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                <div class="form-group"><label class="form-label">인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectPrintFee" value="${(p.printFee || p.printCost) ? Number(p.printFee || p.printCost).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this)"></div>
+                <div class="form-group"><label class="form-label">인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectPrintFee" value="${(p.printFee || p.printCost) ? Number(p.printFee || p.printCost).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcEditProjectRevenue()"></div>
                 <div class="form-group"><label class="form-label">VAT</label>
-                    <select class="form-select" id="editProjectPrintFeeVat">
+                    <select class="form-select" id="editProjectPrintFeeVat" onchange="calcEditProjectRevenue()">
                         <option ${printFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
                         <option ${printFeeVat==='VAT 포함'?'selected':''}>VAT 포함</option>
                     </select>
                 </div>
                 <div class="form-group"><label class="form-label">적용 방식</label>
-                    <select class="form-select" id="editProjectPrintFeeApply">
+                    <select class="form-select" id="editProjectPrintFeeApply" onchange="calcEditProjectRevenue()">
                         <option ${printFeeApply==='1개당'?'selected':''}>1개당</option>
                         <option ${printFeeApply==='일괄'?'selected':''}>일괄</option>
                     </select>
@@ -2013,21 +1996,72 @@ function openEditProject(id) {
                 </div>
             </div>
             <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                <div class="form-group"><label class="form-label">포장비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectPackFee" value="${(p.packagingFee || p.packCost) ? Number(p.packagingFee || p.packCost).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this)"></div>
+                <div class="form-group"><label class="form-label">포장비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectPackFee" value="${(p.packagingFee || p.packCost) ? Number(p.packagingFee || p.packCost).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcEditProjectRevenue()"></div>
                 <div class="form-group"><label class="form-label">VAT</label>
-                    <select class="form-select" id="editProjectPackFeeVat">
+                    <select class="form-select" id="editProjectPackFeeVat" onchange="calcEditProjectRevenue()">
                         <option ${packagingFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
                         <option ${packagingFeeVat==='VAT 포함'?'selected':''}>VAT 포함</option>
                     </select>
                 </div>
                 <div class="form-group"><label class="form-label">적용 방식</label>
-                    <select class="form-select" id="editProjectPackFeeApply">
+                    <select class="form-select" id="editProjectPackFeeApply" onchange="calcEditProjectRevenue()">
                         <option ${packagingFeeApply==='1개당'?'selected':''}>1개당</option>
                         <option ${packagingFeeApply==='일괄'?'selected':''}>일괄</option>
                     </select>
                 </div>
             </div>
+            <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid var(--gray-200)">
+                <label class="form-label" style="color:var(--blue);font-weight:800">💰 매출액 (자동계산 — 단가 + 인쇄비 + 포장비 포함)</label>
+                <div class="form-input" id="editProjectRevenueDisplay" style="background:#E8F4FD;color:var(--blue);font-weight:800;font-size:20px">${(p.revenue||0).toLocaleString()} 원</div>
+            </div>
         `)}
+
+        <div id="editSupplierDetailCard" style="background:#FFF8F2;border:1.5px solid #FFE0CC;border-left:4px solid var(--klp-orange,#E67E22);border-radius:10px;padding:16px 20px;margin-bottom:16px;display:${p.supplier ? 'block' : 'none'}">
+            <div class="form-section-title" style="color:var(--klp-orange,#E67E22)">🏭 매입처 상세 (작업요청서용)</div>
+            <div class="form-row" style="grid-template-columns:2fr 1fr">
+                <div class="form-group"><label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">매입 단가</label><input type="text" inputmode="numeric" class="form-input" id="editProjectSupUnitPrice" value="${p.supplierUnitPrice ? Number(p.supplierUnitPrice).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcEditSupplierTotal()"></div>
+                <div class="form-group"><label class="form-label">매입 VAT</label>
+                    <select class="form-select" id="editProjectSupVat" onchange="calcEditSupplierTotal()">
+                        <option value="exclude" ${supVatCurrent==='exclude'?'selected':''}>VAT 별도</option>
+                        <option value="include" ${supVatCurrent==='include'?'selected':''}>VAT 포함</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                <div class="form-group"><label class="form-label">매입 인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectSupPrintFee" value="${p.supplierPrintFee ? Number(p.supplierPrintFee).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcEditSupplierTotal()"></div>
+                <div class="form-group"><label class="form-label">VAT</label>
+                    <select class="form-select" id="editProjectSupPrintFeeVat" onchange="calcEditSupplierTotal()">
+                        <option ${supPrintFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
+                        <option ${supPrintFeeVat==='VAT 포함'?'selected':''}>VAT 포함</option>
+                    </select>
+                </div>
+                <div class="form-group"><label class="form-label">적용 방식</label>
+                    <select class="form-select" id="editProjectSupPrintFeeApply" onchange="calcEditSupplierTotal()">
+                        <option ${supPrintFeeApply==='1개당'?'selected':''}>1개당</option>
+                        <option ${supPrintFeeApply==='일괄'?'selected':''}>일괄</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                <div class="form-group"><label class="form-label">매입 포장비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectSupPackFee" value="${p.supplierPackagingFee ? Number(p.supplierPackagingFee).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcEditSupplierTotal()"></div>
+                <div class="form-group"><label class="form-label">VAT</label>
+                    <select class="form-select" id="editProjectSupPackFeeVat" onchange="calcEditSupplierTotal()">
+                        <option ${supPackFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
+                        <option ${supPackFeeVat==='VAT 포함'?'selected':''}>VAT 포함</option>
+                    </select>
+                </div>
+                <div class="form-group"><label class="form-label">적용 방식</label>
+                    <select class="form-select" id="editProjectSupPackFeeApply" onchange="calcEditSupplierTotal()">
+                        <option ${supPackFeeApply==='1개당'?'selected':''}>1개당</option>
+                        <option ${supPackFeeApply==='일괄'?'selected':''}>일괄</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid #FFE0CC">
+                <label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">💰 매입액 (자동계산 — 매입단가 + 매입인쇄비 + 매입포장비 포함)</label>
+                <div class="form-input" id="editProjectSupTotalDisplay" style="background:#fff;color:var(--klp-orange,#E67E22);font-weight:800;font-size:20px">${(p.supplierRevenue||0).toLocaleString()} 원</div>
+            </div>
+        </div>
 
         ${secCard(`
             <div class="form-section-title">🚚 납기 및 배송</div>
@@ -2059,12 +2093,39 @@ function openEditProject(id) {
 }
 
 function calcEditProjectRevenue() {
+    const displayEl = document.getElementById('editProjectRevenueDisplay');
+    if (!displayEl) return;
     const price = readProjectNumber('editProjectUnitPrice');
     const qty = readProjectNumber('editProjectQty');
-    const vat = document.getElementById('editProjectVat').value;
-    let revenue = price * qty;
-    if (vat === 'exclude') revenue = Math.round(revenue * 1.1);
-    document.getElementById('editProjectRevenueDisplay').textContent = revenue.toLocaleString() + ' 원';
+    const vatEl = document.getElementById('editProjectVat');
+    const vat = vatEl ? vatEl.value : 'exclude';
+    let productTotal = price * qty;
+    if (vat === 'exclude') productTotal = Math.round(productTotal * 1.1);
+    const printTotal = _feeComponent('editProjectPrintFee','editProjectPrintFeeVat','editProjectPrintFeeApply',qty);
+    const packTotal = _feeComponent('editProjectPackFee','editProjectPackFeeVat','editProjectPackFeeApply',qty);
+    displayEl.textContent = (productTotal + printTotal + packTotal).toLocaleString() + ' 원';
+}
+
+function toggleEditSupplierSection() {
+    const supEl = document.getElementById('editProjectSupplier');
+    const card = document.getElementById('editSupplierDetailCard');
+    if (!supEl || !card) return;
+    const hasSupplier = (supEl.value || '').trim().length > 0;
+    card.style.display = hasSupplier ? 'block' : 'none';
+}
+
+function calcEditSupplierTotal() {
+    const displayEl = document.getElementById('editProjectSupTotalDisplay');
+    if (!displayEl) return;
+    const price = readProjectNumber('editProjectSupUnitPrice');
+    const qty = readProjectNumber('editProjectQty');
+    const vatEl = document.getElementById('editProjectSupVat');
+    const vat = vatEl ? vatEl.value : 'exclude';
+    let productTotal = price * qty;
+    if (vat === 'exclude') productTotal = Math.round(productTotal * 1.1);
+    const printTotal = _feeComponent('editProjectSupPrintFee','editProjectSupPrintFeeVat','editProjectSupPrintFeeApply',qty);
+    const packTotal = _feeComponent('editProjectSupPackFee','editProjectSupPackFeeVat','editProjectSupPackFeeApply',qty);
+    displayEl.textContent = (productTotal + printTotal + packTotal).toLocaleString() + ' 원';
 }
 
 async function updateProject(id) {
@@ -2081,8 +2142,36 @@ async function updateProject(id) {
     const unitPrice = readProjectNumber('editProjectUnitPrice');
     const qty = readProjectNumber('editProjectQty');
     const vat = getVal('editProjectVat');
-    let revenue = unitPrice * qty;
-    if (vat === 'exclude') revenue = Math.round(revenue * 1.1);
+    let productTotal = unitPrice * qty;
+    if (vat === 'exclude') productTotal = Math.round(productTotal * 1.1);
+    // 매출액 = 단가 + 인쇄비 환산 + 포장비 환산
+    const printTotal = _feeComponent('editProjectPrintFee','editProjectPrintFeeVat','editProjectPrintFeeApply',qty);
+    const packTotal = _feeComponent('editProjectPackFee','editProjectPackFeeVat','editProjectPackFeeApply',qty);
+    const revenue = productTotal + printTotal + packTotal;
+
+    // 매입처 상세
+    const supplierName = getVal('editProjectSupplier');
+    const supUnit = readProjectNumber('editProjectSupUnitPrice');
+    let supplierUnitPrice = 0, supplierUnitPriceVat = 'VAT 별도', supplierVat = 'exclude';
+    let supplierPrintFee = 0, supplierPrintFeeVat = 'VAT 별도', supplierPrintFeeApply = '1개당';
+    let supplierPackagingFee = 0, supplierPackagingFeeVat = 'VAT 별도', supplierPackagingFeeApply = '1개당';
+    let supplierRevenue = 0;
+    if (supplierName && supUnit > 0) {
+        supplierVat = getVal('editProjectSupVat') || 'exclude';
+        supplierUnitPriceVat = supplierVat === 'include' ? 'VAT 포함' : 'VAT 별도';
+        supplierUnitPrice = supUnit;
+        supplierPrintFee = readProjectNumber('editProjectSupPrintFee');
+        supplierPrintFeeVat = getVal('editProjectSupPrintFeeVat') || 'VAT 별도';
+        supplierPrintFeeApply = getVal('editProjectSupPrintFeeApply') || '1개당';
+        supplierPackagingFee = readProjectNumber('editProjectSupPackFee');
+        supplierPackagingFeeVat = getVal('editProjectSupPackFeeVat') || 'VAT 별도';
+        supplierPackagingFeeApply = getVal('editProjectSupPackFeeApply') || '1개당';
+        let supProductTotal = supUnit * qty;
+        if (supplierVat === 'exclude') supProductTotal = Math.round(supProductTotal * 1.1);
+        const supPrintTotal = _feeComponent('editProjectSupPrintFee','editProjectSupPrintFeeVat','editProjectSupPrintFeeApply',qty);
+        const supPackTotal = _feeComponent('editProjectSupPackFee','editProjectSupPackFeeVat','editProjectSupPackFeeApply',qty);
+        supplierRevenue = supProductTotal + supPrintTotal + supPackTotal;
+    }
 
     const newChecks = {};
     Object.keys(p.checks || {}).forEach(k => {
@@ -2092,7 +2181,7 @@ async function updateProject(id) {
 
     Object.assign(p, {
         name, client,
-        supplier: getVal('editProjectSupplier'),
+        supplier: supplierName,
         contactPerson: getVal('editProjectContact'),
         title: '',
         manager: getVal('editProjectManager'),
@@ -2113,6 +2202,16 @@ async function updateProject(id) {
         packCost: readProjectNumber('editProjectPackFee'),
         packagingFeeVat: getVal('editProjectPackFeeVat'),
         packagingFeeApply: getVal('editProjectPackFeeApply'),
+        supplierUnitPrice,
+        supplierUnitPriceVat,
+        supplierVat,
+        supplierPrintFee,
+        supplierPrintFeeVat,
+        supplierPrintFeeApply,
+        supplierPackagingFee,
+        supplierPackagingFeeVat,
+        supplierPackagingFeeApply,
+        supplierRevenue,
         deadline: getVal('editProjectDeadline'),
         recipient: getVal('editProjectRecipient'),
         phone: getVal('editProjectPhone'),
@@ -2153,7 +2252,16 @@ async function updateProject(id) {
                 print_fee_vat: p.printFeeVat,
                 print_fee_apply: p.printFeeApply,
                 packaging_fee_vat: p.packagingFeeVat,
-                packaging_fee_apply: p.packagingFeeApply
+                packaging_fee_apply: p.packagingFeeApply,
+                supplier_unit_price: p.supplierUnitPrice || 0,
+                supplier_unit_price_vat: p.supplierUnitPriceVat || 'VAT 별도',
+                supplier_print_fee: p.supplierPrintFee || 0,
+                supplier_print_fee_vat: p.supplierPrintFeeVat || 'VAT 별도',
+                supplier_print_fee_apply: p.supplierPrintFeeApply || '1개당',
+                supplier_packaging_fee: p.supplierPackagingFee || 0,
+                supplier_packaging_fee_vat: p.supplierPackagingFeeVat || 'VAT 별도',
+                supplier_packaging_fee_apply: p.supplierPackagingFeeApply || '1개당',
+                supplier_revenue: p.supplierRevenue || 0
             }).eq('id', id);
             if (error) throw error;
         } catch (err) {
@@ -2162,7 +2270,7 @@ async function updateProject(id) {
         }
     }
 
-    if (!p.parentProjectId) await syncProjectDeadlineTask(p);
+    await syncProjectDeadlineTask(p);
     closeModal(); renderProjects(); renderHome();
     showToast('프로젝트가 수정되었습니다');
 }
@@ -2237,7 +2345,7 @@ function openModal(type) {
                         <div class="form-group"><label class="form-label">매출처 담당자</label><input type="text" class="form-input" id="newProjectContact" placeholder="담당자" value="${v('contactPerson')}"></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">매입처 (작업요청서 발송 공장)</label><input type="text" class="form-input" id="newProjectSupplier" list="clientsListDoc" autocomplete="off" placeholder="공장/제작처" value="${v('supplier')}"></div>
+                        <div class="form-group"><label class="form-label">매입처 (작업요청서 발송 공장)</label><input type="text" class="form-input" id="newProjectSupplier" list="clientsListDoc" autocomplete="off" placeholder="공장/제작처 — 입력 시 매입처 상세 섹션이 나타납니다" value="${v('supplier')}" oninput="toggleSupplierSection()"></div>
                         <div class="form-group"><label class="form-label">매입처 담당자</label><input type="text" class="form-input" id="newProjectSupplierContact" placeholder="공장 담당자명" value="${v('supplierContact')}"></div>
                     </div>
                     <div class="form-row">
@@ -2258,7 +2366,7 @@ function openModal(type) {
                     <div class="form-section-title">📦 제품 정보</div>
                     <div class="form-group"><label class="form-label">품명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="newProjectName" placeholder="품명 입력" value="${v('productName') || v('name')}"></div>
                     <div class="form-row" style="grid-template-columns:2fr 1fr">
-                        <div class="form-group"><label class="form-label">수량</label><input type="text" inputmode="numeric" class="form-input" id="newProjectQty" placeholder="0" value="${v('quantity') ? Number(v('quantity')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcProjectRevenue()"></div>
+                        <div class="form-group"><label class="form-label">수량</label><input type="text" inputmode="numeric" class="form-input" id="newProjectQty" placeholder="0" value="${v('quantity') ? Number(v('quantity')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcProjectRevenue();calcSupplierTotal()"></div>
                         <div class="form-group"><label class="form-label">단위</label>
                             <select class="form-select" id="newProjectUnit">
                                 ${['개','세트','장','박스','EA'].map(u=>`<option ${v('unit')===u?'selected':''}>${u}</option>`).join('')}
@@ -2266,17 +2374,13 @@ function openModal(type) {
                         </div>
                     </div>
                     <div class="form-row" style="grid-template-columns:2fr 1fr">
-                        <div class="form-group"><label class="form-label">단가</label><input type="text" inputmode="numeric" class="form-input" id="newProjectUnitPrice" placeholder="0" value="${v('unitPrice') ? Number(v('unitPrice')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcProjectRevenue()"></div>
-                        <div class="form-group"><label class="form-label">VAT</label>
+                        <div class="form-group"><label class="form-label" style="color:var(--blue);font-weight:800">매출 단가</label><input type="text" inputmode="numeric" class="form-input" id="newProjectUnitPrice" placeholder="0" value="${v('unitPrice') ? Number(v('unitPrice')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcProjectRevenue();calcSupplierTotal()"></div>
+                        <div class="form-group"><label class="form-label">매출 VAT</label>
                             <select class="form-select" id="newProjectVat" onchange="calcProjectRevenue()">
                                 <option value="exclude" ${v('unitPriceVat')==='VAT 별도'||v('vat')==='exclude'||!v('vat')?'selected':''}>VAT 별도</option>
                                 <option value="include" ${v('unitPriceVat')==='VAT 포함'||v('vat')==='include'?'selected':''}>VAT 포함</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">매출액 (자동계산)</label>
-                        <div class="form-input" id="newProjectRevenueDisplay" style="background:var(--gray-50);color:var(--blue);font-weight:800;font-size:18px">0 원</div>
                     </div>
                     <div class="form-row">
                         <div class="form-group"><label class="form-label">색상</label><input type="text" class="form-input" id="newProjectColor" value="${v('color') || '-'}"></div>
@@ -2285,7 +2389,7 @@ function openModal(type) {
                 `)}
 
                 ${secCard(`
-                    <div class="form-section-title">🖨️ 인쇄 / 포장</div>
+                    <div class="form-section-title">🖨️ 인쇄 / 포장 <span style="font-size:12px;font-weight:600;color:var(--blue);margin-left:6px">(매출 기준)</span></div>
                     <div class="form-row">
                         <div class="form-group"><label class="form-label">인쇄 방법</label>
                             <select class="form-select" id="newProjectPrintMethod">
@@ -2294,12 +2398,12 @@ function openModal(type) {
                         </div>
                     </div>
                     <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                        <div class="form-group"><label class="form-label">인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectPrintFee" placeholder="0" value="${v('printFee') ? Number(v('printFee')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this)"></div>
+                        <div class="form-group"><label class="form-label">인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectPrintFee" placeholder="0" value="${v('printFee') ? Number(v('printFee')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcProjectRevenue()"></div>
                         <div class="form-group"><label class="form-label">VAT</label>
-                            <select class="form-select" id="newProjectPrintFeeVat"><option>VAT 별도</option><option>VAT 포함</option></select>
+                            <select class="form-select" id="newProjectPrintFeeVat" onchange="calcProjectRevenue()"><option>VAT 별도</option><option>VAT 포함</option></select>
                         </div>
                         <div class="form-group"><label class="form-label">적용 방식</label>
-                            <select class="form-select" id="newProjectPrintFeeApply"><option>1개당</option><option>일괄</option></select>
+                            <select class="form-select" id="newProjectPrintFeeApply" onchange="calcProjectRevenue()"><option>1개당</option><option>일괄</option></select>
                         </div>
                     </div>
                     <div class="form-row">
@@ -2310,15 +2414,55 @@ function openModal(type) {
                         </div>
                     </div>
                     <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                        <div class="form-group"><label class="form-label">포장비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectPackFee" placeholder="0" value="${v('packagingFee') ? Number(v('packagingFee')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this)"></div>
+                        <div class="form-group"><label class="form-label">포장비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectPackFee" placeholder="0" value="${v('packagingFee') ? Number(v('packagingFee')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcProjectRevenue()"></div>
                         <div class="form-group"><label class="form-label">VAT</label>
-                            <select class="form-select" id="newProjectPackFeeVat"><option>VAT 별도</option><option>VAT 포함</option></select>
+                            <select class="form-select" id="newProjectPackFeeVat" onchange="calcProjectRevenue()"><option>VAT 별도</option><option>VAT 포함</option></select>
                         </div>
                         <div class="form-group"><label class="form-label">적용 방식</label>
-                            <select class="form-select" id="newProjectPackFeeApply"><option>1개당</option><option>일괄</option></select>
+                            <select class="form-select" id="newProjectPackFeeApply" onchange="calcProjectRevenue()"><option>1개당</option><option>일괄</option></select>
                         </div>
                     </div>
+                    <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid var(--gray-200)">
+                        <label class="form-label" style="color:var(--blue);font-weight:800">💰 매출액 (자동계산 — 단가 + 인쇄비 + 포장비 포함)</label>
+                        <div class="form-input" id="newProjectRevenueDisplay" style="background:#E8F4FD;color:var(--blue);font-weight:800;font-size:20px">0 원</div>
+                    </div>
                 `)}
+
+                <div id="supplierDetailCard" style="background:#FFF8F2;border:1.5px solid #FFE0CC;border-left:4px solid var(--klp-orange,#E67E22);border-radius:10px;padding:16px 20px;margin-bottom:16px;display:none">
+                    <div class="form-section-title" style="color:var(--klp-orange,#E67E22)">🏭 매입처 상세 (작업요청서용)</div>
+                    <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:14px">매입 단가를 입력하면 저장 시 매입처 자식 프로젝트가 함께 생성됩니다. (수량·단위·품명은 위 제품 정보를 공유합니다)</div>
+                    <div class="form-row" style="grid-template-columns:2fr 1fr">
+                        <div class="form-group"><label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">매입 단가</label><input type="text" inputmode="numeric" class="form-input" id="newProjectSupUnitPrice" placeholder="0" oninput="fmtProjectNumberInput(this);calcSupplierTotal()"></div>
+                        <div class="form-group"><label class="form-label">매입 VAT</label>
+                            <select class="form-select" id="newProjectSupVat" onchange="calcSupplierTotal()">
+                                <option value="exclude">VAT 별도</option>
+                                <option value="include">VAT 포함</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                        <div class="form-group"><label class="form-label">매입 인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectSupPrintFee" placeholder="0" oninput="fmtProjectNumberInput(this);calcSupplierTotal()"></div>
+                        <div class="form-group"><label class="form-label">VAT</label>
+                            <select class="form-select" id="newProjectSupPrintFeeVat" onchange="calcSupplierTotal()"><option>VAT 별도</option><option>VAT 포함</option></select>
+                        </div>
+                        <div class="form-group"><label class="form-label">적용 방식</label>
+                            <select class="form-select" id="newProjectSupPrintFeeApply" onchange="calcSupplierTotal()"><option>1개당</option><option>일괄</option></select>
+                        </div>
+                    </div>
+                    <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                        <div class="form-group"><label class="form-label">매입 포장비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectSupPackFee" placeholder="0" oninput="fmtProjectNumberInput(this);calcSupplierTotal()"></div>
+                        <div class="form-group"><label class="form-label">VAT</label>
+                            <select class="form-select" id="newProjectSupPackFeeVat" onchange="calcSupplierTotal()"><option>VAT 별도</option><option>VAT 포함</option></select>
+                        </div>
+                        <div class="form-group"><label class="form-label">적용 방식</label>
+                            <select class="form-select" id="newProjectSupPackFeeApply" onchange="calcSupplierTotal()"><option>1개당</option><option>일괄</option></select>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid #FFE0CC">
+                        <label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">💰 매입액 (자동계산 — 매입단가 + 매입인쇄비 + 매입포장비 포함)</label>
+                        <div class="form-input" id="newProjectSupTotalDisplay" style="background:#fff;color:var(--klp-orange,#E67E22);font-weight:800;font-size:20px">0 원</div>
+                    </div>
+                </div>
 
                 ${secCard(`
                     <div class="form-section-title">🚚 납기 및 배송</div>
@@ -2338,7 +2482,7 @@ function openModal(type) {
                 `)}
 
                 <button class="form-submit" onclick="addProject('${addType}')">프로젝트 추가</button>`;
-            setTimeout(calcProjectRevenue, 0);
+            setTimeout(() => { calcProjectRevenue(); toggleSupplierSection(); calcSupplierTotal(); }, 0);
             document.getElementById('modalOverlay').classList.add('modal-wide');
         } else {
             // 해외: 기존 간단 폼 유지
@@ -2440,6 +2584,19 @@ function openModal(type) {
     document.getElementById('modalOverlay').classList.add('show');
 }
 
+// 인쇄비/포장비 같은 "부가비용"을 수량·적용방식·VAT에 맞춰 합계에 환산
+function _feeComponent(feeId, vatId, applyId, qty) {
+    const fee = readProjectNumber(feeId);
+    if (!fee) return 0;
+    const applyEl = document.getElementById(applyId);
+    const vatEl = document.getElementById(vatId);
+    const isPerUnit = applyEl ? applyEl.value === '1개당' : true;
+    const vatExclude = vatEl ? vatEl.value === 'VAT 별도' : true;
+    let total = isPerUnit ? fee * qty : fee;
+    if (vatExclude) total = Math.round(total * 1.1);
+    return total;
+}
+
 function calcProjectRevenue() {
     const displayEl = document.getElementById('newProjectRevenueDisplay');
     if (!displayEl) return;
@@ -2447,9 +2604,35 @@ function calcProjectRevenue() {
     const qty = readProjectNumber('newProjectQty');
     const vatEl = document.getElementById('newProjectVat');
     const vat = vatEl ? vatEl.value : 'exclude';
-    let revenue = price * qty;
-    if (vat === 'exclude') revenue = Math.round(revenue * 1.1);
+    let productTotal = price * qty;
+    if (vat === 'exclude') productTotal = Math.round(productTotal * 1.1);
+    const printTotal = _feeComponent('newProjectPrintFee', 'newProjectPrintFeeVat', 'newProjectPrintFeeApply', qty);
+    const packTotal = _feeComponent('newProjectPackFee', 'newProjectPackFeeVat', 'newProjectPackFeeApply', qty);
+    const revenue = productTotal + printTotal + packTotal;
     displayEl.textContent = revenue.toLocaleString() + ' 원';
+}
+
+function toggleSupplierSection() {
+    const supEl = document.getElementById('newProjectSupplier');
+    const card = document.getElementById('supplierDetailCard');
+    if (!supEl || !card) return;
+    const hasSupplier = (supEl.value || '').trim().length > 0;
+    card.style.display = hasSupplier ? 'block' : 'none';
+}
+
+function calcSupplierTotal() {
+    const displayEl = document.getElementById('newProjectSupTotalDisplay');
+    if (!displayEl) return;
+    const price = readProjectNumber('newProjectSupUnitPrice');
+    const qty = readProjectNumber('newProjectQty');
+    const vatEl = document.getElementById('newProjectSupVat');
+    const vat = vatEl ? vatEl.value : 'exclude';
+    let productTotal = price * qty;
+    if (vat === 'exclude') productTotal = Math.round(productTotal * 1.1);
+    const printTotal = _feeComponent('newProjectSupPrintFee', 'newProjectSupPrintFeeVat', 'newProjectSupPrintFeeApply', qty);
+    const packTotal = _feeComponent('newProjectSupPackFee', 'newProjectSupPackFeeVat', 'newProjectSupPackFeeApply', qty);
+    const total = productTotal + printTotal + packTotal;
+    displayEl.textContent = total.toLocaleString() + ' 원';
 }
 
 function closeModal() {
@@ -2468,8 +2651,13 @@ async function addProject(type) {
     const unitPrice = readProjectNumber('newProjectUnitPrice');
     const qty = readProjectNumber('newProjectQty');
     const vat = document.getElementById('newProjectVat').value;
-    let revenue = unitPrice * qty;
-    if (vat === 'exclude') revenue = Math.round(revenue * 1.1);
+    let productTotal = unitPrice * qty;
+    if (vat === 'exclude') productTotal = Math.round(productTotal * 1.1);
+    // 국내 폼은 인쇄비·포장비를 매출액에 포함; 해외 폼은 단가×수량만
+    const isDomesticForm = type === 'domestic';
+    const printTotal = isDomesticForm ? _feeComponent('newProjectPrintFee','newProjectPrintFeeVat','newProjectPrintFeeApply',qty) : 0;
+    const packTotal = isDomesticForm ? _feeComponent('newProjectPackFee','newProjectPackFeeVat','newProjectPackFeeApply',qty) : 0;
+    const revenue = productTotal + printTotal + packTotal;
 
     const assignee = currentUser ? currentUser.name : '';
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
@@ -2510,6 +2698,31 @@ async function addProject(type) {
         memo: getVal('newProjectMemo')
     };
 
+    // 매입처 상세 (통합 모델: 같은 행에 supplier_* 컬럼으로 저장)
+    if (type === 'domestic' && newProject.supplier) {
+        const supUnit = getInt('newProjectSupUnitPrice');
+        if (supUnit > 0) {
+            const supVatVal = getVal('newProjectSupVat') || 'exclude';
+            const supVatLabel = supVatVal === 'include' ? 'VAT 포함' : 'VAT 별도';
+            let supProductTotal = supUnit * newProject.qty;
+            if (supVatVal === 'exclude') supProductTotal = Math.round(supProductTotal * 1.1);
+            const supPrintTotal = _feeComponent('newProjectSupPrintFee','newProjectSupPrintFeeVat','newProjectSupPrintFeeApply',newProject.qty);
+            const supPackTotal = _feeComponent('newProjectSupPackFee','newProjectSupPackFeeVat','newProjectSupPackFeeApply',newProject.qty);
+            Object.assign(newProject, {
+                supplierUnitPrice: supUnit,
+                supplierUnitPriceVat: supVatLabel,
+                supplierVat: supVatVal,
+                supplierPrintFee: getInt('newProjectSupPrintFee'),
+                supplierPrintFeeVat: getVal('newProjectSupPrintFeeVat') || 'VAT 별도',
+                supplierPrintFeeApply: getVal('newProjectSupPrintFeeApply') || '1개당',
+                supplierPackagingFee: getInt('newProjectSupPackFee'),
+                supplierPackagingFeeVat: getVal('newProjectSupPackFeeVat') || 'VAT 별도',
+                supplierPackagingFeeApply: getVal('newProjectSupPackFeeApply') || '1개당',
+                supplierRevenue: supProductTotal + supPrintTotal + supPackTotal
+            });
+        }
+    }
+
     if (type === 'domestic') {
         try {
             const { data, error } = await sb.from('projects_domestic').insert({
@@ -2546,7 +2759,16 @@ async function addProject(type) {
                 print_fee_vat: newProject.printFeeVat || 'VAT 별도',
                 print_fee_apply: newProject.printFeeApply || '1개당',
                 packaging_fee_vat: newProject.packagingFeeVat || 'VAT 별도',
-                packaging_fee_apply: newProject.packagingFeeApply || '1개당'
+                packaging_fee_apply: newProject.packagingFeeApply || '1개당',
+                supplier_unit_price: newProject.supplierUnitPrice || 0,
+                supplier_unit_price_vat: newProject.supplierUnitPriceVat || 'VAT 별도',
+                supplier_print_fee: newProject.supplierPrintFee || 0,
+                supplier_print_fee_vat: newProject.supplierPrintFeeVat || 'VAT 별도',
+                supplier_print_fee_apply: newProject.supplierPrintFeeApply || '1개당',
+                supplier_packaging_fee: newProject.supplierPackagingFee || 0,
+                supplier_packaging_fee_vat: newProject.supplierPackagingFeeVat || 'VAT 별도',
+                supplier_packaging_fee_apply: newProject.supplierPackagingFeeApply || '1개당',
+                supplier_revenue: newProject.supplierRevenue || 0
             }).select().single();
             if (error) throw error;
             if (data) newProject.id = data.id;
@@ -2560,6 +2782,7 @@ async function addProject(type) {
     }
     projects.unshift(newProject);
     if (type === 'domestic') await syncProjectDeadlineTask(newProject);
+
     closeModal(); renderProjects(); renderHome();
     showToast('프로젝트가 추가되었습니다');
 }
@@ -2582,7 +2805,6 @@ async function loadDomesticProjectsFromDb() {
                 manager: r.manager || '',
                 supplier: r.supplier || '',
                 supplierContact: r.supplier_contact || '',
-                parentProjectId: r.parent_project_id || null,
                 status: r.status || '시작 전',
                 priority: r.priority || '🟢 보통',
                 category: r.category || '국내 주문',
@@ -2603,6 +2825,17 @@ async function loadDomesticProjectsFromDb() {
                 packagingFee: r.packaging_fee || 0,
                 packagingFeeVat: r.packaging_fee_vat || 'VAT 별도',
                 packagingFeeApply: r.packaging_fee_apply || '1개당',
+                // 매입처 상세 (통합 모델)
+                supplierUnitPrice: r.supplier_unit_price || 0,
+                supplierUnitPriceVat: r.supplier_unit_price_vat || 'VAT 별도',
+                supplierVat: r.supplier_unit_price_vat === 'VAT 포함' ? 'include' : 'exclude',
+                supplierPrintFee: r.supplier_print_fee || 0,
+                supplierPrintFeeVat: r.supplier_print_fee_vat || 'VAT 별도',
+                supplierPrintFeeApply: r.supplier_print_fee_apply || '1개당',
+                supplierPackagingFee: r.supplier_packaging_fee || 0,
+                supplierPackagingFeeVat: r.supplier_packaging_fee_vat || 'VAT 별도',
+                supplierPackagingFeeApply: r.supplier_packaging_fee_apply || '1개당',
+                supplierRevenue: r.supplier_revenue || 0,
                 printCost: r.print_fee || 0,
                 packCost: r.packaging_fee || 0,
                 shipCost: 0,
