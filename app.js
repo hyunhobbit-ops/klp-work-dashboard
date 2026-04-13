@@ -2106,6 +2106,7 @@ async function updateProject(id) {
         }
     }
 
+    if (!p.parentProjectId) await syncProjectDeadlineTask(p);
     closeModal(); renderProjects(); renderHome();
     showToast('프로젝트가 수정되었습니다');
 }
@@ -2133,6 +2134,7 @@ async function deleteProject(id) {
     const pIdx = projects.findIndex(x => x.id === id);
     if (pIdx >= 0) projects.splice(pIdx, 1);
 
+    await deleteProjectDeadlineTask(id);
     closeModal(); renderProjects(); renderHome();
     showToast('프로젝트가 삭제되었습니다');
 }
@@ -2501,6 +2503,7 @@ async function addProject(type) {
         overseasProjects.unshift(newProject);
     }
     projects.unshift(newProject);
+    if (type === 'domestic') await syncProjectDeadlineTask(newProject);
     closeModal(); renderProjects(); renderHome();
     showToast('프로젝트가 추가되었습니다');
 }
@@ -2581,7 +2584,8 @@ function taskToDb(t) {
         label: t.label || '',
         client: t.client || '',
         linked_group: t.linkedGroup || null,
-        is_deadline_copy: !!t.isDeadlineCopy
+        is_deadline_copy: !!t.isDeadlineCopy,
+        project_id: t.projectId || null
     };
 }
 function taskFromDb(r) {
@@ -2597,7 +2601,8 @@ function taskFromDb(r) {
         label: r.label || '',
         client: r.client || '',
         linkedGroup: r.linked_group || null,
-        isDeadlineCopy: !!r.is_deadline_copy
+        isDeadlineCopy: !!r.is_deadline_copy,
+        projectId: r.project_id || null
     };
 }
 async function loadDailyTasksFromDb() {
@@ -2677,6 +2682,48 @@ async function dbDeleteTask(id) {
 async function dbDeleteTasksByGroup(groupId) {
     const { error } = await sb.from('daily_tasks').delete().eq('linked_group', groupId);
     if (error) { console.error(error); showToast('DB 삭제 실패: ' + error.message); }
+}
+
+// 프로젝트 마감일 → 전체(공통) 일일 태스크 동기화
+async function syncProjectDeadlineTask(p) {
+    if (!p || !p.id) return;
+    try {
+        const { data: existing, error: selErr } = await sb.from('daily_tasks')
+            .select('id').eq('project_id', p.id).limit(1);
+        if (selErr) throw selErr;
+        if (!p.deadline) {
+            // 마감일 없으면 기존 태스크 삭제
+            if (existing && existing.length > 0) {
+                await sb.from('daily_tasks').delete().eq('project_id', p.id);
+            }
+            return;
+        }
+        const taskName = `${p.client || ''} — ${p.name || ''} 마감`;
+        const payload = {
+            task: taskName,
+            date: p.deadline,
+            assignee: '전체',
+            target: '',
+            priority: '🔴 긴급',
+            done: false,
+            deadline: p.deadline,
+            label: '거래처 업무',
+            client: p.client || '',
+            project_id: p.id,
+            is_deadline_copy: false
+        };
+        if (existing && existing.length > 0) {
+            await sb.from('daily_tasks').update(payload).eq('id', existing[0].id);
+        } else {
+            await sb.from('daily_tasks').insert(payload);
+        }
+    } catch (err) {
+        console.error('프로젝트 마감일 동기화 실패', err);
+    }
+}
+async function deleteProjectDeadlineTask(projectId) {
+    try { await sb.from('daily_tasks').delete().eq('project_id', projectId); }
+    catch (e) { console.error('프로젝트 태스크 삭제 실패', e); }
 }
 
 function deliveryToDb(d) {

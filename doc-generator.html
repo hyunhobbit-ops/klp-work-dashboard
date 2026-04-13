@@ -926,6 +926,25 @@ async function exportToDomesticProject(){
   try{
     var res=await sbFetch('projects_domestic','POST',payload);
     if(res&&res.error){throw new Error(res.message||res.error)}
+    /* 프로젝트 마감일 기준 전체(공통) 일일 태스크 자동 생성 */
+    if(res&&res.length>0&&res[0].id&&payload.delivery_date){
+      var projId=res[0].id;
+      try{
+        await sbFetch('daily_tasks','POST',{
+          task:(payload.client||'')+' — '+(payload.product_name||'')+' 마감',
+          date:payload.delivery_date,
+          assignee:'전체',
+          target:'',
+          priority:'🔴 긴급',
+          done:false,
+          deadline:payload.delivery_date,
+          label:'거래처 업무',
+          client:payload.client||'',
+          project_id:projId,
+          is_deadline_copy:false
+        });
+      }catch(e){console.warn('daily_tasks insert failed',e);}
+    }
     showMsg('✅ 프로젝트 진행사항으로 내보냈습니다! ('+val('companyName')+' — '+val('productName')+')');
     if(confirm('프로젝트 진행사항 페이지로 이동할까요?')){
       location.href='index.html#projects-domestic';
