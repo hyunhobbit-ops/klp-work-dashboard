@@ -1165,9 +1165,19 @@ async function loadRecord(id){
       /* 이미지 복원 (FIX #10) */
       if(r.images_data){var imgs=unpackImages(r.images_data);wrMainImg=imgs.main;wrSubImgs=imgs.subs}else{wrMainImg=null;wrSubImgs=[]}
       renderWrMainThumb();renderWrSubThumbs();
+      /* === 연동된 디자인확인서 자동 복원 === */
+      linkedDC=null;
+      try{
+        var wrParts=(r.doc_number||'').split('_');
+        if(wrParts.length>=3){
+          var dcNum=wrParts.slice(0,2).join('_');
+          var dcRes=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(dcNum)+'&status=neq.작업요청서','GET');
+          if(dcRes&&dcRes.length>0){linkedDC=dcRes[0];}
+        }
+      }catch(e){console.warn('linked DC restore failed',e);}
       calcWrEst();
       showWrTab('form');
-      showMsg('📄 작업요청서 불러오기 완료!');
+      showMsg(linkedDC?'📄 작업요청서 불러오기 완료! (디자인확인서 연동됨)':'📄 작업요청서 불러오기 완료!');
     } else {
       /* DC 데이터 복원 */
       switchMode('dc');
