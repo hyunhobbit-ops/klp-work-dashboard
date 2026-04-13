@@ -521,16 +521,10 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
     document.getElementById(cardGridId).innerHTML = cardHtml;
 }
 
-let _projectRowClickTimer = null;
 function projectRowClick(id) {
-    if (_projectRowClickTimer) clearTimeout(_projectRowClickTimer);
-    _projectRowClickTimer = setTimeout(() => {
-        _projectRowClickTimer = null;
-        showProjectDetail(id);
-    }, 250);
+    showProjectDetail(id);
 }
 function projectRowDblClick(id) {
-    if (_projectRowClickTimer) { clearTimeout(_projectRowClickTimer); _projectRowClickTimer = null; }
     openEditProject(id);
 }
 
