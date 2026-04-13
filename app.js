@@ -525,9 +525,9 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
         // 전체보기 — 시작 전 / 진행 중 / 완료 세 섹션으로 나눠서 출력
         const normalize = s => (s || '').replace(/\s+/g, '');
         const sections = [
-            { key: '시작 전', color: '#8B95A1', bg: '#F1F3F5' },
-            { key: '진행 중', color: '#1B64DA', bg: '#E8F4FD' },
-            { key: '완료', color: '#12B76A', bg: '#E8F8EF' }
+            { key: '시작 전', color: '#A9B1BB', bg: '#F7F8FA' },
+            { key: '진행 중', color: '#7CA9E6', bg: '#F3F8FE' },
+            { key: '완료', color: '#8FD4AE', bg: '#F2FBF6' }
         ];
         // 정규화 매칭으로 버킷 분류 — 알 수 없는 상태는 '시작 전'에 합류
         const buckets = { '시작 전': [], '진행 중': [], '완료': [] };
@@ -539,13 +539,13 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
         });
         sections.forEach(sec => {
             const group = buckets[sec.key];
-            tableHtml += `<tr class="section-divider"><td colspan="${colspan}" style="padding:0;border:none"><div style="background:${sec.bg};color:${sec.color};font-weight:700;font-size:12px;padding:8px 14px;border-top:1px solid ${sec.color}33;border-bottom:1px solid ${sec.color}33;display:flex;align-items:center;gap:8px"><span>${sec.key}</span><span style="color:${sec.color};opacity:.75;font-weight:700">${group.length}</span></div></td></tr>`;
+            tableHtml += `<tr class="section-divider"><td colspan="${colspan}" style="padding:0;border:none"><div style="background:${sec.bg};color:${sec.color};font-weight:700;font-size:14px;padding:12px 18px;border-top:1px solid ${sec.color}55;border-bottom:1px solid ${sec.color}55;display:flex;align-items:center;gap:10px"><span>${sec.key}</span><span style="color:${sec.color};opacity:.8;font-weight:700">${group.length}</span></div></td></tr>`;
             if (group.length === 0) {
                 tableHtml += `<tr class="section-empty"><td colspan="${colspan}" style="color:var(--text-tertiary);font-size:12px;padding:14px;text-align:center;background:#fff">해당 상태의 프로젝트가 없습니다</td></tr>`;
             } else {
                 group.forEach(p => { tableHtml += rowHtmlById.get(p.id); });
             }
-            cardHtml += `<div class="card-section-header" style="grid-column:1/-1;background:${sec.bg};color:${sec.color};font-weight:700;font-size:12px;padding:8px 14px;border-radius:6px;margin-top:8px;display:flex;align-items:center;gap:8px"><span>${sec.key}</span><span style="color:${sec.color};opacity:.75">${group.length}</span></div>`;
+            cardHtml += `<div class="card-section-header" style="grid-column:1/-1;background:${sec.bg};color:${sec.color};font-weight:700;font-size:14px;padding:12px 18px;border-radius:8px;margin-top:10px;display:flex;align-items:center;gap:10px"><span>${sec.key}</span><span style="color:${sec.color};opacity:.8">${group.length}</span></div>`;
             if (group.length === 0) {
                 cardHtml += `<div style="grid-column:1/-1;color:var(--text-tertiary);font-size:12px;padding:8px 14px">해당 상태의 프로젝트가 없습니다</div>`;
             } else {
