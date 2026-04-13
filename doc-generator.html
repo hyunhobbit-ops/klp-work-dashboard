@@ -983,7 +983,8 @@ async function exportWrToDomesticProject(){
   var payload={
     client:linkedDC.company_name||'',
     supplier:val('wrCompany'),
-    contact_person:val('wrContact'),
+    contact_person:linkedDC.contact_person||'',
+    supplier_contact:val('wrContact'),
     title:val('wrTitle'),
     manager:val('wrRequester'),
     product_name:val('wrProduct'),
