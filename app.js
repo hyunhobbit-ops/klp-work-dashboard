@@ -546,8 +546,8 @@ function renderDailyPersonFilter() {
         html += `<button class="filter-chip ${currentPersonFilter === 'viewall' ? 'active' : ''}" data-person="viewall">전체보기</button>`;
     }
 
-    // 관리자 또는 임원만 대표님 탭 표시
-    if (admin || exec) {
+    // 관리자만 대표님 탭 표시
+    if (admin) {
         html += `<button class="filter-chip ${currentPersonFilter === 'ceo' ? 'active' : ''}" data-person="ceo">대표님</button>`;
     }
 
@@ -598,7 +598,7 @@ function renderDaily() {
     // 임원 컬럼: 김현호, 대표님, 이현주에게만 표시. 유지은/구정두(일반)에게는 숨김
     const userName = currentUser ? currentUser.name : '';
     const showExecColumn = ADMIN_USERS.includes(userName) || EXEC_USERS.includes(userName);
-    const showCeoColumn = (currentPersonFilter === 'ceo' || (currentPersonFilter === 'viewall' && (admin || exec)));
+    const showCeoColumn = (currentPersonFilter === 'ceo' || (currentPersonFilter === 'viewall' && admin));
 
     const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
