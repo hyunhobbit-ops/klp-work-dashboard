@@ -2005,7 +2005,8 @@ function openEditProject(id) {
                 </div>
             </div>
             <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid var(--gray-200)">
-                <label class="form-label" style="color:var(--blue);font-weight:800">💰 매출액 (자동계산 — 단가 + 인쇄비 + 포장비 포함)</label>
+                <label class="form-label" style="color:var(--blue);font-weight:800">💰 매출액 (자동계산)</label>
+                <div id="editProjectRevenueBreakdown" style="background:#F5FBFF;border:1px solid #CFE3F5;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--text-secondary)"></div>
                 <div class="form-input" id="editProjectRevenueDisplay" style="background:#E8F4FD;color:var(--blue);font-weight:800;font-size:20px">${(p.revenue||0).toLocaleString()} 원</div>
             </div>
         `)}
@@ -2052,8 +2053,10 @@ function openEditProject(id) {
                 </div>
             </div>
             <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid #FFE0CC">
-                <label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">💰 매입액 (자동계산 — 매입단가 + 매입인쇄비 + 매입포장비 포함)</label>
+                <label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">💰 매입액 (자동계산)</label>
+                <div id="editProjectSupBreakdown" style="background:#fff;border:1px solid #FFE0CC;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--text-secondary)"></div>
                 <div class="form-input" id="editProjectSupTotalDisplay" style="background:#fff;color:var(--klp-orange,#E67E22);font-weight:800;font-size:20px">${(p.supplierRevenue||0).toLocaleString()} 원</div>
+                <div id="editProjectMarginDisplay" style="margin-top:12px"></div>
             </div>
         </div>
 
@@ -2088,6 +2091,7 @@ function openEditProject(id) {
     const overlay = document.getElementById('modalOverlay');
     overlay.classList.add('show');
     overlay.classList.add('modal-wide');
+    setTimeout(() => { calcEditProjectRevenue(); calcEditSupplierTotal(); }, 0);
 }
 
 function calcEditProjectRevenue() {
@@ -2101,7 +2105,11 @@ function calcEditProjectRevenue() {
     if (vat === 'exclude') productTotal = Math.round(productTotal * 1.1);
     const printTotal = _feeComponent('editProjectPrintFee','editProjectPrintFeeVat','editProjectPrintFeeApply',qty);
     const packTotal = _feeComponent('editProjectPackFee','editProjectPackFeeVat','editProjectPackFeeApply',qty);
-    displayEl.textContent = (productTotal + printTotal + packTotal).toLocaleString() + ' 원';
+    const revenue = productTotal + printTotal + packTotal;
+    displayEl.textContent = revenue.toLocaleString() + ' 원';
+    const bd = document.getElementById('editProjectRevenueBreakdown');
+    if (bd) bd.innerHTML = _breakdownHtml(productTotal, printTotal, packTotal);
+    _renderMargin('editProjectMarginDisplay', revenue, _parseKRW('editProjectSupTotalDisplay'));
 }
 
 function toggleEditSupplierSection() {
@@ -2110,6 +2118,10 @@ function toggleEditSupplierSection() {
     if (!supEl || !card) return;
     const hasSupplier = (supEl.value || '').trim().length > 0;
     card.style.display = hasSupplier ? 'block' : 'none';
+    if (!hasSupplier) {
+        const m = document.getElementById('editProjectMarginDisplay');
+        if (m) m.innerHTML = '';
+    }
 }
 
 function calcEditSupplierTotal() {
@@ -2123,7 +2135,11 @@ function calcEditSupplierTotal() {
     if (vat === 'exclude') productTotal = Math.round(productTotal * 1.1);
     const printTotal = _feeComponent('editProjectSupPrintFee','editProjectSupPrintFeeVat','editProjectSupPrintFeeApply',qty);
     const packTotal = _feeComponent('editProjectSupPackFee','editProjectSupPackFeeVat','editProjectSupPackFeeApply',qty);
-    displayEl.textContent = (productTotal + printTotal + packTotal).toLocaleString() + ' 원';
+    const total = productTotal + printTotal + packTotal;
+    displayEl.textContent = total.toLocaleString() + ' 원';
+    const bd = document.getElementById('editProjectSupBreakdown');
+    if (bd) bd.innerHTML = _breakdownHtml(productTotal, printTotal, packTotal);
+    _renderMargin('editProjectMarginDisplay', _parseKRW('editProjectRevenueDisplay'), total);
 }
 
 async function updateProject(id) {
@@ -2421,7 +2437,8 @@ function openModal(type) {
                         </div>
                     </div>
                     <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid var(--gray-200)">
-                        <label class="form-label" style="color:var(--blue);font-weight:800">💰 매출액 (자동계산 — 단가 + 인쇄비 + 포장비 포함)</label>
+                        <label class="form-label" style="color:var(--blue);font-weight:800">💰 매출액 (자동계산)</label>
+                        <div id="newProjectRevenueBreakdown" style="background:#F5FBFF;border:1px solid #CFE3F5;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--text-secondary)"></div>
                         <div class="form-input" id="newProjectRevenueDisplay" style="background:#E8F4FD;color:var(--blue);font-weight:800;font-size:20px">0 원</div>
                     </div>
                 `)}
@@ -2457,8 +2474,10 @@ function openModal(type) {
                         </div>
                     </div>
                     <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid #FFE0CC">
-                        <label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">💰 매입액 (자동계산 — 매입단가 + 매입인쇄비 + 매입포장비 포함)</label>
+                        <label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">💰 매입액 (자동계산)</label>
+                        <div id="newProjectSupBreakdown" style="background:#fff;border:1px solid #FFE0CC;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--text-secondary)"></div>
                         <div class="form-input" id="newProjectSupTotalDisplay" style="background:#fff;color:var(--klp-orange,#E67E22);font-weight:800;font-size:20px">0 원</div>
+                        <div id="newProjectMarginDisplay" style="margin-top:12px"></div>
                     </div>
                 </div>
 
@@ -2595,6 +2614,32 @@ function _feeComponent(feeId, vatId, applyId, qty) {
     return total;
 }
 
+// 매출/매입 내역 한 줄
+function _breakdownHtml(productTotal, printTotal, packTotal, accent) {
+    const r = (label, val) => `<div style="display:flex;justify-content:space-between;padding:3px 0"><span>${label}</span><strong style="color:var(--text-primary)">${val.toLocaleString()}원</strong></div>`;
+    return r('제품 (단가 × 수량)', productTotal) + r('＋ 인쇄비', printTotal) + r('＋ 포장비', packTotal);
+}
+
+// 마진 카드 렌더 — 매입액이 0이면 표시 안 함
+function _renderMargin(marginId, rev, sup) {
+    const el = document.getElementById(marginId);
+    if (!el) return;
+    if (sup <= 0) { el.innerHTML = ''; return; }
+    const margin = rev - sup;
+    const pct = rev > 0 ? Math.round(margin / rev * 100) : 0;
+    const isNeg = margin < 0;
+    el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:${isNeg ? '#FDECEC' : '#E8F8F0'};border-radius:8px;border:1.5px solid ${isNeg ? 'var(--red)' : '#16A34A'}">
+        <span style="font-weight:800;color:var(--text-primary)">💵 예상 마진 <span style="font-size:11px;font-weight:600;color:var(--text-tertiary)">(매출 − 매입)</span></span>
+        <strong style="font-size:20px;color:${isNeg ? 'var(--red)' : '#16A34A'}">${margin.toLocaleString()}원 <span style="font-size:14px;font-weight:600">(${pct}%)</span></strong>
+    </div>`;
+}
+
+function _parseKRW(id) {
+    const el = document.getElementById(id);
+    if (!el) return 0;
+    return parseInt((el.textContent || '').replace(/[^\d-]/g, '')) || 0;
+}
+
 function calcProjectRevenue() {
     const displayEl = document.getElementById('newProjectRevenueDisplay');
     if (!displayEl) return;
@@ -2608,6 +2653,9 @@ function calcProjectRevenue() {
     const packTotal = _feeComponent('newProjectPackFee', 'newProjectPackFeeVat', 'newProjectPackFeeApply', qty);
     const revenue = productTotal + printTotal + packTotal;
     displayEl.textContent = revenue.toLocaleString() + ' 원';
+    const bd = document.getElementById('newProjectRevenueBreakdown');
+    if (bd) bd.innerHTML = _breakdownHtml(productTotal, printTotal, packTotal);
+    _renderMargin('newProjectMarginDisplay', revenue, _parseKRW('newProjectSupTotalDisplay'));
 }
 
 function toggleSupplierSection() {
@@ -2616,6 +2664,10 @@ function toggleSupplierSection() {
     if (!supEl || !card) return;
     const hasSupplier = (supEl.value || '').trim().length > 0;
     card.style.display = hasSupplier ? 'block' : 'none';
+    if (!hasSupplier) {
+        const m = document.getElementById('newProjectMarginDisplay');
+        if (m) m.innerHTML = '';
+    }
 }
 
 function calcSupplierTotal() {
@@ -2631,6 +2683,9 @@ function calcSupplierTotal() {
     const packTotal = _feeComponent('newProjectSupPackFee', 'newProjectSupPackFeeVat', 'newProjectSupPackFeeApply', qty);
     const total = productTotal + printTotal + packTotal;
     displayEl.textContent = total.toLocaleString() + ' 원';
+    const bd = document.getElementById('newProjectSupBreakdown');
+    if (bd) bd.innerHTML = _breakdownHtml(productTotal, printTotal, packTotal);
+    _renderMargin('newProjectMarginDisplay', _parseKRW('newProjectRevenueDisplay'), total);
 }
 
 function closeModal() {
