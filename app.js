@@ -208,6 +208,18 @@ function setupShortcuts() {
                 openModal('client');
                 return;
             }
+            const domProjTab = document.getElementById('tab-projects-domestic');
+            if (domProjTab && domProjTab.classList.contains('active')) {
+                e.preventDefault();
+                openModal('project-domestic');
+                return;
+            }
+            const ovProjTab = document.getElementById('tab-projects-overseas');
+            if (ovProjTab && ovProjTab.classList.contains('active')) {
+                e.preventDefault();
+                openModal('project-overseas');
+                return;
+            }
         }
         if (e.key === 'Escape') {
             const overlay = document.getElementById('modalOverlay');
@@ -558,6 +570,17 @@ async function toggleProjectCheck(id, key) {
             showToast('DB 저장 실패: ' + err.message);
         }
     }
+}
+
+// 입력칸 천단위 콤마 포맷 및 숫자 추출
+function fmtProjectNumberInput(el) {
+    const raw = String(el.value).replace(/[^0-9]/g, '');
+    el.value = raw ? parseInt(raw).toLocaleString() : '';
+}
+function readProjectNumber(id) {
+    const el = document.getElementById(id);
+    if (!el) return 0;
+    return parseInt(String(el.value).replace(/[^0-9]/g, '')) || 0;
 }
 
 function toggleProjectExpand(id) {
@@ -1695,8 +1718,10 @@ async function showProjectDetail(id) {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
                 <div>
                     ${row('매출처', p.client)}
+                    ${row('매출처 담당자', p.contactPerson)}
+                    ${row('매입처', p.supplier)}
+                    ${row('매입처 담당자', p.supplierContact)}
                     ${row('본사 담당자', p.manager || (p.assignees || []).join(', '))}
-                    ${row('거래처 담당자', p.contactPerson)}
                     ${row('품명', p.name)}
                     ${row('수량', `${(p.qty || 0).toLocaleString()} ${p.unit || ''}`)}
                     ${row('단가', (p.unitPrice || 0).toLocaleString() + '원')}
@@ -1835,26 +1860,22 @@ function openEditProject(id) {
         ${secCard(`
             <div class="form-section-title">📋 기본 정보</div>
             <div class="form-row">
-                <div class="form-group"><label class="form-label">매출처 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="editProjectClient" list="clientsListDoc" autocomplete="off" value="${p.client || ''}"></div>
-                <div class="form-group"><label class="form-label">거래처 담당자</label><input type="text" class="form-input" id="editProjectContact" value="${p.contactPerson || ''}"></div>
+                <div class="form-group"><label class="form-label">매출처 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="editProjectClient" list="clientsListDoc" autocomplete="off" value="${(p.client || '').replace(/"/g, '&quot;')}"></div>
+                <div class="form-group"><label class="form-label">매출처 담당자</label><input type="text" class="form-input" id="editProjectContact" value="${(p.contactPerson || '').replace(/"/g, '&quot;')}"></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label class="form-label">매입처 (작업요청서 발송 공장)</label><input type="text" class="form-input" id="editProjectSupplier" list="clientsListDoc" autocomplete="off" value="${p.supplier || ''}" placeholder="공장/제작처"></div>
+                <div class="form-group"><label class="form-label">매입처 (작업요청서 발송 공장)</label><input type="text" class="form-input" id="editProjectSupplier" list="clientsListDoc" autocomplete="off" value="${(p.supplier || '').replace(/"/g, '&quot;')}" placeholder="공장/제작처"></div>
+                <div class="form-group"><label class="form-label">매입처 담당자</label><input type="text" class="form-input" id="editProjectSupplierContact" value="${(p.supplierContact || '').replace(/"/g, '&quot;')}" placeholder="공장 담당자명"></div>
+            </div>
+            <div class="form-row">
                 <div class="form-group"><label class="form-label">본사 담당자</label>
                     <select class="form-select" id="editProjectManager">
                         ${['이현주 실장','김현호 팀장','유지은 대리'].map(m=>`<option ${p.manager===m?'selected':''}>${m}</option>`).join('')}
                     </select>
                 </div>
-            </div>
-            <div class="form-row">
                 <div class="form-group"><label class="form-label">상태</label>
                     <select class="form-select" id="editProjectStatus">
                         ${statusOpts.map(s=>`<option ${p.status===s?'selected':''}>${s}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="form-group"><label class="form-label">진행률</label>
-                    <select class="form-select" id="editProjectProgress">
-                        ${progressOpts.map(s=>`<option ${p.progress===s?'selected':''}>${s}</option>`).join('')}
                     </select>
                 </div>
             </div>
@@ -1864,7 +1885,7 @@ function openEditProject(id) {
             <div class="form-section-title">📦 제품 정보</div>
             <div class="form-group"><label class="form-label">품명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="editProjectName" value="${(p.name || '').replace(/"/g, '&quot;')}"></div>
             <div class="form-row" style="grid-template-columns:2fr 1fr">
-                <div class="form-group"><label class="form-label">수량</label><input type="number" class="form-input" id="editProjectQty" value="${p.qty || ''}" oninput="calcEditProjectRevenue()"></div>
+                <div class="form-group"><label class="form-label">수량</label><input type="text" inputmode="numeric" class="form-input" id="editProjectQty" value="${p.qty ? Number(p.qty).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcEditProjectRevenue()"></div>
                 <div class="form-group"><label class="form-label">단위</label>
                     <select class="form-select" id="editProjectUnit">
                         ${['개','세트','장','박스','EA'].map(u=>`<option ${p.unit===u?'selected':''}>${u}</option>`).join('')}
@@ -1872,7 +1893,7 @@ function openEditProject(id) {
                 </div>
             </div>
             <div class="form-row" style="grid-template-columns:2fr 1fr">
-                <div class="form-group"><label class="form-label">단가</label><input type="number" class="form-input" id="editProjectUnitPrice" value="${p.unitPrice || ''}" oninput="calcEditProjectRevenue()"></div>
+                <div class="form-group"><label class="form-label">단가</label><input type="text" inputmode="numeric" class="form-input" id="editProjectUnitPrice" value="${p.unitPrice ? Number(p.unitPrice).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcEditProjectRevenue()"></div>
                 <div class="form-group"><label class="form-label">VAT</label>
                     <select class="form-select" id="editProjectVat" onchange="calcEditProjectRevenue()">
                         <option value="exclude" ${vatCurrent==='exclude'?'selected':''}>VAT 별도</option>
@@ -1900,7 +1921,7 @@ function openEditProject(id) {
                 </div>
             </div>
             <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                <div class="form-group"><label class="form-label">인쇄비</label><input type="number" class="form-input" id="editProjectPrintFee" value="${p.printFee || p.printCost || ''}"></div>
+                <div class="form-group"><label class="form-label">인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectPrintFee" value="${(p.printFee || p.printCost) ? Number(p.printFee || p.printCost).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this)"></div>
                 <div class="form-group"><label class="form-label">VAT</label>
                     <select class="form-select" id="editProjectPrintFeeVat">
                         <option ${printFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
@@ -1922,7 +1943,7 @@ function openEditProject(id) {
                 </div>
             </div>
             <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                <div class="form-group"><label class="form-label">포장비</label><input type="number" class="form-input" id="editProjectPackFee" value="${p.packagingFee || p.packCost || ''}"></div>
+                <div class="form-group"><label class="form-label">포장비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectPackFee" value="${(p.packagingFee || p.packCost) ? Number(p.packagingFee || p.packCost).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this)"></div>
                 <div class="form-group"><label class="form-label">VAT</label>
                     <select class="form-select" id="editProjectPackFeeVat">
                         <option ${packagingFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
@@ -1968,8 +1989,8 @@ function openEditProject(id) {
 }
 
 function calcEditProjectRevenue() {
-    const price = parseInt(document.getElementById('editProjectUnitPrice').value) || 0;
-    const qty = parseInt(document.getElementById('editProjectQty').value) || 0;
+    const price = readProjectNumber('editProjectUnitPrice');
+    const qty = readProjectNumber('editProjectQty');
     const vat = document.getElementById('editProjectVat').value;
     let revenue = price * qty;
     if (vat === 'exclude') revenue = Math.round(revenue * 1.1);
@@ -1987,8 +2008,8 @@ async function updateProject(id) {
     if (!name) { showToast('품명을 입력해주세요'); return; }
     if (!client) { showToast('거래처를 입력해주세요'); return; }
 
-    const unitPrice = getInt('editProjectUnitPrice');
-    const qty = getInt('editProjectQty');
+    const unitPrice = readProjectNumber('editProjectUnitPrice');
+    const qty = readProjectNumber('editProjectQty');
     const vat = getVal('editProjectVat');
     let revenue = unitPrice * qty;
     if (vat === 'exclude') revenue = Math.round(revenue * 1.1);
@@ -2006,19 +2027,20 @@ async function updateProject(id) {
         title: '',
         manager: getVal('editProjectManager'),
         status: getVal('editProjectStatus'),
-        progress: getVal('editProjectProgress'),
+        progress: p.progress || '0%',
+        supplierContact: getVal('editProjectSupplierContact'),
         unitPrice, qty, vat, revenue,
         unit: getVal('editProjectUnit'),
         color: getVal('editProjectColor'),
         printColorSize: getVal('editProjectPrintColorSize'),
         printMethod: getVal('editProjectPrintMethod'),
-        printFee: getInt('editProjectPrintFee'),
-        printCost: getInt('editProjectPrintFee'),
+        printFee: readProjectNumber('editProjectPrintFee'),
+        printCost: readProjectNumber('editProjectPrintFee'),
         printFeeVat: getVal('editProjectPrintFeeVat'),
         printFeeApply: getVal('editProjectPrintFeeApply'),
         packaging: getVal('editProjectPackaging'),
-        packagingFee: getInt('editProjectPackFee'),
-        packCost: getInt('editProjectPackFee'),
+        packagingFee: readProjectNumber('editProjectPackFee'),
+        packCost: readProjectNumber('editProjectPackFee'),
         packagingFeeVat: getVal('editProjectPackFeeVat'),
         packagingFeeApply: getVal('editProjectPackFeeApply'),
         deadline: getVal('editProjectDeadline'),
@@ -2057,6 +2079,7 @@ async function updateProject(id) {
                 checks: p.checks,
                 memo: p.memo,
                 supplier: p.supplier,
+                supplier_contact: p.supplierContact || '',
                 print_fee_vat: p.printFeeVat,
                 print_fee_apply: p.printFeeApply,
                 packaging_fee_vat: p.packagingFeeVat,
@@ -2130,85 +2153,121 @@ function openModal(type) {
         const v = (k, d = '') => (prefill[k] != null ? prefill[k] : d);
 
         if (isDomestic) {
+            const secCard = (inner) => `<div style="background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:16px 20px;margin-bottom:16px">${inner}</div>`;
+            const mgrDefault = (typeof getLoginManager === 'function' ? getLoginManager() : null) || v('manager') || '김현호 팀장';
             body.innerHTML = `
-                <div class="form-section-title">📋 기본 정보</div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">거래처 (매출처) <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="newProjectClient" list="clientsListDoc" autocomplete="off" placeholder="거래처명" value="${v('client')}"></div>
-                    <div class="form-group"><label class="form-label">거래처 담당자</label><input type="text" class="form-input" id="newProjectContact" placeholder="담당자" value="${v('contactPerson')}"></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">매입처 (작업요청서 발송 공장)</label><input type="text" class="form-input" id="newProjectSupplier" list="clientsListDoc" autocomplete="off" placeholder="공장/제작처" value="${v('supplier')}"></div>
-                </div>
                 <datalist id="clientsListDoc">${clients.map(c => `<option value="${(c.companyName || '').replace(/"/g, '&quot;')}"></option>`).join('')}</datalist>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">본사 담당자</label>
-                        <select class="form-select" id="newProjectManager">
-                            <option ${v('manager')==='이현주 실장'?'selected':''}>이현주 실장</option>
-                            <option ${v('manager')==='김현호 팀장'||!v('manager')?'selected':''}>김현호 팀장</option>
-                            <option ${v('manager')==='유지은 대리'?'selected':''}>유지은 대리</option>
-                        </select>
-                    </div>
-                </div>
 
-                <div class="form-section-title">📦 제품 정보</div>
-                <div class="form-group"><label class="form-label">품명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="newProjectName" placeholder="품명 입력" value="${v('productName') || v('name')}"></div>
-                <div class="form-row" style="grid-template-columns:2fr 1fr">
-                    <div class="form-group"><label class="form-label">수량</label><input type="number" class="form-input" id="newProjectQty" placeholder="0" value="${v('quantity')}" oninput="calcProjectRevenue()"></div>
-                    <div class="form-group"><label class="form-label">단위</label>
-                        <select class="form-select" id="newProjectUnit">
-                            ${['개','세트','장','박스','EA'].map(u=>`<option ${v('unit')===u?'selected':''}>${u}</option>`).join('')}
-                        </select>
+                ${secCard(`
+                    <div class="form-section-title">📋 기본 정보</div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">매출처 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="newProjectClient" list="clientsListDoc" autocomplete="off" placeholder="거래처명" value="${v('client')}"></div>
+                        <div class="form-group"><label class="form-label">매출처 담당자</label><input type="text" class="form-input" id="newProjectContact" placeholder="담당자" value="${v('contactPerson')}"></div>
                     </div>
-                </div>
-                <div class="form-row" style="grid-template-columns:2fr 1fr">
-                    <div class="form-group"><label class="form-label">단가</label><input type="number" class="form-input" id="newProjectUnitPrice" placeholder="0" value="${v('unitPrice')}" oninput="calcProjectRevenue()"></div>
-                    <div class="form-group"><label class="form-label">VAT</label>
-                        <select class="form-select" id="newProjectVat" onchange="calcProjectRevenue()">
-                            <option value="exclude" ${v('unitPriceVat')==='VAT 별도'||v('vat')==='exclude'||!v('vat')?'selected':''}>VAT 별도</option>
-                            <option value="include" ${v('unitPriceVat')==='VAT 포함'||v('vat')==='include'?'selected':''}>VAT 포함</option>
-                        </select>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">매입처 (작업요청서 발송 공장)</label><input type="text" class="form-input" id="newProjectSupplier" list="clientsListDoc" autocomplete="off" placeholder="공장/제작처" value="${v('supplier')}"></div>
+                        <div class="form-group"><label class="form-label">매입처 담당자</label><input type="text" class="form-input" id="newProjectSupplierContact" placeholder="공장 담당자명" value="${v('supplierContact')}"></div>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">매출액 (자동계산)</label>
-                    <div class="form-input" id="newProjectRevenueDisplay" style="background:var(--gray-50);color:var(--gray-700);font-weight:700">0 원</div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">색상</label><input type="text" class="form-input" id="newProjectColor" value="${v('color') || '-'}"></div>
-                    <div class="form-group"><label class="form-label">인쇄 색상/사이즈</label><input type="text" class="form-input" id="newProjectPrintColorSize" value="${v('printColorSize') || '시안 확인'}"></div>
-                </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">본사 담당자</label>
+                            <select class="form-select" id="newProjectManager">
+                                ${['이현주 실장','김현호 팀장','유지은 대리'].map(m => `<option ${mgrDefault===m?'selected':''}>${m}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group"><label class="form-label">상태</label>
+                            <select class="form-select" id="newProjectStatus">
+                                <option>시작 전</option><option>진행 중</option><option>완료</option>
+                            </select>
+                        </div>
+                    </div>
+                `)}
 
-                <div class="form-section-title">🖨️ 인쇄 / 포장</div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">인쇄 방법</label>
-                        <select class="form-select" id="newProjectPrintMethod">
-                            ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u=>`<option ${v('printMethod')===u?'selected':''}>${u}</option>`).join('')}
-                        </select>
+                ${secCard(`
+                    <div class="form-section-title">📦 제품 정보</div>
+                    <div class="form-group"><label class="form-label">품명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="newProjectName" placeholder="품명 입력" value="${v('productName') || v('name')}"></div>
+                    <div class="form-row" style="grid-template-columns:2fr 1fr">
+                        <div class="form-group"><label class="form-label">수량</label><input type="text" inputmode="numeric" class="form-input" id="newProjectQty" placeholder="0" value="${v('quantity') ? Number(v('quantity')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcProjectRevenue()"></div>
+                        <div class="form-group"><label class="form-label">단위</label>
+                            <select class="form-select" id="newProjectUnit">
+                                ${['개','세트','장','박스','EA'].map(u=>`<option ${v('unit')===u?'selected':''}>${u}</option>`).join('')}
+                            </select>
+                        </div>
                     </div>
-                    <div class="form-group"><label class="form-label">인쇄비</label><input type="number" class="form-input" id="newProjectPrintFee" placeholder="0" value="${v('printFee')}"></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">포장</label>
-                        <select class="form-select" id="newProjectPackaging">
-                            ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u=>`<option ${v('packaging')===u?'selected':''}>${u}</option>`).join('')}
-                        </select>
+                    <div class="form-row" style="grid-template-columns:2fr 1fr">
+                        <div class="form-group"><label class="form-label">단가</label><input type="text" inputmode="numeric" class="form-input" id="newProjectUnitPrice" placeholder="0" value="${v('unitPrice') ? Number(v('unitPrice')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcProjectRevenue()"></div>
+                        <div class="form-group"><label class="form-label">VAT</label>
+                            <select class="form-select" id="newProjectVat" onchange="calcProjectRevenue()">
+                                <option value="exclude" ${v('unitPriceVat')==='VAT 별도'||v('vat')==='exclude'||!v('vat')?'selected':''}>VAT 별도</option>
+                                <option value="include" ${v('unitPriceVat')==='VAT 포함'||v('vat')==='include'?'selected':''}>VAT 포함</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="form-group"><label class="form-label">포장비</label><input type="number" class="form-input" id="newProjectPackFee" placeholder="0" value="${v('packagingFee')}"></div>
-                </div>
+                    <div class="form-group">
+                        <label class="form-label">매출액 (자동계산)</label>
+                        <div class="form-input" id="newProjectRevenueDisplay" style="background:var(--gray-50);color:var(--blue);font-weight:800;font-size:18px">0 원</div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">색상</label><input type="text" class="form-input" id="newProjectColor" value="${v('color') || '-'}"></div>
+                        <div class="form-group"><label class="form-label">인쇄 색상/사이즈</label><input type="text" class="form-input" id="newProjectPrintColorSize" value="${v('printColorSize') || '시안 확인'}"></div>
+                    </div>
+                `)}
 
-                <div class="form-section-title">🚚 납기 및 배송</div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">납기일</label><input type="date" class="form-input" id="newProjectDeadline" value="${v('deliveryDate') || v('deadline')}"></div>
-                    <div class="form-group"><label class="form-label">수령인</label><input type="text" class="form-input" id="newProjectRecipient" value="${v('recipient')}"></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">핸드폰</label><input type="text" class="form-input" id="newProjectPhone" placeholder="010-0000-0000" value="${v('phone')}"></div>
-                    <div class="form-group"><label class="form-label">주소</label><input type="text" class="form-input" id="newProjectAddress" value="${v('address')}"></div>
-                </div>
+                ${secCard(`
+                    <div class="form-section-title">🖨️ 인쇄 / 포장</div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">인쇄 방법</label>
+                            <select class="form-select" id="newProjectPrintMethod">
+                                ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u=>`<option ${v('printMethod')===u?'selected':''}>${u}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                        <div class="form-group"><label class="form-label">인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectPrintFee" placeholder="0" value="${v('printFee') ? Number(v('printFee')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this)"></div>
+                        <div class="form-group"><label class="form-label">VAT</label>
+                            <select class="form-select" id="newProjectPrintFeeVat"><option>VAT 별도</option><option>VAT 포함</option></select>
+                        </div>
+                        <div class="form-group"><label class="form-label">적용 방식</label>
+                            <select class="form-select" id="newProjectPrintFeeApply"><option>1개당</option><option>일괄</option></select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">포장</label>
+                            <select class="form-select" id="newProjectPackaging">
+                                ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u=>`<option ${v('packaging')===u?'selected':''}>${u}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                        <div class="form-group"><label class="form-label">포장비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectPackFee" placeholder="0" value="${v('packagingFee') ? Number(v('packagingFee')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this)"></div>
+                        <div class="form-group"><label class="form-label">VAT</label>
+                            <select class="form-select" id="newProjectPackFeeVat"><option>VAT 별도</option><option>VAT 포함</option></select>
+                        </div>
+                        <div class="form-group"><label class="form-label">적용 방식</label>
+                            <select class="form-select" id="newProjectPackFeeApply"><option>1개당</option><option>일괄</option></select>
+                        </div>
+                    </div>
+                `)}
 
-                <div class="form-group"><label class="form-label">메모</label><input type="text" class="form-input" id="newProjectMemo" placeholder="특이사항" value="${v('memo')}"></div>
+                ${secCard(`
+                    <div class="form-section-title">🚚 납기 및 배송</div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">납기일</label><input type="date" class="form-input" id="newProjectDeadline" value="${v('deliveryDate') || v('deadline')}"></div>
+                        <div class="form-group"><label class="form-label">수령인</label><input type="text" class="form-input" id="newProjectRecipient" value="${v('recipient')}"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">핸드폰</label><input type="text" class="form-input" id="newProjectPhone" placeholder="010-0000-0000" value="${v('phone')}"></div>
+                        <div class="form-group"><label class="form-label">주소</label><input type="text" class="form-input" id="newProjectAddress" value="${v('address')}"></div>
+                    </div>
+                `)}
+
+                ${secCard(`
+                    <div class="form-section-title">📝 메모</div>
+                    <div class="form-group"><input type="text" class="form-input" id="newProjectMemo" placeholder="특이사항" value="${v('memo')}"></div>
+                `)}
+
                 <button class="form-submit" onclick="addProject('${addType}')">프로젝트 추가</button>`;
             setTimeout(calcProjectRevenue, 0);
+            document.getElementById('modalOverlay').classList.add('modal-wide');
         } else {
             // 해외: 기존 간단 폼 유지
             body.innerHTML = `
@@ -2310,13 +2369,11 @@ function openModal(type) {
 }
 
 function calcProjectRevenue() {
-    const priceEl = document.getElementById('newProjectUnitPrice');
-    const qtyEl = document.getElementById('newProjectQty');
-    const vatEl = document.getElementById('newProjectVat');
     const displayEl = document.getElementById('newProjectRevenueDisplay');
-    if (!priceEl || !qtyEl || !displayEl) return;
-    const price = parseInt(priceEl.value) || 0;
-    const qty = parseInt(qtyEl.value) || 0;
+    if (!displayEl) return;
+    const price = readProjectNumber('newProjectUnitPrice');
+    const qty = readProjectNumber('newProjectQty');
+    const vatEl = document.getElementById('newProjectVat');
     const vat = vatEl ? vatEl.value : 'exclude';
     let revenue = price * qty;
     if (vat === 'exclude') revenue = Math.round(revenue * 1.1);
@@ -2336,22 +2393,24 @@ async function addProject(type) {
     if (!name) { showToast('품명을 입력해주세요'); return; }
     if (!client) { showToast('거래처를 입력해주세요'); return; }
 
-    const unitPrice = parseInt(document.getElementById('newProjectUnitPrice').value) || 0;
-    const qty = parseInt(document.getElementById('newProjectQty').value) || 0;
+    const unitPrice = readProjectNumber('newProjectUnitPrice');
+    const qty = readProjectNumber('newProjectQty');
     const vat = document.getElementById('newProjectVat').value;
     let revenue = unitPrice * qty;
     if (vat === 'exclude') revenue = Math.round(revenue * 1.1);
 
     const assignee = currentUser ? currentUser.name : '';
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
-    const getInt = (id) => parseInt(getVal(id)) || 0;
+    const getInt = (id) => readProjectNumber(id);
 
     const newProject = {
         id: Date.now(), name, client,
         contactPerson: getVal('newProjectContact'),
         title: '',
         manager: getVal('newProjectManager'),
-        supplier: getVal('newProjectSupplier'), status: "시작 전",
+        supplier: getVal('newProjectSupplier'),
+        supplierContact: getVal('newProjectSupplierContact'),
+        status: getVal('newProjectStatus') || "시작 전",
         priority: "🟢 보통", category: type === 'overseas' ? '해외 주문' : '국내 주문',
         assignees: [assignee],
         progress: "0%",
@@ -2361,12 +2420,12 @@ async function addProject(type) {
         printColorSize: getVal('newProjectPrintColorSize'),
         printMethod: getVal('newProjectPrintMethod'),
         printFee: getInt('newProjectPrintFee'),
-        printFeeVat: 'VAT 별도',
-        printFeeApply: '1개당',
+        printFeeVat: getVal('newProjectPrintFeeVat') || 'VAT 별도',
+        printFeeApply: getVal('newProjectPrintFeeApply') || '1개당',
         packaging: getVal('newProjectPackaging'),
         packagingFee: getInt('newProjectPackFee'),
-        packagingFeeVat: 'VAT 별도',
-        packagingFeeApply: '1개당',
+        packagingFeeVat: getVal('newProjectPackFeeVat') || 'VAT 별도',
+        packagingFeeApply: getVal('newProjectPackFeeApply') || '1개당',
         printCost: getInt('newProjectPrintFee'),
         packCost: getInt('newProjectPackFee'),
         shipCost: getInt('newProjectShipCost'),
@@ -2411,6 +2470,7 @@ async function addProject(type) {
                 checks: newProject.checks,
                 memo: newProject.memo,
                 supplier: newProject.supplier,
+                supplier_contact: newProject.supplierContact || '',
                 print_fee_vat: newProject.printFeeVat || 'VAT 별도',
                 print_fee_apply: newProject.printFeeApply || '1개당',
                 packaging_fee_vat: newProject.packagingFeeVat || 'VAT 별도',
@@ -2448,6 +2508,7 @@ async function loadDomesticProjectsFromDb() {
                 title: r.title || '',
                 manager: r.manager || '',
                 supplier: r.supplier || '',
+                supplierContact: r.supplier_contact || '',
                 parentProjectId: r.parent_project_id || null,
                 status: r.status || '시작 전',
                 priority: r.priority || '🟢 보통',
