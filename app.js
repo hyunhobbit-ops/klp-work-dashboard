@@ -2454,7 +2454,13 @@ function renderClients() {
 
     const esc = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 
+    const catBadge = (cat) => {
+        if (cat === '매입처') return `<span class="badge badge-purple">매입처</span>`;
+        if (cat === '매출처') return `<span class="badge badge-blue">매출처</span>`;
+        return '-';
+    };
     tbody.innerHTML = pageItems.map(c => `<tr>
+        <td>${catBadge(c.category)}</td>
         <td><strong>${esc(c.companyName)}</strong></td>
         <td>${esc(c.ceo) || '-'}</td>
         <td>${esc(c.phone) || '-'}</td>
@@ -2464,7 +2470,7 @@ function renderClients() {
         <td>${esc(c.staffName) || '-'}</td>
         <td>${esc(c.grade) || '-'}</td>
         <td><button class="edit-btn" onclick="openEditClient(${c.id})">편집</button></td>
-    </tr>`).join('') || `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
 
     // 페이지네이션
     const pag = document.getElementById('clientPagination');
@@ -2507,7 +2513,13 @@ function openClientModal(existing) {
         </div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">사업자등록번호</label><input type="text" class="form-input" id="cliBusinessNo" value="${v('businessNo')}"></div>
-            <div class="form-group"><label class="form-label">구분</label><input type="text" class="form-input" id="cliCategory" value="${v('category')}"></div>
+            <div class="form-group"><label class="form-label">구분</label>
+                <select class="form-select" id="cliCategory">
+                    <option value="" ${!c.category ? 'selected' : ''}>선택 안함</option>
+                    <option value="매입처" ${c.category === '매입처' ? 'selected' : ''}>매입처</option>
+                    <option value="매출처" ${c.category === '매출처' ? 'selected' : ''}>매출처</option>
+                </select>
+            </div>
         </div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">전화</label><input type="text" class="form-input" id="cliPhone" value="${v('phone')}"></div>
