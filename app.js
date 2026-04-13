@@ -465,8 +465,9 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
         const revenueStr = (p.revenue || 0).toLocaleString() + '원';
 
-        tableHtml += `<tr onclick="showProjectDetail(${p.id})">
+        tableHtml += `<tr onclick="showProjectDetail(${p.id})" style="cursor:pointer">
             <td><strong>${p.client || '-'}</strong></td>
+            <td>${p.supplier || '-'}</td>
             <td>${p.name}</td>
             <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
             <td>${p.assignees.join(', ')}</td>
@@ -474,6 +475,7 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
             <td>${p.deadline ? fmtDisplay(p.deadline) : '-'}</td>
             <td><div class="progress-cell"><div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div><span class="progress-pct">${p.progress}</span></div></td>
             <td><div class="checks-row">${checkDots}</div></td>
+            <td><button class="edit-btn" onclick="event.stopPropagation();openEditProject(${p.id})">편집</button></td>
         </tr>`;
 
         cardHtml += `<div class="resp-card" onclick="showProjectDetail(${p.id})">
@@ -482,6 +484,7 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
                 <span class="badge ${statusBadgeClass(p.status)}">${p.status}</span>
             </div>
             <div class="resp-card-meta">
+                ${p.supplier ? `<div class="resp-card-row">매입처: ${p.supplier}</div>` : ''}
                 <div class="resp-card-row"><strong>${p.assignees.join(', ')}</strong> · 매출 ${revenueStr}</div>
                 <div class="resp-card-row">마감 ${p.deadline ? fmtDisplay(p.deadline) : '-'}</div>
                 <div class="resp-card-row" style="margin-top:4px"><div class="progress-cell" style="flex:1"><div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div><span class="progress-pct">${p.progress}</span></div></div>
@@ -1554,8 +1557,127 @@ async function updateDeliveryRating(id, value) {
 // =====================================
 // DETAIL PANELS
 // =====================================
-function showProjectDetail(id) {
-    openEditProject(id);
+async function showProjectDetail(id) {
+    const p = projects.find(x => x.id === id);
+    if (!p) return;
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    title.textContent = `${p.client || ''} — ${p.name}`;
+
+    const escFn = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    const checkLabels = {
+        design: '디확 컨펌', workOrder: '작지 발송', advancePayment: '선금 입금',
+        finalPayment: '잔금 입금', invoice: '계산서 발행', supplierPayment: '공급처 송금', delivered: '납품 완료'
+    };
+    const checks = p.checks || {};
+    const checksHtml = Object.entries(checkLabels).map(([k, l]) => {
+        const done = !!checks[k];
+        return `<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:${done ? '#E8F4FD' : 'var(--gray-50)'};border-radius:6px;font-size:13px"><span style="color:${done ? 'var(--blue)' : 'var(--gray-400)'};font-weight:700">${done ? '✓' : '○'}</span>${l}</div>`;
+    }).join('');
+
+    const row = (label, val) => `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--gray-100)"><div style="width:110px;color:var(--text-tertiary);font-size:13px">${label}</div><div style="flex:1;font-size:14px">${escFn(val) || '-'}</div></div>`;
+
+    // 이미지 영역 placeholder (비동기 로드 후 채움)
+    const imagesPlaceholder = p.sourceDocNumber
+        ? `<div id="dcImagesArea" style="margin-top:8px"><div style="color:var(--text-tertiary);font-size:13px">디자인확인서 이미지 로딩 중...</div></div>`
+        : `<div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">연결된 디자인확인서가 없습니다 (문서생성기에서 작성 후 내보내기로 생성된 프로젝트만 이미지 표시)</div>`;
+
+    body.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+            <span class="badge ${statusBadgeClass(p.status)}">${p.status}</span>
+            <span class="badge ${categoryBadgeClass(p.category)}">${p.category}</span>
+            <h3 style="margin:0;font-size:20px">${escFn(p.client)} — ${escFn(p.name)}</h3>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+            <div>
+                <div class="form-section-title">📋 기본 정보</div>
+                <div style="background:var(--gray-50);border-radius:8px;padding:8px 14px;margin-bottom:12px">
+                    ${row('거래처(매출처)', p.client)}
+                    ${row('매입처(공장)', p.supplier)}
+                    ${row('거래처 담당자', p.contactPerson)}
+                    ${row('본사 담당자', p.manager || (p.assignees || []).join(', '))}
+                    ${row('제목', p.title)}
+                    ${row('진행률', p.progress)}
+                    ${row('우선순위', p.priority)}
+                </div>
+                <div class="form-section-title">📦 제품 정보</div>
+                <div style="background:var(--gray-50);border-radius:8px;padding:8px 14px;margin-bottom:12px">
+                    ${row('품명', p.name)}
+                    ${row('수량', `${(p.qty || 0).toLocaleString()} ${p.unit || ''}`)}
+                    ${row('단가', (p.unitPrice || 0).toLocaleString() + '원')}
+                    ${row('VAT', p.vat === 'include' ? 'VAT 포함' : 'VAT 별도')}
+                    ${row('매출액', (p.revenue || 0).toLocaleString() + '원')}
+                    ${row('색상', p.color)}
+                    ${row('인쇄 색상/사이즈', p.printColorSize)}
+                </div>
+                <div class="form-section-title">🖨️ 인쇄 / 포장</div>
+                <div style="background:var(--gray-50);border-radius:8px;padding:8px 14px;margin-bottom:12px">
+                    ${row('인쇄 방법', p.printMethod)}
+                    ${row('인쇄비', (p.printFee || 0).toLocaleString() + '원')}
+                    ${row('포장', p.packaging)}
+                    ${row('포장비', (p.packagingFee || 0).toLocaleString() + '원')}
+                </div>
+            </div>
+            <div>
+                <div class="form-section-title">🚚 납기 및 배송</div>
+                <div style="background:var(--gray-50);border-radius:8px;padding:8px 14px;margin-bottom:12px">
+                    ${row('시작일', p.startDate)}
+                    ${row('납기일', p.deadline)}
+                    ${row('수령인', p.recipient)}
+                    ${row('연락처', p.phone)}
+                    ${row('주소', p.address)}
+                </div>
+                <div class="form-section-title">✅ 체크리스트</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">${checksHtml}</div>
+                ${p.memo ? `<div class="form-section-title">📝 메모</div><div style="background:var(--gray-50);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:14px;white-space:pre-wrap">${escFn(p.memo)}</div>` : ''}
+                <div class="form-section-title">🖼️ 디자인확인서 이미지</div>
+                ${imagesPlaceholder}
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px">
+            <button class="form-submit" style="flex:1" onclick="openEditProject(${id})">✏️ 편집</button>
+            <button class="form-submit" style="flex:1;background:var(--gray-200);color:var(--gray-800)" onclick="closeModal()">닫기</button>
+        </div>`;
+    const overlay = document.getElementById('modalOverlay');
+    overlay.classList.add('show');
+    overlay.classList.add('modal-wide');
+
+    // DC 이미지 비동기 로드
+    if (p.sourceDocNumber) {
+        try {
+            const { data, error } = await sb.from('confirmations')
+                .select('images_data')
+                .eq('doc_number', p.sourceDocNumber)
+                .limit(1);
+            const area = document.getElementById('dcImagesArea');
+            if (!area) return;
+            if (error || !data || data.length === 0 || !data[0].images_data) {
+                area.innerHTML = `<div style="color:var(--text-tertiary);font-size:13px">디자인확인서 이미지를 찾을 수 없습니다 (문서번호: ${escFn(p.sourceDocNumber)})</div>`;
+                return;
+            }
+            let imgs;
+            try { imgs = JSON.parse(data[0].images_data); } catch(e) { imgs = null; }
+            if (!imgs || (!imgs.main && (!imgs.subs || imgs.subs.length === 0))) {
+                area.innerHTML = `<div style="color:var(--text-tertiary);font-size:13px">디자인확인서에 첨부된 이미지가 없습니다</div>`;
+                return;
+            }
+            let html = '';
+            if (imgs.main) {
+                html += `<div style="margin-bottom:8px"><img src="${imgs.main}" style="max-width:100%;border-radius:8px;border:1px solid var(--gray-200);cursor:pointer" onclick="window.open('${imgs.main}','_blank')"></div>`;
+            }
+            if (imgs.subs && imgs.subs.length > 0) {
+                html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">`;
+                imgs.subs.forEach(s => {
+                    html += `<img src="${s}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--gray-200);cursor:pointer" onclick="window.open('${s}','_blank')">`;
+                });
+                html += `</div>`;
+            }
+            area.innerHTML = html;
+        } catch (err) {
+            const area = document.getElementById('dcImagesArea');
+            if (area) area.innerHTML = `<div style="color:var(--red);font-size:13px">이미지 로드 실패: ${err.message}</div>`;
+        }
+    }
 }
 
 function openEditProject(id) {
@@ -1591,9 +1713,13 @@ function openEditProject(id) {
     body.innerHTML = `
         <div class="form-section-title">📋 기본 정보</div>
         <div class="form-row">
-            <div class="form-group"><label class="form-label">거래처 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="editProjectClient" value="${p.client || ''}"></div>
+            <div class="form-group"><label class="form-label">거래처 (매출처) <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="editProjectClient" list="clientsListDoc" autocomplete="off" value="${p.client || ''}"></div>
             <div class="form-group"><label class="form-label">거래처 담당자</label><input type="text" class="form-input" id="editProjectContact" value="${p.contactPerson || ''}"></div>
         </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">매입처 (작업요청서 발송 공장)</label><input type="text" class="form-input" id="editProjectSupplier" list="clientsListDoc" autocomplete="off" value="${p.supplier || ''}" placeholder="공장/제작처"></div>
+        </div>
+        <datalist id="clientsListDoc">${clients.map(c => `<option value="${(c.companyName || '').replace(/"/g, '&quot;')}"></option>`).join('')}</datalist>
         <div class="form-row">
             <div class="form-group"><label class="form-label">제목</label><input type="text" class="form-input" id="editProjectTitle" value="${p.title || ''}"></div>
             <div class="form-group"><label class="form-label">본사 담당자</label>
@@ -1719,6 +1845,7 @@ async function updateProject(id) {
 
     Object.assign(p, {
         name, client,
+        supplier: getVal('editProjectSupplier'),
         contactPerson: getVal('editProjectContact'),
         title: getVal('editProjectTitle'),
         manager: getVal('editProjectManager'),
@@ -1768,7 +1895,8 @@ async function updateProject(id) {
                 status: p.status,
                 progress: p.progress,
                 checks: p.checks,
-                memo: p.memo
+                memo: p.memo,
+                supplier: p.supplier
             }).eq('id', id);
             if (error) throw error;
         } catch (err) {
@@ -1841,9 +1969,13 @@ function openModal(type) {
             body.innerHTML = `
                 <div class="form-section-title">📋 기본 정보</div>
                 <div class="form-row">
-                    <div class="form-group"><label class="form-label">거래처 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="newProjectClient" placeholder="거래처명" value="${v('client')}"></div>
+                    <div class="form-group"><label class="form-label">거래처 (매출처) <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="newProjectClient" list="clientsListDoc" autocomplete="off" placeholder="거래처명" value="${v('client')}"></div>
                     <div class="form-group"><label class="form-label">거래처 담당자</label><input type="text" class="form-input" id="newProjectContact" placeholder="담당자" value="${v('contactPerson')}"></div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">매입처 (작업요청서 발송 공장)</label><input type="text" class="form-input" id="newProjectSupplier" list="clientsListDoc" autocomplete="off" placeholder="공장/제작처" value="${v('supplier')}"></div>
+                </div>
+                <datalist id="clientsListDoc">${clients.map(c => `<option value="${(c.companyName || '').replace(/"/g, '&quot;')}"></option>`).join('')}</datalist>
                 <div class="form-row">
                     <div class="form-group"><label class="form-label">제목</label><input type="text" class="form-input" id="newProjectTitle" placeholder="예: 상패 시안" value="${v('title')}"></div>
                     <div class="form-group"><label class="form-label">본사 담당자</label>
@@ -2056,7 +2188,7 @@ async function addProject(type) {
         contactPerson: getVal('newProjectContact'),
         title: getVal('newProjectTitle'),
         manager: getVal('newProjectManager'),
-        supplier: "", status: "시작 전",
+        supplier: getVal('newProjectSupplier'), status: "시작 전",
         priority: "🟢 보통", category: type === 'overseas' ? '해외 주문' : '국내 주문',
         assignees: [assignee],
         progress: "0%",
@@ -2110,7 +2242,8 @@ async function addProject(type) {
                 progress: newProject.progress,
                 start_date: newProject.startDate || null,
                 checks: newProject.checks,
-                memo: newProject.memo
+                memo: newProject.memo,
+                supplier: newProject.supplier
             }).select().single();
             if (error) throw error;
             if (data) newProject.id = data.id;
@@ -2143,7 +2276,7 @@ async function loadDomesticProjectsFromDb() {
                 contactPerson: r.contact_person || '',
                 title: r.title || '',
                 manager: r.manager || '',
-                supplier: '',
+                supplier: r.supplier || '',
                 status: r.status || '시작 전',
                 priority: r.priority || '🟢 보통',
                 category: r.category || '국내 주문',
