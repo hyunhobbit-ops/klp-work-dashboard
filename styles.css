@@ -1006,6 +1006,23 @@ body {
 .badge-yellow { background: var(--yellow-light); color: var(--yellow); }
 .badge-purple { background: var(--purple-light); color: var(--purple); }
 
+/* Inline status select (badge 형태) */
+.status-select {
+    border: none;
+    padding: 4px 22px 4px 10px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    background-size: 10px;
+}
+.status-select:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+
 /* Checks */
 .checks-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-start; }
 .check-item { display: flex; flex-direction: column; align-items: center; gap: 3px; }

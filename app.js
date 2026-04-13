@@ -485,8 +485,10 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
             : '<span style="color:var(--text-tertiary)">-</span>';
 
         const ownerStr = p.manager || (p.assignees && p.assignees.length ? p.assignees.join(', ') : '-');
+        const statusCls = statusBadgeClass(p.status);
+        const statusOptsHtml = ['시작 전', '진행 중', '완료'].map(s => `<option value="${s}"${s === p.status ? ' selected' : ''}>${s}</option>`).join('');
         tableHtml += `<tr onclick="projectRowClick(${p.id})" ondblclick="projectRowDblClick(${p.id})" style="cursor:pointer">
-            <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
+            <td><select class="status-select badge ${statusCls}" onclick="event.stopPropagation()" onchange="updateProjectStatus(${p.id}, this.value)">${statusOptsHtml}</select></td>
             <td><strong>${p.client || '-'}</strong></td>
             <td>${supplierDisplay}</td>
             <td>${p.name}</td>
@@ -524,6 +526,23 @@ function projectRowClick(id) {
 }
 function projectRowDblClick(id) {
     openEditProject(id);
+}
+
+async function updateProjectStatus(id, newStatus) {
+    const p = projects.find(x => x.id === id);
+    if (!p) return;
+    p.status = newStatus;
+    renderProjects();
+    if (p.category !== '해외 주문') {
+        try {
+            const { error } = await sb.from('projects_domestic').update({ status: newStatus }).eq('id', id);
+            if (error) throw error;
+            showToast('상태가 변경되었습니다');
+        } catch (err) {
+            console.error('상태 저장 실패', err);
+            showToast('DB 저장 실패: ' + err.message);
+        }
+    }
 }
 
 async function toggleProjectCheck(id, key) {
