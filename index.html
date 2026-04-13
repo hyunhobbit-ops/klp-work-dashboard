@@ -488,24 +488,27 @@
 
             <!-- ===== 고객사 리스트 ===== -->
             <main class="content" id="tab-clients">
-                <div class="page-section">
-                    <div class="toolbar">
-                        <div class="toolbar-search">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-                            <input type="text" class="search-input" id="clientSearch" placeholder="회사명, 대표자, 전화, 담당직원, 주소 검색">
-                        </div>
-                        <div class="toolbar-buttons">
-                            <input type="file" id="clientImportFile" accept=".xlsx,.xls" style="display:none" onchange="importClientsFromExcel(event)">
-                            <button class="btn-export" onclick="document.getElementById('clientImportFile').click()">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 19V5m0 0l-6 6m6-6l6 6M4 20h16"/></svg>
-                                엑셀 가져오기
-                            </button>
-                            <button class="btn-primary" onclick="openModal('client')">
-                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
-                                새 고객사
-                            </button>
+                <div class="content-toolbar">
+                    <div class="toolbar-left">
+                        <div class="search-bar">
+                            <svg width="16" height="16" fill="none" stroke="#999" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                            <input type="text" id="clientSearch" placeholder="회사명, 대표자, 전화, 담당직원, 주소 검색">
                         </div>
                     </div>
+                    <div class="toolbar-buttons">
+                        <input type="file" id="clientImportFile" accept=".xlsx,.xls" style="display:none" onchange="importClientsFromExcel(event)">
+                        <button class="btn-export" onclick="document.getElementById('clientImportFile').click()">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 19V5m0 0l-6 6m6-6l6 6M4 20h16"/></svg>
+                            엑셀 가져오기
+                        </button>
+                        <button class="btn-primary" onclick="openModal('client')" title="F2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                            새 고객사 (F2)
+                        </button>
+                    </div>
+                </div>
+                <div class="page-section">
+                    <div></div>
                     <div class="client-stats" id="clientStats" style="padding:8px 16px;color:var(--text-secondary);font-size:14px"></div>
                     <div class="table-wrap">
                         <table class="data-table" id="clientTable">

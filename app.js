@@ -199,6 +199,13 @@ function setupShortcuts() {
             if (deliveryTab && deliveryTab.classList.contains('active')) {
                 e.preventDefault();
                 openModal('delivery');
+                return;
+            }
+            const clientTab = document.getElementById('tab-clients');
+            if (clientTab && clientTab.classList.contains('active')) {
+                e.preventDefault();
+                openModal('client');
+                return;
             }
         }
     });
@@ -2459,19 +2466,25 @@ function renderClients() {
         if (cat === '매출처') return `<span class="badge badge-blue">매출처</span>`;
         return '-';
     };
-    tbody.innerHTML = pageItems.map(c => `<tr onclick="openEditClient(${c.id})" style="cursor:pointer">
-        <td>${catBadge(c.category)}</td>
-        <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><strong>${esc(c.companyName)}</strong></td>
-        <td>${esc(c.ceo) || '-'}</td>
-        <td>${esc(c.phone) || '-'}</td>
-        <td>${esc(c.mobile) || '-'}</td>
-        <td>${esc(c.email) || '-'}</td>
-        <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.address) || '-'}</td>
-        <td>${esc(c.bizType) || '-'}</td>
-        <td>${esc(c.bizItem) || '-'}</td>
-        <td>${esc(c.staffName) || '-'}</td>
-        <td>${esc(c.grade) || '-'}</td>
-    </tr>`).join('') || `<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
+    tbody.innerHTML = pageItems.map(c => {
+        const ed = (field, type, val, opts) => {
+            const opt = opts ? ` data-options="${opts}"` : '';
+            return `<td class="cell-editable" data-entity="client" data-id="${c.id}" data-field="${field}" data-type="${type}"${opt}>${val}</td>`;
+        };
+        return `<tr onclick="clientRowClick(${c.id})" style="cursor:pointer">
+        ${ed('category', 'select', catBadge(c.category), '매입처,매출처,')}
+        ${ed('companyName', 'text', `<strong>${esc(c.companyName)}</strong>`)}
+        ${ed('ceo', 'text', esc(c.ceo) || '-')}
+        ${ed('phone', 'text', esc(c.phone) || '-')}
+        ${ed('mobile', 'text', esc(c.mobile) || '-')}
+        ${ed('email', 'text', esc(c.email) || '-')}
+        <td class="cell-editable" data-entity="client" data-id="${c.id}" data-field="address" data-type="text" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.address) || '-'}</td>
+        ${ed('bizType', 'text', esc(c.bizType) || '-')}
+        ${ed('bizItem', 'text', esc(c.bizItem) || '-')}
+        ${ed('staffName', 'text', esc(c.staffName) || '-')}
+        ${ed('grade', 'text', esc(c.grade) || '-')}
+    </tr>`;
+    }).join('') || `<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
 
     // 페이지네이션
     const pag = document.getElementById('clientPagination');
@@ -2591,6 +2604,15 @@ function openEditClient(id) {
     const c = clients.find(x => x.id === id);
     if (!c) return;
     openClientModal(c);
+}
+
+let _clientRowClickTimer = null;
+function clientRowClick(id) {
+    if (_clientRowClickTimer) clearTimeout(_clientRowClickTimer);
+    _clientRowClickTimer = setTimeout(() => {
+        _clientRowClickTimer = null;
+        openEditClient(id);
+    }, 250);
 }
 
 async function saveEditClient(id) {
@@ -2900,13 +2922,27 @@ document.addEventListener('dblclick', (e) => {
     const cell = e.target.closest('.cell-editable');
     if (!cell || cell.querySelector('.cell-edit-input, .cell-edit-select')) return;
 
+    // 행 클릭(모달) 타이머 취소
+    if (_clientRowClickTimer) { clearTimeout(_clientRowClickTimer); _clientRowClickTimer = null; }
+
     const id = Number(cell.dataset.id);
     const field = cell.dataset.field;
     const type = cell.dataset.type || 'text';
-    const d = deliveries.find(x => x.id === id);
-    if (!d) return;
+    const entity = cell.dataset.entity || 'delivery';
 
-    const currentVal = d[field] ?? '';
+    let row, dbUpdate, rerender;
+    if (entity === 'client') {
+        row = clients.find(x => x.id === id);
+        dbUpdate = (patch) => dbUpdateClient(id, patch);
+        rerender = renderClients;
+    } else {
+        row = deliveries.find(x => x.id === id);
+        dbUpdate = (patch) => dbUpdateDelivery(id, patch);
+        rerender = renderDeliveries;
+    }
+    if (!row) return;
+
+    const currentVal = row[field] ?? '';
     const originalHtml = cell.innerHTML;
 
     if (type === 'select') {
@@ -2916,18 +2952,19 @@ document.addEventListener('dblclick', (e) => {
         options.forEach(opt => {
             const o = document.createElement('option');
             o.value = opt;
-            o.textContent = opt;
+            o.textContent = opt || '-';
             if (opt === currentVal) o.selected = true;
             select.appendChild(o);
         });
         cell.innerHTML = '';
         cell.appendChild(select);
         select.focus();
+        select.addEventListener('click', ev => ev.stopPropagation());
 
         const save = async () => {
-            d[field] = select.value;
-            await dbUpdateDelivery(id, { [field]: select.value });
-            renderDeliveries();
+            row[field] = select.value;
+            await dbUpdate({ [field]: select.value });
+            rerender();
             showToast('수정되었습니다');
         };
         select.addEventListener('change', save);
@@ -2940,13 +2977,14 @@ document.addEventListener('dblclick', (e) => {
         cell.innerHTML = '';
         cell.appendChild(input);
         input.focus();
+        input.addEventListener('click', ev => ev.stopPropagation());
 
         const save = async () => {
             if (input.value) {
-                d[field] = input.value;
-                await dbUpdateDelivery(id, { [field]: input.value });
+                row[field] = input.value;
+                await dbUpdate({ [field]: input.value });
             }
-            renderDeliveries();
+            rerender();
             showToast('수정되었습니다');
         };
         input.addEventListener('change', save);
@@ -2960,15 +2998,16 @@ document.addEventListener('dblclick', (e) => {
         cell.appendChild(input);
         input.focus();
         input.select();
+        input.addEventListener('click', ev => ev.stopPropagation());
 
         const save = async () => {
             if (type === 'number') {
-                d[field] = parseInt(input.value) || 0;
+                row[field] = parseInt(input.value) || 0;
             } else {
-                d[field] = input.value.trim();
+                row[field] = input.value.trim();
             }
-            await dbUpdateDelivery(id, { [field]: d[field] });
-            renderDeliveries();
+            await dbUpdate({ [field]: row[field] });
+            rerender();
             showToast('수정되었습니다');
         };
         input.addEventListener('blur', save);
