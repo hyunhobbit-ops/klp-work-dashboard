@@ -11,6 +11,7 @@
 - `app.js` — 모든 로직 (인증, 렌더링, CRUD)
 - `index.html` — 전체 HTML 구조
 - `styles.css` — Toss 스타일 디자인 시스템
+- `doc-generator.html` — 디자인확인서(DC)/작업요청서(WR) 생성기 (독립 페이지)
 - 단일 파일 구조 유지, 파일 분리하지 않음
 
 ## 배포 규칙
@@ -50,8 +51,28 @@
 ## Supabase 연동
 - URL: `vtulmuxkriklpiibiues.supabase.co`
 - `profiles` 테이블: id, name, password, role
+- `projects_domestic` 테이블: 국내 프로젝트. **매출 + 매입 통합 단일 행 모델** (부모/자식 구조 아님)
+  - 매출: `unit_price`, `unit_price_vat`, `print_fee`, `packaging_fee`, `revenue` 등
+  - 매입: `supplier`, `supplier_contact`, `supplier_unit_price`, `supplier_print_fee`, `supplier_packaging_fee`, `supplier_revenue` 등 `supplier_*` 9개 컬럼
+  - `parent_project_id`는 레거시이며 더 이상 사용하지 않음
+  - `source_doc_number`: 연결된 디자인확인서 `doc_number` (DC 저장 시 자동 업데이트)
+- `confirmations` 테이블: DC/WR 문서 저장 (`doc-generator.html` 전용)
 - RLS 정책: 전체 조회 허용
 - 로그인 시 localStorage에 사용자 정보 저장 (`klp_user`)
+
+## 프로젝트 진행사항 (국내)
+- **매출/매입 통합 단일 행**: 매출처 정보 + 매입처 상세(작업요청서용)를 한 프로젝트 행에 함께 저장
+- 신규/편집 모달에서 매입처명 입력 시 주황색 🏭 매입처 상세 카드가 펼쳐짐 (매입 단가·VAT·인쇄비·포장비)
+- 매출액/매입액은 `단가 × 수량 + 인쇄비 환산 + 포장비 환산` 합산 (VAT, 1개당/일괄 적용)
+- 마진 = `revenue - supplier_revenue`
+
+## 문서 생성기 (DC/WR) 연동
+- **생성 흐름**: 프로젝트 진행사항 → 상세/편집 모달의 `📄 디자인확인서 만들기` / `📋 작업요청서 만들기` 버튼 → `doc-generator.html`로 이동하여 pre-fill
+  - 프로젝트 데이터는 `localStorage.klp_doc_prefill`로 전달 (doc-generator가 로드 시 읽고 즉시 삭제)
+  - DC는 매출 필드로, WR은 매입(`supplier_*`) 필드로 pre-fill
+- **DB 분리**: doc-generator는 `confirmations` 테이블에만 쓰고, `projects_domestic`에는 쓰지 않음
+- **자동 연결**: DC 저장 성공 시 `projects_domestic.source_doc_number`를 새 문서번호로 PATCH (프로젝트 상세에서 DC 이미지 미리보기 연동)
+- **WR 전제 조건**: WR 만들기는 프로젝트에 `source_doc_number`(연결된 DC) + `supplier_unit_price`(매입 단가)가 있어야 동작
 
 ## 코드 스타일
 - 에러 발생 시 디버깅용 상세 메시지 유지 (console.error + 화면 표시)
