@@ -1301,6 +1301,33 @@ loadClientsDatalist();
   }catch(e){console.error('prefill 적용 실패',e);}
 })();
 
+/* === URL 해시 기반 자동 다운로드 (#dl-jpg-DOCNUM 또는 #dl-pdf-DOCNUM) === */
+(async function applyDownloadHash(){
+  var hash=(location.hash||'').replace(/^#/,'');
+  if(!hash.startsWith('dl-'))return;
+  var parts=hash.split('-');
+  if(parts.length<3)return;
+  var fmt=parts[1]; /* jpg 또는 pdf */
+  var docNum=parts.slice(2).join('-');
+  history.replaceState(null,'',location.pathname);
+  try{
+    var res=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(docNum),'GET');
+    if(!res||res.length===0){showMsg('❌ 문서를 찾을 수 없습니다: '+docNum,true);return;}
+    var r=res[0];
+    await loadRecord(r.id);
+    await new Promise(function(resolve){setTimeout(resolve,400);});
+    if(r.status==='작업요청서'){
+      showWrTab('preview');
+      await new Promise(function(resolve){setTimeout(resolve,600);});
+      await dlWr(fmt);
+    }else{
+      showDcTab('preview');
+      await new Promise(function(resolve){setTimeout(resolve,600);});
+      await dl(fmt);
+    }
+  }catch(e){console.error('auto-dl failed',e);showMsg('❌ 다운로드 실패: '+e.message,true);}
+})();
+
 /* === 로그인 사용자 기반 본사 담당자 자동 선택 === */
 function getLoginManager(){
   try{

@@ -1704,11 +1704,7 @@ async function showProjectDetail(id) {
         </div>`;
     }).join('');
 
-    const imagesPlaceholder = p.sourceDocNumber
-        ? `<div id="dcImagesArea"><div style="color:var(--text-tertiary);font-size:13px">디자인확인서 이미지 로딩 중...</div></div>`
-        : `<div style="color:var(--text-tertiary);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">연결된 디자인확인서가 없습니다</div>`;
-
-    const secTitle = (icon, text) => `<div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:var(--text-primary);padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--gray-200)">${icon} ${text}</div>`;
+    const secTitle = (icon, text) =>`<div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:var(--text-primary);padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--gray-200)">${icon} ${text}</div>`;
     const cardBase = 'background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:14px 18px;margin-bottom:14px';
     const brLine = (label, val) => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span style="color:var(--text-secondary)">${label}</span><strong style="color:var(--text-primary)">${val.toLocaleString()}원</strong></div>`;
 
@@ -1830,10 +1826,16 @@ async function showProjectDetail(id) {
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">${checksHtml}</div>
         </div>
 
-        <!-- 디자인확인서 이미지 -->
+        <!-- 디자인확인서 -->
         <div style="${cardBase}">
-            ${secTitle('🖼️', '디자인확인서 시안')}
-            ${imagesPlaceholder}
+            ${secTitle('🖼️', '디자인확인서')}
+            <div id="dcDocArea">${p.sourceDocNumber ? `<div style="color:var(--text-tertiary);font-size:13px">디자인확인서 로딩 중...</div>` : `<div style="color:var(--text-tertiary);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">연결된 디자인확인서가 없습니다. 상단의 "디자인확인서 만들기" 버튼으로 생성하세요.</div>`}</div>
+        </div>
+
+        <!-- 작업요청서 -->
+        <div style="${cardBase}">
+            ${secTitle('📋', '작업요청서')}
+            <div id="wrDocArea">${p.sourceDocNumber ? `<div style="color:var(--text-tertiary);font-size:13px">작업요청서 로딩 중...</div>` : `<div style="color:var(--text-tertiary);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">디자인확인서가 먼저 연결되어야 작업요청서를 조회할 수 있습니다</div>`}</div>
         </div>
 
         ${p.memo ? `
@@ -1853,42 +1855,96 @@ async function showProjectDetail(id) {
     overlay.classList.add('show');
     overlay.classList.add('modal-wide');
 
-    // DC 이미지 비동기 로드
+    // DC / WR 비동기 로드
     if (p.sourceDocNumber) {
+        const renderDocCard = (r, kind) => {
+            const titleColor = kind === 'DC' ? 'var(--blue)' : 'var(--klp-orange,#E67E22)';
+            const bg = kind === 'DC' ? '#F5FBFF' : '#FFF8F2';
+            const brd = kind === 'DC' ? '#CFE3F5' : '#FFE0CC';
+            let imgs = null;
+            try { imgs = r.images_data ? JSON.parse(r.images_data) : null; } catch(e) {}
+            const hasMain = imgs && imgs.main;
+            const hasSubs = imgs && imgs.subs && imgs.subs.length > 0;
+            let imgHtml = '';
+            if (hasMain) {
+                imgHtml += `<div style="margin-bottom:6px"><img src="${imgs.main}" style="max-width:100%;max-height:260px;border-radius:8px;border:1px solid var(--gray-200);cursor:pointer" onclick="window.open('${imgs.main}','_blank')"></div>`;
+            }
+            if (hasSubs) {
+                imgHtml += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:4px">`;
+                imgs.subs.forEach(s => {
+                    imgHtml += `<img src="${s}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--gray-200);cursor:pointer" onclick="window.open('${s}','_blank')">`;
+                });
+                imgHtml += `</div>`;
+            }
+            if (!hasMain && !hasSubs) {
+                imgHtml = `<div style="color:var(--text-tertiary);font-size:12px;padding:8px 0">첨부된 시안 이미지가 없습니다</div>`;
+            }
+            const clientLine = `${escFn(r.company_name || '')}${r.title ? ' — ' + escFn(r.title) : ''}`;
+            return `<div style="background:${bg};border:1px solid ${brd};border-radius:10px;padding:12px 14px;margin-bottom:10px">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+                    <div style="min-width:0">
+                        <div style="font-size:11px;color:${titleColor};font-weight:800">${escFn(r.doc_number)}</div>
+                        <div style="font-size:13px;color:var(--text-primary);font-weight:700;margin-top:2px">${clientLine}</div>
+                        ${r.product_name ? `<div style="font-size:12px;color:var(--text-tertiary);margin-top:2px">${escFn(r.product_name)}</div>` : ''}
+                    </div>
+                    <div style="display:flex;gap:6px;flex-shrink:0">
+                        <button onclick="downloadDoc('${escFn(r.doc_number)}','jpg')" style="padding:6px 12px;border:1.5px solid ${titleColor};border-radius:6px;background:#fff;color:${titleColor};font-size:12px;font-weight:700;cursor:pointer">📷 JPG</button>
+                        <button onclick="downloadDoc('${escFn(r.doc_number)}','pdf')" style="padding:6px 12px;border:1.5px solid ${titleColor};border-radius:6px;background:#fff;color:${titleColor};font-size:12px;font-weight:700;cursor:pointer">📄 PDF</button>
+                    </div>
+                </div>
+                ${imgHtml}
+            </div>`;
+        };
+
+        // DC 로드
         try {
-            const { data, error } = await sb.from('confirmations')
-                .select('images_data')
+            const { data: dcData, error: dcErr } = await sb.from('confirmations')
+                .select('*')
                 .eq('doc_number', p.sourceDocNumber)
                 .limit(1);
-            const area = document.getElementById('dcImagesArea');
-            if (!area) return;
-            if (error || !data || data.length === 0 || !data[0].images_data) {
-                area.innerHTML = `<div style="color:var(--text-tertiary);font-size:13px">디자인확인서 이미지를 찾을 수 없습니다 (문서번호: ${escFn(p.sourceDocNumber)})</div>`;
-                return;
+            const dcEl = document.getElementById('dcDocArea');
+            if (dcEl) {
+                if (dcErr || !dcData || dcData.length === 0) {
+                    dcEl.innerHTML = `<div style="color:var(--text-tertiary);font-size:13px">디자인확인서를 찾을 수 없습니다 (문서번호: ${escFn(p.sourceDocNumber)})</div>`;
+                } else {
+                    dcEl.innerHTML = renderDocCard(dcData[0], 'DC');
+                }
             }
-            let imgs;
-            try { imgs = JSON.parse(data[0].images_data); } catch(e) { imgs = null; }
-            if (!imgs || (!imgs.main && (!imgs.subs || imgs.subs.length === 0))) {
-                area.innerHTML = `<div style="color:var(--text-tertiary);font-size:13px">디자인확인서에 첨부된 이미지가 없습니다</div>`;
-                return;
-            }
-            let html = '';
-            if (imgs.main) {
-                html += `<div style="margin-bottom:8px"><img src="${imgs.main}" style="max-width:100%;border-radius:8px;border:1px solid var(--gray-200);cursor:pointer" onclick="window.open('${imgs.main}','_blank')"></div>`;
-            }
-            if (imgs.subs && imgs.subs.length > 0) {
-                html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">`;
-                imgs.subs.forEach(s => {
-                    html += `<img src="${s}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:1px solid var(--gray-200);cursor:pointer" onclick="window.open('${s}','_blank')">`;
-                });
-                html += `</div>`;
-            }
-            area.innerHTML = html;
         } catch (err) {
-            const area = document.getElementById('dcImagesArea');
-            if (area) area.innerHTML = `<div style="color:var(--red);font-size:13px">이미지 로드 실패: ${err.message}</div>`;
+            const dcEl = document.getElementById('dcDocArea');
+            if (dcEl) dcEl.innerHTML = `<div style="color:var(--red);font-size:13px">DC 로드 실패: ${err.message}</div>`;
+        }
+
+        // WR 로드 (doc_number 가 `DC번호_` 로 시작하는 것들)
+        try {
+            const prefix = p.sourceDocNumber + '_';
+            const { data: wrData, error: wrErr } = await sb.from('confirmations')
+                .select('*')
+                .like('doc_number', prefix + '%')
+                .order('doc_number', { ascending: true });
+            const wrEl = document.getElementById('wrDocArea');
+            if (wrEl) {
+                if (wrErr) {
+                    wrEl.innerHTML = `<div style="color:var(--red);font-size:13px">WR 로드 실패: ${wrErr.message}</div>`;
+                } else {
+                    const wrs = (wrData || []).filter(d => d.doc_number && d.doc_number.startsWith(prefix) && d.status === '작업요청서');
+                    if (wrs.length === 0) {
+                        wrEl.innerHTML = `<div style="color:var(--text-tertiary);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">저장된 작업요청서가 없습니다. 상단의 "작업요청서 만들기" 버튼으로 생성하세요.</div>`;
+                    } else {
+                        wrEl.innerHTML = wrs.map(r => renderDocCard(r, 'WR')).join('');
+                    }
+                }
+            }
+        } catch (err) {
+            const wrEl = document.getElementById('wrDocArea');
+            if (wrEl) wrEl.innerHTML = `<div style="color:var(--red);font-size:13px">WR 로드 실패: ${err.message}</div>`;
         }
     }
+}
+
+// 상세보기의 DC/WR 다운로드 버튼 — 새 탭으로 doc-generator 열어 자동 렌더+다운로드
+function downloadDoc(docNum, fmt) {
+    window.open('doc-generator.html#dl-' + fmt + '-' + docNum, '_blank');
 }
 
 // =====================================
