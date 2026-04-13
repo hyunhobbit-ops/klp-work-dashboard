@@ -775,10 +775,10 @@ function renderDaily() {
 
     let html = '';
 
-    // 개인별 탭일 때: 개인 컬럼을 맨 앞에, 그 다음 전체/임원/대표님 순
-    const isPersonalTab = currentPersonFilter !== 'viewall' && currentPersonFilter !== 'ceo';
+    // 개인 탭(대표님 포함)일 때: 본인 컬럼을 맨 앞에, 그 다음 전체/임원 순
+    const isPersonalTab = currentPersonFilter !== 'viewall';
 
-    const renderCommonCols = () => {
+    const renderCommonCols = (includeCeo) => {
         let h = '';
         if (showCommonColumn) {
             const commonTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '전체');
@@ -788,7 +788,7 @@ function renderDaily() {
             const execTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '임원');
             h += renderColumn('임원', execTasks, '임원');
         }
-        if (showCeoColumn) {
+        if (includeCeo && showCeoColumn) {
             const ceoTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '대표님');
             h += renderColumn('대표님', ceoTasks, '대표님');
         }
@@ -799,11 +799,17 @@ function renderDaily() {
         return renderColumn(person, tasks, person);
     }).join('');
 
-    if (isPersonalTab) {
+    if (currentPersonFilter === 'ceo') {
+        // 대표님 탭: 대표님 컬럼을 맨 앞에, 그 다음 전체/임원
+        const ceoTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '대표님');
+        html += renderColumn('대표님', ceoTasks, '대표님');
+        html += renderCommonCols(false);
+    } else if (isPersonalTab) {
         html += renderPersonalCols();
-        html += renderCommonCols();
+        html += renderCommonCols(false);
     } else {
-        html += renderCommonCols();
+        // 전체보기: 전체/임원/대표님/개인별 순
+        html += renderCommonCols(true);
         html += renderPersonalCols();
     }
 
