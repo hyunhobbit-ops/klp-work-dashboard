@@ -450,28 +450,22 @@ const CHECK_ITEMS = [
 ];
 
 function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
-    const filtered = filter === 'all' ? dataArr : dataArr.filter(p => p.status === filter);
+    // 매출처(부모) 행만 메인 목록에 표시. 매입처(자식) 행은 상세 모달에서 표시.
+    const baseList = dataArr.filter(p => !p.parentProjectId);
+    const filtered = filter === 'all' ? baseList : baseList.filter(p => p.status === filter);
     const checkSvg = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
-    // 부모 → 자식 순으로 정렬 (자식은 부모 바로 아래)
-    const ordered = [];
-    const parents = filtered.filter(p => !p.parentProjectId);
-    const childrenByParent = {};
-    filtered.filter(p => p.parentProjectId).forEach(c => {
-        (childrenByParent[c.parentProjectId] = childrenByParent[c.parentProjectId] || []).push(c);
-    });
-    parents.forEach(p => {
-        ordered.push(p);
-        (childrenByParent[p.id] || []).forEach(c => ordered.push({ ...c, _isChild: true }));
-    });
-    // 부모가 다른 필터로 가려진 자식은 마지막에 표시
-    filtered.filter(p => p.parentProjectId && !parents.find(pp => pp.id === p.parentProjectId)).forEach(c => {
-        ordered.push({ ...c, _isChild: true });
+    // 자식 개수 계산 (배지 표시용)
+    const childCountByParent = {};
+    dataArr.filter(p => p.parentProjectId).forEach(c => {
+        childCountByParent[c.parentProjectId] = (childCountByParent[c.parentProjectId] || 0) + 1;
     });
 
     let tableHtml = '';
     let cardHtml = '';
-    ordered.forEach(p => {
+    filtered.forEach(p => {
+        const childCount = childCountByParent[p.id] || 0;
+        const supplierBadge = childCount > 0 ? ` <span class="badge badge-orange" style="font-size:10px">매입 ${childCount}</span>` : '';
         const pNum = parseInt(p.progress) || 0;
         const checks = p.checks || {};
         const checkDots = CHECK_ITEMS.map(item => {
@@ -481,10 +475,8 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
         const revenueStr = (p.revenue || 0).toLocaleString() + '원';
 
-        const childIndent = p._isChild ? `<span style="color:var(--klp-orange,#E67E22);font-weight:700;margin-right:4px">↳ 매입</span>` : '';
-        const rowStyle = p._isChild ? 'cursor:pointer;background:#FFF8F2' : 'cursor:pointer';
-        tableHtml += `<tr onclick="showProjectDetail(${p.id})" style="${rowStyle}">
-            <td>${childIndent}<strong>${p.client || '-'}</strong></td>
+        tableHtml += `<tr onclick="showProjectDetail(${p.id})" style="cursor:pointer">
+            <td><strong>${p.client || '-'}</strong>${supplierBadge}</td>
             <td>${p.supplier || '-'}</td>
             <td>${p.name}</td>
             <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
@@ -1647,6 +1639,8 @@ async function showProjectDetail(id) {
                 <div class="form-section-title">✅ 체크리스트</div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">${checksHtml}</div>
                 ${p.memo ? `<div class="form-section-title">📝 메모</div><div style="background:var(--gray-50);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:14px;white-space:pre-wrap">${escFn(p.memo)}</div>` : ''}
+                <div class="form-section-title">🏭 매입처 (작업요청서)</div>
+                <div id="projectSuppliersArea" style="margin-bottom:12px"><div style="color:var(--text-tertiary);font-size:13px">매입처 데이터 로딩 중...</div></div>
                 <div class="form-section-title">🖼️ 디자인확인서 이미지</div>
                 ${imagesPlaceholder}
             </div>
@@ -1658,6 +1652,43 @@ async function showProjectDetail(id) {
     const overlay = document.getElementById('modalOverlay');
     overlay.classList.add('show');
     overlay.classList.add('modal-wide');
+
+    // 매입처(자식) 행 렌더링
+    const suppliersArea = document.getElementById('projectSuppliersArea');
+    if (suppliersArea) {
+        const children = projects.filter(x => x.parentProjectId === p.id);
+        if (children.length === 0) {
+            suppliersArea.innerHTML = `<div style="color:var(--text-tertiary);font-size:13px">등록된 매입처가 없습니다. 문서생성기 작업요청서에서 "프로젝트 진행사항(국내)으로 내보내기"로 추가할 수 있습니다.</div>`;
+        } else {
+            const totalCost = children.reduce((s, c) => s + (c.revenue || 0), 0);
+            const margin = (p.revenue || 0) - totalCost;
+            const marginPct = p.revenue > 0 ? Math.round((margin / p.revenue) * 100) : 0;
+            let html = `<div style="background:#FFF5F0;border:1px solid #FFE0CC;border-radius:8px;padding:12px;margin-bottom:8px">
+                <div style="display:flex;gap:16px;font-size:13px">
+                    <div><span style="color:var(--text-tertiary)">매출 합계</span> <strong>${(p.revenue || 0).toLocaleString()}원</strong></div>
+                    <div><span style="color:var(--text-tertiary)">매입 합계</span> <strong>${totalCost.toLocaleString()}원</strong></div>
+                    <div><span style="color:var(--text-tertiary)">마진</span> <strong style="color:${margin >= 0 ? 'var(--blue)' : 'var(--red)'}">${margin.toLocaleString()}원 (${marginPct}%)</strong></div>
+                </div>
+            </div>`;
+            children.forEach(c => {
+                html += `<div style="border:1px solid var(--gray-200);border-radius:8px;padding:12px;margin-bottom:8px;cursor:pointer" onclick="event.stopPropagation();openEditProject(${c.id})">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                        <div><strong>${escFn(c.supplier || c.client || '-')}</strong> <span style="color:var(--text-tertiary);font-size:12px">${escFn(c.name || '')}</span></div>
+                        <span class="badge ${statusBadgeClass(c.status)}">${escFn(c.status)}</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:13px;color:var(--text-secondary)">
+                        <div>매입가: <strong>${(c.unitPrice || 0).toLocaleString()}원</strong> × ${c.qty || 0}${c.unit || ''}</div>
+                        <div>매입 합계: <strong>${(c.revenue || 0).toLocaleString()}원</strong></div>
+                        ${c.printFee ? `<div>인쇄비: ${(c.printFee).toLocaleString()}원</div>` : ''}
+                        ${c.packagingFee ? `<div>포장비: ${(c.packagingFee).toLocaleString()}원</div>` : ''}
+                        ${c.deadline ? `<div>납기: ${escFn(c.deadline)}</div>` : ''}
+                        ${c.sourceDocNumber ? `<div>WR: ${escFn(c.sourceDocNumber)}</div>` : ''}
+                    </div>
+                </div>`;
+            });
+            suppliersArea.innerHTML = html;
+        }
+    }
 
     // DC 이미지 비동기 로드
     if (p.sourceDocNumber) {
