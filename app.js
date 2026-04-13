@@ -484,51 +484,47 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
         const revenueStr = (p.revenue || 0).toLocaleString() + '원';
 
+        // 매입액(자식 합계) / 마진 계산
+        const childrenForP = childrenByParent[p.id] || [];
+        const purchaseTotal = childrenForP.reduce((s, c) => s + (c.revenue || 0), 0);
+        const marginVal = (p.revenue || 0) - purchaseTotal;
+        const marginPctVal = p.revenue > 0 ? Math.round((marginVal / p.revenue) * 100) : 0;
+        const purchaseStr = purchaseTotal > 0 ? purchaseTotal.toLocaleString() + '원' : '-';
+        const marginStr = purchaseTotal > 0
+            ? `<span style="color:${marginVal >= 0 ? 'var(--blue)' : 'var(--red)'};font-weight:700">${marginVal.toLocaleString()}원 (${marginPctVal}%)</span>`
+            : '-';
+
         tableHtml += `<tr onclick="toggleProjectExpand(${p.id})" style="cursor:pointer">
+            <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
             <td>${expandIcon}<strong>${p.client || '-'}</strong>${supplierBadge}</td>
             <td>${p.supplier || '-'}</td>
             <td>${p.name}</td>
-            <td><span class="badge ${statusBadgeClass(p.status)}">${p.status}</span></td>
             <td>${p.assignees.join(', ')}</td>
             <td>${revenueStr}</td>
+            <td>${purchaseStr}</td>
+            <td>${marginStr}</td>
             <td>${p.deadline ? fmtDisplay(p.deadline) : '-'}</td>
-            <td><div class="progress-cell"><div class="progress-bar"><div class="progress-fill pf-${pNum}"></div></div><span class="progress-pct">${p.progress}</span></div></td>
             <td><div class="checks-row">${checkDots}</div></td>
-            <td>
-                <button class="edit-btn" onclick="event.stopPropagation();showProjectDetail(${p.id})" style="margin-right:4px">상세</button>
-                <button class="edit-btn" onclick="event.stopPropagation();openEditProject(${p.id})">편집</button>
-            </td>
+            <td><button class="edit-btn" onclick="event.stopPropagation();openEditProject(${p.id})">편집</button></td>
         </tr>`;
 
         // 확장된 상태면 자식 행을 부모 바로 아래에 렌더
         if (isExpanded && childCount > 0) {
-            const children = childrenByParent[p.id] || [];
-            const totalCost = children.reduce((s, c) => s + (c.revenue || 0), 0);
-            const margin = (p.revenue || 0) - totalCost;
-            const marginPct = p.revenue > 0 ? Math.round((margin / p.revenue) * 100) : 0;
-            children.forEach(c => {
-                const cNum = parseInt(c.progress) || 0;
-                tableHtml += `<tr onclick="event.stopPropagation();showProjectDetail(${c.id})" style="cursor:pointer;background:#FFF8F2">
-                    <td style="padding-left:32px"><span style="color:var(--klp-orange,#E67E22);font-weight:700;margin-right:6px">↳ 매입</span><strong>${c.supplier || '-'}</strong></td>
-                    <td>—</td>
-                    <td>${c.name || '-'}</td>
+            childrenForP.forEach(c => {
+                tableHtml += `<tr onclick="event.stopPropagation();openEditProject(${c.id})" style="cursor:pointer;background:#FFF8F2">
                     <td><span class="badge ${statusBadgeClass(c.status)}">${c.status}</span></td>
+                    <td style="padding-left:32px"><span style="color:var(--klp-orange,#E67E22);font-weight:700">↳ 매입</span></td>
+                    <td><strong>${c.supplier || '-'}</strong></td>
+                    <td>${c.name || '-'}</td>
                     <td>${(c.assignees || []).join(', ')}</td>
-                    <td>${(c.revenue || 0).toLocaleString()}원<span style="font-size:11px;color:var(--text-tertiary)"> (매입가)</span></td>
+                    <td>—</td>
+                    <td>${(c.revenue || 0).toLocaleString()}원</td>
+                    <td>—</td>
                     <td>${c.deadline ? fmtDisplay(c.deadline) : '-'}</td>
-                    <td><div class="progress-cell"><div class="progress-bar"><div class="progress-fill pf-${cNum}"></div></div><span class="progress-pct">${c.progress}</span></div></td>
-                    <td>${c.sourceDocNumber ? `<span style="font-size:11px;color:var(--text-tertiary)">${c.sourceDocNumber}</span>` : '-'}</td>
+                    <td>—</td>
                     <td><button class="edit-btn" onclick="event.stopPropagation();openEditProject(${c.id})">편집</button></td>
                 </tr>`;
             });
-            // 합계 행
-            tableHtml += `<tr style="background:#FFF5F0">
-                <td colspan="10" style="padding:8px 16px;font-size:13px">
-                    <span style="color:var(--text-tertiary);margin-right:16px">매출 합계 <strong style="color:var(--text-primary)">${(p.revenue || 0).toLocaleString()}원</strong></span>
-                    <span style="color:var(--text-tertiary);margin-right:16px">매입 합계 <strong style="color:var(--text-primary)">${totalCost.toLocaleString()}원</strong></span>
-                    <span style="color:var(--text-tertiary)">마진 <strong style="color:${margin >= 0 ? 'var(--blue)' : 'var(--red)'}">${margin.toLocaleString()}원 (${marginPct}%)</strong></span>
-                </td>
-            </tr>`;
         }
 
         cardHtml += `<div class="resp-card" onclick="showProjectDetail(${p.id})">
