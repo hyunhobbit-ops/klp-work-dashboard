@@ -2761,6 +2761,8 @@ function openModal(type) {
         return;
     }
     document.getElementById('modalOverlay').classList.add('show');
+    const mb = document.getElementById('modalBody');
+    if (mb) mb.scrollTop = 0;
 }
 
 // 인쇄비/포장비 같은 "부가비용"을 수량·적용방식·VAT에 맞춰 합계에 환산
