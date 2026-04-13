@@ -539,13 +539,13 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
         });
         sections.forEach(sec => {
             const group = buckets[sec.key];
-            tableHtml += `<tr class="section-divider"><td colspan="${colspan}" style="padding:0;border:none"><div style="background:${sec.bg};color:${sec.color};font-weight:800;font-size:15px;padding:14px 18px;border-left:6px solid ${sec.color};border-top:2px solid ${sec.color};border-bottom:2px solid ${sec.color};letter-spacing:.3px;display:flex;align-items:center;gap:10px"><span>${sec.key}</span><span style="background:${sec.color};color:#fff;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:800">${group.length}건</span></div></td></tr>`;
+            tableHtml += `<tr class="section-divider"><td colspan="${colspan}" style="padding:0;border:none"><div style="background:${sec.bg};color:${sec.color};font-weight:700;font-size:12px;padding:8px 14px;border-top:1px solid ${sec.color}33;border-bottom:1px solid ${sec.color}33;display:flex;align-items:center;gap:8px"><span>${sec.key}</span><span style="color:${sec.color};opacity:.75;font-weight:700">${group.length}</span></div></td></tr>`;
             if (group.length === 0) {
                 tableHtml += `<tr class="section-empty"><td colspan="${colspan}" style="color:var(--text-tertiary);font-size:12px;padding:14px;text-align:center;background:#fff">해당 상태의 프로젝트가 없습니다</td></tr>`;
             } else {
                 group.forEach(p => { tableHtml += rowHtmlById.get(p.id); });
             }
-            cardHtml += `<div class="card-section-header" style="grid-column:1/-1;background:${sec.bg};color:${sec.color};font-weight:800;font-size:15px;padding:14px 18px;border-radius:10px;margin-top:10px;border-left:6px solid ${sec.color};display:flex;align-items:center;gap:10px"><span>${sec.key}</span><span style="background:${sec.color};color:#fff;padding:2px 10px;border-radius:20px;font-size:12px">${group.length}건</span></div>`;
+            cardHtml += `<div class="card-section-header" style="grid-column:1/-1;background:${sec.bg};color:${sec.color};font-weight:700;font-size:12px;padding:8px 14px;border-radius:6px;margin-top:8px;display:flex;align-items:center;gap:8px"><span>${sec.key}</span><span style="color:${sec.color};opacity:.75">${group.length}</span></div>`;
             if (group.length === 0) {
                 cardHtml += `<div style="grid-column:1/-1;color:var(--text-tertiary);font-size:12px;padding:8px 14px">해당 상태의 프로젝트가 없습니다</div>`;
             } else {
