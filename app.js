@@ -644,9 +644,9 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
         });
         sections.forEach(sec => {
             const group = buckets[sec.key];
-            tableHtml += `<tr class="section-divider"><td colspan="${colspan}" style="padding:14px 0 6px 0;border:none;background:#fff"><div style="display:inline-flex;align-items:center;gap:10px;background:${sec.bg};color:${sec.color};font-weight:700;font-size:14px;padding:8px 16px;border-radius:8px;border:1px solid ${sec.color}55"><span>${sec.key}</span><span style="color:${sec.color};opacity:.8;font-weight:700">${group.length}</span></div></td></tr>`;
+            tableHtml += `<tr class="section-divider"><td colspan="${colspan}" style="padding:14px 0 6px 0;border:none;background:var(--white)"><div style="display:inline-flex;align-items:center;gap:10px;background:${sec.bg};color:${sec.color};font-weight:700;font-size:14px;padding:8px 16px;border-radius:8px;border:1px solid ${sec.color}55"><span>${sec.key}</span><span style="color:${sec.color};opacity:.8;font-weight:700">${group.length}</span></div></td></tr>`;
             if (group.length === 0) {
-                tableHtml += `<tr class="section-empty"><td colspan="${colspan}" style="color:var(--text-tertiary);font-size:12px;padding:14px;text-align:center;background:#fff">해당 상태의 프로젝트가 없습니다</td></tr>`;
+                tableHtml += `<tr class="section-empty"><td colspan="${colspan}" style="color:var(--text-tertiary);font-size:12px;padding:14px;text-align:center;background:var(--white)">해당 상태의 프로젝트가 없습니다</td></tr>`;
             } else {
                 group.forEach(p => { tableHtml += rowHtmlById.get(p.id); });
             }

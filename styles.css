@@ -678,7 +678,7 @@ body {
    HOME - Deadline Soon (D-3)
    ============================ */
 .deadline-soon-panel {
-    background: #fff;
+    background: var(--white);
     border: 1px solid var(--gray-200);
     border-radius: 14px;
     padding: 18px 22px;
@@ -1596,12 +1596,12 @@ body {
 .daily-item:hover { background: var(--gray-50); }
 
 /* Deadline highlight */
-.deadline-item { border-left: 3px solid var(--red); background: #fff5f5; }
-.deadline-item:hover { background: #fee2e2; }
+.deadline-item { border-left: 3px solid var(--red); background: var(--red-light); }
+.deadline-item:hover { background: var(--red-light); filter: brightness(0.96); }
 .deadline-badge-wrap { flex-shrink: 0; margin-left: 8px; }
-.deadline-badge-lg { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 700; color: var(--red); background: #fee2e2; padding: 6px 14px; border-radius: 8px; white-space: nowrap; }
-.wk-task.deadline-item { border-left: 3px solid var(--red); background: #fff5f5; }
-.wk-task.deadline-item:hover { background: #fee2e2; border-color: var(--red); }
+.deadline-badge-lg { display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 700; color: var(--red); background: var(--red-light); padding: 6px 14px; border-radius: 8px; white-space: nowrap; }
+.wk-task.deadline-item { border-left: 3px solid var(--red); background: var(--red-light); }
+.wk-task.deadline-item:hover { background: var(--red-light); border-color: var(--red); filter: brightness(0.96); }
 .wk-task-tags { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; align-items: center; }
 .wk-deadline-right { margin-left: auto; font-size: 12px; padding: 4px 10px; }
 
@@ -1627,7 +1627,7 @@ body {
 .wk-day-name { font-size: 13px; font-weight: 700; color: var(--gray-700); }
 .wk-day-date { font-size: 12px; font-weight: 500; color: var(--gray-400); }
 .wk-day-body { flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 6px; min-height: 100px; transition: background 0.15s; }
-.wk-day-body.wk-drop-target { background: #dbeafe; border-radius: 0 0 var(--radius) var(--radius); }
+.wk-day-body.wk-drop-target { background: var(--blue-light); border-radius: 0 0 var(--radius) var(--radius); }
 .wk-task { background: var(--gray-50); border: 1px solid var(--gray-100); border-radius: 8px; padding: 8px 10px; cursor: grab; transition: all 0.15s; }
 .wk-task:hover { border-color: var(--blue); box-shadow: var(--shadow-xs); }
 .wk-task.completed { opacity: 0.45; }
@@ -1693,8 +1693,8 @@ body {
 .mc-cell:hover { background: var(--gray-50); }
 .mc-other-month { background: var(--gray-50); }
 .mc-other-month .mc-date { color: var(--gray-300); }
-.mc-weekend { background: #fafafa; }
-.mc-today { background: #eff6ff; }
+.mc-weekend { background: var(--gray-100); }
+.mc-today { background: var(--blue-light); }
 
 .mc-cell-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .mc-date { font-size: 14px; font-weight: 700; color: var(--gray-700); }
@@ -1706,7 +1706,7 @@ body {
 .mc-task:hover { background: rgba(0,0,0,0.05); }
 .mc-task-done { opacity: 0.4; }
 .mc-task-done .mc-task-text { text-decoration: line-through; }
-.mc-task-deadline { background: #fff5f5; border-left: 2px solid var(--red); }
+.mc-task-deadline { background: var(--red-light); border-left: 2px solid var(--red); }
 
 .mc-check { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--gray-300); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; transition: all var(--transition); }
 .mc-check:hover { border-color: var(--blue); }
@@ -1715,7 +1715,7 @@ body {
 .mc-check.checked svg { opacity: 1; }
 
 .mc-task-text { font-size: 13px; font-weight: 600; color: var(--gray-700); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
-.mc-deadline-badge { flex-shrink: 0; margin-left: auto; font-size: 11px; font-weight: 700; color: var(--red); background: #fee2e2; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+.mc-deadline-badge { flex-shrink: 0; margin-left: auto; font-size: 11px; font-weight: 700; color: var(--red); background: var(--red-light); padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
 
 /* 월간 캘린더 모바일 반응형 */
 @media (max-width: 768px) {
