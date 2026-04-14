@@ -167,8 +167,9 @@ let currentDomesticFilter = 'all';
 let currentOverseasFilter = 'all';
 let currentDeliveryTypeFilter = 'all';
 let currentDeliverySearch = '';
-let currentDeliveryYear = 'all';
-let currentDeliveryMonth = 'all';
+// 택배 기본 필터: 이번 달 (전체 표시는 1,800건+ 렌더로 무거워서 기본은 월별)
+let currentDeliveryYear = String(new Date().getFullYear());
+let currentDeliveryMonth = String(new Date().getMonth() + 1).padStart(2, '0');
 
 // ===== Page Titles =====
 const pageTitles = {
