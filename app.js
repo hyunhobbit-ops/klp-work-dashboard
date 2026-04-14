@@ -141,10 +141,8 @@ const domesticProjects = [
     { id: 8, name: "제안서 DB 구축", client: "본사", supplier: "", status: "시작 전", priority: "🟢 보통", category: "기타", assignees: ["이현주"], revenue: 0, startDate: "", deadline: "2026-04-20", checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "" },
 ];
 
-// 해외 프로젝트
-const overseasProjects = [
-    { id: 5, name: "해외 PO 시스템 구축", client: "본사", supplier: "", status: "진행 중", priority: "🟡 높음", category: "해외 주문", assignees: ["이현주"], revenue: 0, startDate: "2026-03-20", deadline: "2026-04-12", checks: { design: true, workOrder: true, advancePayment: true, finalPayment: false, invoice: false, supplierPayment: false, delivered: false }, memo: "해외 PO 만들기 진행 중" },
-];
+// 해외 프로젝트 (하드코딩, DB 미연동)
+const overseasProjects = [];
 
 // 홈 등에서 전체 프로젝트 참조용
 const projects = [...domesticProjects, ...overseasProjects];
