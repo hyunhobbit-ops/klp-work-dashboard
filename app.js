@@ -209,6 +209,32 @@ function setupTheme() {
     }
 }
 
+// 리틀리 링크 클릭 시 URL을 클립보드에 복사 (새 탭은 그대로 열림 — preventDefault 안 함)
+function copyLittlyLink(url, name) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+            showToast(`${name} 링크 복사됨 (${url})`);
+        }).catch(() => {
+            showToast('복사 실패 — 직접 복사해주세요');
+        });
+    } else {
+        // fallback: 임시 textarea
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = url;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast(`${name} 링크 복사됨`);
+        } catch (e) {
+            showToast('복사 실패');
+        }
+    }
+}
+
 function applyTheme(theme) {
     if (theme === 'dark') {
         document.documentElement.setAttribute('data-theme', 'dark');
