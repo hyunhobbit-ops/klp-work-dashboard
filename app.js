@@ -5170,8 +5170,236 @@ function generateShareLink() {
     renderProposalEditor();
 }
 
+// =====================================
+// 제안서 미리보기 카탈로그 (파트 5)
+// =====================================
+let currentPreviewFilter = 'all';
+let currentPreviewView = 'gallery';
+
+function _previewInitials(name) {
+    if (!name) return 'KLP';
+    const n = name.trim();
+    return n.length >= 2 ? n.slice(-2) : n;
+}
+
+function _ppCollectProducts(ep) {
+    // items + productsDB 조인
+    return ep.items.map(it => {
+        const p = productsDB.find(x => x.id === it.productId);
+        if (!p) return null;
+        return { ...p, _quantity: it.quantity, _subtotal: it.subtotal };
+    }).filter(Boolean);
+}
+
+function _ppFilterProducts(list, filter) {
+    if (filter === 'all') return list;
+    if (filter === 'print') return list.filter(p => p.printType && p.printType !== '불가');
+    if (filter === 'gift') return list.filter(p => p.packagingType === '선물포장');
+    if (filter === 'under100k') return list.filter(p => (p.unitPrice || 0) <= 100000);
+    return list;
+}
+
 function openProposalPreview() {
-    showToast('미리보기는 파트 5에서 구현 예정');
+    if (!editingProposal) return;
+    let overlay = document.getElementById('proposalPreviewOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'proposalPreviewOverlay';
+        overlay.className = 'proposal-preview-overlay';
+        document.body.appendChild(overlay);
+    }
+    currentPreviewFilter = 'all';
+    currentPreviewView = 'gallery';
+    renderProposalPreview();
+    overlay.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeProposalPreview() {
+    const overlay = document.getElementById('proposalPreviewOverlay');
+    if (overlay) overlay.classList.remove('show');
+    document.body.style.overflow = '';
+}
+
+function setPreviewFilter(f) {
+    currentPreviewFilter = f;
+    renderProposalPreview();
+}
+
+function setPreviewView(v) {
+    currentPreviewView = v;
+    renderProposalPreview();
+}
+
+function renderProposalPreview() {
+    const overlay = document.getElementById('proposalPreviewOverlay');
+    if (!overlay) return;
+    const ep = editingProposal;
+    if (!ep) { overlay.innerHTML = ''; return; }
+
+    const all = _ppCollectProducts(ep);
+    const filtered = _ppFilterProducts(all, currentPreviewFilter);
+
+    const validHtml = ep.validUntil
+        ? `유효기간: <span class="pp-valid">${fmtDisplay(ep.validUntil)}까지</span>`
+        : '유효기간 미정';
+
+    // 상품 카드 그리드
+    const cardsHtml = filtered.map((p, idx) => {
+        const isBest = idx === 0 && p.status === '판매 중';
+        const vatLabel = p.vatIncluded ? 'VAT 포함' : 'VAT 별도';
+        const badgeHtml = isBest
+            ? `<span class="pp-card-badge best">BEST</span>`
+            : (idx < 3 ? `<span class="pp-card-badge new">NEW</span>` : '');
+
+        // 옵션 행 구성
+        const printRow = p.printType === '불가'
+            ? `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value pp-opt-muted">불가</span></div>`
+            : `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value"><span class="pp-tag pp-tag-print">${p.printType}</span></span></div>`;
+        const printFeeRow = (p.printType !== '불가' && p.printFee)
+            ? `<div class="pp-opt-row"><span class="pp-opt-label">인쇄비</span><span class="pp-opt-value">개당 ₩${p.printFee.toLocaleString()}</span></div>` : '';
+        const packRow = p.packagingType
+            ? (p.packagingType === '기본박스'
+                ? `<div class="pp-opt-row"><span class="pp-opt-label">포장</span><span class="pp-opt-value pp-opt-muted">기본박스</span></div>`
+                : `<div class="pp-opt-row"><span class="pp-opt-label">포장</span><span class="pp-opt-value"><span class="pp-tag pp-tag-pack">${p.packagingType}</span></span></div>`)
+            : '';
+        const packFeeRow = p.packagingFee
+            ? `<div class="pp-opt-row"><span class="pp-opt-label">포장비</span><span class="pp-opt-value">개당 ₩${p.packagingFee.toLocaleString()}</span></div>` : '';
+        const labelRow = p.labelAvailable
+            ? `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span class="pp-tag pp-tag-label-yes">부착 가능</span></span></div>`
+            : `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span class="pp-tag pp-tag-label-no">부착 불가</span></span></div>`;
+
+        const imgHtml = p.image
+            ? `<img src="${p.image}" alt="${p.name}">`
+            : `<svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
+
+        return `<div class="pp-card">
+            <div class="pp-card-img">
+                ${imgHtml}
+                ${badgeHtml}
+            </div>
+            <div class="pp-card-body">
+                <div class="pp-card-name">${p.name}</div>
+                ${p.description ? `<div class="pp-card-desc">${p.description}</div>` : ''}
+                <div class="pp-card-price">₩${(p.unitPrice || 0).toLocaleString()} <small>(${vatLabel})</small></div>
+                <div class="pp-card-opts">
+                    ${printRow}
+                    ${printFeeRow}
+                    ${packRow}
+                    ${packFeeRow}
+                    ${labelRow}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    // 테이블 뷰
+    const tableRows = filtered.map(p => {
+        const vatLabel = p.vatIncluded ? 'VAT 포함' : 'VAT 별도';
+        const printCell = p.printType === '불가'
+            ? `<span class="pp-opt-muted">불가</span>`
+            : `<span class="pp-tag pp-tag-print">${p.printType}</span>${p.printFee ? ` <span style="color:var(--gray-500)">₩${p.printFee.toLocaleString()}/개</span>` : ''}`;
+        const packCell = p.packagingType
+            ? `<span class="pp-tag pp-tag-pack">${p.packagingType}</span>${p.packagingFee ? ` <span style="color:var(--gray-500)">₩${p.packagingFee.toLocaleString()}/개</span>` : ''}`
+            : '-';
+        const labelCell = p.labelAvailable
+            ? `<span class="pp-tag pp-tag-label-yes">가능</span>`
+            : `<span class="pp-tag pp-tag-label-no">불가</span>`;
+        return `<tr>
+            <td><strong>${p.name}</strong>${p.description ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">${p.description}</div>` : ''}</td>
+            <td><span class="badge badge-gray">${p.category}</span></td>
+            <td><strong>₩${(p.unitPrice || 0).toLocaleString()}</strong> <span style="color:var(--gray-500);font-size:11px">${vatLabel}</span></td>
+            <td>${printCell}</td>
+            <td>${packCell}</td>
+            <td>${labelCell}</td>
+        </tr>`;
+    }).join('');
+
+    const productsHtml = currentPreviewView === 'gallery'
+        ? `<div class="pp-grid">${cardsHtml || `<div style="grid-column:1/-1;text-align:center;color:var(--gray-500);padding:60px 0">해당 조건의 상품이 없습니다</div>`}</div>`
+        : `<table class="pp-table-view"><thead><tr><th>상품명</th><th>카테고리</th><th>가격</th><th>인쇄</th><th>포장</th><th>라벨</th></tr></thead><tbody>${tableRows || `<tr><td colspan="6" style="text-align:center;padding:60px 0;color:var(--gray-500)">해당 조건의 상품이 없습니다</td></tr>`}</tbody></table>`;
+
+    overlay.innerHTML = `
+        <button class="pp-close" onclick="closeProposalPreview()" aria-label="닫기">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+        <div class="pp-wrap">
+            <!-- 프리미엄 다크 헤더 -->
+            <div class="pp-hero">
+                <div class="pp-hero-circle3"></div>
+                <div class="pp-hero-left">
+                    <div class="pp-hero-label">PRODUCT PROPOSAL</div>
+                    <div class="pp-hero-title">${ep.title || '제안서 제목'}</div>
+                    <div class="pp-hero-sub">${ep.clientName || '거래처'} · ${ep.assignee || '담당자'} 담당</div>
+                </div>
+                <div class="pp-hero-right">
+                    <div class="pp-hero-brand">KLP KOREA</div>
+                    <div class="pp-hero-slogan">We Make Better Goods</div>
+                </div>
+            </div>
+
+            <!-- 제안 안내 + 담당자 -->
+            <div class="pp-info-row">
+                <div class="pp-info-card">
+                    <div class="pp-info-title">제안 안내</div>
+                    <div class="pp-info-desc">${(ep.description || '본 제안서는 아래 상품 구성을 기반으로 작성되었습니다.').replace(/\n/g, '<br>')}</div>
+                    <div style="margin-top:14px;font-size:13px;color:var(--gray-600);font-weight:700">${validHtml}</div>
+                </div>
+                <div class="pp-info-card">
+                    <div class="pp-info-title">담당자 정보</div>
+                    <div class="pp-mgr-row">
+                        <div class="pp-mgr-avatar">${_previewInitials(ep.assignee)}</div>
+                        <div>
+                            <div class="pp-mgr-name">${ep.assignee || 'KLP 담당자'}</div>
+                            <div class="pp-mgr-title">KLP KOREA · 영업팀</div>
+                        </div>
+                    </div>
+                    <div class="pp-mgr-contact">
+                        <div>📧 ${ep.clientEmail || 'sales@klpkorea.com'}</div>
+                        <div>📱 ${ep.clientPhone || '02-0000-0000'}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 필터 + 뷰 전환 -->
+            <div class="pp-filter-bar">
+                <div class="pp-chips">
+                    <button class="pp-chip ${currentPreviewFilter === 'all' ? 'active' : ''}" onclick="setPreviewFilter('all')">전체 (${all.length})</button>
+                    <button class="pp-chip ${currentPreviewFilter === 'print' ? 'active' : ''}" onclick="setPreviewFilter('print')">인쇄 가능</button>
+                    <button class="pp-chip ${currentPreviewFilter === 'gift' ? 'active' : ''}" onclick="setPreviewFilter('gift')">선물포장</button>
+                    <button class="pp-chip ${currentPreviewFilter === 'under100k' ? 'active' : ''}" onclick="setPreviewFilter('under100k')">10만원 이하</button>
+                </div>
+                <div class="pp-view-toggle">
+                    <button class="pp-view-btn ${currentPreviewView === 'gallery' ? 'active' : ''}" onclick="setPreviewView('gallery')" title="갤러리">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    </button>
+                    <button class="pp-view-btn ${currentPreviewView === 'table' ? 'active' : ''}" onclick="setPreviewView('table')" title="테이블">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            ${productsHtml}
+
+            <!-- 하단 CTA -->
+            <div class="pp-cta">
+                <div>
+                    <div class="pp-cta-title">관심 있는 상품이 있으신가요?</div>
+                    <div class="pp-cta-sub">상품을 선택하시면 견적서를 바로 받아보실 수 있습니다</div>
+                </div>
+                <div class="pp-cta-btns">
+                    <button class="pp-cta-btn" onclick="showToast('PDF 기능 준비 중')">📄 PDF 다운로드</button>
+                    <button class="pp-cta-btn primary" onclick="showToast('견적 요청이 접수되었습니다')">✉️ 견적 요청하기</button>
+                </div>
+            </div>
+
+            <!-- 푸터 -->
+            <div class="pp-footer">
+                <strong>KLP KOREA</strong> · 서울시 강남구 · 02-0000-0000 · sales@klpkorea.com · www.klpkorea.com<br>
+                본 제안서는 KLP KOREA의 자산이며, 무단 복제 및 배포를 금합니다.
+            </div>
+        </div>
+    `;
 }
 
 function saveProposal() {
