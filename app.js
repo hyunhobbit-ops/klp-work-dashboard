@@ -510,33 +510,41 @@ function renderHome() {
     });
     document.getElementById('todaySchedule').innerHTML = taskHtml || empty('오늘 할 일이 없습니다');
 
-    // Project list
-    const activeProjects = projects.filter(p => p.status === '진행 중').slice(0, 5);
+    // Project list — 진행 중 프로젝트, 마감 임박순
+    const activeProjects = projects
+        .filter(p => p.status === '진행 중')
+        .sort((a, b) => {
+            if (!a.deadline) return 1;
+            if (!b.deadline) return -1;
+            return a.deadline.localeCompare(b.deadline);
+        })
+        .slice(0, 6);
     let projHtml = '';
     activeProjects.forEach(p => {
+        const owner = p.manager || (p.assignees && p.assignees.length ? p.assignees.join(', ') : '-');
+        let ddayHtml = '';
+        if (p.deadline) {
+            const d0 = new Date(todayStr + 'T00:00:00');
+            const dd = new Date(p.deadline + 'T00:00:00');
+            const diff = Math.round((dd - d0) / 86400000);
+            let label, bg, color;
+            if (diff < 0) { label = `D+${Math.abs(diff)}`; bg = 'var(--red-light)'; color = 'var(--red)'; }
+            else if (diff === 0) { label = 'D-DAY'; bg = 'var(--red-light)'; color = 'var(--red)'; }
+            else if (diff <= 3) { label = `D-${diff}`; bg = 'var(--orange-light)'; color = 'var(--orange)'; }
+            else { label = `D-${diff}`; bg = 'var(--blue-light)'; color = 'var(--blue)'; }
+            ddayHtml = `<span class="dash-proj-dday" style="background:${bg};color:${color}">${label}</span>`;
+        } else {
+            ddayHtml = `<span class="dash-proj-dday" style="background:var(--gray-100);color:var(--gray-500)">미정</span>`;
+        }
         projHtml += `<div class="dash-proj-item" onclick="showProjectDetail(${p.id})">
             <div class="dash-proj-info">
                 <div class="dash-proj-name">${p.name}</div>
-                <div class="dash-proj-meta">${p.assignees.join(', ')} · ${p.category}</div>
+                <div class="dash-proj-meta">담당 ${owner}${p.deadline ? ' · 마감 ' + fmtDisplay(p.deadline) : ''}</div>
             </div>
+            ${ddayHtml}
         </div>`;
     });
     document.getElementById('dashProjects').innerHTML = projHtml || empty('진행 중 프로젝트 없음');
-
-    // Recent deliveries
-    const recent = [...deliveries].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
-    let delHtml = '';
-    recent.forEach(d => {
-        delHtml += `<div class="dash-del-item" onclick="showDeliveryDetail(${d.id})">
-            <span class="dash-del-type badge ${typeBadgeClass(d.type)}">${d.type}</span>
-            <div class="dash-del-info">
-                <div class="dash-del-name">${d.recipient} — ${d.product}</div>
-                <div class="dash-del-sub">${d.sender} · ${d.payment}</div>
-            </div>
-            <span class="dash-del-date">${fmtDisplay(d.date)}</span>
-        </div>`;
-    });
-    document.getElementById('dashDeliveries').innerHTML = delHtml || empty('최근 택배 없음');
 }
 
 // =====================================
