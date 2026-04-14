@@ -153,6 +153,18 @@ const projects = [...domesticProjects, ...overseasProjects];
 let dailyTasks = [];
 let deliveries = [];
 let clients = [];
+
+// 상품 DB (제안서 시스템) — 파트 2: 로컬 JS 배열. 추후 Supabase 전환 예정.
+const productsDB = [
+    { id: 1, name: '미니클락 골드', description: '작고 고급스러운 골드 컬러 탁상시계', category: '시계', image: '', unitPrice: 85000, vatIncluded: true, printType: '레이저각인', printFee: 2000, packagingType: '선물포장', packagingFee: 1500, labelAvailable: true, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
+    { id: 2, name: '순금 1돈 감사패 대형', description: '순금 1돈이 박힌 프리미엄 감사패', category: '굿즈', image: '', unitPrice: 1800000, vatIncluded: true, printType: '레이저각인', printFee: 5000, packagingType: '전용보관함', packagingFee: 60000, labelAvailable: true, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
+    { id: 3, name: '센트하우스 와인 디퓨저', description: '고급 향수 디퓨저 — 와인병 모양', category: '생활용품', image: '', unitPrice: 88000, vatIncluded: true, printType: '불가', printFee: 0, packagingType: '선물포장', packagingFee: 0, labelAvailable: true, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
+    { id: 4, name: '파카 51 코어 볼펜', description: '파카 51 시리즈 고급 볼펜 (각인 가능)', category: '필기구', image: '', unitPrice: 121000, vatIncluded: true, printType: '레이저각인', printFee: 3000, packagingType: '선물포장', packagingFee: 0, labelAvailable: false, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
+    { id: 5, name: '대통령 취임 기념시계', description: '대통령 취임 기념 한정판 시계', category: '시계', image: '', unitPrice: 250000, vatIncluded: true, printType: '레이저각인', printFee: 8000, packagingType: '전용케이스', packagingFee: 15000, labelAvailable: true, status: '품절', createdAt: '2026-03-01T00:00:00.000Z' },
+    { id: 6, name: 'UM2 접지형 멀티 충전기', description: '접지형 멀티탭 + USB 충전기', category: '생활용품', image: '', unitPrice: 69000, vatIncluded: true, printType: '레이저각인', printFee: 2000, packagingType: '선물포장', packagingFee: 1500, labelAvailable: true, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
+];
+let currentProductCategory = 'all';
+let currentProductSearch = '';
 let clientSearch = '';
 let clientPage = 1;
 const CLIENTS_PER_PAGE = 50;
@@ -389,6 +401,15 @@ function setupFilters() {
             renderDeliveries();
         });
     });
+    // 상품 DB 카테고리 칩
+    document.querySelectorAll('[data-pcat]').forEach(chip => {
+        chip.addEventListener('click', () => {
+            chip.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            currentProductCategory = chip.dataset.pcat;
+            renderProductDB();
+        });
+    });
 }
 
 // ===== Date Nav =====
@@ -417,6 +438,13 @@ function setupSearch() {
             renderClients();
         });
     }
+    const productSearchEl = document.getElementById('productSearch');
+    if (productSearchEl) {
+        productSearchEl.addEventListener('input', e => {
+            currentProductSearch = e.target.value.toLowerCase();
+            renderProductDB();
+        });
+    }
 }
 
 // ===== Render All =====
@@ -426,6 +454,7 @@ function renderAll() {
     renderDaily();
     renderDeliveries();
     renderClients();
+    renderProductDB();
 }
 
 // =====================================
@@ -3113,6 +3142,9 @@ function openModal(type) {
     } else if (type === 'client') {
         openClientModal(null);
         return;
+    } else if (type === 'product') {
+        openProductDBModal(null);
+        return;
     }
     document.getElementById('modalOverlay').classList.add('show');
     const mb = document.getElementById('modalBody');
@@ -4469,4 +4501,231 @@ function ratingBadgeClass(r) {
     if (r.includes('C')) return 'badge-yellow';
     if (r.includes('X')) return 'badge-red';
     return 'badge-gray';
+}
+
+// =====================================
+// 상품 DB (제안서 시스템 파트 2)
+// =====================================
+const PRODUCT_CATEGORIES = ['시계', '굿즈', '생활용품', '필기구', '식품', '기타'];
+const PRINT_TYPES = ['불가', '레이저각인', '실크인쇄', '패드인쇄', '기타'];
+const PACKAGING_TYPES = ['기본박스', '선물포장', '전용케이스', '전용보관함', '기타'];
+const PRODUCT_STATUSES = ['판매 중', '품절', '단종'];
+
+function productStatusBadge(s) {
+    if (s === '판매 중') return 'badge-green';
+    if (s === '품절') return 'badge-gray';
+    if (s === '단종') return 'badge-red';
+    return 'badge-gray';
+}
+
+function formatKRW(n) {
+    return (n || 0).toLocaleString() + '원';
+}
+
+function productThumb(p) {
+    if (p.image) {
+        return `<img src="${p.image}" alt="${p.name}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--gray-200)">`;
+    }
+    return `<div style="width:44px;height:44px;border-radius:8px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;color:var(--gray-400)"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>`;
+}
+
+function renderProductDB() {
+    // 요약 카드
+    document.getElementById('pdbTotal').textContent = productsDB.length;
+    document.getElementById('pdbActive').textContent = productsDB.filter(p => p.status === '판매 중').length;
+    document.getElementById('pdbInactive').textContent = productsDB.filter(p => p.status === '품절' || p.status === '단종').length;
+
+    // 필터링
+    let filtered = productsDB;
+    if (currentProductCategory !== 'all') {
+        filtered = filtered.filter(p => p.category === currentProductCategory);
+    }
+    if (currentProductSearch) {
+        const q = currentProductSearch;
+        filtered = filtered.filter(p =>
+            (p.name || '').toLowerCase().includes(q) ||
+            (p.description || '').toLowerCase().includes(q)
+        );
+    }
+
+    let tableHtml = '';
+    let cardHtml = '';
+    filtered.forEach(p => {
+        const priceStr = `${formatKRW(p.unitPrice)} <span style="font-size:11px;color:var(--gray-500)">(${p.vatIncluded ? 'VAT 포함' : 'VAT 별도'})</span>`;
+        const printCell = p.printType === '불가'
+            ? `<span style="color:var(--gray-400);font-weight:600">불가</span>`
+            : `<span class="badge" style="background:#FAECE7;color:#712B13;font-weight:700">${p.printType}</span>${p.printFee ? `<div style="font-size:11px;color:var(--gray-500);margin-top:3px">₩${p.printFee.toLocaleString()}/개</div>` : ''}`;
+        const packCell = p.packagingType
+            ? `<span class="badge badge-green">${p.packagingType}</span>${p.packagingFee ? `<div style="font-size:11px;color:var(--gray-500);margin-top:3px">₩${p.packagingFee.toLocaleString()}/개</div>` : ''}`
+            : `<span style="color:var(--gray-400)">-</span>`;
+        const labelCell = p.labelAvailable
+            ? `<span class="badge badge-green">가능</span>`
+            : `<span class="badge badge-red">불가</span>`;
+
+        tableHtml += `<tr onclick="showProductDetail(${p.id})" style="cursor:pointer">
+            <td>${productThumb(p)}</td>
+            <td>
+                <div style="font-weight:700;color:var(--gray-900)">${p.name}</div>
+                <div style="font-size:12px;color:var(--gray-500);font-weight:500;margin-top:2px">${p.description || ''}</div>
+            </td>
+            <td><span class="badge badge-gray">${p.category}</span></td>
+            <td style="font-weight:700">${priceStr}</td>
+            <td>${printCell}</td>
+            <td>${packCell}</td>
+            <td>${labelCell}</td>
+            <td><span class="badge ${productStatusBadge(p.status)}">${p.status}</span></td>
+        </tr>`;
+
+        cardHtml += `<div class="resp-card" onclick="showProductDetail(${p.id})">
+            <div class="resp-card-top">
+                <div style="display:flex;gap:12px;align-items:center">
+                    ${productThumb(p)}
+                    <div>
+                        <div class="resp-card-title">${p.name}</div>
+                        <div style="font-size:12px;color:var(--gray-500)">${p.description || ''}</div>
+                    </div>
+                </div>
+                <span class="badge ${productStatusBadge(p.status)}">${p.status}</span>
+            </div>
+            <div class="resp-card-meta">
+                <div class="resp-card-row"><span class="badge badge-gray">${p.category}</span> <strong>${priceStr}</strong></div>
+                <div class="resp-card-row">인쇄: ${p.printType}${p.printFee ? ` (₩${p.printFee.toLocaleString()}/개)` : ''}</div>
+                <div class="resp-card-row">포장: ${p.packagingType || '-'}${p.packagingFee ? ` (₩${p.packagingFee.toLocaleString()}/개)` : ''}</div>
+                <div class="resp-card-row">라벨: ${p.labelAvailable ? '가능' : '불가'}</div>
+            </div>
+        </div>`;
+    });
+
+    if (!tableHtml) {
+        tableHtml = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-500)">등록된 상품이 없습니다</td></tr>`;
+    }
+    document.getElementById('productTableBody').innerHTML = tableHtml;
+    document.getElementById('productCardGrid').innerHTML = cardHtml;
+}
+
+// 상품 등록/편집 모달
+function openProductDBModal(editId) {
+    const overlay = document.getElementById('modalOverlay');
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    const p = editId ? productsDB.find(x => x.id === editId) : null;
+    title.textContent = p ? '상품 편집' : '상품 등록';
+    const v = (k, d = '') => (p && p[k] != null ? p[k] : d);
+    const sel = (opts, cur) => opts.map(o => `<option value="${o}" ${cur === o ? 'selected' : ''}>${o}</option>`).join('');
+    body.innerHTML = `
+        <input type="hidden" id="productEditId" value="${editId || ''}">
+        <div class="form-group"><label class="form-label">상품명 <span style="color:var(--red)">*</span></label>
+            <input type="text" class="form-input" id="productName" placeholder="상품명" value="${v('name')}"></div>
+        <div class="form-group"><label class="form-label">상품 설명</label>
+            <input type="text" class="form-input" id="productDescription" placeholder="간단 설명" value="${v('description')}"></div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">카테고리</label>
+                <select class="form-select" id="productCategory">${sel(PRODUCT_CATEGORIES, v('category') || '시계')}</select></div>
+            <div class="form-group"><label class="form-label">상태</label>
+                <select class="form-select" id="productStatus">${sel(PRODUCT_STATUSES, v('status') || '판매 중')}</select></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">단가 (원)</label>
+                <input type="number" class="form-input" id="productUnitPrice" placeholder="0" value="${v('unitPrice', 0)}"></div>
+            <div class="form-group"><label class="form-label">VAT 포함</label>
+                <label style="display:flex;align-items:center;gap:8px;padding:10px 0;font-weight:500;color:var(--gray-700)">
+                    <input type="checkbox" id="productVatIncluded" ${v('vatIncluded', true) ? 'checked' : ''}> 단가에 VAT 포함</label>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">인쇄</label>
+                <select class="form-select" id="productPrintType" onchange="document.getElementById('productPrintFeeRow').style.display=this.value==='불가'?'none':'block'">${sel(PRINT_TYPES, v('printType') || '불가')}</select></div>
+            <div class="form-group" id="productPrintFeeRow" style="display:${(v('printType') || '불가') === '불가' ? 'none' : 'block'}"><label class="form-label">인쇄비 (개당)</label>
+                <input type="number" class="form-input" id="productPrintFee" placeholder="0" value="${v('printFee', 0)}"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">포장 방식</label>
+                <select class="form-select" id="productPackagingType">${sel(PACKAGING_TYPES, v('packagingType') || '기본박스')}</select></div>
+            <div class="form-group"><label class="form-label">포장비 (개당)</label>
+                <input type="number" class="form-input" id="productPackagingFee" placeholder="0" value="${v('packagingFee', 0)}"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">라벨부착</label>
+                <select class="form-select" id="productLabelAvailable">
+                    <option value="true" ${v('labelAvailable', true) ? 'selected' : ''}>가능</option>
+                    <option value="false" ${!v('labelAvailable', true) ? 'selected' : ''}>불가</option>
+                </select></div>
+            <div class="form-group"><label class="form-label">이미지 URL</label>
+                <input type="text" class="form-input" id="productImage" placeholder="https://..." value="${v('image')}"></div>
+        </div>
+        <div class="form-actions" style="display:flex;gap:10px;margin-top:16px">
+            <button class="form-submit" style="flex:1" onclick="saveProduct()">${p ? '저장' : '상품 등록'}</button>
+            ${p ? `<button class="form-delete-btn" onclick="deleteProduct(${p.id})">🗑️ 삭제</button>` : ''}
+        </div>
+    `;
+    overlay.classList.add('show');
+    const mb = document.getElementById('modalBody');
+    if (mb) mb.scrollTop = 0;
+}
+
+function saveProduct() {
+    const editId = parseInt(document.getElementById('productEditId').value) || 0;
+    const name = document.getElementById('productName').value.trim();
+    if (!name) { showToast('상품명을 입력해주세요'); return; }
+    const data = {
+        name,
+        description: document.getElementById('productDescription').value.trim(),
+        category: document.getElementById('productCategory').value,
+        image: document.getElementById('productImage').value.trim(),
+        unitPrice: parseInt(document.getElementById('productUnitPrice').value) || 0,
+        vatIncluded: document.getElementById('productVatIncluded').checked,
+        printType: document.getElementById('productPrintType').value,
+        printFee: parseInt(document.getElementById('productPrintFee').value) || 0,
+        packagingType: document.getElementById('productPackagingType').value,
+        packagingFee: parseInt(document.getElementById('productPackagingFee').value) || 0,
+        labelAvailable: document.getElementById('productLabelAvailable').value === 'true',
+        status: document.getElementById('productStatus').value,
+    };
+    if (editId) {
+        const idx = productsDB.findIndex(p => p.id === editId);
+        if (idx >= 0) productsDB[idx] = { ...productsDB[idx], ...data };
+        showToast('상품이 수정되었습니다');
+    } else {
+        productsDB.push({ id: Date.now(), ...data, createdAt: new Date().toISOString() });
+        showToast('상품이 등록되었습니다');
+    }
+    closeModal();
+    renderProductDB();
+}
+
+function deleteProduct(id) {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    const idx = productsDB.findIndex(p => p.id === id);
+    if (idx >= 0) productsDB.splice(idx, 1);
+    closeModal();
+    closeDetail();
+    renderProductDB();
+    showToast('삭제되었습니다');
+}
+
+function showProductDetail(id) {
+    const p = productsDB.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById('detailPanelTitle').textContent = p.name;
+    const row = (label, val) => `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-100)"><span style="color:var(--gray-500);font-weight:600">${label}</span><span style="color:var(--gray-900);font-weight:700">${val}</span></div>`;
+    const imgHtml = p.image
+        ? `<img src="${p.image}" style="width:100%;max-height:260px;object-fit:cover;border-radius:12px;border:1px solid var(--gray-200);margin-bottom:16px">`
+        : `<div style="width:100%;height:180px;border-radius:12px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;color:var(--gray-400);margin-bottom:16px"><svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>`;
+    document.getElementById('detailContent').innerHTML = `
+        ${imgHtml}
+        <div style="margin-bottom:16px">
+            <span class="badge badge-gray">${p.category}</span>
+            <span class="badge ${productStatusBadge(p.status)}" style="margin-left:6px">${p.status}</span>
+        </div>
+        <div style="color:var(--gray-600);font-size:13px;margin-bottom:16px">${p.description || '-'}</div>
+        ${row('단가', `${formatKRW(p.unitPrice)} <span style="font-size:11px;color:var(--gray-500);font-weight:500">(${p.vatIncluded ? 'VAT 포함' : 'VAT 별도'})</span>`)}
+        ${row('인쇄', p.printType + (p.printFee ? ` · ₩${p.printFee.toLocaleString()}/개` : ''))}
+        ${row('포장', (p.packagingType || '-') + (p.packagingFee ? ` · ₩${p.packagingFee.toLocaleString()}/개` : ''))}
+        ${row('라벨부착', p.labelAvailable ? '가능' : '불가')}
+        <div style="display:flex;gap:10px;margin-top:20px">
+            <button class="form-submit" style="flex:1" onclick="closeDetail();openProductDBModal(${p.id})">✏️ 편집</button>
+            <button class="form-delete-btn" onclick="deleteProduct(${p.id})">🗑️ 삭제</button>
+        </div>
+    `;
+    document.getElementById('detailOverlay').classList.add('show');
 }

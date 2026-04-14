@@ -495,8 +495,69 @@
                 <div class="card-grid" id="deliveryCardGrid"></div>
             </main>
 
-            <!-- ===== 상품 DB (파트 2에서 구현) ===== -->
-            <main class="content" id="tab-product-db"></main>
+            <!-- ===== 상품 DB ===== -->
+            <main class="content" id="tab-product-db">
+                <div class="content-toolbar" style="align-items:flex-start">
+                    <div>
+                        <h2 style="font-size:20px;font-weight:800;color:var(--gray-900);margin-bottom:4px">상품 DB</h2>
+                        <p style="font-size:13px;color:var(--gray-500);font-weight:500">제안서 작성에 사용할 상품을 등록·관리합니다</p>
+                    </div>
+                    <button class="btn-primary" onclick="openModal('product')">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                        상품 등록
+                    </button>
+                </div>
+
+                <div class="summary-row">
+                    <div class="summary-card">
+                        <div class="summary-icon blue"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"/></svg></div>
+                        <div class="summary-info"><span class="summary-label">전체 상품</span><span class="summary-value" id="pdbTotal">0</span></div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-icon green"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+                        <div class="summary-info"><span class="summary-label">판매 중</span><span class="summary-value" id="pdbActive">0</span></div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-icon" style="background:var(--red-light);color:var(--red)"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></div>
+                        <div class="summary-info"><span class="summary-label">품절·단종</span><span class="summary-value" id="pdbInactive">0</span></div>
+                    </div>
+                </div>
+
+                <div class="content-toolbar" style="margin-top:8px">
+                    <div class="filter-bar" id="productCategoryFilter">
+                        <button class="filter-chip active" data-pcat="all">전체</button>
+                        <button class="filter-chip" data-pcat="시계">시계</button>
+                        <button class="filter-chip" data-pcat="굿즈">굿즈</button>
+                        <button class="filter-chip" data-pcat="생활용품">생활용품</button>
+                        <button class="filter-chip" data-pcat="필기구">필기구</button>
+                        <button class="filter-chip" data-pcat="식품">식품</button>
+                        <button class="filter-chip" data-pcat="기타">기타</button>
+                    </div>
+                    <div class="search-bar">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                        <input type="text" id="productSearch" placeholder="상품명·설명 검색">
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="data-table" id="productTable">
+                        <thead>
+                            <tr>
+                                <th style="width:64px">이미지</th>
+                                <th>상품명</th>
+                                <th style="width:90px">카테고리</th>
+                                <th style="width:130px">단가</th>
+                                <th style="width:170px">인쇄</th>
+                                <th style="width:170px">포장</th>
+                                <th style="width:80px">라벨</th>
+                                <th style="width:90px">상태</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="card-grid" id="productCardGrid"></div>
+            </main>
 
             <!-- ===== 제안서 관리 (파트 3에서 구현) ===== -->
             <main class="content" id="tab-proposals"></main>
