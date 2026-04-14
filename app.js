@@ -178,6 +178,8 @@ const pageTitles = {
     'projects-overseas': '프로젝트 진행사항 — 해외',
     daily: '일일계획표',
     delivery: '택배 관리',
+    'product-db': '상품 DB',
+    proposals: '제안서 관리',
     docs: '회사 문서',
     manual: '회사 매뉴얼',
     clients: '고객사 리스트'

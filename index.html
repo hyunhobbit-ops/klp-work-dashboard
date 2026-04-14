@@ -84,6 +84,19 @@
                     </button>
                 </div>
 
+                <!-- 제안서 그룹 -->
+                <div class="nav-group">
+                    <div class="nav-group-label">제안서</div>
+                    <button class="nav-item" data-tab="product-db">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        <span>상품 DB</span>
+                    </button>
+                    <button class="nav-item" data-tab="proposals">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        <span>제안서 관리</span>
+                    </button>
+                </div>
+
                 <!-- 자료실 그룹 -->
                 <div class="nav-group">
                     <div class="nav-group-label">자료실</div>
@@ -481,6 +494,12 @@
                 </div>
                 <div class="card-grid" id="deliveryCardGrid"></div>
             </main>
+
+            <!-- ===== 상품 DB (파트 2에서 구현) ===== -->
+            <main class="content" id="tab-product-db"></main>
+
+            <!-- ===== 제안서 관리 (파트 3에서 구현) ===== -->
+            <main class="content" id="tab-proposals"></main>
 
             <!-- ===== 회사 문서 ===== -->
             <main class="content" id="tab-docs">
