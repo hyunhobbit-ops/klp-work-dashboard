@@ -183,6 +183,7 @@ const pageTitles = {
 
 // ===== Init =====
 document.addEventListener('DOMContentLoaded', () => {
+    setupTheme();
     setupTopbar();
     setupSidebar();
     setupTabs();
@@ -192,6 +193,28 @@ document.addEventListener('DOMContentLoaded', () => {
     setupShortcuts();
     checkAuth();
 });
+
+// ===== Theme (light / dark) =====
+function setupTheme() {
+    const saved = localStorage.getItem('klp_theme') || 'light';
+    applyTheme(saved);
+    const btn = document.getElementById('themeToggle');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+            applyTheme(cur === 'dark' ? 'light' : 'dark');
+        });
+    }
+}
+
+function applyTheme(theme) {
+    if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+    }
+    localStorage.setItem('klp_theme', theme);
+}
 
 function setupShortcuts() {
     document.addEventListener('keydown', (e) => {
@@ -371,46 +394,83 @@ function renderHome() {
     const monthPrefix = todayStr.substring(0, 7); // YYYY-MM
     const monthDel = deliveries.filter(d => (d.date || '').startsWith(monthPrefix)).length;
 
+    // 인사말 + 날짜
+    const now = new Date();
+    const hour = now.getHours();
+    let greet = '안녕하세요';
+    if (hour < 12) greet = '좋은 아침이에요';
+    else if (hour < 18) greet = '좋은 오후예요';
+    else greet = '좋은 저녁이에요';
+    const urgentProjCount = projects.filter(p => p.priority && p.priority.includes('긴급') && p.status !== '완료').length;
+    const urgentTaskCount = dailyTasks.filter(t => t.priority && t.priority.includes('긴급') && !t.done && t.date <= todayStr).length;
+    const totalUrgent = urgentProjCount + urgentTaskCount;
+    const greetTitleEl = document.getElementById('greetingTitle');
+    const greetSubEl = document.getElementById('greetingSub');
+    const greetDateEl = document.getElementById('greetingDate');
+    if (greetTitleEl) greetTitleEl.textContent = `${myName || '환영합니다'}님, ${greet}`;
+    if (greetSubEl) {
+        greetSubEl.innerHTML = `오늘 할 일 <strong>${myTodayItems.length}건</strong>, 긴급 항목 <strong class="${totalUrgent > 0 ? 'urgent' : ''}">${totalUrgent}건</strong>이 있어요`;
+    }
+    if (greetDateEl) {
+        const wk = ['일', '월', '화', '수', '목', '금', '토'][now.getDay()];
+        greetDateEl.textContent = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일 (${wk})`;
+    }
+
     // Summary cards (이번 달 택배 카드는 HTML에서 제거됨)
     document.getElementById('activeProjects').textContent = activeCount;
     document.getElementById('todayTasks').textContent = myTodayItems.length;
     document.getElementById('completionRate').textContent = rate + '%';
 
     // Quick menu counts
-    document.getElementById('qProjects').textContent = `${activeCount}건 진행`;
-    document.getElementById('qDaily').textContent = `오늘 ${myTodayItems.length}건`;
-    document.getElementById('qDelivery').textContent = `이번달 ${monthDel}건`;
+    const qP = document.getElementById('qProjects'); if (qP) qP.textContent = `${activeCount}건 진행`;
+    const qD = document.getElementById('qDaily'); if (qD) qD.textContent = `오늘 ${myTodayItems.length}건`;
+    const qDel = document.getElementById('qDelivery'); if (qDel) qDel.textContent = `이번달 ${monthDel}건`;
 
-    // 마감임박 (D-3) — 프로젝트 마감일이 오늘부터 3일 이내, 완료 제외
+    // 마감 상태 카드 3종 — 마감 초과 / 3일 이내 / 이번 주
     const today0 = new Date(todayStr + 'T00:00:00');
-    const deadlineSoon = projects
+    const deadlineList = projects
         .filter(p => p.status !== '완료' && p.deadline)
         .map(p => {
             const d = new Date(p.deadline + 'T00:00:00');
             const diff = Math.round((d - today0) / 86400000);
             return { p, diff };
-        })
-        .filter(x => x.diff >= 0 && x.diff <= 3)
-        .sort((a, b) => a.diff - b.diff);
-    const deadlineEl = document.getElementById('deadlineSoonList');
-    const deadlineCountEl = document.getElementById('deadlineSoonCount');
-    if (deadlineCountEl) deadlineCountEl.textContent = deadlineSoon.length;
-    if (deadlineEl) {
-        if (deadlineSoon.length === 0) {
-            deadlineEl.innerHTML = `<div style="color:var(--text-tertiary);font-size:13px;padding:8px 2px">마감임박 항목이 없습니다</div>`;
-        } else {
-            deadlineEl.innerHTML = deadlineSoon.map(({ p, diff }) => {
-                const dLabel = diff === 0 ? 'D-DAY' : 'D-' + diff;
-                const dColor = diff === 0 ? '#E03131' : (diff === 1 ? '#E67E22' : '#1B64DA');
-                return `<div class="deadline-soon-item" onclick="showProjectDetail(${p.id})">
-                    <span class="deadline-soon-dday" style="background:${dColor}1a;color:${dColor}">${dLabel}</span>
-                    <span class="deadline-soon-name">${p.name}</span>
-                    <span class="deadline-soon-client">${p.client || '-'}</span>
-                    <span class="deadline-soon-date">${fmtDisplay(p.deadline)}</span>
-                </div>`;
-            }).join('');
+        });
+    const overdueItems = deadlineList.filter(x => x.diff < 0).sort((a, b) => a.diff - b.diff);
+    const soonItems = deadlineList.filter(x => x.diff >= 0 && x.diff <= 3).sort((a, b) => a.diff - b.diff);
+    const weekItems = deadlineList.filter(x => x.diff > 3 && x.diff <= 7).sort((a, b) => a.diff - b.diff);
+
+    const renderDeadlineCard = (items, listId, countId, kind) => {
+        const listEl = document.getElementById(listId);
+        const countEl = document.getElementById(countId);
+        if (countEl) countEl.textContent = items.length;
+        if (!listEl) return;
+        if (items.length === 0) {
+            listEl.innerHTML = `<div class="deadline-card-empty">해당 항목이 없습니다</div>`;
+            return;
         }
-    }
+        listEl.innerHTML = items.slice(0, 4).map(({ p, diff }) => {
+            let ddayLabel, ddayBg, ddayColor;
+            if (kind === 'overdue') {
+                ddayLabel = `D+${Math.abs(diff)}`;
+                ddayBg = 'var(--red-light)'; ddayColor = 'var(--red)';
+            } else if (kind === 'soon') {
+                ddayLabel = diff === 0 ? 'D-DAY' : `D-${diff}`;
+                ddayBg = 'var(--orange-light)'; ddayColor = 'var(--orange)';
+            } else {
+                ddayLabel = `D-${diff}`;
+                ddayBg = 'var(--gray-100)'; ddayColor = 'var(--gray-700)';
+            }
+            const owner = (p.assignees && p.assignees.length ? p.assignees.join(', ') : (p.manager || '-'));
+            return `<div class="deadline-card-row" onclick="showProjectDetail(${p.id})">
+                <span class="dday" style="background:${ddayBg};color:${ddayColor}">${ddayLabel}</span>
+                <span class="name">${p.name}</span>
+                <span class="meta">${owner} · ${fmtDisplay(p.deadline)}</span>
+            </div>`;
+        }).join('');
+    };
+    renderDeadlineCard(overdueItems, 'overdueList', 'overdueCount', 'overdue');
+    renderDeadlineCard(soonItems, 'soonList', 'soonCount', 'soon');
+    renderDeadlineCard(weekItems, 'weekList', 'weekCount', 'week');
 
     // Urgent
     const urgentProjects = projects.filter(p => p.priority.includes('긴급') && p.status !== '완료');

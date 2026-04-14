@@ -6,9 +6,17 @@
     <title>KLP KOREA - 업무 대시보드</title>
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260411">
+    <link rel="stylesheet" href="styles.css?v=20260414a">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        // 다크모드 FOUC 방지 — 페인트 전에 즉시 적용
+        try {
+            if (localStorage.getItem('klp_theme') === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        } catch (e) {}
+    </script>
 </head>
 <body>
     <!-- Login Screen -->
@@ -142,63 +150,58 @@
 
             <!-- ===== HOME ===== -->
             <main class="content active" id="tab-home">
-                <!-- Company Header -->
-                <div class="home-hero">
-                    <div class="hero-brand">
-                        <div class="hero-logo">K</div>
-                        <div class="hero-text">
-                            <h2 class="hero-company">KLP KOREA</h2>
-                            <p class="hero-motto">지식공유</p>
+                <!-- 개인화 인사말 -->
+                <div class="home-greeting">
+                    <div class="greeting-text">
+                        <h2 class="greeting-title" id="greetingTitle">안녕하세요</h2>
+                        <p class="greeting-sub" id="greetingSub">오늘도 좋은 하루 되세요</p>
+                    </div>
+                    <div class="greeting-date" id="greetingDate"></div>
+                </div>
+
+                <!-- 한 줄 히어로 배너 -->
+                <div class="hero-banner">
+                    <div class="hero-banner-left">
+                        <div class="hero-banner-logo">K</div>
+                        <div class="hero-banner-text">
+                            <span class="hero-banner-label">2026 경영목표</span>
+                            <span class="hero-banner-title">국내 시계 브랜드 인지도 1위</span>
                         </div>
+                    </div>
+                    <div class="hero-banner-goals">
+                        <div class="hero-goal" title="자체 브랜드 확장"><span class="hero-goal-num">01</span><span class="hero-goal-text">브랜드 확장</span></div>
+                        <div class="hero-goal" title="콘텐츠 리더십"><span class="hero-goal-num">02</span><span class="hero-goal-text">콘텐츠 리더십</span></div>
+                        <div class="hero-goal" title="IP 콜라보 사업 확대"><span class="hero-goal-num">03</span><span class="hero-goal-text">IP 콜라보</span></div>
+                        <div class="hero-goal" title="시계 문화 보급"><span class="hero-goal-num">04</span><span class="hero-goal-text">시계 문화</span></div>
                     </div>
                 </div>
 
-                <!-- 경영목표 -->
-                <div class="goal-section">
-                    <div class="goal-main">
-                        <div class="goal-main-label">2026 경영목표</div>
-                        <div class="goal-main-title">국내 시계 브랜드 인지도 1위</div>
+                <!-- 마감 상태 카드 3종 -->
+                <div class="deadline-cards">
+                    <div class="deadline-card overdue">
+                        <div class="deadline-card-header">
+                            <span class="deadline-card-icon">🔴</span>
+                            <span class="deadline-card-label">마감 초과</span>
+                            <span class="deadline-card-count" id="overdueCount">0</span>
+                        </div>
+                        <div class="deadline-card-body" id="overdueList"></div>
                     </div>
-                    <div class="goal-details">
-                        <div class="goal-item">
-                            <div class="goal-num">01</div>
-                            <div class="goal-content">
-                                <div class="goal-item-title">자체 브랜드 확장</div>
-                                <div class="goal-item-desc">자사만의 시계 라인업을 구축하고, 크라우드펀딩·글로벌 시장에 도전한다</div>
-                            </div>
+                    <div class="deadline-card soon">
+                        <div class="deadline-card-header">
+                            <span class="deadline-card-icon">🟠</span>
+                            <span class="deadline-card-label">3일 이내</span>
+                            <span class="deadline-card-count" id="soonCount">0</span>
                         </div>
-                        <div class="goal-item">
-                            <div class="goal-num">02</div>
-                            <div class="goal-content">
-                                <div class="goal-item-title">콘텐츠 리더십</div>
-                                <div class="goal-item-desc">"시계 하면 KLP"라는 인식을 유튜브·SNS를 통해 확립한다</div>
-                            </div>
-                        </div>
-                        <div class="goal-item">
-                            <div class="goal-num">03</div>
-                            <div class="goal-content">
-                                <div class="goal-item-title">IP 콜라보 사업 확대</div>
-                                <div class="goal-item-desc">인기 IP와의 협업을 통해 굿즈·한정판 시계 라인을 확장한다</div>
-                            </div>
-                        </div>
-                        <div class="goal-item">
-                            <div class="goal-num">04</div>
-                            <div class="goal-content">
-                                <div class="goal-item-title">시계 문화 보급</div>
-                                <div class="goal-item-desc">조립 키트·교육 콘텐츠를 통해 시계를 직접 만드는 문화를 국내에 정착시킨다</div>
-                            </div>
-                        </div>
+                        <div class="deadline-card-body" id="soonList"></div>
                     </div>
-                </div>
-
-                <!-- 마감임박 (D-3) -->
-                <div class="deadline-soon-panel">
-                    <div class="deadline-soon-header">
-                        <span class="deadline-soon-title">⏰ 마감임박</span>
-                        <span class="deadline-soon-sub">오늘부터 3일 이내</span>
-                        <span class="panel-badge red" id="deadlineSoonCount">0</span>
+                    <div class="deadline-card week">
+                        <div class="deadline-card-header">
+                            <span class="deadline-card-icon">⚪</span>
+                            <span class="deadline-card-label">이번 주</span>
+                            <span class="deadline-card-count" id="weekCount">0</span>
+                        </div>
+                        <div class="deadline-card-body" id="weekList"></div>
                     </div>
-                    <div class="deadline-soon-body" id="deadlineSoonList"></div>
                 </div>
 
                 <!-- Summary Row -->
@@ -232,83 +235,73 @@
                     </div>
                 </div>
 
-                <!-- Quick Menu Cards -->
-                <div class="home-section-title">바로가기</div>
-                <div class="quick-menu">
-                    <div class="quick-card" onclick="switchTab('projects-domestic')">
-                        <div class="quick-icon blue">
-                            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                <!-- 업무 현황 (비대칭 1.4fr 1fr) -->
+                <div class="home-section-title" style="margin-top:24px">업무 현황</div>
+                <div class="dash-grid-async">
+                    <!-- 좌측 (넓음): 오늘의 할 일 + 긴급 항목 -->
+                    <div class="dash-col-left">
+                        <div class="dash-panel">
+                            <div class="panel-header">
+                                <h2 class="panel-title">오늘의 할 일</h2>
+                                <button class="panel-link" onclick="switchTab('daily')">전체보기 &rarr;</button>
+                            </div>
+                            <div class="panel-body" id="todaySchedule"></div>
                         </div>
-                        <div class="quick-label">프로젝트</div>
-                        <div class="quick-count" id="qProjects">0건 진행</div>
+                        <div class="dash-panel">
+                            <div class="panel-header">
+                                <h2 class="panel-title">긴급 항목</h2>
+                                <span class="panel-badge red" id="urgentCount">0</span>
+                            </div>
+                            <div class="panel-body" id="urgentList"></div>
+                        </div>
                     </div>
-                    <div class="quick-card" onclick="switchTab('daily')">
-                        <div class="quick-icon orange">
-                            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <!-- 우측 (좁음): 프로젝트 현황 + 최근 택배 + 바로가기 -->
+                    <div class="dash-col-right">
+                        <div class="dash-panel">
+                            <div class="panel-header">
+                                <h2 class="panel-title">프로젝트 현황</h2>
+                                <button class="panel-link" onclick="switchTab('projects-domestic')">전체보기 &rarr;</button>
+                            </div>
+                            <div class="panel-body" id="dashProjects"></div>
                         </div>
-                        <div class="quick-label">일일계획표</div>
-                        <div class="quick-count" id="qDaily">오늘 0건</div>
-                    </div>
-                    <div class="quick-card" onclick="switchTab('delivery')">
-                        <div class="quick-icon green">
-                            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M20 7l-8 8-4-4M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <div class="dash-panel">
+                            <div class="panel-header">
+                                <h2 class="panel-title">최근 택배</h2>
+                                <button class="panel-link" onclick="switchTab('delivery')">전체보기 &rarr;</button>
+                            </div>
+                            <div class="panel-body" id="dashDeliveries"></div>
                         </div>
-                        <div class="quick-label">택배 관리</div>
-                        <div class="quick-count" id="qDelivery">이번달 0건</div>
-                    </div>
-                    <div class="quick-card" onclick="switchTab('docs')">
-                        <div class="quick-icon purple">
-                            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                        <div class="dash-panel">
+                            <div class="panel-header">
+                                <h2 class="panel-title">바로가기</h2>
+                            </div>
+                            <div class="quick-mini">
+                                <div class="quick-mini-card" onclick="switchTab('projects-domestic')">
+                                    <div class="quick-mini-icon blue"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg></div>
+                                    <div class="quick-mini-text"><span class="quick-mini-label">프로젝트</span><span class="quick-mini-sub" id="qProjects">0건 진행</span></div>
+                                </div>
+                                <div class="quick-mini-card" onclick="switchTab('daily')">
+                                    <div class="quick-mini-icon orange"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+                                    <div class="quick-mini-text"><span class="quick-mini-label">일일계획표</span><span class="quick-mini-sub" id="qDaily">오늘 0건</span></div>
+                                </div>
+                                <div class="quick-mini-card" onclick="switchTab('delivery')">
+                                    <div class="quick-mini-icon green"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8 8-4-4M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+                                    <div class="quick-mini-text"><span class="quick-mini-label">택배 관리</span><span class="quick-mini-sub" id="qDelivery">이번달 0건</span></div>
+                                </div>
+                                <div class="quick-mini-card" onclick="switchTab('docs')">
+                                    <div class="quick-mini-icon purple"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div>
+                                    <div class="quick-mini-text"><span class="quick-mini-label">회사 문서</span><span class="quick-mini-sub">자료실</span></div>
+                                </div>
+                                <div class="quick-mini-card" onclick="switchTab('clients')">
+                                    <div class="quick-mini-icon teal"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
+                                    <div class="quick-mini-text"><span class="quick-mini-label">고객사</span><span class="quick-mini-sub">자료실</span></div>
+                                </div>
+                                <a class="quick-mini-card" href="https://klp-document-generator.vercel.app" target="_blank" rel="noopener">
+                                    <div class="quick-mini-icon rose"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
+                                    <div class="quick-mini-text"><span class="quick-mini-label">문서생성기</span><span class="quick-mini-sub">외부 ↗</span></div>
+                                </a>
+                            </div>
                         </div>
-                        <div class="quick-label">회사 문서</div>
-                        <div class="quick-count">자료실</div>
-                    </div>
-                    <div class="quick-card" onclick="switchTab('clients')">
-                        <div class="quick-icon teal">
-                            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                        </div>
-                        <div class="quick-label">고객사 리스트</div>
-                        <div class="quick-count">자료실</div>
-                    </div>
-                    <a class="quick-card" href="https://klp-document-generator.vercel.app" target="_blank" rel="noopener">
-                        <div class="quick-icon rose">
-                            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        </div>
-                        <div class="quick-label">문서생성기</div>
-                        <div class="quick-count">외부 링크 ↗</div>
-                    </a>
-                </div>
-
-                <!-- Dashboard Grid -->
-                <div class="home-section-title" style="margin-top:32px">업무 현황</div>
-                <div class="dash-grid">
-                    <div class="dash-panel">
-                        <div class="panel-header">
-                            <h2 class="panel-title">긴급 항목</h2>
-                            <span class="panel-badge red" id="urgentCount">0</span>
-                        </div>
-                        <div class="panel-body" id="urgentList"></div>
-                    </div>
-                    <div class="dash-panel">
-                        <div class="panel-header">
-                            <h2 class="panel-title">오늘의 할 일</h2>
-                            <button class="panel-link" onclick="switchTab('daily')">전체보기 &rarr;</button>
-                        </div>
-                        <div class="panel-body" id="todaySchedule"></div>
-                    </div>
-                    <div class="dash-panel">
-                        <div class="panel-header">
-                            <h2 class="panel-title">프로젝트 현황</h2>
-                            <button class="panel-link" onclick="switchTab('projects-domestic')">전체보기 &rarr;</button>
-                        </div>
-                        <div class="panel-body" id="dashProjects"></div>
-                    </div>
-                    <div class="dash-panel">
-                        <div class="panel-header">
-                            <h2 class="panel-title">최근 택배</h2>
-                            <button class="panel-link" onclick="switchTab('delivery')">전체보기 &rarr;</button>
-                        </div>
-                        <div class="panel-body" id="dashDeliveries"></div>
                     </div>
                 </div>
             </main>
@@ -573,6 +566,11 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <script src="app.js?v=20260413g"></script>
+    <!-- 테마 토글 (라이트/다크) -->
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="테마 전환" title="라이트/다크 전환">
+        <svg class="icon-moon" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        <svg class="icon-sun" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    </button>
+    <script src="app.js?v=20260414a"></script>
 </body>
 </html>

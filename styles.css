@@ -44,6 +44,38 @@
     --radius-sm: 12px;
     --radius-xs: 8px;
     --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --text-tertiary: #b0b8c1;
+}
+
+/* ============================
+   DARK THEME
+   ============================ */
+[data-theme="dark"] {
+    --bg: #0f141b;
+    --white: #1a222e;
+    --gray-50: #1f2935;
+    --gray-100: #263240;
+    --gray-200: #34404f;
+    --gray-300: #475262;
+    --gray-400: #6b7684;
+    --gray-500: #8b95a1;
+    --gray-600: #b0b8c1;
+    --gray-700: #d1d6db;
+    --gray-800: #e5e8eb;
+    --gray-900: #f2f4f6;
+    --blue-light: #1a2f4d;
+    --orange-light: #3a2818;
+    --green-light: #15302a;
+    --purple-light: #2a1f3d;
+    --teal-light: #15302d;
+    --rose-light: #3a1f25;
+    --red-light: #3a1d1f;
+    --yellow-light: #3a2f1a;
+    --shadow-xs: 0 1px 2px rgba(0,0,0,0.4);
+    --shadow-sm: 0 1px 4px rgba(0,0,0,0.5);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.6);
+    --shadow-lg: 0 8px 28px rgba(0,0,0,0.7);
+    --text-tertiary: #6b7684;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -821,6 +853,291 @@ body {
 
 .panel-body::-webkit-scrollbar { width: 4px; }
 .panel-body::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 4px; }
+
+/* ============================
+   HOME - 인사말 (Greeting)
+   ============================ */
+.home-greeting {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding: 4px 2px;
+}
+.greeting-text { display: flex; flex-direction: column; gap: 4px; }
+.greeting-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--gray-900);
+    letter-spacing: -0.5px;
+    line-height: 1.25;
+}
+.greeting-sub {
+    font-size: 13px;
+    color: var(--gray-500);
+    font-weight: 600;
+}
+.greeting-sub strong { color: var(--blue); font-weight: 800; }
+.greeting-sub strong.urgent { color: var(--red); }
+.greeting-date {
+    font-size: 13px;
+    color: var(--gray-500);
+    font-weight: 700;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* ============================
+   HOME - 한 줄 히어로 배너
+   ============================ */
+.hero-banner {
+    background: linear-gradient(135deg, #191f28 0%, #232a36 100%);
+    border-radius: var(--radius);
+    padding: 18px 24px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    box-shadow: var(--shadow-sm);
+}
+.hero-banner-left { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.hero-banner-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--white);
+    color: #191f28;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 18px;
+}
+.hero-banner-text { display: flex; flex-direction: column; gap: 2px; }
+.hero-banner-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #6ea1f5;
+    letter-spacing: 0.6px;
+}
+.hero-banner-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.3px;
+}
+.hero-banner-goals {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+    flex-wrap: wrap;
+}
+.hero-goal {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.85);
+}
+.hero-goal-num {
+    font-weight: 900;
+    color: #6ea1f5;
+    font-size: 11px;
+    letter-spacing: 0.4px;
+}
+.hero-goal-text { color: #fff; font-weight: 700; }
+
+@media (max-width: 1100px) {
+    .hero-banner-goals { margin-left: 0; width: 100%; }
+}
+
+/* ============================
+   HOME - 마감 상태 카드 3종
+   ============================ */
+.deadline-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+}
+.deadline-card {
+    background: var(--white);
+    border-radius: var(--radius-sm);
+    padding: 16px 18px;
+    box-shadow: var(--shadow-xs);
+    border-top: 3px solid var(--gray-200);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 140px;
+}
+.deadline-card.overdue { border-top-color: var(--red); }
+.deadline-card.soon { border-top-color: var(--orange); }
+.deadline-card.week { border-top-color: var(--gray-400); }
+
+.deadline-card-header { display: flex; align-items: center; gap: 8px; }
+.deadline-card-icon { font-size: 14px; }
+.deadline-card-label {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--gray-900);
+    letter-spacing: -0.2px;
+}
+.deadline-card-count {
+    margin-left: auto;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 2px 10px;
+    border-radius: 10px;
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+.deadline-card.overdue .deadline-card-count { background: var(--red-light); color: var(--red); }
+.deadline-card.soon .deadline-card-count { background: var(--orange-light); color: var(--orange); }
+
+.deadline-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.deadline-card-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+.deadline-card-row:hover { background: var(--gray-50); }
+.deadline-card-row .name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gray-900);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+.deadline-card-row .meta {
+    font-size: 11px;
+    color: var(--gray-500);
+    font-weight: 600;
+    white-space: nowrap;
+}
+.deadline-card-row .dday {
+    font-size: 11px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+.deadline-card-empty {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    text-align: center;
+    padding: 16px 4px;
+    font-weight: 600;
+}
+
+@media (max-width: 900px) {
+    .deadline-cards { grid-template-columns: 1fr; }
+}
+
+/* ============================
+   HOME - 비대칭 대시 그리드 (1.4fr 1fr)
+   ============================ */
+.dash-grid-async {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 20px;
+}
+.dash-col-left, .dash-col-right {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+@media (max-width: 1100px) {
+    .dash-grid-async { grid-template-columns: 1fr; }
+}
+
+/* 우측 컬럼 안 바로가기 */
+.quick-mini {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 0 24px 20px;
+}
+.quick-mini-card {
+    background: var(--gray-50);
+    border-radius: 10px;
+    padding: 14px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    transition: background var(--transition), transform var(--transition);
+}
+.quick-mini-card:hover { background: var(--blue-light); transform: translateY(-1px); }
+.quick-mini-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.quick-mini-icon.blue { background: var(--blue-light); color: var(--blue); }
+.quick-mini-icon.orange { background: var(--orange-light); color: var(--orange); }
+.quick-mini-icon.green { background: var(--green-light); color: var(--green); }
+.quick-mini-icon.purple { background: var(--purple-light); color: var(--purple); }
+.quick-mini-icon.teal { background: var(--teal-light); color: var(--teal); }
+.quick-mini-icon.rose { background: var(--rose-light); color: var(--rose); }
+.quick-mini-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.quick-mini-label { font-size: 13px; font-weight: 700; color: var(--gray-900); }
+.quick-mini-sub { font-size: 11px; font-weight: 500; color: var(--gray-500); }
+
+/* ============================
+   THEME TOGGLE BUTTON (우측 하단)
+   ============================ */
+.theme-toggle {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 1000;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 1px solid var(--gray-200);
+    background: var(--white);
+    color: var(--gray-700);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-md);
+    transition: transform var(--transition), box-shadow var(--transition), background var(--transition);
+}
+.theme-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+.theme-toggle .icon-sun { display: none; }
+.theme-toggle .icon-moon { display: block; }
+[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 
 /* ============================
    Placeholder Page (자료실 등)
