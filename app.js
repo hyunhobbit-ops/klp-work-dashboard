@@ -4915,8 +4915,295 @@ function copyProposalLink(id) {
     }
 }
 
-// 편집 뷰 (파트 4에서 구현) — 일단 스텁
+// 제안서 편집 상태 (편집 중인 제안서 객체 사본) — 저장 시 proposals에 반영
+let editingProposal = null;
+
+function _defaultAssignee() {
+    if (currentUser && currentUser.name) return currentUser.name;
+    return '김현호';
+}
+
 function openProposalEditor(id) {
-    showToast('제안서 편집 화면은 파트 4에서 구현 예정');
-    // TODO 파트 4: proposalListView 숨기고 proposalEditorView에 편집 폼 렌더
+    const existing = id ? proposals.find(p => p.id === id) : null;
+    if (existing) {
+        editingProposal = JSON.parse(JSON.stringify(existing));
+    } else {
+        editingProposal = {
+            id: null,
+            title: '',
+            clientName: '',
+            clientContact: '',
+            clientPhone: '',
+            clientEmail: '',
+            description: '',
+            validUntil: '',
+            assignee: _defaultAssignee(),
+            status: '작성 중',
+            items: [],
+            totalAmount: 0,
+            sentDate: '',
+            shareLink: '',
+            createdAt: new Date().toISOString(),
+        };
+    }
+    // 뷰 전환
+    document.getElementById('proposalListView').style.display = 'none';
+    document.getElementById('proposalEditorView').style.display = 'block';
+    renderProposalEditor();
+    window.scrollTo(0, 0);
+    const mainWrap = document.querySelector('.main-wrap');
+    if (mainWrap) mainWrap.scrollTo(0, 0);
+}
+
+function closeProposalEditor() {
+    editingProposal = null;
+    document.getElementById('proposalEditorView').style.display = 'none';
+    document.getElementById('proposalEditorView').innerHTML = '';
+    document.getElementById('proposalListView').style.display = 'block';
+    renderProposals();
+}
+
+function renderProposalEditor() {
+    if (!editingProposal) return;
+    const ep = editingProposal;
+    const isNew = !ep.id;
+    const assignees = ['이현주', '김현호', '유지은', '구정두', '대표님'];
+    const view = document.getElementById('proposalEditorView');
+
+    // 상품 아이템 행 렌더
+    const itemsHtml = ep.items.length === 0
+        ? `<div style="padding:40px;text-align:center;color:var(--gray-500);font-size:13px">아직 담은 상품이 없습니다. "상품 DB에서 추가" 버튼으로 추가해주세요.</div>`
+        : ep.items.map((it, idx) => {
+            const p = productsDB.find(x => x.id === it.productId);
+            if (!p) return '';
+            const vatLabel = p.vatIncluded ? 'VAT 포함' : 'VAT 별도';
+            return `<div style="display:grid;grid-template-columns:56px 1fr 160px 120px 140px 40px;gap:12px;align-items:center;padding:12px;border-bottom:1px solid var(--gray-100)">
+                ${p.image
+                    ? `<img src="${p.image}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--gray-200)">`
+                    : `<div style="width:56px;height:56px;border-radius:8px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;color:var(--gray-400)"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>`}
+                <div style="min-width:0">
+                    <div style="font-weight:700;color:var(--gray-900);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>
+                    <div style="font-size:12px;color:var(--gray-500);margin-top:2px">${p.description || ''}</div>
+                    <span class="badge badge-gray" style="margin-top:4px">${p.category}</span>
+                </div>
+                <div style="text-align:right;font-weight:700">${formatKRW(p.unitPrice)}<div style="font-size:11px;color:var(--gray-500);font-weight:500">${vatLabel}</div></div>
+                <div><input type="number" min="1" class="form-input" style="text-align:right" value="${it.quantity}" onchange="updateProposalItemQty(${idx}, this.value)"></div>
+                <div style="text-align:right;font-weight:800;color:var(--blue)">${formatKRW(it.subtotal)}</div>
+                <button type="button" onclick="removeProductFromProposal(${idx})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:18px;padding:4px" title="삭제">✕</button>
+            </div>`;
+        }).join('');
+
+    view.innerHTML = `
+        <div class="content-toolbar" style="align-items:flex-start">
+            <div>
+                <h2 style="font-size:20px;font-weight:800;color:var(--gray-900);margin-bottom:4px">${isNew ? '새 제안서 작성' : '제안서 편집'}</h2>
+                <p style="font-size:13px;color:var(--gray-500);font-weight:500">거래처 정보·상품·금액을 구성하고 저장하세요</p>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <button class="panel-link" style="padding:8px 14px;border:1px solid var(--gray-200);border-radius:8px;background:var(--white);color:var(--gray-700);font-weight:700" onclick="closeProposalEditor()">← 목록으로</button>
+                <button class="panel-link" style="padding:8px 14px;border:1px solid var(--gray-200);border-radius:8px;background:var(--white);color:var(--gray-700);font-weight:700" onclick="openProposalPreview()">👁 미리보기</button>
+                <button class="btn-primary" onclick="saveProposal()">💾 저장</button>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+            <!-- 거래처 정보 -->
+            <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:18px 20px">
+                <div style="font-size:14px;font-weight:800;color:var(--gray-900);margin-bottom:12px">🏢 거래처 정보</div>
+                <div class="form-group"><label class="form-label">거래처명 <span style="color:var(--red)">*</span></label>
+                    <input type="text" class="form-input" id="epClientName" value="${ep.clientName || ''}" placeholder="거래처명"></div>
+                <div class="form-group"><label class="form-label">담당자</label>
+                    <input type="text" class="form-input" id="epClientContact" value="${ep.clientContact || ''}" placeholder="담당자 이름"></div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">연락처</label>
+                        <input type="text" class="form-input" id="epClientPhone" value="${ep.clientPhone || ''}" placeholder="010-0000-0000"></div>
+                    <div class="form-group"><label class="form-label">이메일</label>
+                        <input type="email" class="form-input" id="epClientEmail" value="${ep.clientEmail || ''}" placeholder="email@example.com"></div>
+                </div>
+            </div>
+            <!-- 제안서 정보 -->
+            <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:18px 20px">
+                <div style="font-size:14px;font-weight:800;color:var(--gray-900);margin-bottom:12px">📄 제안서 정보</div>
+                <div class="form-group"><label class="form-label">제안서 제목 <span style="color:var(--red)">*</span></label>
+                    <input type="text" class="form-input" id="epTitle" value="${ep.title || ''}" placeholder="예) 지플러스타워 준공 감사패 제안"></div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">유효기간</label>
+                        <input type="date" class="form-input" id="epValidUntil" value="${ep.validUntil || ''}"></div>
+                    <div class="form-group"><label class="form-label">담당자</label>
+                        <select class="form-select" id="epAssignee">
+                            ${assignees.map(a => `<option value="${a}" ${ep.assignee === a ? 'selected' : ''}>${a}</option>`).join('')}
+                        </select></div>
+                </div>
+                <div class="form-group"><label class="form-label">상태</label>
+                    <select class="form-select" id="epStatus">
+                        ${PROPOSAL_STATUSES.map(s => `<option value="${s}" ${ep.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+                    </select></div>
+                <div class="form-group"><label class="form-label">제안 안내 문구</label>
+                    <textarea class="form-input" id="epDescription" rows="3" placeholder="제안 배경·구성·특이사항 등">${ep.description || ''}</textarea></div>
+            </div>
+        </div>
+
+        <!-- 담은 상품 -->
+        <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:18px 20px;margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px">
+                <div>
+                    <span style="font-size:14px;font-weight:800;color:var(--gray-900)">🛒 담은 상품</span>
+                    <span style="font-size:12px;color:var(--gray-500);font-weight:600;margin-left:8px">${ep.items.length}개 선택</span>
+                </div>
+                <button class="btn-primary" onclick="openProductPicker()">+ 상품 DB에서 추가</button>
+            </div>
+            <div id="proposalItemsList" style="border:1px solid var(--gray-100);border-radius:8px;overflow:hidden">
+                ${itemsHtml}
+            </div>
+            <div style="display:flex;justify-content:flex-end;align-items:center;gap:14px;margin-top:14px;padding-top:14px;border-top:2px solid var(--gray-200)">
+                <span style="color:var(--gray-600);font-weight:700">총 제안 금액</span>
+                <span id="proposalTotalDisplay" style="font-size:24px;font-weight:900;color:var(--blue)">${formatKRW(ep.totalAmount)}</span>
+            </div>
+        </div>
+
+        <!-- 발송 영역 -->
+        <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:18px 20px">
+            <div style="font-size:14px;font-weight:800;color:var(--gray-900);margin-bottom:12px">📤 발송</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <button class="panel-link" style="padding:10px 16px;border:1px solid var(--gray-200);border-radius:8px;background:var(--white);color:var(--gray-700);font-weight:700" onclick="showToast('PDF 기능 준비 중')">📄 PDF 다운로드</button>
+                <button class="btn-primary" onclick="generateShareLink()">🔗 링크 생성 및 공유</button>
+            </div>
+            ${ep.shareLink ? `<div style="margin-top:12px;padding:10px 14px;background:var(--blue-light);border-radius:8px;font-size:12px;color:var(--blue);font-weight:600;word-break:break-all">공유 링크: ${ep.shareLink}</div>` : ''}
+        </div>
+    `;
+}
+
+function recalcProposalTotal() {
+    if (!editingProposal) return;
+    let total = 0;
+    editingProposal.items.forEach(it => {
+        const p = productsDB.find(x => x.id === it.productId);
+        if (!p) { it.subtotal = 0; return; }
+        it.subtotal = (p.unitPrice || 0) * (it.quantity || 0);
+        total += it.subtotal;
+    });
+    editingProposal.totalAmount = total;
+}
+
+function updateProposalItemQty(index, val) {
+    if (!editingProposal || !editingProposal.items[index]) return;
+    const qty = Math.max(1, parseInt(val) || 1);
+    editingProposal.items[index].quantity = qty;
+    recalcProposalTotal();
+    renderProposalEditor();
+}
+
+function removeProductFromProposal(index) {
+    if (!editingProposal) return;
+    editingProposal.items.splice(index, 1);
+    recalcProposalTotal();
+    renderProposalEditor();
+}
+
+function addProductToProposal(productId) {
+    if (!editingProposal) return;
+    if (editingProposal.items.find(it => it.productId === productId)) return; // 중복 방지
+    const p = productsDB.find(x => x.id === productId);
+    if (!p) return;
+    editingProposal.items.push({ productId, quantity: 1, subtotal: p.unitPrice || 0 });
+    recalcProposalTotal();
+}
+
+// 상품 선택 모달 — 상품 DB에서 판매 중 상품만 체크박스로
+function openProductPicker() {
+    if (!editingProposal) return;
+    const overlay = document.getElementById('modalOverlay');
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    title.textContent = '상품 DB에서 추가';
+    const selectedIds = new Set(editingProposal.items.map(it => it.productId));
+    const activeProducts = productsDB.filter(p => p.status === '판매 중');
+    body.innerHTML = `
+        <div style="font-size:13px;color:var(--gray-500);margin-bottom:12px">판매 중인 상품만 표시됩니다. 이미 담긴 상품은 비활성화됩니다.</div>
+        <div style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto">
+            ${activeProducts.map(p => {
+                const already = selectedIds.has(p.id);
+                return `<label style="display:grid;grid-template-columns:24px 56px 1fr auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--gray-200);border-radius:8px;cursor:${already ? 'not-allowed' : 'pointer'};opacity:${already ? '0.5' : '1'}">
+                    <input type="checkbox" class="product-picker-check" data-id="${p.id}" ${already ? 'checked disabled' : ''}>
+                    ${p.image
+                        ? `<img src="${p.image}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--gray-200)">`
+                        : `<div style="width:48px;height:48px;border-radius:6px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;color:var(--gray-400)"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16"/></svg></div>`}
+                    <div style="min-width:0">
+                        <div style="font-weight:700;color:var(--gray-900)">${p.name}</div>
+                        <div style="font-size:11px;color:var(--gray-500);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.description || ''}</div>
+                        <span class="badge badge-gray" style="margin-top:2px">${p.category}</span>
+                    </div>
+                    <div style="font-weight:800;color:var(--blue);white-space:nowrap">${formatKRW(p.unitPrice)}</div>
+                </label>`;
+            }).join('') || '<div style="text-align:center;padding:40px;color:var(--gray-500)">판매 중인 상품이 없습니다</div>'}
+        </div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+            <button class="panel-link" style="flex:1;padding:10px;border:1px solid var(--gray-200);border-radius:8px;background:var(--white);color:var(--gray-700);font-weight:700" onclick="closeModal()">취소</button>
+            <button class="form-submit" style="flex:1" onclick="confirmProductPicker()">선택 완료</button>
+        </div>
+    `;
+    overlay.classList.add('show');
+}
+
+function confirmProductPicker() {
+    if (!editingProposal) { closeModal(); return; }
+    const checks = document.querySelectorAll('.product-picker-check:not(:disabled):checked');
+    checks.forEach(c => {
+        const pid = parseInt(c.dataset.id);
+        addProductToProposal(pid);
+    });
+    closeModal();
+    renderProposalEditor();
+}
+
+function generateShareLink() {
+    if (!editingProposal) return;
+    const id = editingProposal.id || Date.now();
+    const link = `#proposal-preview-${id}`;
+    editingProposal.shareLink = link;
+    const full = location.origin + location.pathname + link;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(full).then(() => showToast('공유 링크가 생성되고 복사되었습니다')).catch(() => showToast('링크 생성됨 (복사 실패)'));
+    } else {
+        showToast('공유 링크가 생성되었습니다');
+    }
+    renderProposalEditor();
+}
+
+function openProposalPreview() {
+    showToast('미리보기는 파트 5에서 구현 예정');
+}
+
+function saveProposal() {
+    if (!editingProposal) return;
+    // DOM 값 수집
+    const title = document.getElementById('epTitle').value.trim();
+    const clientName = document.getElementById('epClientName').value.trim();
+    if (!clientName) { showToast('거래처명을 입력해주세요'); return; }
+    if (!title) { showToast('제안서 제목을 입력해주세요'); return; }
+    editingProposal.title = title;
+    editingProposal.clientName = clientName;
+    editingProposal.clientContact = document.getElementById('epClientContact').value.trim();
+    editingProposal.clientPhone = document.getElementById('epClientPhone').value.trim();
+    editingProposal.clientEmail = document.getElementById('epClientEmail').value.trim();
+    editingProposal.validUntil = document.getElementById('epValidUntil').value;
+    editingProposal.assignee = document.getElementById('epAssignee').value;
+    const newStatus = document.getElementById('epStatus').value;
+    if (newStatus === '발송 완료' && !editingProposal.sentDate) {
+        editingProposal.sentDate = fmtDate(new Date());
+    }
+    editingProposal.status = newStatus;
+    editingProposal.description = document.getElementById('epDescription').value.trim();
+    recalcProposalTotal();
+
+    if (editingProposal.id) {
+        const idx = proposals.findIndex(p => p.id === editingProposal.id);
+        if (idx >= 0) proposals[idx] = { ...editingProposal };
+        showToast('제안서가 저장되었습니다');
+    } else {
+        editingProposal.id = Date.now();
+        proposals.push({ ...editingProposal });
+        showToast('제안서가 등록되었습니다');
+    }
+    closeProposalEditor();
 }
