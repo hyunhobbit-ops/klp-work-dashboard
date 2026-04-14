@@ -284,6 +284,11 @@ function switchTab(tabId) {
     // Close mobile sidebar
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebarOverlay').classList.remove('show');
+
+    // 탭 전환 시 스크롤 위로
+    window.scrollTo(0, 0);
+    const mainWrap = document.querySelector('.main-wrap');
+    if (mainWrap) mainWrap.scrollTo(0, 0);
 }
 
 // ===== Filters =====
