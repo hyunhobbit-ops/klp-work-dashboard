@@ -105,10 +105,13 @@ async function showApp() {
     await loadClientsFromDb();
     subscribeDailyTasks();
     renderAll();
-    // URL 해시 → 탭 전환 (문서생성기에서 이동해온 경우 등)
+    // URL 해시 → 탭 전환 (새로고침 시 탭 유지, 문서생성기에서 이동해온 경우 등)
     const hash = location.hash.replace('#', '');
     if (hash && document.getElementById('tab-' + hash)) {
-        switchTab(hash);
+        switchTab(hash, true); // fromHistory=true → pushState 안 함
+    } else {
+        // 초기 home 상태도 history에 기록해두어 뒤로가기가 자연스럽게 동작
+        history.replaceState({ tab: 'home' }, '', '#home');
     }
     // 문서생성기에서 넘어온 프로젝트 프리필 처리
     try {
@@ -288,7 +291,10 @@ function setupTabs() {
     });
 }
 
-function switchTab(tabId) {
+function switchTab(tabId, fromHistory = false) {
+    // 존재하지 않는 탭이면 무시
+    if (!document.getElementById(`tab-${tabId}`)) return;
+
     // Update nav active state
     document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
     const navBtn = document.querySelector(`[data-tab="${tabId}"]`);
@@ -310,7 +316,23 @@ function switchTab(tabId) {
     window.scrollTo(0, 0);
     const mainWrap = document.querySelector('.main-wrap');
     if (mainWrap) mainWrap.scrollTo(0, 0);
+
+    // URL 해시 동기화 (브라우저 뒤로/앞으로 + 새로고침 시 탭 유지)
+    if (!fromHistory) {
+        const newHash = '#' + tabId;
+        if (location.hash !== newHash) {
+            history.pushState({ tab: tabId }, '', newHash);
+        }
+    }
 }
+
+// 브라우저 뒤로/앞으로 → 해시에 맞춰 탭 전환
+window.addEventListener('popstate', () => {
+    const hash = (location.hash || '').replace('#', '') || 'home';
+    if (document.getElementById('tab-' + hash)) {
+        switchTab(hash, true);
+    }
+});
 
 // ===== Filters =====
 function setupFilters() {
