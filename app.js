@@ -2070,7 +2070,7 @@ async function showProjectDetail(id) {
     title.textContent = `${p.client || ''} — ${p.name}`;
 
     const escFn = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
-    const row = (label, val) => `<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--gray-100)"><div style="width:100px;color:var(--text-tertiary);font-size:12px;font-weight:600">${label}</div><div style="flex:1;font-size:14px;color:var(--text-primary)">${escFn(val) || '-'}</div></div>`;
+    const row = (label, val) => `<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--gray-100)"><div style="width:100px;color:var(--gray-500);font-size:12px;font-weight:600">${label}</div><div style="flex:1;font-size:14px;color:var(--gray-900)">${escFn(val) || '-'}</div></div>`;
 
     // 금액 계산
     const revenue = p.revenue || 0;
@@ -2120,15 +2120,15 @@ async function showProjectDetail(id) {
     const checks = p.checks || {};
     const checksHtml = CHECK_ITEMS.map(item => {
         const done = !!checks[item.key];
-        return `<div onclick="toggleProjectCheck(${id},'${item.key}');setTimeout(()=>showProjectDetail(${id}),50)" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:${done ? '#E8F4FD' : 'var(--gray-50)'};border:1px solid ${done ? 'var(--blue)' : 'var(--gray-200)'};border-radius:8px;font-size:13px;cursor:pointer;transition:all .15s">
+        return `<div onclick="toggleProjectCheck(${id},'${item.key}');setTimeout(()=>showProjectDetail(${id}),50)" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:${done ? 'var(--blue-light)' : 'var(--gray-50)'};border:1px solid ${done ? 'var(--blue)' : 'var(--gray-200)'};border-radius:8px;font-size:13px;cursor:pointer;transition:all .15s;color:var(--gray-900)">
             <span style="display:inline-flex;width:18px;height:18px;border-radius:50%;background:${done ? 'var(--blue)' : 'var(--gray-300)'};color:white;align-items:center;justify-content:center;font-size:12px;font-weight:700">${done ? '✓' : ''}</span>
             <span style="font-weight:${done ? '700' : '500'}">${item.label}</span>
         </div>`;
     }).join('');
 
-    const secTitle = (icon, text) =>`<div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:var(--text-primary);padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--gray-200)">${icon} ${text}</div>`;
-    const cardBase = 'background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:14px 18px;margin-bottom:14px';
-    const brLine = (label, val) => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span style="color:var(--text-secondary)">${label}</span><strong style="color:var(--text-primary)">${val.toLocaleString()}원</strong></div>`;
+    const secTitle = (icon, text) =>`<div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:var(--gray-900);padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--gray-200)">${icon} ${text}</div>`;
+    const cardBase = 'background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:14px 18px;margin-bottom:14px;color:var(--gray-900)';
+    const brLine = (label, val) => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span style="color:var(--gray-500)">${label}</span><strong style="color:var(--gray-900)">${val.toLocaleString()}원</strong></div>`;
 
     body.innerHTML = `
         <!-- 헤더 -->
@@ -2136,29 +2136,29 @@ async function showProjectDetail(id) {
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
                 <span class="badge ${statusBadgeClass(p.status)}">${p.status}</span>
                 <span class="badge ${categoryBadgeClass(p.category)}">${p.category}</span>
-                ${p.sourceDocNumber ? `<span class="badge" style="background:#E8F4FD;color:var(--blue)">DC ${escFn(p.sourceDocNumber)}</span>` : ''}
+                ${p.sourceDocNumber ? `<span class="badge" style="background:var(--blue-light);color:var(--blue)">DC ${escFn(p.sourceDocNumber)}</span>` : ''}
             </div>
-            <h3 style="margin:0;font-size:20px;font-weight:800;color:var(--text-primary)">${escFn(p.client)}</h3>
-            <div style="font-size:14px;color:var(--text-secondary);margin-top:2px">${escFn(p.name)}</div>
+            <h3 style="margin:0;font-size:20px;font-weight:800;color:var(--gray-900)">${escFn(p.client)}</h3>
+            <div style="font-size:14px;color:var(--gray-500);margin-top:2px">${escFn(p.name)}</div>
         </div>
 
         <!-- 요약 스트립 -->
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
-            <div style="background:#E8F4FD;border:1px solid #CFE3F5;border-radius:10px;padding:12px;text-align:center">
-                <div style="font-size:11px;color:var(--text-tertiary);font-weight:700;margin-bottom:4px">매출</div>
+            <div style="background:var(--blue-light);border:1px solid var(--gray-200);border-radius:10px;padding:12px;text-align:center">
+                <div style="font-size:11px;color:var(--gray-500);font-weight:700;margin-bottom:4px">매출</div>
                 <div style="font-size:17px;font-weight:800;color:var(--blue)">${revenue.toLocaleString()}<span style="font-size:12px">원</span></div>
             </div>
-            <div style="background:${hasSupplier ? '#FFF5F0' : 'var(--gray-50)'};border:1px solid ${hasSupplier ? '#FFE0CC' : 'var(--gray-200)'};border-radius:10px;padding:12px;text-align:center">
-                <div style="font-size:11px;color:var(--text-tertiary);font-weight:700;margin-bottom:4px">매입</div>
-                <div style="font-size:17px;font-weight:800;color:${hasSupplier ? 'var(--klp-orange,#E67E22)' : 'var(--text-tertiary)'}">${hasSupplier ? purchaseTotal.toLocaleString() + '<span style="font-size:12px">원</span>' : '-'}</div>
+            <div style="background:${hasSupplier ? 'var(--orange-light)' : 'var(--gray-50)'};border:1px solid var(--gray-200);border-radius:10px;padding:12px;text-align:center">
+                <div style="font-size:11px;color:var(--gray-500);font-weight:700;margin-bottom:4px">매입</div>
+                <div style="font-size:17px;font-weight:800;color:${hasSupplier ? 'var(--orange)' : 'var(--gray-500)'}">${hasSupplier ? purchaseTotal.toLocaleString() + '<span style="font-size:12px">원</span>' : '-'}</div>
             </div>
-            <div style="background:${hasSupplier ? (margin >= 0 ? '#E8F8F0' : '#FDECEC') : 'var(--gray-50)'};border:1px solid ${hasSupplier ? (margin >= 0 ? '#B7E4C7' : '#F5B4B4') : 'var(--gray-200)'};border-radius:10px;padding:12px;text-align:center">
-                <div style="font-size:11px;color:var(--text-tertiary);font-weight:700;margin-bottom:4px">마진 ${hasSupplier ? `(${marginPct}%)` : ''}</div>
-                <div style="font-size:17px;font-weight:800;color:${hasSupplier ? (margin >= 0 ? '#16A34A' : 'var(--red)') : 'var(--text-tertiary)'}">${hasSupplier ? margin.toLocaleString() + '<span style="font-size:12px">원</span>' : '-'}</div>
+            <div style="background:${hasSupplier ? (margin >= 0 ? 'var(--green-light)' : 'var(--red-light)') : 'var(--gray-50)'};border:1px solid var(--gray-200);border-radius:10px;padding:12px;text-align:center">
+                <div style="font-size:11px;color:var(--gray-500);font-weight:700;margin-bottom:4px">마진 ${hasSupplier ? `(${marginPct}%)` : ''}</div>
+                <div style="font-size:17px;font-weight:800;color:${hasSupplier ? (margin >= 0 ? 'var(--green)' : 'var(--red)') : 'var(--gray-500)'}">${hasSupplier ? margin.toLocaleString() + '<span style="font-size:12px">원</span>' : '-'}</div>
             </div>
-            <div style="background:#F5F5F7;border:1px solid var(--gray-200);border-radius:10px;padding:12px;text-align:center">
-                <div style="font-size:11px;color:var(--text-tertiary);font-weight:700;margin-bottom:4px">납기 ${dday ? `<span style="color:var(--blue)">${dday}</span>` : ''}</div>
-                <div style="font-size:14px;font-weight:800;color:var(--text-primary)">${p.deadline || '-'}</div>
+            <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:10px;padding:12px;text-align:center">
+                <div style="font-size:11px;color:var(--gray-500);font-weight:700;margin-bottom:4px">납기 ${dday ? `<span style="color:var(--blue)">${dday}</span>` : ''}</div>
+                <div style="font-size:14px;font-weight:800;color:var(--gray-900)">${p.deadline || '-'}</div>
             </div>
         </div>
 
@@ -2200,28 +2200,28 @@ async function showProjectDetail(id) {
 
         <!-- 금액 상세 (매출·매입 나란히) -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
-            <div style="background:#F5FBFF;border:1.5px solid #CFE3F5;border-left:4px solid var(--blue);border-radius:10px;padding:14px 16px">
-                <div style="font-size:14px;font-weight:800;color:var(--blue);padding-bottom:8px;margin-bottom:8px;border-bottom:2px solid #CFE3F5">💰 매출 상세</div>
-                <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px">단가 ${(p.unitPrice||0).toLocaleString()}원 × ${qty.toLocaleString()}${p.unit||''} (${salesVatLabel})</div>
+            <div style="background:var(--blue-light);border:1.5px solid var(--gray-200);border-left:4px solid var(--blue);border-radius:10px;padding:14px 16px;color:var(--gray-900)">
+                <div style="font-size:14px;font-weight:800;color:var(--blue);padding-bottom:8px;margin-bottom:8px;border-bottom:2px solid var(--gray-200)">💰 매출 상세</div>
+                <div style="font-size:11px;color:var(--gray-500);margin-bottom:6px">단가 ${(p.unitPrice||0).toLocaleString()}원 × ${qty.toLocaleString()}${p.unit||''} (${salesVatLabel})</div>
                 ${brLine('제품 합계', salesProduct)}
                 ${brLine('＋ 인쇄비', salesPrint)}
                 ${brLine('＋ 포장비', salesPack)}
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-top:8px;background:#E8F4FD;border-radius:8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-top:8px;background:var(--white);border:1px solid var(--gray-200);border-radius:8px">
                     <span style="font-weight:800;color:var(--blue);font-size:13px">매출액</span>
                     <strong style="font-size:18px;color:var(--blue)">${revenue.toLocaleString()}원</strong>
                 </div>
             </div>
-            <div style="background:${hasSupplier ? '#FFF8F2' : 'var(--gray-50)'};border:1.5px solid ${hasSupplier ? '#FFE0CC' : 'var(--gray-200)'};border-left:4px solid ${hasSupplier ? 'var(--klp-orange,#E67E22)' : 'var(--gray-300)'};border-radius:10px;padding:14px 16px">
-                <div style="font-size:14px;font-weight:800;color:${hasSupplier ? 'var(--klp-orange,#E67E22)' : 'var(--text-tertiary)'};padding-bottom:8px;margin-bottom:8px;border-bottom:2px solid ${hasSupplier ? '#FFE0CC' : 'var(--gray-200)'}">🏭 매입 상세</div>
-                ${!hasSupplier ? `<div style="color:var(--text-tertiary);font-size:13px;padding:20px 0;text-align:center">매입처 정보 없음</div>` : `
-                    <div style="font-size:13px;color:var(--text-primary);margin-bottom:4px"><strong>${escFn(p.supplier)}</strong>${p.supplierContact ? `<span style="color:var(--text-tertiary);font-size:12px"> · ${escFn(p.supplierContact)}</span>` : ''}</div>
-                    <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px">매입단가 ${(p.supplierUnitPrice||0).toLocaleString()}원 × ${qty.toLocaleString()}${p.unit||''} (${supVatLabel})</div>
+            <div style="background:${hasSupplier ? 'var(--orange-light)' : 'var(--gray-50)'};border:1.5px solid var(--gray-200);border-left:4px solid ${hasSupplier ? 'var(--orange)' : 'var(--gray-300)'};border-radius:10px;padding:14px 16px;color:var(--gray-900)">
+                <div style="font-size:14px;font-weight:800;color:${hasSupplier ? 'var(--orange)' : 'var(--gray-500)'};padding-bottom:8px;margin-bottom:8px;border-bottom:2px solid var(--gray-200)">🏭 매입 상세</div>
+                ${!hasSupplier ? `<div style="color:var(--gray-500);font-size:13px;padding:20px 0;text-align:center">매입처 정보 없음</div>` : `
+                    <div style="font-size:13px;color:var(--gray-900);margin-bottom:4px"><strong>${escFn(p.supplier)}</strong>${p.supplierContact ? `<span style="color:var(--gray-500);font-size:12px"> · ${escFn(p.supplierContact)}</span>` : ''}</div>
+                    <div style="font-size:11px;color:var(--gray-500);margin-bottom:6px">매입단가 ${(p.supplierUnitPrice||0).toLocaleString()}원 × ${qty.toLocaleString()}${p.unit||''} (${supVatLabel})</div>
                     ${brLine('제품 합계', supProduct)}
                     ${brLine('＋ 매입 인쇄비', supPrint)}
                     ${brLine('＋ 매입 포장비', supPack)}
-                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-top:8px;background:#fff;border:1px solid #FFE0CC;border-radius:8px">
-                        <span style="font-weight:800;color:var(--klp-orange,#E67E22);font-size:13px">매입액</span>
-                        <strong style="font-size:18px;color:var(--klp-orange,#E67E22)">${purchaseTotal.toLocaleString()}원</strong>
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-top:8px;background:var(--white);border:1px solid var(--gray-200);border-radius:8px">
+                        <span style="font-weight:800;color:var(--orange);font-size:13px">매입액</span>
+                        <strong style="font-size:18px;color:var(--orange)">${purchaseTotal.toLocaleString()}원</strong>
                     </div>
                 `}
             </div>
@@ -2251,19 +2251,19 @@ async function showProjectDetail(id) {
         <!-- 디자인확인서 -->
         <div style="${cardBase}">
             ${secTitle('🖼️', '디자인확인서')}
-            <div id="dcDocArea">${p.sourceDocNumber ? `<div style="color:var(--text-tertiary);font-size:13px">디자인확인서 로딩 중...</div>` : `<div style="color:var(--text-tertiary);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">연결된 디자인확인서가 없습니다. 상단의 "디자인확인서 만들기" 버튼으로 생성하세요.</div>`}</div>
+            <div id="dcDocArea">${p.sourceDocNumber ? `<div style="color:var(--gray-500);font-size:13px">디자인확인서 로딩 중...</div>` : `<div style="color:var(--gray-500);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">연결된 디자인확인서가 없습니다. 상단의 "디자인확인서 만들기" 버튼으로 생성하세요.</div>`}</div>
         </div>
 
         <!-- 작업요청서 -->
         <div style="${cardBase}">
             ${secTitle('📋', '작업요청서')}
-            <div id="wrDocArea">${p.sourceDocNumber ? `<div style="color:var(--text-tertiary);font-size:13px">작업요청서 로딩 중...</div>` : `<div style="color:var(--text-tertiary);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">디자인확인서가 먼저 연결되어야 작업요청서를 조회할 수 있습니다</div>`}</div>
+            <div id="wrDocArea">${p.sourceDocNumber ? `<div style="color:var(--gray-500);font-size:13px">작업요청서 로딩 중...</div>` : `<div style="color:var(--gray-500);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">디자인확인서가 먼저 연결되어야 작업요청서를 조회할 수 있습니다</div>`}</div>
         </div>
 
         ${p.memo ? `
-        <div style="background:#FFFBF0;border:1px solid #FDE68A;border-left:4px solid #F59E0B;border-radius:10px;padding:12px 16px;margin-bottom:14px">
-            <div style="font-size:11px;color:#92400E;font-weight:800;margin-bottom:4px">📝 메모</div>
-            <div style="font-size:13px;white-space:pre-wrap;color:var(--text-primary)">${escFn(p.memo)}</div>
+        <div style="background:var(--yellow-light);border:1px solid var(--gray-200);border-left:4px solid var(--yellow);border-radius:10px;padding:12px 16px;margin-bottom:14px;color:var(--gray-900)">
+            <div style="font-size:11px;color:var(--yellow);font-weight:800;margin-bottom:4px">📝 메모</div>
+            <div style="font-size:13px;white-space:pre-wrap;color:var(--gray-900)">${escFn(p.memo)}</div>
         </div>` : ''}
 
         <!-- 액션 버튼 -->
@@ -2280,22 +2280,21 @@ async function showProjectDetail(id) {
     // DC / WR 비동기 로드
     if (p.sourceDocNumber) {
         const renderDocCard = (r, kind) => {
-            const titleColor = kind === 'DC' ? 'var(--blue)' : 'var(--klp-orange,#E67E22)';
-            const bg = kind === 'DC' ? '#F5FBFF' : '#FFF8F2';
-            const brd = kind === 'DC' ? '#CFE3F5' : '#FFE0CC';
+            const titleColor = kind === 'DC' ? 'var(--blue)' : 'var(--orange)';
+            const bg = kind === 'DC' ? 'var(--blue-light)' : 'var(--orange-light)';
             const viewUrl = `doc-generator.html#view-${encodeURIComponent(r.doc_number)}`;
-            const imgHtml = `<div style="border-radius:8px;overflow:hidden;border:1px solid var(--gray-200);background:#fff"><iframe src="${viewUrl}" style="width:100%;height:560px;border:0;display:block;background:#fff" loading="lazy" title="${escFn(r.doc_number)}"></iframe><div style="padding:6px 10px;background:var(--gray-50);border-top:1px solid var(--gray-200);text-align:right"><a href="${viewUrl}" target="_blank" style="font-size:11px;color:${titleColor};text-decoration:none;font-weight:700">새 탭에서 크게 보기 ↗</a></div></div>`;
+            const imgHtml = `<div style="border-radius:8px;overflow:hidden;border:1px solid var(--gray-200);background:var(--white)"><iframe src="${viewUrl}" style="width:100%;height:560px;border:0;display:block;background:#fff" loading="lazy" title="${escFn(r.doc_number)}"></iframe><div style="padding:6px 10px;background:var(--gray-50);border-top:1px solid var(--gray-200);text-align:right"><a href="${viewUrl}" target="_blank" style="font-size:11px;color:${titleColor};text-decoration:none;font-weight:700">새 탭에서 크게 보기 ↗</a></div></div>`;
             const clientLine = `${escFn(r.company_name || '')}${r.title ? ' — ' + escFn(r.title) : ''}`;
-            return `<div style="background:${bg};border:1px solid ${brd};border-radius:10px;padding:12px 14px;margin-bottom:10px">
+            return `<div style="background:${bg};border:1px solid var(--gray-200);border-radius:10px;padding:12px 14px;margin-bottom:10px;color:var(--gray-900)">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px;flex-wrap:wrap">
                     <div style="min-width:0">
                         <div style="font-size:11px;color:${titleColor};font-weight:800">${escFn(r.doc_number)}</div>
-                        <div style="font-size:13px;color:var(--text-primary);font-weight:700;margin-top:2px">${clientLine}</div>
-                        ${r.product_name ? `<div style="font-size:12px;color:var(--text-tertiary);margin-top:2px">${escFn(r.product_name)}</div>` : ''}
+                        <div style="font-size:13px;color:var(--gray-900);font-weight:700;margin-top:2px">${clientLine}</div>
+                        ${r.product_name ? `<div style="font-size:12px;color:var(--gray-500);margin-top:2px">${escFn(r.product_name)}</div>` : ''}
                     </div>
                     <div style="display:flex;gap:6px;flex-shrink:0">
-                        <button onclick="downloadDoc('${escFn(r.doc_number)}','jpg')" style="padding:6px 12px;border:1.5px solid ${titleColor};border-radius:6px;background:#fff;color:${titleColor};font-size:12px;font-weight:700;cursor:pointer">📷 JPG</button>
-                        <button onclick="downloadDoc('${escFn(r.doc_number)}','pdf')" style="padding:6px 12px;border:1.5px solid ${titleColor};border-radius:6px;background:#fff;color:${titleColor};font-size:12px;font-weight:700;cursor:pointer">📄 PDF</button>
+                        <button onclick="downloadDoc('${escFn(r.doc_number)}','jpg')" style="padding:6px 12px;border:1.5px solid ${titleColor};border-radius:6px;background:var(--white);color:${titleColor};font-size:12px;font-weight:700;cursor:pointer">📷 JPG</button>
+                        <button onclick="downloadDoc('${escFn(r.doc_number)}','pdf')" style="padding:6px 12px;border:1.5px solid ${titleColor};border-radius:6px;background:var(--white);color:${titleColor};font-size:12px;font-weight:700;cursor:pointer">📄 PDF</button>
                     </div>
                 </div>
                 ${imgHtml}
@@ -2477,7 +2476,7 @@ function openEditProject(id) {
             </div>
         </label>`).join('');
 
-    const secCard = (inner) => `<div style="background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:16px 20px;margin-bottom:16px">${inner}</div>`;
+    const secCard = (inner) => `<div style="background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900)">${inner}</div>`;
     const printFeeVat = p.printFeeVat || 'VAT 별도';
     const printFeeApply = p.printFeeApply || '1개당';
     const packagingFeeVat = p.packagingFeeVat || 'VAT 별도';
@@ -2589,12 +2588,12 @@ function openEditProject(id) {
             </div>
             <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid var(--gray-200)">
                 <label class="form-label" style="color:var(--blue);font-weight:800">💰 매출액 (자동계산)</label>
-                <div id="editProjectRevenueBreakdown" style="background:#F5FBFF;border:1px solid #CFE3F5;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--text-secondary)"></div>
-                <div class="form-input" id="editProjectRevenueDisplay" style="background:#E8F4FD;color:var(--blue);font-weight:800;font-size:20px">${(p.revenue||0).toLocaleString()} 원</div>
+                <div id="editProjectRevenueBreakdown" style="background:var(--blue-light);border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--gray-600)"></div>
+                <div class="form-input" id="editProjectRevenueDisplay" style="background:var(--blue-light);color:var(--blue);font-weight:800;font-size:20px">${(p.revenue||0).toLocaleString()} 원</div>
             </div>
         `)}
 
-        <div id="editSupplierDetailCard" style="background:#FFF8F2;border:1.5px solid #FFE0CC;border-left:4px solid var(--klp-orange,#E67E22);border-radius:10px;padding:16px 20px;margin-bottom:16px;display:${p.supplier ? 'block' : 'none'}">
+        <div id="editSupplierDetailCard" style="background:var(--orange-light);border:1.5px solid var(--gray-200);border-left:4px solid var(--orange);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900);display:${p.supplier ? 'block' : 'none'}">
             <div class="form-section-title" style="color:var(--klp-orange,#E67E22)">🏭 매입처 상세 (작업요청서용)</div>
             <div class="form-row" style="grid-template-columns:2fr 1fr">
                 <div class="form-group"><label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">매입 단가</label><input type="text" inputmode="numeric" class="form-input" id="editProjectSupUnitPrice" value="${p.supplierUnitPrice ? Number(p.supplierUnitPrice).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcEditSupplierTotal()"></div>
@@ -2637,8 +2636,8 @@ function openEditProject(id) {
             </div>
             <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid #FFE0CC">
                 <label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">💰 매입액 (자동계산)</label>
-                <div id="editProjectSupBreakdown" style="background:#fff;border:1px solid #FFE0CC;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--text-secondary)"></div>
-                <div class="form-input" id="editProjectSupTotalDisplay" style="background:#fff;color:var(--klp-orange,#E67E22);font-weight:800;font-size:20px">${(p.supplierRevenue||0).toLocaleString()} 원</div>
+                <div id="editProjectSupBreakdown" style="background:var(--white);border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--gray-600)"></div>
+                <div class="form-input" id="editProjectSupTotalDisplay" style="background:var(--white);color:var(--orange);font-weight:800;font-size:20px">${(p.supplierRevenue||0).toLocaleString()} 원</div>
                 <div id="editProjectMarginDisplay" style="margin-top:12px"></div>
             </div>
         </div>
@@ -2928,7 +2927,7 @@ function openModal(type) {
         const v = (k, d = '') => (prefill[k] != null ? prefill[k] : d);
 
         if (isDomestic) {
-            const secCard = (inner) => `<div style="background:#fff;border:1px solid var(--gray-200);border-radius:10px;padding:16px 20px;margin-bottom:16px">${inner}</div>`;
+            const secCard = (inner) => `<div style="background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900)">${inner}</div>`;
             const mgrDefault = (typeof getLoginManager === 'function' ? getLoginManager() : null) || v('manager') || '김현호 팀장';
             body.innerHTML = `
                 <datalist id="clientsListDoc">${clients.map(c => `<option value="${(c.companyName || '').replace(/"/g, '&quot;')}"></option>`).join('')}</datalist>
@@ -3019,12 +3018,12 @@ function openModal(type) {
                     </div>
                     <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid var(--gray-200)">
                         <label class="form-label" style="color:var(--blue);font-weight:800">💰 매출액 (자동계산)</label>
-                        <div id="newProjectRevenueBreakdown" style="background:#F5FBFF;border:1px solid #CFE3F5;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--text-secondary)"></div>
-                        <div class="form-input" id="newProjectRevenueDisplay" style="background:#E8F4FD;color:var(--blue);font-weight:800;font-size:20px">0 원</div>
+                        <div id="newProjectRevenueBreakdown" style="background:var(--blue-light);border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--gray-600)"></div>
+                        <div class="form-input" id="newProjectRevenueDisplay" style="background:var(--blue-light);color:var(--blue);font-weight:800;font-size:20px">0 원</div>
                     </div>
                 `)}
 
-                <div id="supplierDetailCard" style="background:#FFF8F2;border:1.5px solid #FFE0CC;border-left:4px solid var(--klp-orange,#E67E22);border-radius:10px;padding:16px 20px;margin-bottom:16px;display:none">
+                <div id="supplierDetailCard" style="background:var(--orange-light);border:1.5px solid var(--gray-200);border-left:4px solid var(--orange);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900);display:none">
                     <div class="form-section-title" style="color:var(--klp-orange,#E67E22)">🏭 매입처 상세 (작업요청서용)</div>
                     <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:14px">매입 단가를 입력하면 저장 시 매입처 자식 프로젝트가 함께 생성됩니다. (수량·단위·품명은 위 제품 정보를 공유합니다)</div>
                     <div class="form-row" style="grid-template-columns:2fr 1fr">
@@ -3056,8 +3055,8 @@ function openModal(type) {
                     </div>
                     <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid #FFE0CC">
                         <label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">💰 매입액 (자동계산)</label>
-                        <div id="newProjectSupBreakdown" style="background:#fff;border:1px solid #FFE0CC;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--text-secondary)"></div>
-                        <div class="form-input" id="newProjectSupTotalDisplay" style="background:#fff;color:var(--klp-orange,#E67E22);font-weight:800;font-size:20px">0 원</div>
+                        <div id="newProjectSupBreakdown" style="background:var(--white);border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--gray-600)"></div>
+                        <div class="form-input" id="newProjectSupTotalDisplay" style="background:var(--white);color:var(--orange);font-weight:800;font-size:20px">0 원</div>
                         <div id="newProjectMarginDisplay" style="margin-top:12px"></div>
                     </div>
                 </div>
