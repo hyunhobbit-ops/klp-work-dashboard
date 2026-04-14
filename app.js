@@ -432,15 +432,32 @@ function renderHome() {
     const qD = document.getElementById('qDaily'); if (qD) qD.textContent = `오늘 ${myTodayItems.length}건`;
     const qDel = document.getElementById('qDelivery'); if (qDel) qDel.textContent = `이번달 ${monthDel}건`;
 
-    // 마감 상태 카드 3종 — 마감 초과 / 3일 이내 / 이번 주
+    // 마감 상태 카드 3종 — 마감 초과 / 3일 이내 / 7일 이내
+    // 프로젝트 + 일일계획 할 일(deadline 있고 미완료) 모두 합산. 본인 담당 + '전체' 공통만.
     const today0 = new Date(todayStr + 'T00:00:00');
-    const deadlineList = projects
-        .filter(p => p.status !== '완료' && p.deadline)
+    const meName = myName || '';
+    const projDeadlines = projects
+        .filter(p => {
+            if (p.status === '완료' || !p.deadline) return false;
+            const owners = p.assignees || [];
+            return owners.includes(meName) || owners.includes('전체');
+        })
         .map(p => {
             const d = new Date(p.deadline + 'T00:00:00');
             const diff = Math.round((d - today0) / 86400000);
-            return { p, diff };
+            return { kind: 'project', item: p, diff };
         });
+    const taskDeadlines = dailyTasks
+        .filter(t => {
+            if (t.done || !t.deadline || t.isDeadlineCopy) return false;
+            return t.assignee === meName || t.assignee === '전체';
+        })
+        .map(t => {
+            const d = new Date(t.deadline + 'T00:00:00');
+            const diff = Math.round((d - today0) / 86400000);
+            return { kind: 'task', item: t, diff };
+        });
+    const deadlineList = [...taskDeadlines, ...projDeadlines]; // 할 일을 먼저 (우선순위)
     const overdueItems = deadlineList.filter(x => x.diff < 0).sort((a, b) => a.diff - b.diff);
     const soonItems = deadlineList.filter(x => x.diff >= 0 && x.diff <= 3).sort((a, b) => a.diff - b.diff);
     const weekItems = deadlineList.filter(x => x.diff > 3 && x.diff <= 7).sort((a, b) => a.diff - b.diff);
@@ -454,7 +471,10 @@ function renderHome() {
             listEl.innerHTML = `<div class="deadline-card-empty">해당 항목이 없습니다</div>`;
             return;
         }
-        listEl.innerHTML = items.slice(0, 4).map(({ p, diff }) => {
+        listEl.innerHTML = items.slice(0, 4).map(entry => {
+            const diff = entry.diff;
+            const isTask = entry.kind === 'task';
+            const it = entry.item;
             let ddayLabel, ddayBg, ddayColor;
             if (kind === 'overdue') {
                 ddayLabel = `D+${Math.abs(diff)}`;
@@ -466,11 +486,20 @@ function renderHome() {
                 ddayLabel = `D-${diff}`;
                 ddayBg = 'var(--gray-100)'; ddayColor = 'var(--gray-700)';
             }
-            const owner = (p.assignees && p.assignees.length ? p.assignees.join(', ') : (p.manager || '-'));
-            return `<div class="deadline-card-row" onclick="showProjectDetail(${p.id})">
+            const name = isTask ? it.task : it.name;
+            const owner = isTask
+                ? (it.assignee || '-')
+                : (it.assignees && it.assignees.length ? it.assignees.join(', ') : (it.manager || '-'));
+            const tag = isTask ? '할 일' : '프로젝트';
+            const tagColor = isTask ? 'var(--orange)' : 'var(--blue)';
+            const tagBg = isTask ? 'var(--orange-light)' : 'var(--blue-light)';
+            const onclick = isTask
+                ? `closeModal();switchTab('daily');setTimeout(()=>openEditTask(${it.id}),100)`
+                : `showProjectDetail(${it.id})`;
+            return `<div class="deadline-card-row" onclick="${onclick}">
                 <span class="dday" style="background:${ddayBg};color:${ddayColor}">${ddayLabel}</span>
-                <span class="name">${p.name}</span>
-                <span class="meta">${owner} · ${fmtDisplay(p.deadline)}</span>
+                <span class="name"><span class="kind-tag" style="background:${tagBg};color:${tagColor}">${tag}</span> ${name}</span>
+                <span class="meta">${owner} · ${fmtDisplay(it.deadline)}</span>
             </div>`;
         }).join('');
     };

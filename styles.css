@@ -1028,6 +1028,15 @@ body {
     flex: 1;
     min-width: 0;
 }
+.deadline-card-row .kind-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-right: 4px;
+    vertical-align: 1px;
+}
 .deadline-card-row .meta {
     font-size: 11px;
     color: var(--gray-500);
