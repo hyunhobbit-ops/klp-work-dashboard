@@ -399,8 +399,16 @@ function renderHome() {
     if (hour < 12) greet = '좋은 아침이에요';
     else if (hour < 18) greet = '좋은 오후예요';
     else greet = '좋은 저녁이에요';
-    const urgentProjCount = projects.filter(p => p.priority && p.priority.includes('긴급') && p.status !== '완료').length;
-    const urgentTaskCount = dailyTasks.filter(t => t.priority && t.priority.includes('긴급') && !t.done && t.date <= todayStr).length;
+    const _me = myName || '';
+    const urgentProjCount = projects.filter(p => {
+        if (!p.priority || !p.priority.includes('긴급') || p.status === '완료') return false;
+        const owners = p.assignees || [];
+        return owners.includes(_me) || owners.includes('전체');
+    }).length;
+    const urgentTaskCount = dailyTasks.filter(t => {
+        if (!t.priority || !t.priority.includes('긴급') || t.done || t.date > todayStr) return false;
+        return t.assignee === _me || t.assignee === '전체';
+    }).length;
     const totalUrgent = urgentProjCount + urgentTaskCount;
     const greetTitleEl = document.getElementById('greetingTitle');
     const greetSubEl = document.getElementById('greetingSub');
@@ -470,9 +478,20 @@ function renderHome() {
     renderDeadlineCard(soonItems, 'soonList', 'soonCount', 'soon');
     renderDeadlineCard(weekItems, 'weekList', 'weekCount', 'week');
 
-    // Urgent
-    const urgentProjects = projects.filter(p => p.priority.includes('긴급') && p.status !== '완료');
-    const urgentTasks = dailyTasks.filter(t => t.priority.includes('긴급') && !t.done && t.date <= todayStr);
+    // Urgent — 본인 담당 + 전체(공통)만
+    const me = myName || '';
+    const urgentProjects = projects.filter(p => {
+        if (!p.priority || !p.priority.includes('긴급')) return false;
+        if (p.status === '완료') return false;
+        const owners = p.assignees || [];
+        return owners.includes(me) || owners.includes('전체');
+    });
+    const urgentTasks = dailyTasks.filter(t => {
+        if (!t.priority || !t.priority.includes('긴급')) return false;
+        if (t.done) return false;
+        if (t.date > todayStr) return false;
+        return t.assignee === me || t.assignee === '전체';
+    });
     document.getElementById('urgentCount').textContent = urgentProjects.length + urgentTasks.length;
 
     let urgentHtml = '';
@@ -820,11 +839,44 @@ function renderDailyPersonFilter() {
 }
 
 function renderDaily() {
+    // 포커스 보존: 인라인 입력에 포커스가 있었다면 어디에 있었는지 기억
+    const _activeEl = document.activeElement;
+    let _focusKey = null;
+    let _focusValue = '';
+    let _focusSelStart = 0;
+    if (_activeEl && _activeEl.classList && _activeEl.classList.contains('daily-inline-input')) {
+        if (_activeEl.classList.contains('wk-inline-input')) {
+            _focusKey = `wk:${_activeEl.dataset.person || ''}:${_activeEl.dataset.date || ''}`;
+        } else {
+            _focusKey = `dc:${_activeEl.dataset.assignee || ''}`;
+        }
+        _focusValue = _activeEl.value || '';
+        try { _focusSelStart = _activeEl.selectionStart || 0; } catch(e) {}
+    }
+
     const todayStr = fmtDate(currentDate);
     const days = ['일', '월', '화', '수', '목', '금', '토'];
     const d = currentDate;
     document.getElementById('currentDateDisplay').textContent =
         `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`;
+
+    // 렌더 끝난 뒤 포커스 복원 (queueMicrotask로 DOM 반영 직후)
+    queueMicrotask(() => {
+        if (!_focusKey) return;
+        let target = null;
+        if (_focusKey.startsWith('dc:')) {
+            const a = _focusKey.slice(3);
+            target = document.querySelector(`#dailyColumns .daily-inline-input[data-assignee="${a}"]`);
+        } else if (_focusKey.startsWith('wk:')) {
+            const [, p, dt] = _focusKey.split(':');
+            target = document.querySelector(`#weeklyKanban .wk-inline-input[data-person="${p}"][data-date="${dt}"]`);
+        }
+        if (target) {
+            target.value = _focusValue;
+            target.focus();
+            try { target.setSelectionRange(_focusSelStart, _focusSelStart); } catch(e) {}
+        }
+    });
 
     // 관리자가 아닌데 전체보기 상태면 본인 탭으로 전환
     if (!isAdminUser() && currentPersonFilter === 'viewall') {
@@ -1140,10 +1192,7 @@ async function inlineAddWeeklyTask(input, person, dateStr) {
     renderDaily();
     renderHome();
     showToast('할 일이 추가되었습니다');
-    setTimeout(() => {
-        const next = document.querySelector(`#weeklyKanban .wk-inline-input[data-date="${dateStr}"]`);
-        if (next) next.focus();
-    }, 50);
+    // 포커스는 renderDaily 내부 보존 로직이 자동 복원
 }
 
 function initKanbanDragDrop() {
@@ -1558,7 +1607,7 @@ async function deleteTask(id) {
 async function inlineAddTask(input, assignee) {
     const task = input.value.trim();
     if (!task) return;
-    // 즉시 입력창 비우기 (사용자 피드백)
+    // 즉시 입력창 비우기 (사용자 피드백) — 다음 입력 이어가게
     input.value = '';
     const saved = await dbInsertTask({
         task, date: fmtDate(currentDate), assignee,
@@ -1572,9 +1621,7 @@ async function inlineAddTask(input, assignee) {
     renderDaily();
     renderHome();
     showToast('할 일이 추가되었습니다');
-    // 렌더링 후 같은 컬럼 인라인 입력에 포커스 유지
-    const next = document.querySelector(`#dailyColumns .daily-inline-input[data-assignee="${assignee}"]`);
-    if (next) next.focus();
+    // 포커스는 renderDaily 내부 보존 로직이 자동 복원
 }
 
 async function toggleTask(id) {
@@ -3354,21 +3401,35 @@ function subscribeDailyTasks() {
     }
     dailyTasksChannel = sb.channel('daily_tasks_realtime')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_tasks' }, (payload) => {
+            let changed = false;
             if (payload.eventType === 'INSERT') {
                 const row = taskFromDb(payload.new);
                 if (!dailyTasks.find(t => t.id === row.id)) {
                     dailyTasks.push(row);
+                    changed = true;
                 }
             } else if (payload.eventType === 'UPDATE') {
                 const row = taskFromDb(payload.new);
                 const idx = dailyTasks.findIndex(t => t.id === row.id);
-                if (idx !== -1) dailyTasks[idx] = row;
-                else dailyTasks.push(row);
+                if (idx !== -1) {
+                    // 이미 동일한 내용이면 스킵 (자기 자신이 보낸 update 에코로 인한 불필요한 리렌더 방지)
+                    if (JSON.stringify(dailyTasks[idx]) !== JSON.stringify(row)) {
+                        dailyTasks[idx] = row;
+                        changed = true;
+                    }
+                } else {
+                    dailyTasks.push(row);
+                    changed = true;
+                }
             } else if (payload.eventType === 'DELETE') {
                 const oldId = payload.old && payload.old.id;
                 const idx = dailyTasks.findIndex(t => t.id === oldId);
-                if (idx !== -1) dailyTasks.splice(idx, 1);
+                if (idx !== -1) {
+                    dailyTasks.splice(idx, 1);
+                    changed = true;
+                }
             }
+            if (!changed) return;
             renderDaily();
             renderHome();
         })
