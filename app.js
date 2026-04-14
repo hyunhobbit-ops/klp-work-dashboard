@@ -1633,7 +1633,7 @@ function renderDeliveries() {
             <td class="td-check"><input type="checkbox" class="delivery-check" data-id="${d.id}" ${d._checked ? 'checked' : ''}></td>
             <td class="cell-editable" data-id="${d.id}" data-field="date" data-type="date">${fmtDisplay(d.date)}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="type" data-type="select" data-options="일반,중고,번개,당근,GS반택,ETSY"><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
-            <td class="cell-editable" data-id="${d.id}" data-field="sender" data-type="select" data-options="케이엘피코리아,김관택,이현주,김현호,유지은,구정두">${d.sender}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="sender" data-type="select" data-options="케이엘피코리아,김관택,이현주,김현호,유지은,구정두,기타">${d.sender}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="recipient"><strong>${d.recipient}</strong></td>
             <td class="cell-editable" data-id="${d.id}" data-field="phone">${d.phone || '-'}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="product">${d.product}</td>
@@ -1730,9 +1730,16 @@ function openEditDelivery(id) {
                 </select>
             </div>
             <div class="form-group"><label class="form-label">발송인</label>
-                <select class="form-select" id="editDelSender">
-                    ${['케이엘피코리아','김관택','이현주','김현호','유지은','구정두'].map(s => `<option value="${s}" ${d.sender === s ? 'selected' : ''}>${s}</option>`).join('')}
-                </select>
+                ${(() => {
+                    const senders = ['케이엘피코리아','김관택','이현주','김현호','유지은','구정두'];
+                    const isCustom = d.sender && !senders.includes(d.sender);
+                    const opts = senders.map(s => `<option value="${s}" ${d.sender === s ? 'selected' : ''}>${s}</option>`).join('');
+                    return `<select class="form-select" id="editDelSender">
+                        ${opts}
+                        <option value="__custom" ${isCustom ? 'selected' : ''}>기타 (직접입력)</option>
+                    </select>
+                    <input type="text" class="form-input" id="editDelSenderCustom" placeholder="발송인을 입력하세요" value="${isCustom ? d.sender : ''}" style="display:${isCustom ? 'block' : 'none'};margin-top:6px">`;
+                })()}
             </div>
             <div class="form-group"><label class="form-label">선/착불</label>
                 <select class="form-select" id="editDelPayment">
@@ -1751,6 +1758,20 @@ function openEditDelivery(id) {
             <button class="form-delete-btn" onclick="deleteDelivery(${d.id})">삭제</button>
         </div>`;
     document.getElementById('editDelPhone').addEventListener('input', formatPhoneInput);
+    // 편집 모달 발송인 기타 토글
+    const editSender = document.getElementById('editDelSender');
+    if (editSender) {
+        editSender.addEventListener('change', function() {
+            const custom = document.getElementById('editDelSenderCustom');
+            if (this.value === '__custom') {
+                custom.style.display = 'block';
+                custom.focus();
+            } else {
+                custom.style.display = 'none';
+                custom.value = '';
+            }
+        });
+    }
     document.getElementById('modalOverlay').classList.add('show');
 }
 
@@ -1764,7 +1785,11 @@ async function saveEditDelivery(id) {
         zipcode: document.getElementById('editDelZipcode').value.trim(),
         address: document.getElementById('editDelAddress').value.trim(),
         type: document.getElementById('editDelType').value,
-        sender: document.getElementById('editDelSender').value,
+        sender: (() => {
+            const sel = document.getElementById('editDelSender').value;
+            if (sel !== '__custom') return sel;
+            return document.getElementById('editDelSenderCustom').value.trim() || '기타';
+        })(),
         payment: document.getElementById('editDelPayment').value,
         product: document.getElementById('editDelProduct').value.trim(),
         price: parseInt(document.getElementById('editDelPrice').value) || 0,
@@ -2910,7 +2935,9 @@ function openModal(type) {
                         <option value="김현호">김현호</option>
                         <option value="유지은">유지은</option>
                         <option value="구정두">구정두</option>
+                        <option value="__custom">기타 (직접입력)</option>
                     </select>
+                    <input type="text" class="form-input" id="newDelSenderCustom" placeholder="발송인을 입력하세요" style="display:none;margin-top:6px">
                 </div>
                 <div class="form-group"><label class="form-label">선/착불</label><select class="form-select" id="newDelPayment"><option value="선불">선불</option><option value="착불">착불</option></select></div>
             </div>
@@ -2935,6 +2962,17 @@ function openModal(type) {
                 custom.value = '';
             }
             priceGroup.style.display = priceTypes.includes(this.value) ? 'block' : 'none';
+        });
+        // 발송인 변경: 기타 토글
+        document.getElementById('newDelSender').addEventListener('change', function() {
+            const custom = document.getElementById('newDelSenderCustom');
+            if (this.value === '__custom') {
+                custom.style.display = 'block';
+                custom.focus();
+            } else {
+                custom.style.display = 'none';
+                custom.value = '';
+            }
         });
     } else if (type === 'client') {
         openClientModal(null);
@@ -4018,11 +4056,14 @@ async function addDelivery() {
     const typeSelect = document.getElementById('newDelType').value;
     const typeCustom = document.getElementById('newDelTypeCustom').value.trim();
     const type = typeSelect === '__custom' ? (typeCustom || '기타') : typeSelect;
+    const senderSelect = document.getElementById('newDelSender').value;
+    const senderCustom = document.getElementById('newDelSenderCustom').value.trim();
+    const sender = senderSelect === '__custom' ? (senderCustom || '기타') : senderSelect;
     const saved = await dbInsertDelivery({
         recipient,
         date: document.getElementById('newDelDate').value || fmtDate(new Date()),
         type,
-        sender: document.getElementById('newDelSender').value,
+        sender,
         zipcode: document.getElementById('newDelZipcode').value.trim(),
         address: document.getElementById('newDelAddress').value.trim(),
         phone: document.getElementById('newDelPhone').value.trim(),
