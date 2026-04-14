@@ -4644,14 +4644,24 @@ function openProductDBModal(editId) {
             <div class="form-group"><label class="form-label">포장비 (개당)</label>
                 <input type="number" class="form-input" id="productPackagingFee" placeholder="0" value="${v('packagingFee', 0)}"></div>
         </div>
-        <div class="form-row">
-            <div class="form-group"><label class="form-label">라벨부착</label>
-                <select class="form-select" id="productLabelAvailable">
-                    <option value="true" ${v('labelAvailable', true) ? 'selected' : ''}>가능</option>
-                    <option value="false" ${!v('labelAvailable', true) ? 'selected' : ''}>불가</option>
-                </select></div>
-            <div class="form-group"><label class="form-label">이미지 URL</label>
-                <input type="text" class="form-input" id="productImage" placeholder="https://..." value="${v('image')}"></div>
+        <div class="form-group"><label class="form-label">라벨부착</label>
+            <select class="form-select" id="productLabelAvailable">
+                <option value="true" ${v('labelAvailable', true) ? 'selected' : ''}>가능</option>
+                <option value="false" ${!v('labelAvailable', true) ? 'selected' : ''}>불가</option>
+            </select></div>
+        <div class="form-group"><label class="form-label">상품 이미지</label>
+            <input type="hidden" id="productImage" value="${v('image')}">
+            <div id="productImagePreview" style="margin-bottom:8px">
+                ${v('image') ? `<img src="${v('image')}" style="max-width:200px;max-height:200px;border-radius:10px;border:1px solid var(--gray-200);object-fit:cover">` : `<div style="width:200px;height:140px;border:2px dashed var(--gray-300);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:12px">이미지 없음</div>`}
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <label class="form-submit" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;cursor:pointer;font-size:13px;margin:0">
+                    📁 파일 선택
+                    <input type="file" accept="image/*" onchange="handleProductImageUpload(event)" style="display:none">
+                </label>
+                ${v('image') ? `<button type="button" class="form-delete-btn" style="padding:8px 14px;font-size:13px" onclick="clearProductImage()">이미지 제거</button>` : ''}
+                <span style="font-size:11px;color:var(--gray-500)">PNG/JPG · 2MB 이하 권장</span>
+            </div>
         </div>
         <div class="form-actions" style="display:flex;gap:10px;margin-top:16px">
             <button class="form-submit" style="flex:1" onclick="saveProduct()">${p ? '저장' : '상품 등록'}</button>
@@ -4661,6 +4671,31 @@ function openProductDBModal(editId) {
     overlay.classList.add('show');
     const mb = document.getElementById('modalBody');
     if (mb) mb.scrollTop = 0;
+}
+
+// 이미지 파일 업로드 → base64 data URL로 hidden input에 저장 + 미리보기 갱신
+function handleProductImageUpload(ev) {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { showToast('이미지 파일만 업로드 가능합니다'); return; }
+    if (file.size > 4 * 1024 * 1024) { showToast('4MB 이하 파일만 업로드 가능합니다'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const dataUrl = e.target.result;
+        const hidden = document.getElementById('productImage');
+        if (hidden) hidden.value = dataUrl;
+        const preview = document.getElementById('productImagePreview');
+        if (preview) preview.innerHTML = `<img src="${dataUrl}" style="max-width:200px;max-height:200px;border-radius:10px;border:1px solid var(--gray-200);object-fit:cover">`;
+    };
+    reader.onerror = () => showToast('이미지 읽기 실패');
+    reader.readAsDataURL(file);
+}
+
+function clearProductImage() {
+    const hidden = document.getElementById('productImage');
+    if (hidden) hidden.value = '';
+    const preview = document.getElementById('productImagePreview');
+    if (preview) preview.innerHTML = `<div style="width:200px;height:140px;border:2px dashed var(--gray-300);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:12px">이미지 없음</div>`;
 }
 
 function saveProduct() {
