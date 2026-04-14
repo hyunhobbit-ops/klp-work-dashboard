@@ -157,9 +157,9 @@ let clients = [];
 // 상품 DB (제안서 시스템) — 파트 2: 로컬 JS 배열. 추후 Supabase 전환 예정.
 const productsDB = [
     { id: 1, name: '미니클락 골드', description: '작고 고급스러운 골드 컬러 탁상시계', category: '시계', image: '', unitPrice: 85000, vatIncluded: true, printType: '레이저각인', printFee: 2000, packagingType: '선물포장', packagingFee: 1500, labelAvailable: true, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
-    { id: 2, name: '순금 1돈 감사패 대형', description: '순금 1돈이 박힌 프리미엄 감사패', category: '굿즈', image: '', unitPrice: 1800000, vatIncluded: true, printType: '레이저각인', printFee: 5000, packagingType: '전용보관함', packagingFee: 60000, labelAvailable: true, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
+    { id: 2, name: '순금 1돈 감사패 대형', description: '순금 1돈이 박힌 프리미엄 감사패', category: '상패,트로피', image: '', unitPrice: 1800000, vatIncluded: true, printType: '레이저각인', printFee: 5000, packagingType: '전용보관함', packagingFee: 60000, labelAvailable: true, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
     { id: 3, name: '센트하우스 와인 디퓨저', description: '고급 향수 디퓨저 — 와인병 모양', category: '생활용품', image: '', unitPrice: 88000, vatIncluded: true, printType: '불가', printFee: 0, packagingType: '선물포장', packagingFee: 0, labelAvailable: true, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
-    { id: 4, name: '파카 51 코어 볼펜', description: '파카 51 시리즈 고급 볼펜 (각인 가능)', category: '필기구', image: '', unitPrice: 121000, vatIncluded: true, printType: '레이저각인', printFee: 3000, packagingType: '선물포장', packagingFee: 0, labelAvailable: false, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
+    { id: 4, name: '파카 51 코어 볼펜', description: '파카 51 시리즈 고급 볼펜 (각인 가능)', category: '사무용품', image: '', unitPrice: 121000, vatIncluded: true, printType: '레이저각인', printFee: 3000, packagingType: '선물포장', packagingFee: 0, labelAvailable: false, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
     { id: 5, name: '대통령 취임 기념시계', description: '대통령 취임 기념 한정판 시계', category: '시계', image: '', unitPrice: 250000, vatIncluded: true, printType: '레이저각인', printFee: 8000, packagingType: '전용케이스', packagingFee: 15000, labelAvailable: true, status: '품절', createdAt: '2026-03-01T00:00:00.000Z' },
     { id: 6, name: 'UM2 접지형 멀티 충전기', description: '접지형 멀티탭 + USB 충전기', category: '생활용품', image: '', unitPrice: 69000, vatIncluded: true, printType: '레이저각인', printFee: 2000, packagingType: '선물포장', packagingFee: 1500, labelAvailable: true, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
 ];
@@ -4506,7 +4506,7 @@ function ratingBadgeClass(r) {
 // =====================================
 // 상품 DB (제안서 시스템 파트 2)
 // =====================================
-const PRODUCT_CATEGORIES = ['시계', '굿즈', '생활용품', '필기구', '식품', '기타'];
+const PRODUCT_CATEGORIES = ['시계', '생활용품', '사무용품', '상패,트로피', '기타'];
 const PRINT_TYPES = ['불가', '레이저각인', '실크인쇄', '패드인쇄', '기타'];
 const PACKAGING_TYPES = ['기본박스', '선물포장', '전용케이스', '전용보관함', '기타'];
 const PRODUCT_STATUSES = ['판매 중', '품절', '단종'];
