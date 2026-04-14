@@ -898,7 +898,7 @@ function renderDaily() {
             <div class="daily-col-body">
                 ${itemsHtml}
                 <div class="daily-inline-add">
-                    <input type="text" class="daily-inline-input" placeholder="할 일 입력 후 Enter" onkeydown="if(event.key==='Enter')inlineAddTask(this,'${assignee}')">
+                    <input type="text" class="daily-inline-input" placeholder="할 일 입력 후 Enter" data-assignee="${assignee}">
                 </div>
             </div>
         </div>`;
@@ -945,6 +945,18 @@ function renderDaily() {
     }
 
     document.getElementById('dailyColumns').innerHTML = html;
+
+    // 인라인 입력에 keydown 리스너 부착 (한국어 assignee가 inline JS에 박힐 때의 escaping 문제 회피)
+    document.querySelectorAll('#dailyColumns .daily-inline-input').forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            // IME 조합 중인 한글 Enter는 무시 (조합 확정만 처리)
+            if (e.isComposing || e.keyCode === 229) return;
+            e.preventDefault();
+            const assignee = input.dataset.assignee || '';
+            inlineAddTask(input, assignee);
+        });
+    });
 
     // 전체보기 외 모든 탭에서 주간 칸반보드 + 월간 캘린더 표시
     const kanbanWrap = document.getElementById('weeklyKanban');
@@ -1084,7 +1096,7 @@ function renderWeeklyKanban(person) {
             <div class="wk-day-body" data-date="${dateStr}">
                 ${itemsHtml}
                 <div class="daily-inline-add">
-                    <input type="text" class="daily-inline-input wk-inline-input" placeholder="+ 할 일" onkeydown="if(event.key==='Enter')inlineAddWeeklyTask(this,'${person}','${dateStr}')">
+                    <input type="text" class="daily-inline-input wk-inline-input" placeholder="+ 할 일" data-person="${person}" data-date="${dateStr}">
                 </div>
             </div>
         </div>`;
@@ -1093,6 +1105,18 @@ function renderWeeklyKanban(person) {
     html += `</div>`;
     document.getElementById('weeklyKanban').innerHTML = html;
 
+    // 주간 인라인 입력 keydown 리스너 부착
+    document.querySelectorAll('#weeklyKanban .wk-inline-input').forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            if (e.isComposing || e.keyCode === 229) return;
+            e.preventDefault();
+            const p = input.dataset.person || '';
+            const d = input.dataset.date || '';
+            inlineAddWeeklyTask(input, p, d);
+        });
+    });
+
     // 드래그 앤 드롭 초기화
     initKanbanDragDrop();
 }
@@ -1100,19 +1124,19 @@ function renderWeeklyKanban(person) {
 async function inlineAddWeeklyTask(input, person, dateStr) {
     const task = input.value.trim();
     if (!task) return;
+    input.value = '';
     const saved = await dbInsertTask({
         task, date: dateStr, assignee: person, target: '',
         priority: '🟡 보통', done: false
     });
-    if (!saved) return;
-    dailyTasks.push(saved);
+    if (!saved) { input.value = task; return; }
+    if (!dailyTasks.find(t => t.id === saved.id)) dailyTasks.push(saved);
     renderDaily();
     renderHome();
     showToast('할 일이 추가되었습니다');
-    // 포커스 유지
     setTimeout(() => {
-        const inputs = document.querySelectorAll(`.wk-day-body[data-date="${dateStr}"] .wk-inline-input`);
-        if (inputs.length) inputs[0].focus();
+        const next = document.querySelector(`#weeklyKanban .wk-inline-input[data-date="${dateStr}"]`);
+        if (next) next.focus();
     }, 50);
 }
 
@@ -1528,20 +1552,23 @@ async function deleteTask(id) {
 async function inlineAddTask(input, assignee) {
     const task = input.value.trim();
     if (!task) return;
+    // 즉시 입력창 비우기 (사용자 피드백)
+    input.value = '';
     const saved = await dbInsertTask({
         task, date: fmtDate(currentDate), assignee,
         target: '본사', priority: '🟡 보통', done: false
     });
-    if (!saved) return;
-    dailyTasks.push(saved);
+    if (!saved) {
+        input.value = task; // 실패 시 복원
+        return;
+    }
+    if (!dailyTasks.find(t => t.id === saved.id)) dailyTasks.push(saved);
     renderDaily();
     renderHome();
     showToast('할 일이 추가되었습니다');
-    // 렌더링 후 일일계획 같은 컬럼의 인라인 입력에 포커스 유지
-    const inputs = document.querySelectorAll('#dailyColumns .daily-inline-input');
-    inputs.forEach(el => {
-        if (el.getAttribute('onkeydown').includes(`'${assignee}'`)) el.focus();
-    });
+    // 렌더링 후 같은 컬럼 인라인 입력에 포커스 유지
+    const next = document.querySelector(`#dailyColumns .daily-inline-input[data-assignee="${assignee}"]`);
+    if (next) next.focus();
 }
 
 async function toggleTask(id) {
