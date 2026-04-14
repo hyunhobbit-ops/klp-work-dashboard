@@ -433,15 +433,11 @@ function renderHome() {
     const qDel = document.getElementById('qDelivery'); if (qDel) qDel.textContent = `이번달 ${monthDel}건`;
 
     // 마감 상태 카드 3종 — 마감 초과 / 3일 이내 / 7일 이내
-    // 프로젝트 + 일일계획 할 일(deadline 있고 미완료) 모두 합산. 본인 담당 + '전체' 공통만.
+    // 프로젝트(전체) + 일일계획 할 일(본인/'전체' 공통, deadline 있고 미완료) 합산.
     const today0 = new Date(todayStr + 'T00:00:00');
     const meName = myName || '';
     const projDeadlines = projects
-        .filter(p => {
-            if (p.status === '완료' || !p.deadline) return false;
-            const owners = p.assignees || [];
-            return owners.includes(meName) || owners.includes('전체');
-        })
+        .filter(p => p.status !== '완료' && p.deadline)
         .map(p => {
             const d = new Date(p.deadline + 'T00:00:00');
             const diff = Math.round((d - today0) / 86400000);
@@ -457,10 +453,15 @@ function renderHome() {
             const diff = Math.round((d - today0) / 86400000);
             return { kind: 'task', item: t, diff };
         });
-    const deadlineList = [...taskDeadlines, ...projDeadlines]; // 할 일을 먼저 (우선순위)
-    const overdueItems = deadlineList.filter(x => x.diff < 0).sort((a, b) => a.diff - b.diff);
-    const soonItems = deadlineList.filter(x => x.diff >= 0 && x.diff <= 3).sort((a, b) => a.diff - b.diff);
-    const weekItems = deadlineList.filter(x => x.diff > 3 && x.diff <= 7).sort((a, b) => a.diff - b.diff);
+    // 프로젝트를 먼저, 그 다음 할 일. 같은 종류 내에서는 마감일 빠른 순.
+    const sortFn = (a, b) => {
+        if (a.kind !== b.kind) return a.kind === 'project' ? -1 : 1;
+        return a.diff - b.diff;
+    };
+    const deadlineList = [...projDeadlines, ...taskDeadlines];
+    const overdueItems = deadlineList.filter(x => x.diff < 0).sort(sortFn);
+    const soonItems = deadlineList.filter(x => x.diff >= 0 && x.diff <= 3).sort(sortFn);
+    const weekItems = deadlineList.filter(x => x.diff > 3 && x.diff <= 7).sort(sortFn);
 
     const renderDeadlineCard = (items, listId, countId, kind) => {
         const listEl = document.getElementById(listId);
