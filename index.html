@@ -558,8 +558,76 @@
                 <div class="card-grid" id="productCardGrid"></div>
             </main>
 
-            <!-- ===== 제안서 관리 (파트 3에서 구현) ===== -->
-            <main class="content" id="tab-proposals"></main>
+            <!-- ===== 제안서 관리 ===== -->
+            <main class="content" id="tab-proposals">
+                <!-- 목록 뷰 -->
+                <div id="proposalListView">
+                    <div class="content-toolbar" style="align-items:flex-start">
+                        <div>
+                            <h2 style="font-size:20px;font-weight:800;color:var(--gray-900);margin-bottom:4px">제안서 관리</h2>
+                            <p style="font-size:13px;color:var(--gray-500);font-weight:500">거래처별 제안서 작성·발송·이력 관리</p>
+                        </div>
+                        <button class="btn-primary" onclick="openProposalEditor(null)">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                            새 제안서
+                        </button>
+                    </div>
+
+                    <div class="summary-row" style="grid-template-columns:repeat(4,1fr)">
+                        <div class="summary-card">
+                            <div class="summary-icon blue"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg></div>
+                            <div class="summary-info"><span class="summary-label">전체</span><span class="summary-value" id="propTotal">0</span></div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon blue"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg></div>
+                            <div class="summary-info"><span class="summary-label">발송 완료</span><span class="summary-value" id="propSent">0</span></div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon green"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+                            <div class="summary-info"><span class="summary-label">계약 성사</span><span class="summary-value" id="propWon">0</span></div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-icon" style="background:var(--orange-light);color:var(--orange)"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3 1.343 3 3-1.343 3-3 3m0-12V6m0 12v2m0-14a4 4 0 014 4"/></svg></div>
+                            <div class="summary-info"><span class="summary-label">이번 달 매출</span><span class="summary-value" id="propMonthRevenue" style="font-size:20px">0원</span></div>
+                        </div>
+                    </div>
+
+                    <div class="content-toolbar" style="margin-top:8px">
+                        <div class="filter-bar" id="proposalStatusFilter">
+                            <button class="filter-chip active" data-pstatus="all">전체</button>
+                            <button class="filter-chip" data-pstatus="작성 중">작성 중</button>
+                            <button class="filter-chip" data-pstatus="발송 완료">발송 완료</button>
+                            <button class="filter-chip" data-pstatus="계약 성사">계약 성사</button>
+                            <button class="filter-chip" data-pstatus="미성사">미성사</button>
+                        </div>
+                        <div class="search-bar">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                            <input type="text" id="proposalSearch" placeholder="제안서명·거래처 검색">
+                        </div>
+                    </div>
+
+                    <div class="table-wrap">
+                        <table class="data-table" id="proposalTable">
+                            <thead>
+                                <tr>
+                                    <th>제안서명</th>
+                                    <th style="width:180px">거래처</th>
+                                    <th style="width:140px">제안 금액</th>
+                                    <th style="width:100px">상태</th>
+                                    <th style="width:110px">발송일</th>
+                                    <th style="width:100px">담당</th>
+                                    <th style="width:70px">공유</th>
+                                </tr>
+                            </thead>
+                            <tbody id="proposalTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="card-grid" id="proposalCardGrid"></div>
+                </div>
+
+                <!-- 편집 뷰 (파트 4에서 구현) -->
+                <div id="proposalEditorView" style="display:none"></div>
+            </main>
 
             <!-- ===== 회사 문서 ===== -->
             <main class="content" id="tab-docs">

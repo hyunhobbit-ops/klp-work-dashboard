@@ -165,6 +165,38 @@ const productsDB = [
 ];
 let currentProductCategory = 'all';
 let currentProductSearch = '';
+
+// 제안서 (제안서 시스템 파트 3) — 로컬 JS 배열. 추후 Supabase 전환 예정.
+const proposals = [
+    {
+        id: 1, title: '순금1돈 감사패 제안', clientName: '지플러스타워', clientContact: '김팀장',
+        clientPhone: '010-1234-5678', clientEmail: 'gplus@example.com',
+        description: '지플러스타워 준공 기념 감사패 제안', validUntil: '2026-04-30',
+        assignee: '김현호', status: '계약 성사',
+        items: [{ productId: 2, quantity: 1, subtotal: 1865000 }],
+        totalAmount: 2400000, sentDate: '2026-04-10',
+        shareLink: '#proposal-preview-1', createdAt: '2026-04-08T09:00:00.000Z'
+    },
+    {
+        id: 2, title: '러쉬 성수 커스텀시계', clientName: '러쉬코리아', clientContact: '박담당',
+        clientPhone: '010-2345-6789', clientEmail: 'lush@example.com',
+        description: '러쉬 성수동 플래그십 오픈 기념 커스텀 시계', validUntil: '2026-05-15',
+        assignee: '이현주', status: '발송 완료',
+        items: [{ productId: 1, quantity: 100, subtotal: 8700000 }],
+        totalAmount: 8500000, sentDate: '2026-04-09',
+        shareLink: '#proposal-preview-2', createdAt: '2026-04-07T09:00:00.000Z'
+    },
+    {
+        id: 3, title: '롯데월드 천관사복 굿즈', clientName: '롯데월드', clientContact: '이매니저',
+        clientPhone: '010-3456-7890', clientEmail: 'lotte@example.com',
+        description: '천관사복 협업 한정판 굿즈 패키지', validUntil: '2026-06-01',
+        assignee: '김현호', status: '작성 중',
+        items: [], totalAmount: 15000000, sentDate: '',
+        shareLink: '', createdAt: '2026-04-11T09:00:00.000Z'
+    },
+];
+let currentProposalStatus = 'all';
+let currentProposalSearch = '';
 let clientSearch = '';
 let clientPage = 1;
 const CLIENTS_PER_PAGE = 50;
@@ -410,6 +442,15 @@ function setupFilters() {
             renderProductDB();
         });
     });
+    // 제안서 상태 칩
+    document.querySelectorAll('[data-pstatus]').forEach(chip => {
+        chip.addEventListener('click', () => {
+            chip.parentElement.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            currentProposalStatus = chip.dataset.pstatus;
+            renderProposals();
+        });
+    });
 }
 
 // ===== Date Nav =====
@@ -445,6 +486,13 @@ function setupSearch() {
             renderProductDB();
         });
     }
+    const proposalSearchEl = document.getElementById('proposalSearch');
+    if (proposalSearchEl) {
+        proposalSearchEl.addEventListener('input', e => {
+            currentProposalSearch = e.target.value.toLowerCase();
+            renderProposals();
+        });
+    }
 }
 
 // ===== Render All =====
@@ -455,6 +503,7 @@ function renderAll() {
     renderDeliveries();
     renderClients();
     renderProductDB();
+    renderProposals();
 }
 
 // =====================================
@@ -4763,4 +4812,111 @@ function showProductDetail(id) {
         </div>
     `;
     document.getElementById('detailOverlay').classList.add('show');
+}
+
+// =====================================
+// 제안서 관리 (제안서 시스템 파트 3)
+// =====================================
+const PROPOSAL_STATUSES = ['작성 중', '발송 완료', '계약 성사', '미성사'];
+
+function proposalStatusBadge(s) {
+    if (s === '작성 중') return 'badge-orange';
+    if (s === '발송 완료') return 'badge-blue';
+    if (s === '계약 성사') return 'badge-green';
+    if (s === '미성사') return 'badge-gray';
+    return 'badge-gray';
+}
+
+function renderProposals() {
+    // 요약 카드
+    document.getElementById('propTotal').textContent = proposals.length;
+    document.getElementById('propSent').textContent = proposals.filter(p => p.status === '발송 완료').length;
+    document.getElementById('propWon').textContent = proposals.filter(p => p.status === '계약 성사').length;
+    // 이번 달 매출 — 계약 성사 상태이고 발송일(또는 createdAt) 이 이번 달인 건의 totalAmount 합
+    const ymNow = fmtDate(new Date()).substring(0, 7);
+    const monthRevenue = proposals
+        .filter(p => p.status === '계약 성사')
+        .filter(p => {
+            const d = p.sentDate || (p.createdAt ? p.createdAt.substring(0, 10) : '');
+            return d.startsWith(ymNow);
+        })
+        .reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+    document.getElementById('propMonthRevenue').textContent = formatKRW(monthRevenue);
+
+    // 필터링
+    let filtered = proposals;
+    if (currentProposalStatus !== 'all') {
+        filtered = filtered.filter(p => p.status === currentProposalStatus);
+    }
+    if (currentProposalSearch) {
+        const q = currentProposalSearch;
+        filtered = filtered.filter(p =>
+            (p.title || '').toLowerCase().includes(q) ||
+            (p.clientName || '').toLowerCase().includes(q)
+        );
+    }
+
+    // 최신순 정렬
+    filtered = [...filtered].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    let tableHtml = '';
+    let cardHtml = '';
+    filtered.forEach(p => {
+        const sentStr = p.sentDate ? fmtDisplay(p.sentDate) : '—';
+        const shareBtn = p.shareLink
+            ? `<button class="edit-btn" onclick="event.stopPropagation();copyProposalLink(${p.id})" title="공유 링크 복사"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg></button>`
+            : `<span style="color:var(--gray-400);font-size:12px">—</span>`;
+
+        tableHtml += `<tr onclick="openProposalEditor(${p.id})" style="cursor:pointer">
+            <td>
+                <div style="font-weight:700;color:var(--gray-900)">${p.title}</div>
+                <div style="font-size:11px;color:var(--gray-500);margin-top:2px">${(p.items || []).length}개 상품</div>
+            </td>
+            <td>
+                <div style="font-weight:600">${p.clientName || '-'}</div>
+                ${p.clientContact ? `<div style="font-size:11px;color:var(--gray-500)">${p.clientContact}</div>` : ''}
+            </td>
+            <td style="font-weight:800;color:var(--blue)">${formatKRW(p.totalAmount)}</td>
+            <td><span class="badge ${proposalStatusBadge(p.status)}">${p.status}</span></td>
+            <td>${sentStr}</td>
+            <td>${p.assignee || '-'}</td>
+            <td>${shareBtn}</td>
+        </tr>`;
+
+        cardHtml += `<div class="resp-card" onclick="openProposalEditor(${p.id})">
+            <div class="resp-card-top">
+                <div class="resp-card-title">${p.title}</div>
+                <span class="badge ${proposalStatusBadge(p.status)}">${p.status}</span>
+            </div>
+            <div class="resp-card-meta">
+                <div class="resp-card-row"><strong>${p.clientName || '-'}</strong>${p.clientContact ? ` · ${p.clientContact}` : ''}</div>
+                <div class="resp-card-row" style="color:var(--blue);font-weight:800">${formatKRW(p.totalAmount)}</div>
+                <div class="resp-card-row">${(p.items || []).length}개 상품 · ${p.assignee || '-'}</div>
+                <div class="resp-card-row">${p.sentDate ? '발송 ' + fmtDisplay(p.sentDate) : '미발송'}</div>
+            </div>
+        </div>`;
+    });
+
+    if (!tableHtml) {
+        tableHtml = `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--gray-500)">제안서가 없습니다</td></tr>`;
+    }
+    document.getElementById('proposalTableBody').innerHTML = tableHtml;
+    document.getElementById('proposalCardGrid').innerHTML = cardHtml;
+}
+
+function copyProposalLink(id) {
+    const p = proposals.find(x => x.id === id);
+    if (!p || !p.shareLink) return;
+    const full = location.origin + location.pathname + p.shareLink;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(full).then(() => showToast('링크가 복사되었습니다')).catch(() => showToast('복사 실패'));
+    } else {
+        showToast('링크가 복사되었습니다');
+    }
+}
+
+// 편집 뷰 (파트 4에서 구현) — 일단 스텁
+function openProposalEditor(id) {
+    showToast('제안서 편집 화면은 파트 4에서 구현 예정');
+    // TODO 파트 4: proposalListView 숨기고 proposalEditorView에 편집 폼 렌더
 }
