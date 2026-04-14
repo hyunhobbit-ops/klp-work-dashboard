@@ -440,8 +440,8 @@ function renderHome() {
     });
     document.getElementById('urgentList').innerHTML = urgentHtml || empty('긴급 항목이 없습니다');
 
-    // Today schedule
-    const sorted = [...todayItems].sort((a, b) => a.done - b.done);
+    // Today schedule — 로그인 사용자 본인 할 일만
+    const sorted = [...myTodayItems].sort((a, b) => a.done - b.done);
     let taskHtml = '';
     sorted.forEach(t => {
         taskHtml += `<div class="dash-task-item ${t.done ? 'completed' : ''}">
