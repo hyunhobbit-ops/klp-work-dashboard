@@ -4744,16 +4744,17 @@ function renderProductDB() {
 
     let tableHtml = '';
     let cardHtml = '';
+    const feeUnit = apply => apply === '일괄' ? '일괄' : '개당';
     filtered.forEach(p => {
         const priceStr = `${formatKRW(p.unitPrice)} <span style="font-size:11px;color:var(--gray-500)">(${p.vatIncluded ? 'VAT 포함' : 'VAT 별도'})</span>`;
         const printCell = p.printType === '불가'
             ? `<span style="color:var(--gray-400);font-weight:600">불가</span>`
-            : `<span class="badge" style="background:#FAECE7;color:#712B13;font-weight:700">${p.printType}</span>${p.printFee ? `<div style="font-size:11px;color:var(--gray-500);margin-top:3px">₩${p.printFee.toLocaleString()}/개</div>` : ''}`;
+            : `<span class="badge" style="background:#FAECE7;color:#712B13;font-weight:700">${p.printType}</span>${p.printFee ? `<div style="font-size:11px;color:var(--gray-500);margin-top:3px">₩${p.printFee.toLocaleString()} ${feeUnit(p.printFeeApply)}</div>` : ''}`;
         const packCell = p.packagingType
-            ? `<span class="badge badge-green">${p.packagingType}</span>${p.packagingFee ? `<div style="font-size:11px;color:var(--gray-500);margin-top:3px">₩${p.packagingFee.toLocaleString()}/개</div>` : ''}`
+            ? `<span class="badge badge-green">${p.packagingType}</span>${p.packagingFee ? `<div style="font-size:11px;color:var(--gray-500);margin-top:3px">₩${p.packagingFee.toLocaleString()} ${feeUnit(p.packagingFeeApply)}</div>` : ''}`
             : `<span style="color:var(--gray-400)">-</span>`;
         const labelCell = p.labelAvailable
-            ? `<span class="badge badge-green">가능</span>`
+            ? `<span class="badge badge-green">가능</span>${p.labelFee ? `<div style="font-size:11px;color:var(--gray-500);margin-top:3px">₩${p.labelFee.toLocaleString()} ${feeUnit(p.labelFeeApply)}</div>` : ''}`
             : `<span class="badge badge-red">불가</span>`;
 
         tableHtml += `<tr onclick="showProductDetail(${p.id})" style="cursor:pointer">
@@ -4783,9 +4784,9 @@ function renderProductDB() {
             </div>
             <div class="resp-card-meta">
                 <div class="resp-card-row"><span class="badge badge-gray">${p.category}</span> <strong>${priceStr}</strong></div>
-                <div class="resp-card-row">인쇄: ${p.printType}${p.printFee ? ` (₩${p.printFee.toLocaleString()}/개)` : ''}</div>
-                <div class="resp-card-row">포장: ${p.packagingType || '-'}${p.packagingFee ? ` (₩${p.packagingFee.toLocaleString()}/개)` : ''}</div>
-                <div class="resp-card-row">라벨: ${p.labelAvailable ? '가능' : '불가'}</div>
+                <div class="resp-card-row">인쇄: ${p.printType}${p.printFee ? ` (₩${p.printFee.toLocaleString()} ${feeUnit(p.printFeeApply)})` : ''}</div>
+                <div class="resp-card-row">포장: ${p.packagingType || '-'}${p.packagingFee ? ` (₩${p.packagingFee.toLocaleString()} ${feeUnit(p.packagingFeeApply)})` : ''}</div>
+                <div class="resp-card-row">라벨: ${p.labelAvailable ? '가능' : '불가'}${p.labelAvailable && p.labelFee ? ` (₩${p.labelFee.toLocaleString()} ${feeUnit(p.labelFeeApply)})` : ''}</div>
             </div>
         </div>`;
     });
@@ -4820,7 +4821,7 @@ function openProductDBModal(editId) {
         </div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">단가 (원)</label>
-                <input type="number" class="form-input" id="productUnitPrice" placeholder="0" value="${v('unitPrice', 0)}"></div>
+                <input type="text" inputmode="numeric" class="form-input" id="productUnitPrice" placeholder="0" value="${v('unitPrice', 0) ? Number(v('unitPrice', 0)).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this)"></div>
             <div class="form-group"><label class="form-label">VAT 포함</label>
                 <label style="display:flex;align-items:center;gap:8px;padding:10px 0;font-weight:500;color:var(--gray-700)">
                     <input type="checkbox" id="productVatIncluded" ${v('vatIncluded', true) ? 'checked' : ''}> 단가에 VAT 포함</label>
@@ -4828,21 +4829,46 @@ function openProductDBModal(editId) {
         </div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">인쇄</label>
-                <select class="form-select" id="productPrintType" onchange="document.getElementById('productPrintFeeRow').style.display=this.value==='불가'?'none':'block'">${sel(PRINT_TYPES, v('printType') || '불가')}</select></div>
-            <div class="form-group" id="productPrintFeeRow" style="display:${(v('printType') || '불가') === '불가' ? 'none' : 'block'}"><label class="form-label">인쇄비 (개당)</label>
-                <input type="number" class="form-input" id="productPrintFee" placeholder="0" value="${v('printFee', 0)}"></div>
+                <select class="form-select" id="productPrintType" onchange="document.getElementById('productPrintFeeRow').style.display=this.value==='불가'?'none':'flex'">${sel(PRINT_TYPES, v('printType') || '불가')}</select></div>
+            <div class="form-group" id="productPrintFeeRow" style="display:${(v('printType') || '불가') === '불가' ? 'none' : 'flex'};gap:6px">
+                <div style="flex:1"><label class="form-label">인쇄비</label>
+                    <input type="text" inputmode="numeric" class="form-input" id="productPrintFee" placeholder="0" value="${v('printFee', 0) ? Number(v('printFee', 0)).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this)"></div>
+                <div style="width:92px"><label class="form-label">적용</label>
+                    <select class="form-select" id="productPrintFeeApply">
+                        <option value="1개당" ${(v('printFeeApply', '1개당')) === '1개당' ? 'selected' : ''}>1개당</option>
+                        <option value="일괄" ${v('printFeeApply') === '일괄' ? 'selected' : ''}>일괄</option>
+                    </select></div>
+            </div>
         </div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">포장 방식</label>
                 <select class="form-select" id="productPackagingType">${sel(PACKAGING_TYPES, v('packagingType') || '기본박스')}</select></div>
-            <div class="form-group"><label class="form-label">포장비 (개당)</label>
-                <input type="number" class="form-input" id="productPackagingFee" placeholder="0" value="${v('packagingFee', 0)}"></div>
+            <div class="form-group" style="display:flex;gap:6px">
+                <div style="flex:1"><label class="form-label">포장비</label>
+                    <input type="text" inputmode="numeric" class="form-input" id="productPackagingFee" placeholder="0" value="${v('packagingFee', 0) ? Number(v('packagingFee', 0)).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this)"></div>
+                <div style="width:92px"><label class="form-label">적용</label>
+                    <select class="form-select" id="productPackagingFeeApply">
+                        <option value="1개당" ${(v('packagingFeeApply', '1개당')) === '1개당' ? 'selected' : ''}>1개당</option>
+                        <option value="일괄" ${v('packagingFeeApply') === '일괄' ? 'selected' : ''}>일괄</option>
+                    </select></div>
+            </div>
         </div>
-        <div class="form-group"><label class="form-label">라벨부착</label>
-            <select class="form-select" id="productLabelAvailable">
-                <option value="true" ${v('labelAvailable', true) ? 'selected' : ''}>가능</option>
-                <option value="false" ${!v('labelAvailable', true) ? 'selected' : ''}>불가</option>
-            </select></div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">라벨부착</label>
+                <select class="form-select" id="productLabelAvailable" onchange="document.getElementById('productLabelFeeRow').style.display=this.value==='true'?'flex':'none'">
+                    <option value="true" ${v('labelAvailable', true) ? 'selected' : ''}>가능</option>
+                    <option value="false" ${!v('labelAvailable', true) ? 'selected' : ''}>불가</option>
+                </select></div>
+            <div class="form-group" id="productLabelFeeRow" style="display:${v('labelAvailable', true) ? 'flex' : 'none'};gap:6px">
+                <div style="flex:1"><label class="form-label">라벨부착 비용</label>
+                    <input type="text" inputmode="numeric" class="form-input" id="productLabelFee" placeholder="0" value="${v('labelFee', 0) ? Number(v('labelFee', 0)).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this)"></div>
+                <div style="width:92px"><label class="form-label">적용</label>
+                    <select class="form-select" id="productLabelFeeApply">
+                        <option value="1개당" ${(v('labelFeeApply', '1개당')) === '1개당' ? 'selected' : ''}>1개당</option>
+                        <option value="일괄" ${v('labelFeeApply') === '일괄' ? 'selected' : ''}>일괄</option>
+                    </select></div>
+            </div>
+        </div>
         <div class="form-group"><label class="form-label">상품 이미지</label>
             <input type="hidden" id="productImage" value="${v('image')}">
             <div id="productImagePreview" style="margin-bottom:8px">
@@ -4896,18 +4922,23 @@ function saveProduct() {
     const editId = parseInt(document.getElementById('productEditId').value) || 0;
     const name = document.getElementById('productName').value.trim();
     if (!name) { showToast('상품명을 입력해주세요'); return; }
+    const labelAvailable = document.getElementById('productLabelAvailable').value === 'true';
     const data = {
         name,
         description: document.getElementById('productDescription').value.trim(),
         category: document.getElementById('productCategory').value,
         image: document.getElementById('productImage').value.trim(),
-        unitPrice: parseInt(document.getElementById('productUnitPrice').value) || 0,
+        unitPrice: readProjectNumber('productUnitPrice'),
         vatIncluded: document.getElementById('productVatIncluded').checked,
         printType: document.getElementById('productPrintType').value,
-        printFee: parseInt(document.getElementById('productPrintFee').value) || 0,
+        printFee: readProjectNumber('productPrintFee'),
+        printFeeApply: document.getElementById('productPrintFeeApply').value || '1개당',
         packagingType: document.getElementById('productPackagingType').value,
-        packagingFee: parseInt(document.getElementById('productPackagingFee').value) || 0,
-        labelAvailable: document.getElementById('productLabelAvailable').value === 'true',
+        packagingFee: readProjectNumber('productPackagingFee'),
+        packagingFeeApply: document.getElementById('productPackagingFeeApply').value || '1개당',
+        labelAvailable,
+        labelFee: labelAvailable ? readProjectNumber('productLabelFee') : 0,
+        labelFeeApply: document.getElementById('productLabelFeeApply').value || '1개당',
         status: document.getElementById('productStatus').value,
     };
     if (editId) {
@@ -4948,9 +4979,9 @@ function showProductDetail(id) {
         </div>
         <div style="color:var(--gray-600);font-size:13px;margin-bottom:16px">${p.description || '-'}</div>
         ${row('단가', `${formatKRW(p.unitPrice)} <span style="font-size:11px;color:var(--gray-500);font-weight:500">(${p.vatIncluded ? 'VAT 포함' : 'VAT 별도'})</span>`)}
-        ${row('인쇄', p.printType + (p.printFee ? ` · ₩${p.printFee.toLocaleString()}/개` : ''))}
-        ${row('포장', (p.packagingType || '-') + (p.packagingFee ? ` · ₩${p.packagingFee.toLocaleString()}/개` : ''))}
-        ${row('라벨부착', p.labelAvailable ? '가능' : '불가')}
+        ${row('인쇄', p.printType + (p.printFee ? ` · ₩${p.printFee.toLocaleString()} ${p.printFeeApply === '일괄' ? '일괄' : '개당'}` : ''))}
+        ${row('포장', (p.packagingType || '-') + (p.packagingFee ? ` · ₩${p.packagingFee.toLocaleString()} ${p.packagingFeeApply === '일괄' ? '일괄' : '개당'}` : ''))}
+        ${row('라벨부착', (p.labelAvailable ? '가능' : '불가') + (p.labelAvailable && p.labelFee ? ` · ₩${p.labelFee.toLocaleString()} ${p.labelFeeApply === '일괄' ? '일괄' : '개당'}` : ''))}
         <div style="display:flex;gap:10px;margin-top:20px">
             <button class="form-submit" style="flex:1" onclick="closeDetail();openProductDBModal(${p.id})">✏️ 편집</button>
             <button class="form-delete-btn" onclick="deleteProduct(${p.id})">🗑️ 삭제</button>
@@ -5401,17 +5432,18 @@ function renderProposalPreview() {
         const printRow = p.printType === '불가'
             ? `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value pp-opt-muted">불가</span></div>`
             : `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value"><span class="pp-tag pp-tag-print">${p.printType}</span></span></div>`;
+        const feeUnit = a => a === '일괄' ? '일괄' : '개당';
         const printFeeRow = (p.printType !== '불가' && p.printFee)
-            ? `<div class="pp-opt-row"><span class="pp-opt-label">인쇄비</span><span class="pp-opt-value">개당 ₩${p.printFee.toLocaleString()}</span></div>` : '';
+            ? `<div class="pp-opt-row"><span class="pp-opt-label">인쇄비</span><span class="pp-opt-value">${feeUnit(p.printFeeApply)} ₩${p.printFee.toLocaleString()}</span></div>` : '';
         const packRow = p.packagingType
             ? (p.packagingType === '기본박스'
                 ? `<div class="pp-opt-row"><span class="pp-opt-label">포장</span><span class="pp-opt-value pp-opt-muted">기본박스</span></div>`
                 : `<div class="pp-opt-row"><span class="pp-opt-label">포장</span><span class="pp-opt-value"><span class="pp-tag pp-tag-pack">${p.packagingType}</span></span></div>`)
             : '';
         const packFeeRow = p.packagingFee
-            ? `<div class="pp-opt-row"><span class="pp-opt-label">포장비</span><span class="pp-opt-value">개당 ₩${p.packagingFee.toLocaleString()}</span></div>` : '';
+            ? `<div class="pp-opt-row"><span class="pp-opt-label">포장비</span><span class="pp-opt-value">${feeUnit(p.packagingFeeApply)} ₩${p.packagingFee.toLocaleString()}</span></div>` : '';
         const labelRow = p.labelAvailable
-            ? `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span class="pp-tag pp-tag-label-yes">부착 가능</span></span></div>`
+            ? `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span class="pp-tag pp-tag-label-yes">부착 가능</span>${p.labelFee ? ` <span style="color:var(--gray-500);font-size:11px">${feeUnit(p.labelFeeApply)} ₩${p.labelFee.toLocaleString()}</span>` : ''}</span></div>`
             : `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span class="pp-tag pp-tag-label-no">부착 불가</span></span></div>`;
 
         const imgHtml = p.image
@@ -5441,14 +5473,15 @@ function renderProposalPreview() {
     // 테이블 뷰
     const tableRows = filtered.map(p => {
         const vatLabel = p.vatIncluded ? 'VAT 포함' : 'VAT 별도';
+        const fu = a => a === '일괄' ? '일괄' : '개당';
         const printCell = p.printType === '불가'
             ? `<span class="pp-opt-muted">불가</span>`
-            : `<span class="pp-tag pp-tag-print">${p.printType}</span>${p.printFee ? ` <span style="color:var(--gray-500)">₩${p.printFee.toLocaleString()}/개</span>` : ''}`;
+            : `<span class="pp-tag pp-tag-print">${p.printType}</span>${p.printFee ? ` <span style="color:var(--gray-500)">₩${p.printFee.toLocaleString()} ${fu(p.printFeeApply)}</span>` : ''}`;
         const packCell = p.packagingType
-            ? `<span class="pp-tag pp-tag-pack">${p.packagingType}</span>${p.packagingFee ? ` <span style="color:var(--gray-500)">₩${p.packagingFee.toLocaleString()}/개</span>` : ''}`
+            ? `<span class="pp-tag pp-tag-pack">${p.packagingType}</span>${p.packagingFee ? ` <span style="color:var(--gray-500)">₩${p.packagingFee.toLocaleString()} ${fu(p.packagingFeeApply)}</span>` : ''}`
             : '-';
         const labelCell = p.labelAvailable
-            ? `<span class="pp-tag pp-tag-label-yes">가능</span>`
+            ? `<span class="pp-tag pp-tag-label-yes">가능</span>${p.labelFee ? ` <span style="color:var(--gray-500)">₩${p.labelFee.toLocaleString()} ${fu(p.labelFeeApply)}</span>` : ''}`
             : `<span class="pp-tag pp-tag-label-no">불가</span>`;
         return `<tr>
             <td><strong>${p.name}</strong>${p.description ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">${p.description}</div>` : ''}</td>
