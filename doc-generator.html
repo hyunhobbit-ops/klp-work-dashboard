@@ -179,7 +179,11 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
 body.view-mode{background:#fff}
 body.view-mode .mode-bar,body.view-mode .sub-bar,body.view-mode .action-bar{display:none!important}
 body.view-mode .preview-area{padding:0}
-body.view-mode .preview-wrap{box-shadow:none;border-radius:0;max-width:100%;margin:0}
+body.view-mode .preview-wrap{box-shadow:none;border-radius:0;max-width:100%;margin:0;overflow:hidden}
+/* 외부 임베드(iframe)에서 A4 원본(794x1123)을 뷰포트 폭에 맞춰 축소 */
+body.view-mode #docEl,body.view-mode #wrDocEl{width:100vw;height:calc(100vw * 1123 / 794);overflow:hidden;position:relative}
+body.view-mode #docEl > div,body.view-mode #wrDocEl > div{transform:scale(calc(100vw / 794));transform-origin:top left}
+body.view-mode html,body.view-mode body{margin:0;padding:0;overflow:hidden}
 </style>
 </head>
 <body>
