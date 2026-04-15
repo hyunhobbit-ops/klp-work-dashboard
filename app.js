@@ -397,6 +397,15 @@ function switchTab(tabId, fromHistory = false) {
             history.pushState({ tab: tabId }, '', newHash);
         }
     }
+
+    // 일일계획표 열릴 때 네이버 캘린더 백그라운드 동기화 (URL 저장돼 있을 때만)
+    if (tabId === 'daily' && localStorage.getItem('klp_naver_ics_url')) {
+        const last = Number(sessionStorage.getItem('klp_naver_last_sync') || 0);
+        if (Date.now() - last > 5 * 60 * 1000) {
+            sessionStorage.setItem('klp_naver_last_sync', String(Date.now()));
+            syncNaverCalendar(true);
+        }
+    }
 }
 
 // 브라우저 뒤로/앞으로 → 해시에 맞춰 탭 전환
@@ -3653,6 +3662,141 @@ async function dbInsertTask(t) {
     const { data, error } = await sb.from('daily_tasks').insert(taskToDb(t)).select().single();
     if (error) { console.error(error); showToast('DB 저장 실패: ' + error.message); return null; }
     return taskFromDb(data);
+}
+
+// =====================================
+// 네이버 캘린더 동기화 (iCal 구독 URL → 일일계획표)
+// =====================================
+function parseIcsText(text) {
+    // 연속 라인(라인 접힘) 해제
+    const unfolded = text.replace(/\r?\n[ \t]/g, '');
+    const events = [];
+    const chunks = unfolded.split(/BEGIN:VEVENT/);
+    for (let i = 1; i < chunks.length; i++) {
+        const blk = chunks[i].split('END:VEVENT')[0];
+        const ev = {};
+        blk.split(/\r?\n/).forEach(line => {
+            const idx = line.indexOf(':');
+            if (idx < 0) return;
+            let key = line.substring(0, idx);
+            const val = line.substring(idx + 1);
+            const semi = key.indexOf(';');
+            if (semi >= 0) key = key.substring(0, semi);
+            const unescape = s => s
+                .replace(/\\n/gi, ' ')
+                .replace(/\\,/g, ',')
+                .replace(/\\;/g, ';')
+                .replace(/\\\\/g, '\\')
+                .trim();
+            if (key === 'UID') ev.uid = val.trim();
+            else if (key === 'SUMMARY') ev.summary = unescape(val);
+            else if (key === 'DTSTART') ev.dtstart = val.trim();
+            else if (key === 'DESCRIPTION') ev.description = unescape(val);
+        });
+        if (!ev.dtstart || !ev.summary) continue;
+        const m = ev.dtstart.match(/^(\d{4})(\d{2})(\d{2})/);
+        if (!m) continue;
+        ev.date = `${m[1]}-${m[2]}-${m[3]}`;
+        events.push(ev);
+    }
+    return events;
+}
+
+async function syncNaverCalendar(silent) {
+    const url = localStorage.getItem('klp_naver_ics_url');
+    if (!url) {
+        if (!silent) openNaverSyncSettings();
+        return;
+    }
+    if (!silent) showToast('네이버 캘린더 동기화 중...');
+    try {
+        const resp = await fetch('/api/naver-ics?url=' + encodeURIComponent(url));
+        if (!resp.ok) {
+            const errJson = await resp.json().catch(() => ({}));
+            throw new Error(errJson.error || ('프록시 오류 ' + resp.status));
+        }
+        const text = await resp.text();
+        const events = parseIcsText(text);
+        if (events.length === 0) {
+            if (!silent) showToast('가져올 일정이 없습니다');
+            return;
+        }
+        // 기존 네이버 라벨 task로 중복 체크 (date + summary 조합)
+        const existing = new Set();
+        dailyTasks.filter(t => t.label === '네이버').forEach(t => {
+            existing.add(t.date + '|' + t.task);
+        });
+        const assignee = (currentUser && currentUser.name) || '전체';
+        let added = 0;
+        for (const ev of events) {
+            const key = ev.date + '|' + ev.summary;
+            if (existing.has(key)) continue;
+            const saved = await dbInsertTask({
+                task: ev.summary,
+                date: ev.date,
+                assignee,
+                target: '',
+                priority: '🟡 보통',
+                done: false,
+                deadline: null,
+                label: '네이버',
+                client: '',
+                linkedGroup: null,
+                isDeadlineCopy: false,
+                projectId: null
+            });
+            if (saved) {
+                dailyTasks.push(saved);
+                added++;
+            }
+        }
+        if (!silent) showToast(`네이버 동기화 완료: 신규 ${added}개 / 총 ${events.length}개`);
+        try { renderDaily(); } catch (e) {}
+        try { renderHome(); } catch (e) {}
+    } catch (e) {
+        console.error('네이버 동기화 실패', e);
+        if (!silent) showToast('네이버 동기화 실패: ' + e.message);
+    }
+}
+
+function openNaverSyncSettings() {
+    const current = localStorage.getItem('klp_naver_ics_url') || '';
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    title.textContent = '네이버 캘린더 동기화';
+    body.innerHTML = `
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.7;margin-bottom:14px;padding:12px 14px;background:var(--bg-secondary);border-radius:8px">
+            <strong>iCal 구독 URL 얻는 법</strong><br>
+            1. 네이버 캘린더 → <strong>설정</strong> → <strong>캘린더 관리</strong><br>
+            2. 원하는 캘린더 옆의 <strong>"URL 공개"</strong> 활성화<br>
+            3. 발급된 <strong>iCal 구독 URL</strong>(.ics) 복사 → 아래 붙여넣기<br>
+            <span style="color:var(--text-tertiary);font-size:12px">※ 네이버 .ics 캐시 갱신이 약 15~30분 단위라 실시간 반영은 아닙니다.</span>
+        </div>
+        <div class="form-group">
+            <label class="form-label">iCal URL</label>
+            <input type="text" class="form-input" id="naverIcsUrl" value="${current.replace(/"/g,'&quot;')}" placeholder="https://cal.naver.com/....ics">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+            <button class="form-submit" style="flex:2" onclick="saveNaverSyncSettings()">💾 저장 후 동기화</button>
+            ${current ? `<button class="form-submit" style="flex:1;background:var(--gray-200);color:var(--gray-800)" onclick="clearNaverSyncSettings()">🗑 연결 해제</button>` : ''}
+        </div>`;
+    document.getElementById('modalOverlay').classList.add('show');
+}
+
+function saveNaverSyncSettings() {
+    const url = document.getElementById('naverIcsUrl').value.trim();
+    if (!url) { showToast('URL을 입력해주세요'); return; }
+    if (!/^https?:\/\//i.test(url)) { showToast('http(s)://로 시작하는 URL이어야 합니다'); return; }
+    localStorage.setItem('klp_naver_ics_url', url);
+    closeModal();
+    syncNaverCalendar();
+}
+
+function clearNaverSyncSettings() {
+    if (!confirm('네이버 캘린더 연동을 해제하시겠습니까?\n(기존에 가져온 일정은 그대로 남습니다)')) return;
+    localStorage.removeItem('klp_naver_ics_url');
+    closeModal();
+    showToast('연동이 해제되었습니다');
 }
 async function dbUpdateTask(id, patch) {
     const map = { task:'task', date:'date', assignee:'assignee', target:'target', priority:'priority',
