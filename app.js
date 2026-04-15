@@ -3859,6 +3859,86 @@ function filterClients() {
     );
 }
 
+const selectedClientIds = new Set();
+
+function toggleClientSelect(id, el) {
+    if (el.checked) selectedClientIds.add(id);
+    else selectedClientIds.delete(id);
+    const tr = el.closest('tr');
+    if (tr) tr.classList.toggle('row-selected', el.checked);
+    updateClientBulkBar();
+    const pageChecks = document.querySelectorAll('#clientTableBody .client-row-check');
+    const selAll = document.getElementById('clientSelectAll');
+    if (selAll && pageChecks.length) {
+        const all = Array.from(pageChecks).every(cb => cb.checked);
+        const some = Array.from(pageChecks).some(cb => cb.checked);
+        selAll.checked = all;
+        selAll.indeterminate = !all && some;
+    }
+}
+
+function toggleClientSelectAll(el) {
+    const checks = document.querySelectorAll('#clientTableBody .client-row-check');
+    checks.forEach(cb => {
+        const id = Number(cb.dataset.id);
+        cb.checked = el.checked;
+        if (el.checked) selectedClientIds.add(id);
+        else selectedClientIds.delete(id);
+        const tr = cb.closest('tr');
+        if (tr) tr.classList.toggle('row-selected', el.checked);
+    });
+    el.indeterminate = false;
+    updateClientBulkBar();
+}
+
+function updateClientBulkBar() {
+    const bar = document.getElementById('clientBulkBar');
+    const cnt = document.getElementById('clientBulkCount');
+    if (!bar || !cnt) return;
+    const n = selectedClientIds.size;
+    if (n === 0) {
+        bar.style.display = 'none';
+    } else {
+        bar.style.display = 'flex';
+        cnt.textContent = `${n}개 선택됨`;
+    }
+}
+
+function clearClientSelection() {
+    selectedClientIds.clear();
+    renderClients();
+}
+
+async function applyClientBulkEdit() {
+    if (selectedClientIds.size === 0) { showToast('선택된 고객사가 없습니다'); return; }
+    const catSel = document.getElementById('clientBulkCategory');
+    const gradeEnabled = document.getElementById('clientBulkGradeEnabled').checked;
+    const gradeVal = document.getElementById('clientBulkGrade').value.trim();
+    const catVal = catSel.value;
+    const changeCat = catVal !== '__skip';
+    if (!changeCat && !gradeEnabled) { showToast('변경할 항목을 선택해주세요'); return; }
+
+    const ids = Array.from(selectedClientIds);
+    const dbPatch = {};
+    const localPatch = {};
+    if (changeCat) { dbPatch.category = catVal; localPatch.category = catVal; }
+    if (gradeEnabled) { dbPatch.grade = gradeVal; localPatch.grade = gradeVal; }
+
+    if (!confirm(`${ids.length}개 고객사를 일괄 수정하시겠습니까?`)) return;
+
+    let ok = 0, fail = 0;
+    for (const id of ids) {
+        const { error } = await sb.from('clients').update(dbPatch).eq('id', id);
+        if (error) { console.error(error); fail++; continue; }
+        const c = clients.find(x => x.id === id);
+        if (c) Object.assign(c, localPatch);
+        ok++;
+    }
+    showToast(`일괄 수정 완료: ${ok}건${fail ? ` / 실패 ${fail}건` : ''}`);
+    selectedClientIds.clear();
+    renderClients();
+}
+
 function renderClients() {
     const tbody = document.getElementById('clientTableBody');
     if (!tbody) return;
@@ -3885,7 +3965,9 @@ function renderClients() {
             const opt = opts ? ` data-options="${opts}"` : '';
             return `<td class="cell-editable" data-entity="client" data-id="${c.id}" data-field="${field}" data-type="${type}"${opt}>${val}</td>`;
         };
-        return `<tr onclick="clientRowClick(${c.id})" style="cursor:pointer">
+        const checked = selectedClientIds.has(c.id) ? 'checked' : '';
+        return `<tr onclick="clientRowClick(${c.id})" style="cursor:pointer" ${checked ? 'class="row-selected"' : ''}>
+        <td style="text-align:center" onclick="event.stopPropagation()"><input type="checkbox" class="client-row-check" data-id="${c.id}" ${checked} onclick="toggleClientSelect(${c.id}, this)" style="width:16px;height:16px;cursor:pointer"></td>
         ${ed('category', 'select', catBadge(c.category), '매입처,매출처,')}
         ${ed('companyName', 'text', `<strong>${esc(c.companyName)}</strong>`)}
         ${ed('ceo', 'text', esc(c.ceo) || '-')}
@@ -3899,7 +3981,18 @@ function renderClients() {
         ${ed('grade', 'text', esc(c.grade) || '-')}
         <td><button class="edit-btn" onclick="event.stopPropagation();openEditClient(${c.id})">편집</button></td>
     </tr>`;
-    }).join('') || `<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
+    }).join('') || `<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
+
+    // 일괄 수정 바 / 전체선택 체크박스 동기화
+    updateClientBulkBar();
+    const selAll = document.getElementById('clientSelectAll');
+    if (selAll) {
+        const pageIds = pageItems.map(c => c.id);
+        const allChecked = pageIds.length > 0 && pageIds.every(id => selectedClientIds.has(id));
+        const someChecked = pageIds.some(id => selectedClientIds.has(id));
+        selAll.checked = allChecked;
+        selAll.indeterminate = !allChecked && someChecked;
+    }
 
     // 페이지네이션
     const pag = document.getElementById('clientPagination');

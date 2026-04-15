@@ -677,10 +677,28 @@
                 <div class="page-section">
                     <div></div>
                     <div class="client-stats" id="clientStats" style="padding:8px 16px;color:var(--text-secondary);font-size:14px"></div>
+                    <div id="clientBulkBar" style="display:none;align-items:center;gap:10px;padding:12px 16px;margin:0 16px 12px 16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap">
+                        <span id="clientBulkCount" style="font-weight:600;color:var(--text-primary)"></span>
+                        <span style="color:var(--text-tertiary)">|</span>
+                        <label style="font-size:13px;color:var(--text-secondary);margin:0">구분</label>
+                        <select id="clientBulkCategory" class="form-select" style="width:140px;margin:0">
+                            <option value="__skip">변경 안함</option>
+                            <option value="">선택 안함</option>
+                            <option value="매입처">매입처</option>
+                            <option value="매출처">매출처</option>
+                        </select>
+                        <label style="font-size:13px;color:var(--text-secondary);margin:0;display:flex;align-items:center;gap:6px">
+                            <input type="checkbox" id="clientBulkGradeEnabled" style="width:16px;height:16px"> 등급
+                        </label>
+                        <input type="text" id="clientBulkGrade" class="form-input" placeholder="등급 값 (체크 시 변경)" style="width:180px;margin:0">
+                        <button class="btn-primary" onclick="applyClientBulkEdit()">일괄 적용</button>
+                        <button class="btn-export" onclick="clearClientSelection()">선택 해제</button>
+                    </div>
                     <div class="table-wrap">
                         <table class="data-table" id="clientTable">
                             <thead>
                                 <tr>
+                                    <th style="width:40px;text-align:center"><input type="checkbox" id="clientSelectAll" onclick="toggleClientSelectAll(this)" style="width:16px;height:16px;cursor:pointer" title="현재 페이지 전체 선택"></th>
                                     <th style="width:90px">구분</th>
                                     <th style="max-width:220px">회사명</th>
                                     <th>대표자</th>
