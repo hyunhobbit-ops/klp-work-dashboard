@@ -30,6 +30,13 @@ async function checkAuth() {
     }
 }
 
+const DELIVERY_PRICE_ALLOWED = ['김관택','이현주','김현호'];
+function applyDeliveryPricePermission() {
+    const login = currentUser ? (currentUser.loginName || currentUser.name) : null;
+    const allowed = login && DELIVERY_PRICE_ALLOWED.includes(login);
+    document.body.classList.toggle('hide-delivery-price', !allowed);
+}
+
 function updateSidebarUser() {
     const initials = currentUser.name.length >= 2
         ? currentUser.name.slice(-2)
@@ -38,6 +45,7 @@ function updateSidebarUser() {
     document.getElementById('userName').textContent = currentUser.name;
     document.getElementById('userRole').textContent = currentUser.role;
     try { applyMarketdbPermission(); } catch (e) {}
+    try { applyDeliveryPricePermission(); } catch (e) {}
 }
 
 async function handleLogin() {
@@ -1868,7 +1876,7 @@ function renderDeliveries() {
             <td class="cell-editable" data-id="${d.id}" data-field="zipcode">${d.zipcode || '-'}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="address" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.address}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="payment" data-type="select" data-options="선불,착불">${d.payment}</td>
-            <td class="cell-editable" data-id="${d.id}" data-field="price" data-type="number">${d.price ? d.price.toLocaleString() + '원' : '-'}</td>
+            <td class="cell-editable delivery-price-col" data-id="${d.id}" data-field="price" data-type="number">${d.price ? d.price.toLocaleString() + '원' : '-'}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="memo">${d.memo || '-'}</td>
             <td><span class="author-badge">${d.author || '-'}</span></td>
             <td>${trackingCell}</td>
@@ -1890,7 +1898,7 @@ function renderDeliveries() {
                 <div class="resp-card-row">${d.sender} · ${fmtDisplay(d.date)} · ${d.payment}</div>
                 ${d.phone ? `<div class="resp-card-row">${d.phone}</div>` : ''}
                 ${d.zipcode ? `<div class="resp-card-row">${d.zipcode} ${d.address}</div>` : `<div class="resp-card-row">${d.address}</div>`}
-                <div class="resp-card-row">${d.price ? d.price.toLocaleString() + '원' : ''}</div>
+                <div class="resp-card-row delivery-price-col">${d.price ? d.price.toLocaleString() + '원' : ''}</div>
                 ${d.memo ? `<div class="resp-card-row">${d.memo}</div>` : ''}
                 <div class="resp-card-row">작성자: <span class="author-badge">${d.author || '-'}</span></div>
                 <div class="resp-card-row">${trackingCell}</div>
@@ -1979,7 +1987,7 @@ function openEditDelivery(id) {
         </div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">품목</label><input type="text" class="form-input" id="editDelProduct" value="${d.product}" placeholder="품목"></div>
-            <div class="form-group"><label class="form-label">판매가</label><input type="number" class="form-input" id="editDelPrice" value="${d.price || ''}" placeholder="0"></div>
+            <div class="form-group delivery-price-col"><label class="form-label">판매가</label><input type="number" class="form-input" id="editDelPrice" value="${d.price || ''}" placeholder="0"></div>
         </div>
         <div class="form-group"><label class="form-label">배송메모</label><input type="text" class="form-input" id="editDelMemo" value="${d.memo}" placeholder="배송메모"></div>
         <div class="form-actions">
@@ -3235,7 +3243,7 @@ function openModal(type) {
                 </div>
                 <div class="form-group"><label class="form-label">선/착불</label><select class="form-select" id="newDelPayment"><option value="선불">선불</option><option value="착불">착불</option></select></div>
             </div>
-            <div class="form-group" id="newDelPriceGroup" style="display:none"><label class="form-label">판매가</label><input type="number" class="form-input" id="newDelPrice" placeholder="0"></div>
+            <div class="form-group delivery-price-col" id="newDelPriceGroup" style="display:none"><label class="form-label">판매가</label><input type="number" class="form-input" id="newDelPrice" placeholder="0"></div>
             <div class="form-row" style="grid-template-columns:140px 1fr">
                 <div class="form-group"><label class="form-label">품목</label><input type="text" class="form-input" id="newDelProduct" placeholder="품목"></div>
                 <div class="form-group"><label class="form-label">배송메모</label><input type="text" class="form-input" id="newDelMemo" placeholder="배송메모"></div>

@@ -2406,3 +2406,6 @@ body {
 .market-sort-btn:hover { background: var(--gray-50); color: var(--blue); border-color: var(--blue); }
 [data-theme="dark"] .market-sort-btn { background: var(--gray-50); border-color: var(--gray-300); color: var(--gray-600); }
 [data-theme="dark"] .market-sort-btn:hover { background: var(--gray-100); color: var(--blue); }
+
+/* 택배관리 판매가 컬럼 — 권한 없는 사용자에겐 숨김 */
+body.hide-delivery-price .delivery-price-col { display: none !important; }
