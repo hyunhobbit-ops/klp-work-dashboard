@@ -5727,7 +5727,19 @@ async function loadMarketdbFromDb() {
                 const rows = [];
                 ['watch','goods','misc'].forEach(cat => {
                     (MARKETDB_SEED[cat] || []).forEach((r, i) => {
-                        const row = marketRowToDb({ ...r, image: '' }, cat);
+                        // CSV의 1/2/3/4 → 담당자별 중고·번개·당근 일괄 체크
+                        const ceo = r['1'] === 'Yes';
+                        const iyj = r['2'] === 'Yes';
+                        const khh = r['3'] === 'Yes';
+                        const nko = r['4'] === 'Yes';
+                        const mapped = Object.assign({}, r, {
+                            image: '',
+                            ceo_junggo: ceo, ceo_bungae: ceo, ceo_danggeun: ceo,
+                            iyj_junggo: iyj, iyj_bungae: iyj, iyj_danggeun: iyj,
+                            khh_junggo: khh, khh_bungae: khh, khh_danggeun: khh,
+                            nko_junggo: nko, nko_bungae: nko
+                        });
+                        const row = marketRowToDb(mapped, cat);
                         row.sort_order = i;
                         rows.push(row);
                     });
