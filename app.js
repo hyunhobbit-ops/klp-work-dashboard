@@ -5199,16 +5199,22 @@ function renderProposalEditor() {
             </div>
             <!-- 제안서 정보 -->
             <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:18px 20px">
-                <div style="font-size:14px;font-weight:800;color:var(--gray-900);margin-bottom:12px">📄 제안서 정보</div>
+                <div style="font-size:14px;font-weight:800;color:var(--gray-900);margin-bottom:12px">📄 제안서 정보 (KLP 담당)</div>
                 <div class="form-group"><label class="form-label">제안서 제목 <span style="color:var(--red)">*</span></label>
                     <input type="text" class="form-input" id="epTitle" value="${ep.title || ''}" placeholder="예) 지플러스타워 준공 감사패 제안"></div>
                 <div class="form-row">
                     <div class="form-group"><label class="form-label">유효기간</label>
                         <input type="date" class="form-input" id="epValidUntil" value="${ep.validUntil || ''}"></div>
-                    <div class="form-group"><label class="form-label">담당자</label>
+                    <div class="form-group"><label class="form-label">KLP 담당자</label>
                         <select class="form-select" id="epAssignee">
                             ${assignees.map(a => `<option value="${a}" ${ep.assignee === a ? 'selected' : ''}>${a}</option>`).join('')}
                         </select></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">KLP 담당자 연락처</label>
+                        <input type="text" class="form-input" id="epAssigneePhone" value="${ep.assigneePhone || ''}" placeholder="010-0000-0000"></div>
+                    <div class="form-group"><label class="form-label">KLP 담당자 이메일</label>
+                        <input type="email" class="form-input" id="epAssigneeEmail" value="${ep.assigneeEmail || ''}" placeholder="name@klpkorea.com"></div>
                 </div>
                 <div class="form-group"><label class="form-label">상태</label>
                     <select class="form-select" id="epStatus">
@@ -5502,13 +5508,13 @@ function renderProposalPreview() {
             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
         </button>
         <div class="pp-wrap">
-            <!-- 프리미엄 다크 헤더 -->
+            <!-- 프리미엄 다크 헤더 — 거래처 정보 -->
             <div class="pp-hero">
                 <div class="pp-hero-circle3"></div>
                 <div class="pp-hero-left">
                     <div class="pp-hero-label">PRODUCT PROPOSAL</div>
                     <div class="pp-hero-title">${ep.title || '제안서 제목'}</div>
-                    <div class="pp-hero-sub">${ep.clientName || '거래처'} · ${ep.assignee || '담당자'} 담당</div>
+                    <div class="pp-hero-sub">${ep.clientName || '거래처'}${ep.clientContact ? ' · ' + ep.clientContact + ' 님' : ''}</div>
                 </div>
                 <div class="pp-hero-right">
                     <div class="pp-hero-brand">KLP KOREA</div>
@@ -5516,7 +5522,7 @@ function renderProposalPreview() {
                 </div>
             </div>
 
-            <!-- 제안 안내 + 담당자 -->
+            <!-- 제안 안내 + KLP 담당자 -->
             <div class="pp-info-row">
                 <div class="pp-info-card">
                     <div class="pp-info-title">제안 안내</div>
@@ -5533,8 +5539,8 @@ function renderProposalPreview() {
                         </div>
                     </div>
                     <div class="pp-mgr-contact">
-                        <div>📧 ${ep.clientEmail || 'sales@klpkorea.com'}</div>
-                        <div>📱 ${ep.clientPhone || '02-0000-0000'}</div>
+                        <div>📧 ${ep.assigneeEmail || 'sales@klpkorea.com'}</div>
+                        <div>📱 ${ep.assigneePhone || '02-0000-0000'}</div>
                     </div>
                 </div>
             </div>
@@ -5594,6 +5600,8 @@ function saveProposal() {
     editingProposal.clientEmail = document.getElementById('epClientEmail').value.trim();
     editingProposal.validUntil = document.getElementById('epValidUntil').value;
     editingProposal.assignee = document.getElementById('epAssignee').value;
+    editingProposal.assigneePhone = (document.getElementById('epAssigneePhone') || {}).value || '';
+    editingProposal.assigneeEmail = (document.getElementById('epAssigneeEmail') || {}).value || '';
     const newStatus = document.getElementById('epStatus').value;
     if (newStatus === '발송 완료' && !editingProposal.sentDate) {
         editingProposal.sentDate = fmtDate(new Date());
