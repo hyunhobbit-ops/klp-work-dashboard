@@ -705,6 +705,7 @@ function renderHome() {
         !t.done &&
         !t.isDeadlineCopy
     ).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    console.log('[home overdue]', { me, todayStr, total: dailyTasks.length, mine: dailyTasks.filter(t => t.assignee === me).length, overdueCount: overdueList.length });
     const overdueCountEl = document.getElementById('overdueCount');
     if (overdueCountEl) overdueCountEl.textContent = overdueList.length;
     const overdueListEl = document.getElementById('overdueList');
