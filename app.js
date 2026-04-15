@@ -1093,6 +1093,49 @@ function renderDaily() {
         return title; // 개인 이름은 그대로
     }
 
+    // 미완료(어제 이전까지) 컬럼 — 개인 탭에서만 노출
+    function renderOverdueColumn(person) {
+        const overdue = dailyTasks.filter(t =>
+            t.assignee === person &&
+            t.date && t.date < todayStr &&
+            !t.done &&
+            !t.isDeadlineCopy
+        ).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        if (overdue.length === 0) return '';
+        const MS = 24*60*60*1000;
+        const today0 = new Date(todayStr + 'T00:00:00');
+        let itemsHtml = '';
+        overdue.forEach(t => {
+            const tagClass = (t.priority||'').includes('긴급') ? 'tag-urgent' : (t.priority||'').includes('낮음') ? 'tag-low' : 'tag-normal';
+            const tagLabel = (t.priority||'').includes('긴급') ? '긴급' : (t.priority||'').includes('낮음') ? '낮음' : '보통';
+            const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
+            const clientStr = t.client ? `<span class="daily-client">📌 ${t.client}</span>` : '';
+            const dObj = new Date(t.date + 'T00:00:00');
+            const days = Math.max(1, Math.round((today0 - dObj) / MS));
+            itemsHtml += `<div class="daily-item overdue-item" onclick="openEditTask(${t.id})" style="cursor:pointer">
+                <div class="daily-checkbox" onclick="event.stopPropagation();toggleTask(${t.id})">${checkSvg}</div>
+                <div class="daily-info">
+                    <div class="daily-title">${t.task}</div>
+                    <div class="daily-meta">
+                        <span class="daily-tag ${tagClass}">${tagLabel}</span>
+                        ${labelStr}
+                        ${clientStr}
+                    </div>
+                    <div class="overdue-date-row"><span class="overdue-date-badge">${fmtDisplay(t.date)}</span><span class="overdue-days">${days}일 지남</span></div>
+                </div>
+            </div>`;
+        });
+        return `<div class="daily-column overdue-column">
+            <div class="daily-col-header">
+                <span class="daily-col-title">🔴 미완료 (${person})</span>
+                <div class="daily-col-actions">
+                    <span class="daily-col-count">${overdue.length}</span>
+                </div>
+            </div>
+            <div class="daily-col-body">${itemsHtml}</div>
+        </div>`;
+    }
+
     function renderColumn(title, tasks, assignee) {
         const doneCount = tasks.filter(t => t.done).length;
         let itemsHtml = '';
@@ -1170,13 +1213,15 @@ function renderDaily() {
     }).join('');
 
     if (currentPersonFilter === 'ceo') {
-        // 대표님 탭: 대표님 컬럼을 맨 앞에, 그 다음 전체/임원
+        // 대표님 탭: 대표님 컬럼을 맨 앞에, 그 다음 전체/임원 + 미완료
         const ceoTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '대표님');
         html += renderColumn('대표님', ceoTasks, '대표님');
         html += renderCommonCols(false);
+        html += renderOverdueColumn('대표님');
     } else if (isPersonalTab) {
         html += renderPersonalCols();
         html += renderCommonCols(false);
+        displayPeople.forEach(person => { html += renderOverdueColumn(person); });
     } else {
         // 전체보기: 전체/임원/대표님/개인별 순
         html += renderCommonCols(true);

@@ -2438,3 +2438,33 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
   letter-spacing: .3px;
   vertical-align: middle;
 }
+
+/* 일일계획표 미완료(어제 이전) 컬럼 */
+.daily-column.overdue-column {
+  background: #fff5f5;
+  border: 2px solid #fecaca;
+}
+.daily-column.overdue-column .daily-col-header {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+}
+.daily-column.overdue-column .daily-col-title { color: #991b1b; font-weight: 800; }
+.daily-item.overdue-item {
+  background: #fff;
+  border-left: 3px solid #ef4444;
+}
+.daily-item.overdue-item .daily-title { color: #1a1d29; }
+.overdue-date-row {
+  display: flex; align-items: center; gap: 6px; margin-top: 4px;
+}
+.overdue-date-badge {
+  display: inline-block; padding: 1px 8px; font-size: 10px; font-weight: 700;
+  background: #fee2e2; color: #991b1b; border-radius: 10px;
+}
+.overdue-days { font-size: 11px; color: #dc2626; font-weight: 700; }
+
+[data-theme="dark"] .daily-column.overdue-column { background: #3a1d1f; border-color: #7f1d1d; }
+[data-theme="dark"] .daily-column.overdue-column .daily-col-header { background: linear-gradient(135deg, #7f1d1d, #5f1515); }
+[data-theme="dark"] .daily-column.overdue-column .daily-col-title { color: #fca5a5; }
+[data-theme="dark"] .daily-item.overdue-item { background: var(--white); }
+[data-theme="dark"] .overdue-date-badge { background: #5f1515; color: #fca5a5; }
+[data-theme="dark"] .overdue-days { color: #fca5a5; }
