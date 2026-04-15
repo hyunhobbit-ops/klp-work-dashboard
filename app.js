@@ -5673,30 +5673,39 @@ const MARKETDB_SEED={"goods":[{"1":"No","2":"Yes","3":"Yes","4":"No","상태":"�
 
 // localStorage 영구화 (시안 단계 — 추후 Supabase 이관 예정)
 const MARKETDB_LS_KEY = 'klp_marketdb_v1';
+const MARKETDB_UNCHECK_VERSION = '2026-04-15-uncheck-all'; // 값을 바꾸면 다음 로드에서 모든 체크 초기화
+const MARKETDB_CHECK_FIELDS = ['ceo_junggo','ceo_bungae','ceo_danggeun','iyj_junggo','iyj_bungae','iyj_danggeun','khh_junggo','khh_bungae','khh_danggeun','nko_junggo','nko_bungae'];
 let MARKETDB = null;
 function marketdbLoad() {
+    let fromStorage = false;
     try {
         const raw = localStorage.getItem(MARKETDB_LS_KEY);
-        if (raw) { MARKETDB = JSON.parse(raw); return; }
+        if (raw) { MARKETDB = JSON.parse(raw); fromStorage = true; }
     } catch (e) { console.warn(e); }
-    MARKETDB = JSON.parse(JSON.stringify(MARKETDB_SEED));
-    ['watch','goods','misc'].forEach(cat => {
-        MARKETDB[cat].forEach(r => {
-            if (r.ceo_junggo===undefined) r.ceo_junggo = (r['중']==='Yes')||(r['1']==='Yes');
-            if (r.ceo_bungae===undefined) r.ceo_bungae = false;
-            if (r.ceo_danggeun===undefined) r.ceo_danggeun = r['당']==='Yes';
-            if (r.iyj_junggo===undefined) r.iyj_junggo = r['2']==='Yes';
-            if (r.iyj_bungae===undefined) r.iyj_bungae = false;
-            if (r.iyj_danggeun===undefined) r.iyj_danggeun = false;
-            if (r.khh_junggo===undefined) r.khh_junggo = r['3']==='Yes';
-            if (r.khh_bungae===undefined) r.khh_bungae = false;
-            if (r.khh_danggeun===undefined) r.khh_danggeun = false;
-            if (r.nko_junggo===undefined) r.nko_junggo = r['4']==='Yes';
-            if (r.nko_bungae===undefined) r.nko_bungae = false;
-            if (!r.image) r.image = '';
+    if (!fromStorage) {
+        MARKETDB = JSON.parse(JSON.stringify(MARKETDB_SEED));
+        ['watch','goods','misc'].forEach(cat => {
+            MARKETDB[cat].forEach(r => {
+                // 신규 로드: 체크는 전부 false로 시작
+                MARKETDB_CHECK_FIELDS.forEach(k => { if (r[k]===undefined) r[k] = false; });
+                if (!r.image) r.image = '';
+            });
         });
-    });
-    marketdbSave();
+        marketdbSave();
+    }
+    // 일회성 체크 초기화 마이그레이션 — 상품/이미지는 보존, 체크만 false로
+    try {
+        const ver = localStorage.getItem('klp_marketdb_uncheck_version');
+        if (ver !== MARKETDB_UNCHECK_VERSION) {
+            ['watch','goods','misc'].forEach(cat => {
+                (MARKETDB[cat]||[]).forEach(r => {
+                    MARKETDB_CHECK_FIELDS.forEach(k => { r[k] = false; });
+                });
+            });
+            localStorage.setItem('klp_marketdb_uncheck_version', MARKETDB_UNCHECK_VERSION);
+            marketdbSave();
+        }
+    } catch (e) { console.warn(e); }
 }
 function marketdbSave() {
     try { localStorage.setItem(MARKETDB_LS_KEY, JSON.stringify(MARKETDB)); }
