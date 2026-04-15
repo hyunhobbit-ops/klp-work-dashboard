@@ -5750,6 +5750,7 @@ async function loadMarketdbFromDb() {
                 buckets[cat].push(marketRowFromDb(r));
             });
             MARKETDB = buckets;
+            subscribeMarketRealtime();
         } catch (err) {
             console.error('중고마켓DB 로드 실패:', err);
             showToast('중고마켓DB 로드 실패: ' + (err.message || err));
@@ -5763,6 +5764,15 @@ async function loadMarketdbFromDb() {
 
 async function dbMarketInsert(item, cat) {
     const row = marketRowToDb(item, cat);
+    // 기존 카테고리의 최솟값보다 작게 지정해 맨 위에 노출
+    const existing = (MARKETDB && MARKETDB[cat]) || [];
+    let minSort = 0;
+    // DB에 sort_order가 남아 있을 수 있으므로 실제 값을 조회해 -1
+    try {
+        const res = await sb.from('market_db').select('sort_order').eq('category', cat).order('sort_order', { ascending: true }).limit(1);
+        if (res && res.data && res.data.length > 0) minSort = (res.data[0].sort_order || 0) - 1;
+    } catch (e) {}
+    row.sort_order = minSort;
     const { data, error } = await sb.from('market_db').insert(row).select().single();
     if (error) { showToast('추가 실패: ' + error.message); return null; }
     return marketRowFromDb(data);
@@ -5778,6 +5788,94 @@ async function dbMarketDelete(id) {
     const { error } = await sb.from('market_db').delete().eq('id', id);
     if (error) { showToast('삭제 실패: ' + error.message); return false; }
     return true;
+}
+
+// 같은 카테고리 내에서 위/아래로 이동 (sort_order swap)
+async function moveMarketItem(ev, cat, idx, dir) {
+    ev.stopPropagation();
+    if (!MARKETDB || !MARKETDB[cat]) return;
+    const list = MARKETDB[cat];
+    const targetIdx = idx + dir;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+    const a = list[idx], b = list[targetIdx];
+    // 순서를 뒤집기 위해 임시로 로컬 스왑
+    list[idx] = b;
+    list[targetIdx] = a;
+    // DB는 sort_order 필드를 쓰는 게 깔끔하지만, 현재 seed sort_order=idx이므로 두 행의 sort_order를 교환
+    // 안정적으로 하려면 전체 카테고리를 재번호화하는 것이 안전 (충돌 방지)
+    const updates = list.map((r, i) => ({ id: r.id, sort_order: i }));
+    // 개별 update 병렬 수행
+    try {
+        await Promise.all(updates.map(u => sb.from('market_db').update({ sort_order: u.sort_order }).eq('id', u.id)));
+    } catch (err) {
+        console.error('sort update failed', err);
+        showToast('순서 변경 실패');
+        // 롤백
+        list[idx] = a;
+        list[targetIdx] = b;
+    }
+    renderMarketdb();
+}
+
+// ---- Storage: 상품 이미지 업로드 ----
+async function uploadMarketImage(file) {
+    const ext = ((file.name || '').split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const path = 'items/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+    const { error } = await sb.storage.from('market-db').upload(path, file, { cacheControl: '3600', upsert: false });
+    if (error) throw error;
+    const { data } = sb.storage.from('market-db').getPublicUrl(path);
+    return data.publicUrl;
+}
+
+// ---- Realtime 구독: 3명이 동시 작업 시 실시간 동기화 ----
+let _marketRealtimeChannel = null;
+function subscribeMarketRealtime() {
+    if (_marketRealtimeChannel || !sb || !sb.channel) return;
+    try {
+        _marketRealtimeChannel = sb.channel('market_db_changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'market_db' }, (payload) => {
+                handleMarketRealtimePayload(payload);
+            })
+            .subscribe();
+    } catch (e) { console.warn('realtime subscribe failed', e); }
+}
+function handleMarketRealtimePayload(payload) {
+    if (!MARKETDB) return;
+    const eventType = payload.eventType;
+    const newRow = payload.new;
+    const oldRow = payload.old;
+    if (eventType === 'INSERT' && newRow) {
+        const cat = newRow.category;
+        if (MARKETDB[cat] && !MARKETDB[cat].find(x => x.id === newRow.id)) {
+            MARKETDB[cat].unshift(marketRowFromDb(newRow));
+        }
+    } else if (eventType === 'UPDATE' && newRow) {
+        const targetCat = newRow.category;
+        let moved = false;
+        ['watch','goods','misc'].forEach(c => {
+            const idx = MARKETDB[c].findIndex(x => x.id === newRow.id);
+            if (idx >= 0) {
+                if (c === targetCat) {
+                    MARKETDB[c][idx] = marketRowFromDb(newRow);
+                } else {
+                    MARKETDB[c].splice(idx, 1);
+                    moved = true;
+                }
+            }
+        });
+        if (moved && MARKETDB[targetCat]) {
+            MARKETDB[targetCat].unshift(marketRowFromDb(newRow));
+        }
+    } else if (eventType === 'DELETE' && oldRow) {
+        ['watch','goods','misc'].forEach(c => {
+            const idx = MARKETDB[c].findIndex(x => x.id === oldRow.id);
+            if (idx >= 0) MARKETDB[c].splice(idx, 1);
+        });
+    }
+    const tab = document.getElementById('tab-marketdb');
+    if (tab && tab.classList.contains('active')) {
+        renderMarketdb();
+    }
 }
 
 let marketCurrentCat = 'all';
@@ -5837,7 +5935,7 @@ async function renderMarketdb() {
     const catIcon = {'시계':'⌚','굿즈':'🎁','기타잡화':'📦'};
 
     if (pageItems.length === 0) {
-        tb.innerHTML = '<tr><td colspan="20" style="text-align:center;padding:60px 20px;color:var(--text-tertiary)">상품이 없습니다</td></tr>';
+        tb.innerHTML = '<tr><td colspan="21" style="text-align:center;padding:60px 20px;color:var(--text-tertiary)">상품이 없습니다</td></tr>';
         renderMarketPagination(0);
         return;
     }
@@ -5876,7 +5974,11 @@ async function renderMarketdb() {
             '<td class="khh-cell"'+noprop+'>'+chk('khh_bungae','khh')+'</td>'+
             '<td class="khh-cell mcell-last"'+noprop+'>'+chk('khh_danggeun','khh')+'</td>'+
             '<td class="nko-cell"'+noprop+'>'+chk('nko_junggo','nko')+'</td>'+
-            '<td class="nko-cell"'+noprop+'>'+chk('nko_bungae','nko')+'</td>'+
+            '<td class="nko-cell mcell-last"'+noprop+'>'+chk('nko_bungae','nko')+'</td>'+
+            '<td'+noprop+'><div class="market-sort-btns">'+
+                '<button class="market-sort-btn" onclick="moveMarketItem(event,\''+r._catKey+'\','+r._idx+',-1)" title="위로">▲</button>'+
+                '<button class="market-sort-btn" onclick="moveMarketItem(event,\''+r._catKey+'\','+r._idx+',1)" title="아래로">▼</button>'+
+            '</div></td>'+
         '</tr>';
     }).join('');
     renderMarketPagination(totalPages);
@@ -6046,19 +6148,27 @@ async function openMarketModal(cat, idx) {
 function closeMarketModal() {
     document.getElementById('marketModalOverlay').classList.remove('show');
 }
-function handleMarketImgUpload(ev) {
+async function handleMarketImgUpload(ev) {
     const f = ev.target.files && ev.target.files[0];
     if (!f) return;
     if (!f.type.startsWith('image/')) { showToast('이미지 파일만 업로드 가능합니다'); return; }
-    if (f.size > 4*1024*1024) { showToast('4MB 이하만 업로드 가능합니다'); return; }
-    const reader = new FileReader();
-    reader.onload = e => {
-        document.getElementById('mMImage').value = e.target.result;
-        document.getElementById('mMImgPreview').innerHTML = '<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover">';
-        document.getElementById('mMImgClearBtn').style.display = 'block';
-    };
-    reader.readAsDataURL(f);
+    if (f.size > 8*1024*1024) { showToast('8MB 이하만 업로드 가능합니다'); return; }
     ev.target.value = '';
+    const preview = document.getElementById('mMImgPreview');
+    if (preview) preview.innerHTML = '<span style="font-size:10px;color:var(--text-tertiary)">업로드 중...</span>';
+    try {
+        const url = await uploadMarketImage(f);
+        const hidden = document.getElementById('mMImage');
+        if (hidden) hidden.value = url;
+        if (preview) preview.innerHTML = '<img src="'+url+'" style="width:100%;height:100%;object-fit:cover">';
+        const clr = document.getElementById('mMImgClearBtn');
+        if (clr) clr.style.display = 'block';
+        showToast('이미지 업로드 완료');
+    } catch (err) {
+        console.error('image upload failed', err);
+        showToast('이미지 업로드 실패: ' + (err.message || err));
+        if (preview) preview.innerHTML = '없음';
+    }
 }
 function clearMarketImg() {
     document.getElementById('mMImage').value = '';

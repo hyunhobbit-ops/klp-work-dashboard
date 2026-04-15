@@ -2394,3 +2394,15 @@ body {
 
 /* 썸네일 툴팁 다크 모드 */
 [data-theme="dark"] #marketThumbTooltip { border-color: var(--white); }
+
+/* 중고마켓DB 순서 이동 버튼 */
+.market-sort-btns { display: flex; flex-direction: column; gap: 2px; align-items: center; }
+.market-sort-btn {
+  width: 22px; height: 16px; padding: 0; line-height: 1;
+  border: 1px solid var(--gray-300); border-radius: 3px;
+  background: var(--white); color: var(--gray-600);
+  font-size: 9px; cursor: pointer; font-family: inherit;
+}
+.market-sort-btn:hover { background: var(--gray-50); color: var(--blue); border-color: var(--blue); }
+[data-theme="dark"] .market-sort-btn { background: var(--gray-50); border-color: var(--gray-300); color: var(--gray-600); }
+[data-theme="dark"] .market-sort-btn:hover { background: var(--gray-100); color: var(--blue); }

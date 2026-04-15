@@ -57,3 +57,37 @@ drop trigger if exists market_db_updated_at on market_db;
 create trigger market_db_updated_at
     before update on market_db
     for each row execute function market_db_touch_updated_at();
+
+-- Realtime 활성화 (3명이 동시에 보면서 실시간 동기화)
+alter publication supabase_realtime add table market_db;
+
+-- ============================================================
+-- 상품 이미지 Storage 버킷
+-- ============================================================
+insert into storage.buckets (id, name, public)
+values ('market-db', 'market-db', true)
+on conflict (id) do nothing;
+
+drop policy if exists "market-db public read" on storage.objects;
+create policy "market-db public read"
+    on storage.objects for select
+    to public
+    using (bucket_id = 'market-db');
+
+drop policy if exists "market-db anon write" on storage.objects;
+create policy "market-db anon write"
+    on storage.objects for insert
+    to anon, authenticated
+    with check (bucket_id = 'market-db');
+
+drop policy if exists "market-db anon update" on storage.objects;
+create policy "market-db anon update"
+    on storage.objects for update
+    to anon, authenticated
+    using (bucket_id = 'market-db');
+
+drop policy if exists "market-db anon delete" on storage.objects;
+create policy "market-db anon delete"
+    on storage.objects for delete
+    to anon, authenticated
+    using (bucket_id = 'market-db');
