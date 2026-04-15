@@ -698,6 +698,34 @@ function renderHome() {
     });
     document.getElementById('urgentList').innerHTML = urgentHtml || empty('긴급 항목이 없습니다');
 
+    // 미완료 (어제 이전) — 본인 담당 중 date < today && !done
+    const overdueList = dailyTasks.filter(t =>
+        t.assignee === me &&
+        t.date && t.date < todayStr &&
+        !t.done &&
+        !t.isDeadlineCopy
+    ).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const overdueCountEl = document.getElementById('overdueCount');
+    if (overdueCountEl) overdueCountEl.textContent = overdueList.length;
+    const overdueListEl = document.getElementById('overdueList');
+    if (overdueListEl) {
+        const MS_DAY = 24*60*60*1000;
+        const today0 = new Date(todayStr + 'T00:00:00');
+        const overdueHtml = overdueList.map(t => {
+            const dObj = new Date(t.date + 'T00:00:00');
+            const days = Math.max(1, Math.round((today0 - dObj) / MS_DAY));
+            return `<div class="urgent-item overdue-row" onclick="closeModal();switchTab('daily');setTimeout(()=>openEditTask(${t.id}),100)">
+                <div class="urgent-dot" style="background:#ef4444"></div>
+                <div class="urgent-info">
+                    <div class="urgent-name">${t.task}</div>
+                    <div class="urgent-sub">${fmtDisplay(t.date)} · <strong style="color:#dc2626">${days}일 지남</strong></div>
+                </div>
+                <span class="urgent-type" style="background:#fee2e2;color:#991b1b">미완료</span>
+            </div>`;
+        }).join('');
+        overdueListEl.innerHTML = overdueHtml || empty('미완료 항목이 없습니다');
+    }
+
     // Today schedule — 로그인 사용자 본인 할 일만
     const sorted = [...myTodayItems].sort((a, b) => a.done - b.done);
     let taskHtml = '';
