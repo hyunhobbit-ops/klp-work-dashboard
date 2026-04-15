@@ -2416,11 +2416,12 @@ function createQuoteFromProject(id) {
 // 상세보기의 DC/WR 다운로드 버튼 — 이미 떠 있는 iframe의 뷰를 사용해 그 자리에서 다운로드
 function downloadDoc(docNum, fmt) {
     const iframes = document.querySelectorAll('#dcDocArea iframe, #wrDocArea iframe');
-    const enc = encodeURIComponent(docNum);
     let target = null;
     iframes.forEach(f => {
         const src = f.getAttribute('src') || '';
-        if (src.indexOf('view-' + enc) !== -1 || src.indexOf('view-' + docNum) !== -1) target = f;
+        // 해시 전체가 완전히 일치하는 iframe만 선택 (WR 문서번호가 DC 문서번호의 접미사라서 indexOf로 매칭하면 잘못된 iframe을 고름)
+        const m = src.match(/#view-(.+)$/);
+        if (m && decodeURIComponent(m[1]) === docNum) target = f;
     });
     if (!target || !target.contentWindow || typeof target.contentWindow.klpEmbedDownload !== 'function') {
         // fallback: 예전 방식

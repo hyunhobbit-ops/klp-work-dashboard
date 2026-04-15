@@ -1692,12 +1692,35 @@ async function applyProjectPrefillData(pf, opts){
   }catch(e){console.error('quote load failed',e);alert('견적서 불러오기 실패: '+e.message);}
 })();
 
-/* === 부모창 → iframe 다운로드 트리거 (대시보드 상세 모달에서 사용) === */
-window.klpEmbedDownload=function(fmt){
+/* === 부모창 → iframe 다운로드 트리거 (대시보드 상세 모달에서 사용) ===
+   view-mode에서는 fitEmbedToViewport가 docEl/wrDocEl의 인라인 스타일을 뷰포트 폭에 맞게
+   줄여놓기 때문에 그 상태로 html2canvas를 돌리면 A4 크기가 찌그러진다.
+   따라서 다운로드 직전에 원본 A4 크기로 복원한 뒤 dl/dlWr 호출, 끝나면 다시 축소 복원. */
+window.klpEmbedDownload=async function(fmt){
+  var targetIds=['docEl','wrDocEl'];
+  var saved={};
+  targetIds.forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    saved[id]={w:el.style.width,h:el.style.height,ov:el.style.overflow,pos:el.style.position};
+    var inner=el.firstElementChild;
+    if(inner)saved[id].innerTransform=inner.style.transform;
+    try{fitToA4(id);}catch(e){}
+    if(inner){inner.style.transform='none';inner.style.transformOrigin='';}
+  });
+  await new Promise(function(r){setTimeout(r,100);});
   try{
-    if(currentMode==='wr'){return dlWr(fmt);}
-    return dl(fmt);
-  }catch(e){console.error('embed download failed',e);throw e;}
+    if(currentMode==='wr'){await dlWr(fmt);}
+    else{await dl(fmt);}
+  }catch(e){
+    console.error('embed download failed',e);
+    throw e;
+  }finally{
+    /* 뷰포트 축소 복원 */
+    setTimeout(function(){
+      try{fitEmbedToViewport();}catch(e){}
+    },80);
+  }
 };
 
 /* === URL 해시 기반 임베드 뷰 (#view-DOCNUM) — 외부 페이지에서 iframe으로 문서만 렌더 === */
