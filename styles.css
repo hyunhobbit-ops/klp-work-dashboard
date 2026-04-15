@@ -2343,3 +2343,53 @@ body {
 .mbadge.ok { background: #dcfce7; color: #166534; }
 .mbadge.soldout { background: #fee2e2; color: #991b1b; }
 .mbadge.stop { background: var(--gray-100); color: var(--gray-500); }
+
+/* ===== 중고마켓DB 다크 모드 보정 ===== */
+[data-theme="dark"] .mgrp-ceo { background: #3a2818; color: #fbbf24; }
+[data-theme="dark"] .msub-ceo { background: #2a1f13; color: #fbbf24; }
+[data-theme="dark"] .mgrp-iyj { background: #1a2f4d; color: #93c5fd; }
+[data-theme="dark"] .msub-iyj { background: #13223a; color: #93c5fd; }
+[data-theme="dark"] .mgrp-khh { background: #15302a; color: #6ee7b7; }
+[data-theme="dark"] .msub-khh { background: #0f2420; color: #6ee7b7; }
+[data-theme="dark"] .mgrp-nko { background: #2a1f3d; color: #c4b5fd; }
+[data-theme="dark"] .msub-nko { background: #1f1730; color: #c4b5fd; }
+
+/* 체크 컬럼 셀 — 라이트에선 연한 틴트, 다크에선 더 진한 틴트 */
+.market-table tbody td.ceo-cell { background: rgba(245, 158, 11, 0.05); }
+.market-table tbody td.iyj-cell { background: rgba(37, 99, 235, 0.05); }
+.market-table tbody td.khh-cell { background: rgba(16, 185, 129, 0.05); }
+.market-table tbody td.nko-cell { background: rgba(139, 92, 246, 0.05); }
+[data-theme="dark"] .market-table tbody td.ceo-cell { background: rgba(251, 191, 36, 0.08); }
+[data-theme="dark"] .market-table tbody td.iyj-cell { background: rgba(96, 165, 250, 0.08); }
+[data-theme="dark"] .market-table tbody td.khh-cell { background: rgba(110, 231, 183, 0.08); }
+[data-theme="dark"] .market-table tbody td.nko-cell { background: rgba(196, 181, 253, 0.08); }
+
+/* 상단 현황 카드는 다크에서도 파스텔 유지 + 텍스트만 밝게 */
+[data-theme="dark"] .market-person-card.ceo { background: #3a2818; }
+[data-theme="dark"] .market-person-card.ceo .who { color: #fcd34d; border-color: #78350f; }
+[data-theme="dark"] .market-person-card.iyj { background: #1a2f4d; }
+[data-theme="dark"] .market-person-card.iyj .who { color: #93c5fd; border-color: #1e3a8a; }
+[data-theme="dark"] .market-person-card.khh { background: #15302a; }
+[data-theme="dark"] .market-person-card.khh .who { color: #6ee7b7; border-color: #065f46; }
+[data-theme="dark"] .market-person-card.nko { background: #2a1f3d; }
+[data-theme="dark"] .market-person-card.nko .who { color: #c4b5fd; border-color: #4c1d95; }
+[data-theme="dark"] .market-person-card .stat { background: rgba(255, 255, 255, 0.06); }
+[data-theme="dark"] .market-person-card .stat .plat { color: #9ca3af; }
+[data-theme="dark"] .market-person-card .stat .frac { color: #f2f4f6; }
+[data-theme="dark"] .market-person-card .stat.done { background: rgba(34, 197, 94, 0.18); }
+[data-theme="dark"] .market-person-card .stat.done .frac { color: #86efac; }
+
+[data-theme="dark"] .market-status-panel { background: var(--white); border-color: var(--gray-200); }
+[data-theme="dark"] .market-status-title { color: var(--gray-700); }
+[data-theme="dark"] .market-status-scope { color: var(--gray-500); }
+
+/* 상태 배지 다크 모드 */
+[data-theme="dark"] .mbadge.ok { background: rgba(34, 197, 94, 0.2); color: #86efac; }
+[data-theme="dark"] .mbadge.soldout { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+[data-theme="dark"] .mbadge.stop { background: var(--gray-100); color: var(--gray-500); }
+
+/* 체크박스 — 다크에서 테두리 밝게 */
+[data-theme="dark"] .mchk { background: var(--gray-50); border-color: var(--gray-300); }
+
+/* 썸네일 툴팁 다크 모드 */
+[data-theme="dark"] #marketThumbTooltip { border-color: var(--white); }
