@@ -225,8 +225,24 @@ body.view-mode html,body.view-mode body{margin:0;padding:0;overflow:hidden;backg
     <button class="btn-back" onclick="showDcTab('form')">← 수정하기</button>
     <button class="btn-dl png" id="btnJpg" onclick="dl('jpg')">📷 JPG</button>
     <button class="btn-dl pdf" id="btnPdf" onclick="dl('pdf')">📄 PDF</button>
+    <button class="btn-dl" style="background:#16A34A;color:#fff" onclick="openQuoteFromForm()">💰 견적서 만들기</button>
   </div>
   <div class="preview-wrap"><div id="docEl"></div></div>
+</div>
+
+<!-- QUOTE OVERLAY -->
+<div id="quoteOverlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;overflow:auto;padding:24px;display:flex;align-items:flex-start;justify-content:center">
+  <div style="background:#fff;border-radius:12px;max-width:900px;width:100%;margin:auto;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:#F4F3EA;border-bottom:1px solid #e8e8e5">
+      <div style="font-size:16px;font-weight:900;color:#16A34A">💰 견적서 미리보기</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-dl png" id="btnQuoteJpg" onclick="dlQuote('jpg')">📷 JPG</button>
+        <button class="btn-dl pdf" id="btnQuotePdf" onclick="dlQuote('pdf')">📄 PDF</button>
+        <button onclick="closeQuoteOverlay()" style="padding:8px 14px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-weight:700">닫기</button>
+      </div>
+    </div>
+    <div style="padding:20px;background:#f0f0f0"><div id="quoteDocEl" style="margin:0 auto"></div></div>
+  </div>
 </div>
 
 <!-- DC HISTORY -->
@@ -828,6 +844,185 @@ async function dl(type){var el=document.getElementById('docEl');var b1=document.
 
 async function dlWr(type){var el=document.getElementById('wrDocEl');var b1=document.getElementById('btnWrJpg'),b2=document.getElementById('btnWrPdf');b1.disabled=b2.disabled=true;b1.textContent='생성 중...';b2.textContent='생성 중...';try{var canvas=await html2canvas(el,{scale:3,useCORS:true,backgroundColor:'#fff',logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123});var fname=getYYMMDD(val('wrDate'))+'_케이엘피코리아_'+(val('wrCompany')||'업체')+'_'+(val('wrProduct')||'품명')+'_작업요청서';if(type==='jpg'){var a=document.createElement('a');a.download=fname+'.jpg';a.href=canvas.toDataURL('image/jpeg',0.92);a.click()}else{var pdf=new jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});var pw=pdf.internal.pageSize.getWidth();var ph=pdf.internal.pageSize.getHeight();pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',0,0,pw,ph);pdf.save(fname+'.pdf')}}catch(err){alert('오류: '+err.message)}b1.disabled=b2.disabled=false;b1.textContent='📷 JPG';b2.textContent='📄 PDF'}
 
+/* === 견적서 (Quote) === */
+var _quoteData=null;
+function openQuoteFromForm(){
+  try{calcEst();}catch(e){}
+  var e=window._est;
+  if(!e||!e.grand){alert('수량/단가를 먼저 입력해주세요');return;}
+  var docNumEl=document.getElementById('docNumPreview');
+  var docNum=(docNumEl?docNumEl.textContent:'')||'(미저장)';
+  var dateStr=val('date')||new Date().toISOString().substring(0,10);
+  var validUntil=addDaysStr(dateStr,14);
+  _quoteData={
+    docNumber:'EST-'+(docNum.replace(/^DC-/,'')||'NEW'),
+    date:dateStr,
+    validUntil:validUntil,
+    companyName:val('companyName'),
+    contactPerson:val('contactPerson'),
+    manager:val('manager'),
+    title:val('title'),
+    productName:val('productName'),
+    quantity:val('quantity'),
+    unit:val('unit'),
+    unitPrice:val('unitPrice'),
+    unitPriceVat:val('unitPriceVat'),
+    color:val('color'),
+    printColorSize:val('printColorSize'),
+    printMethod:val('printMethod'),
+    printFee:val('printFee'),
+    printFeeVat:val('printFeeVat'),
+    printFeeApply:val('printFeeApply'),
+    packaging:val('packaging'),
+    packagingFee:val('packagingFee'),
+    packagingFeeVat:val('packagingFeeVat'),
+    packagingFeeApply:val('packagingFeeApply'),
+    deliveryDate:val('deliveryDate'),
+    recipient:val('dcRecipient'),
+    phone:val('dcPhone'),
+    address:val('dcAddress'),
+    mainImg:mainImg,
+    subImgs:subImgs,
+    est:e
+  };
+  renderQuoteDoc(_quoteData);
+  document.getElementById('quoteOverlay').classList.remove('hidden');
+  document.addEventListener('keydown',_quoteEscHandler);
+}
+
+function openQuoteFromRecord(r){
+  /* DB 레코드로부터 견적 데이터 구성 및 계산 */
+  var qty=Number(r.quantity)||0;
+  var up=Number(r.unit_price)||0;
+  var pf=Number(r.print_fee)||0;
+  var pkf=Number(r.packaging_fee)||0;
+  var prodT=up*qty;
+  var prodV=(r.unit_price_vat==='VAT 별도')?Math.round(prodT*.1):0;
+  var hasPr=(r.print_method!=='없음')&&pf>0;
+  var prT=0;if(hasPr)prT=(r.print_fee_apply==='1개당')?pf*qty:pf;
+  var prV=(r.print_fee_vat==='VAT 별도')?Math.round(prT*.1):0;
+  var hasPk=pkf>0;
+  var pkT=0;if(hasPk)pkT=(r.packaging_fee_apply==='1개당')?pkf*qty:pkf;
+  var pkV=(r.packaging_fee_vat==='VAT 별도')?Math.round(pkT*.1):0;
+  var sup=prodT+prT+pkT,vat=prodV+prV+pkV,grand=sup+vat;
+  var est={prodT:prodT,prT:prT,pkT:pkT,sup:sup,vat:vat,grand:grand,hasPr:hasPr,hasPk:hasPk};
+  /* 이미지 언팩 */
+  var mi=null,si=[];
+  if(r.images_data){
+    try{var imgs=unpackImages(r.images_data);if(imgs.main)mi={url:imgs.main.url};if(imgs.subs&&imgs.subs.length)si=imgs.subs.map(function(im){return{url:im.url}})}catch(e){}
+  }
+  var shipParts=(r.delivery_address||'').split(' / ');
+  var dateStr=r.doc_date||(r.created_at?r.created_at.substring(0,10):new Date().toISOString().substring(0,10));
+  _quoteData={
+    docNumber:'EST-'+((r.doc_number||'').replace(/^DC-/,'')||'NEW'),
+    date:dateStr,
+    validUntil:addDaysStr(dateStr,14),
+    companyName:r.company_name||'',
+    contactPerson:r.contact_person||'',
+    manager:r.manager||'',
+    title:r.title||'',
+    productName:r.product_name||'',
+    quantity:qty,
+    unit:r.unit||'개',
+    unitPrice:up,
+    unitPriceVat:r.unit_price_vat||'VAT 별도',
+    color:r.color||'-',
+    printColorSize:r.print_color_size||'시안 확인',
+    printMethod:r.print_method||'없음',
+    printFee:pf,
+    printFeeVat:r.print_fee_vat||'VAT 별도',
+    printFeeApply:r.print_fee_apply||'1개당',
+    packaging:r.packaging||'개별박스',
+    packagingFee:pkf,
+    packagingFeeVat:r.packaging_fee_vat||'VAT 별도',
+    packagingFeeApply:r.packaging_fee_apply||'1개당',
+    deliveryDate:r.delivery_date||'',
+    recipient:shipParts[0]||'',
+    phone:shipParts[1]||'',
+    address:shipParts[2]||shipParts.join(' '),
+    mainImg:mi,
+    subImgs:si,
+    est:est
+  };
+  renderQuoteDoc(_quoteData);
+  document.getElementById('quoteOverlay').classList.remove('hidden');
+  document.addEventListener('keydown',_quoteEscHandler);
+}
+
+function closeQuoteOverlay(){
+  document.getElementById('quoteOverlay').classList.add('hidden');
+  document.removeEventListener('keydown',_quoteEscHandler);
+}
+function _quoteEscHandler(e){if(e.key==='Escape'||e.key==='Esc')closeQuoteOverlay()}
+
+function addDaysStr(dateStr,days){
+  try{var d=new Date(dateStr);if(isNaN(d))return'';d.setDate(d.getDate()+days);var y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return y+'-'+m+'-'+day}catch(e){return''}
+}
+
+function renderQuoteDoc(d){
+  var e=d.est;
+  var qtyStr=(d.quantity||'')+' '+(d.unit||'');
+  var pf=Number(d.printFee)||0,pkf=Number(d.packagingFee)||0;
+  var printFeeStr=pf?fmtP(d.printFee)+' ('+(d.printFeeVat||'VAT 별도')+'/'+(d.printFeeApply||'1개당')+')':'-';
+  var pkgFeeStr=pkf?fmtP(d.packagingFee)+' ('+(d.packagingFeeVat||'VAT 별도')+'/'+(d.packagingFeeApply||'1개당')+')':'-';
+
+  /* 이미지 */
+  var imgHtml='';
+  var mi=d.mainImg,si=d.subImgs||[];
+  if(mi||si.length>0){imgHtml+='<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 20px">';if(mi)imgHtml+='<img src="'+mi.url+'" style="max-width:420px;max-height:220px;object-fit:contain;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.08)">';if(si.length>0){imgHtml+='<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">';si.forEach(function(img){imgHtml+='<img src="'+img.url+'" style="width:60px;height:60px;object-fit:contain;border-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,.06)">'});imgHtml+='</div>'}imgHtml+='</div>'}else{imgHtml='<div style="display:flex;align-items:center;justify-content:center;min-height:60px;color:#ccc;font-size:12px">시안 이미지 없음</div>'}
+
+  var leftRows=[['품명',esc(d.productName||'')],['수량',qtyStr],['단가',fmtP(d.unitPrice)+' ('+(d.unitPriceVat||'')+')'],['색상',esc(d.color||'-')],['인쇄 색상/사이즈',esc(d.printColorSize||'')],['납기',d.deliveryDate?fmtDate(d.deliveryDate)+' 출고':'']];
+  var rightRows=[['인쇄 방법',esc(d.printMethod||'없음')]];if(d.printMethod!=='없음')rightRows.push(['인쇄비',printFeeStr]);rightRows.push(['포장',esc(d.packaging||'')]);rightRows.push(['포장비',pkgFeeStr]);
+  function ic(k,v){return '<tr><td style="padding:5px 12px;font-weight:500;color:#999;font-size:10px;letter-spacing:.3px;border-bottom:1px solid #f0f0f0;width:110px;vertical-align:top">'+k+'</td><td style="padding:5px 12px;font-size:11.5px;border-bottom:1px solid #f0f0f0;color:#222;font-weight:500">'+v+'</td></tr>'}
+
+  var estHtml='';
+  if(e&&e.grand>0){
+    var rows=[['제품 금액',fmtN(e.prodT)]];if(e.hasPr)rows.push(['인쇄비',fmtN(e.prT)]);if(e.hasPk)rows.push(['포장비',fmtN(e.pkT)]);rows.push(['공급가액',fmtN(e.sup)]);if(e.vat>0)rows.push(['VAT',fmtN(e.vat)]);
+    estHtml='<div style="padding:10px 0 8px;border-top:1px solid #e8e8e5;flex-shrink:0"><div style="font-size:10px;font-weight:700;color:#16A34A;letter-spacing:1.5px;margin-bottom:6px">견적 금액</div><table style="width:100%;border-collapse:collapse;font-size:11px">'+rows.map(function(r){return '<tr><td style="padding:3px 0;color:#555;font-weight:500">'+r[0]+'</td><td style="padding:3px 0;text-align:right;font-variant-numeric:tabular-nums;color:#333;font-weight:500">'+r[1]+'</td></tr>'}).join('')+'</table><div style="margin-top:6px;padding-top:8px;border-top:2px solid #222327;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13px;font-weight:900;color:#222327">합계 금액</span><span style="font-size:22px;font-weight:900;color:#16A34A;font-variant-numeric:tabular-nums">'+fmtN(e.grand)+'</span></div></div>';
+  }
+
+  var validHtml='<div style="padding:8px 14px;background:#ECFDF5;border:1px solid #86EFAC;border-radius:5px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0"><span style="font-size:10px;font-weight:700;color:#16A34A;letter-spacing:1px">유효기간</span><span style="font-size:13px;font-weight:800;color:#15803D">'+(d.validUntil?fmtDate(d.validUntil):'미정')+' 까지</span></div>';
+
+  document.getElementById('quoteDocEl').innerHTML='<div id="quoteDocInner" style="width:794px;height:1123px;overflow:hidden;background:#fff;font-family:\'Noto Sans KR\',sans-serif;font-size:12px;color:#222327;position:relative"><div style="padding:20px 28px 16px;display:flex;flex-direction:column;height:1123px">'+
+  /* 헤더 */
+  '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-shrink:0"><div><div style="font-size:10px;color:#16A34A;letter-spacing:3px;font-weight:700;margin-bottom:2px">ESTIMATE / QUOTATION</div><div style="font-size:26px;font-weight:900;color:#222327;letter-spacing:2px">견 적 서</div></div><div style="text-align:right"><img src="'+LOGO_DARK+'" style="height:22px;margin-bottom:2px"><div style="font-size:9px;color:#aaa;margin-top:1px">NO. '+esc(d.docNumber)+' | '+fmtDate(d.date)+'</div></div></div>'+
+  /* 라인 */
+  '<div style="height:3px;background:linear-gradient(90deg,#16A34A,#BBF7D0);border-radius:2px;margin-bottom:10px;flex-shrink:0"></div>'+
+  /* 업체 정보 */
+  '<div style="display:flex;gap:0;margin-bottom:8px;border:1px solid #e8e8e5;border-radius:6px;overflow:hidden;flex-shrink:0"><div style="flex:1;padding:8px 14px;background:#F4F3EA"><div style="font-size:9px;color:#999;font-weight:600;letter-spacing:1px;margin-bottom:1px">수신 (업체명)</div><div style="font-size:14px;font-weight:700;color:#222327">'+esc(d.companyName||'')+'</div></div><div style="width:1px;background:#e8e8e5"></div><div style="flex:0 0 140px;padding:8px 14px;background:#F4F3EA"><div style="font-size:9px;color:#999;font-weight:600;letter-spacing:1px;margin-bottom:1px">담당자</div><div style="font-size:12px;font-weight:700;color:#222327">'+esc(d.contactPerson||'')+'</div></div><div style="width:1px;background:#e8e8e5"></div><div style="flex:0 0 140px;padding:8px 14px;background:#F4F3EA"><div style="font-size:9px;color:#999;font-weight:600;letter-spacing:1px;margin-bottom:1px">견적 담당</div><div style="font-size:12px;font-weight:700;color:#16A34A">'+esc(d.manager||'')+'</div></div></div>'+
+  /* 제목 */
+  '<div style="background:#F4F3EA;border-radius:5px;padding:8px 14px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-shrink:0"><span style="font-size:9px;color:#999;font-weight:600;letter-spacing:1px">제목</span><span style="font-size:15px;font-weight:800;color:#333">'+esc(d.title||'')+'</span></div>'+
+  /* 유효기간 */
+  validHtml+
+  /* 이미지 */
+  '<div style="background:#fafafa;border:1px solid #eee;border-radius:6px;margin-bottom:8px;max-height:260px;overflow:hidden;flex-shrink:0">'+imgHtml+'</div>'+
+  /* 제품 정보 테이블 */
+  '<div style="display:flex;gap:0;border:1px solid #e8e8e5;border-radius:6px;overflow:hidden;flex-shrink:0"><div style="flex:1;border-right:1px solid #e8e8e5"><table style="width:100%;border-collapse:collapse">'+leftRows.map(function(r){return ic(r[0],r[1])}).join('')+'</table></div><div style="flex:1"><table style="width:100%;border-collapse:collapse">'+rightRows.map(function(r){return ic(r[0],r[1])}).join('')+'</table></div></div>'+
+  /* 견적 금액 */
+  estHtml+
+  /* 스페이서 */
+  '<div style="flex:1"></div>'+
+  /* 안내 문구 + 서명 */
+  '<div style="padding:8px 14px;background:#F4F3EA;border-radius:5px;font-size:8.5px;color:#999;line-height:1.6;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-shrink:0"><div><div>• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.</div><div>• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.</div></div><div style="text-align:center;min-width:80px"><div style="font-size:8px;color:#bbb;margin-bottom:2px">KLP KOREA</div><div style="border-bottom:1.5px solid #aaa;width:70px;height:20px"></div></div></div>'+
+  /* 푸터 */
+  '<div style="margin-top:6px;padding:8px 14px;background:#222327;border-radius:5px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0"><img src="'+LOGO_WHITE+'" style="height:14px"><div style="color:rgba(255,255,255,.55);font-size:7px;line-height:1.5;text-align:right">서울 구로구 디지털로32길 30, 코오롱빌란트 1차 901호 | T. 02-2103-5757<br>klpkorea.co.kr | agift.kr | showroom.co.kr | klpkorea@agift.kr</div></div>'+
+  '</div></div>';
+}
+
+async function dlQuote(type){
+  if(!_quoteData)return;
+  var el=document.getElementById('quoteDocEl');
+  var b1=document.getElementById('btnQuoteJpg'),b2=document.getElementById('btnQuotePdf');
+  b1.disabled=b2.disabled=true;b1.textContent='생성 중...';b2.textContent='생성 중...';
+  try{
+    var canvas=await html2canvas(el,{scale:3,useCORS:true,backgroundColor:'#fff',logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123});
+    var fname=getYYMMDD(_quoteData.date)+'_케이엘피코리아_'+(_quoteData.companyName||'업체')+'_'+(_quoteData.productName||'품명')+'_견적서';
+    if(type==='jpg'){var a=document.createElement('a');a.download=fname+'.jpg';a.href=canvas.toDataURL('image/jpeg',0.92);a.click()}
+    else{var pdf=new jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});var pw=pdf.internal.pageSize.getWidth();var ph=pdf.internal.pageSize.getHeight();pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',0,0,pw,ph);pdf.save(fname+'.pdf')}
+  }catch(err){alert('오류: '+err.message)}
+  b1.disabled=b2.disabled=false;b1.textContent='📷 JPG';b2.textContent='📄 PDF';
+}
+
 /* === SUPABASE - DC 저장 (FIX #10: 이미지, FIX #11: 문서번호 기준 덮어쓰기) === */
 async function saveToDb(){if(!validate())return;var e=window._est;var seq=Math.max(1,parseInt(document.getElementById('docSeq').value)||1);
   var imgData=await packImages(mainImg,subImgs,400,400);
@@ -1375,6 +1570,19 @@ async function applyProjectPrefillData(pf, opts){
       await dl(fmt);
     }
   }catch(e){console.error('auto-dl failed',e);showMsg('❌ 다운로드 실패: '+e.message,true);}
+})();
+
+/* === URL 해시 기반 견적서 (#quote-DOCNUM) — DC 데이터로 즉시 견적서 오버레이 */
+(async function applyQuoteHash(){
+  var hash=(location.hash||'').replace(/^#/,'');
+  if(!hash.startsWith('quote-'))return;
+  var docNum=decodeURIComponent(hash.substring(6));
+  history.replaceState(null,'',location.pathname);
+  try{
+    var res=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(docNum),'GET');
+    if(!res||res.length===0){alert('문서를 찾을 수 없습니다: '+docNum);return;}
+    openQuoteFromRecord(res[0]);
+  }catch(e){console.error('quote load failed',e);alert('견적서 불러오기 실패: '+e.message);}
 })();
 
 /* === 부모창 → iframe 다운로드 트리거 (대시보드 상세 모달에서 사용) === */

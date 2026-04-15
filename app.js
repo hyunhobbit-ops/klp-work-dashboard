@@ -2301,6 +2301,7 @@ async function showProjectDetail(id) {
         <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
             <button class="form-submit" style="flex:1 1 180px;background:var(--blue)" onclick="createDocFromProject(${id},'dc')">📄 디자인확인서 만들기</button>
             <button class="form-submit" style="flex:1 1 180px;background:var(--klp-orange,#E67E22)" onclick="createDocFromProject(${id},'wr')">📋 작업요청서 만들기</button>
+            <button class="form-submit" style="flex:1 1 160px;background:#16A34A" onclick="createQuoteFromProject(${id})">💰 견적서 만들기</button>
             <button class="form-submit" style="flex:1 1 120px" onclick="openEditProject(${id})">✏️ 편집</button>
             <button class="form-submit" style="flex:1 1 100px;background:var(--gray-200);color:var(--gray-800)" onclick="closeModal()">닫기</button>
         </div>`;
@@ -2376,6 +2377,18 @@ async function showProjectDetail(id) {
             if (wrEl) wrEl.innerHTML = `<div style="color:var(--red);font-size:13px">WR 로드 실패: ${err.message}</div>`;
         }
     }
+}
+
+// 프로젝트 → 견적서 만들기 (연결된 디자인확인서 기준)
+function createQuoteFromProject(id) {
+    const p = projects.find(x => x.id === id);
+    if (!p) return;
+    if (!p.sourceDocNumber) {
+        showToast('연결된 디자인확인서가 없습니다. 먼저 디자인확인서를 만들어주세요');
+        return;
+    }
+    // 새 탭에서 견적서 오버레이 표시
+    window.open('doc-generator.html#quote-' + encodeURIComponent(p.sourceDocNumber), '_blank');
 }
 
 // 상세보기의 DC/WR 다운로드 버튼 — 이미 떠 있는 iframe의 뷰를 사용해 그 자리에서 다운로드
@@ -2718,6 +2731,7 @@ function openEditProject(id) {
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
             <button class="form-submit" style="flex:1 1 180px;background:var(--blue)" onclick="createDocFromProject(${p.id},'dc')">📄 디자인확인서 만들기</button>
             <button class="form-submit" style="flex:1 1 180px;background:var(--klp-orange,#E67E22)" onclick="createDocFromProject(${p.id},'wr')">📋 작업요청서 만들기</button>
+            <button class="form-submit" style="flex:1 1 160px;background:#16A34A" onclick="createQuoteFromProject(${p.id})">💰 견적서 만들기</button>
         </div>
         <div style="display:flex;gap:8px;margin-top:8px">
             <button class="form-submit" style="flex:1;background:var(--red)" onclick="deleteProject(${p.id})">🗑️ 삭제</button>
