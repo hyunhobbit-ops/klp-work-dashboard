@@ -37,6 +37,7 @@ function updateSidebarUser() {
     document.getElementById('userAvatar').textContent = initials;
     document.getElementById('userName').textContent = currentUser.name;
     document.getElementById('userRole').textContent = currentUser.role;
+    try { applyMarketdbPermission(); } catch (e) {}
 }
 
 async function handleLogin() {
@@ -226,7 +227,8 @@ const pageTitles = {
     proposals: '제안서 관리',
     docs: '회사 문서',
     manual: '회사 매뉴얼',
-    clients: '고객사 리스트'
+    clients: '고객사 리스트',
+    marketdb: '중고마켓DB'
 };
 
 // ===== Init =====
@@ -239,6 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupDateNav();
     setupSearch();
     setupShortcuts();
+    setupMarketdbHandlers();
     checkAuth();
 });
 
@@ -368,6 +371,12 @@ function switchTab(tabId, fromHistory = false) {
     // 존재하지 않는 탭이면 무시
     if (!document.getElementById(`tab-${tabId}`)) return;
 
+    // 중고마켓DB 권한 체크 — 비인가 사용자는 홈으로 리다이렉트
+    if (tabId === 'marketdb' && !marketdbCanAccess()) {
+        showToast('접근 권한이 없습니다');
+        tabId = 'home';
+    }
+
     // Update nav active state
     document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
     const navBtn = document.querySelector(`[data-tab="${tabId}"]`);
@@ -396,6 +405,11 @@ function switchTab(tabId, fromHistory = false) {
         if (location.hash !== newHash) {
             history.pushState({ tab: tabId }, '', newHash);
         }
+    }
+
+    // 중고마켓DB 탭 열릴 때 렌더
+    if (tabId === 'marketdb') {
+        try { renderMarketdb(); } catch (e) { console.error('renderMarketdb failed', e); }
     }
 }
 
@@ -5643,3 +5657,410 @@ function saveProposal() {
     }
     closeProposalEditor();
 }
+
+
+// ============================================================
+// 중고마켓DB (업무 탭) — 김현호·김관택·이현주만 접근 가능
+// ============================================================
+const MARKETDB_ALLOWED = ['김관택','이현주','김현호'];
+function marketdbCanAccess() {
+    if (!currentUser) return false;
+    const login = currentUser.loginName || currentUser.name;
+    return MARKETDB_ALLOWED.includes(login);
+}
+
+const MARKETDB_SEED={"goods":[{"1":"No","2":"Yes","3":"Yes","4":"No","상태":"판매가능","상품명":"퇴마록 은장도","PRICE":"9.8","SALE":"6-5","상품 설명":"퇴마록 공식 굿즈 월향 레터나이프\n다른 구성품은 없고 월향 레터나이프와 박스만 있음","구성품":"레터나이프/박스","재고수량":"","판매 페이지":"https://tumblbug.com/toemarok_cb","재고 위치":"","중":"No","당":"No"},{"1":"Yes","2":"Yes","3":"Yes","4":"No","상태":"판매가능","상품명":"화산귀환 백아 목베개(택 없는 새상품)","PRICE":"3.9","SALE":"4-3","상품 설명":"택이 없어서 저렴하게 판매","구성품":"목베개+포스터","재고수량":"10","판매 페이지":"https://m.showroom.co.kr/product/detail.html?product_no=35095","재고 위치":"","중":"No","당":"No"},{"1":"Yes","2":"No","3":"No","4":"No","상태":"판매가능","상품명":"망아살 더던 포토카드 5종","PRICE":"0","SALE":"3","상품 설명":"5종 1세트 , 5종 다 있는지 확인하기","구성품":"포토카드 5종","재고수량":"","판매 페이지":"https://tumblbug.com/the_dawn_official","재고 위치":"","중":"No","당":"No"},{"1":"Yes","2":"No","3":"No","4":"No","상태":"판매가능","상품명":"망아살 더던 스페셜 매거진 + 대형 접지 포스터","PRICE":"2.9","SALE":"5","상품 설명":"매거진이랑 접지 포스터 같이 제공","구성품":"매거진/접지포스터","재고수량":"","판매 페이지":"https://tumblbug.com/the_dawn_official","재고 위치":"","중":"No","당":"No"},{"1":"No","2":"No","3":"No","4":"No","상태":"판매가능","상품명":"망아살 더 던 키링 세트 5종","PRICE":"3.8","SALE":"3","상품 설명":"아크릴 키링 5종 세트","구성품":"아크릴 키링 5종","재고수량":"","판매 페이지":"https://tumblbug.com/the_dawn_official","재고 위치":"","중":"No","당":"No"},{"1":"No","2":"Yes","3":"Yes","4":"No","상태":"판매가능","상품명":"하츠네미쿠 인형","PRICE":"4.8","SALE":"3","상품 설명":"하츠네미쿠 한국 공식 라이센스 20cm 인형","구성품":"인형, 품질보증서, 박스","재고수량":"50","판매 페이지":"https://smartstore.naver.com/klpkorea/products/10439191152","재고 위치":"","중":"No","당":"No"}],"misc":[{"1":"Yes","2":"No","3":"No","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 린 수면안대","PRICE":"1.6","SALE":"1.4","상품 설명":"","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824165261","재고 위치":""},{"1":"Yes","2":"No","3":"No","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 렌 수면안대","PRICE":"1.6","SALE":"1.4","상품 설명":"","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824165261","재고 위치":""},{"1":"Yes","2":"No","3":"No","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 피아프로 캐릭터즈 코롯토 6종","PRICE":"7.2","SALE":"5","상품 설명":"세트 구성으로 판매했을시","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824321366","재고 위치":""},{"1":"Yes","2":"No","3":"No","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 코롯토 - 미쿠","PRICE":"1.2","SALE":"0.9","상품 설명":"","구성품":"본품","재고수량":"2","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824321366","재고 위치":""},{"1":"Yes","2":"No","3":"No","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 코롯토 - 린","PRICE":"1.2","SALE":"0.9","상품 설명":"","구성품":"본품","재고수량":"2","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824321366","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 코롯토 - 렌","PRICE":"1.2","SALE":"0.9","상품 설명":"","구성품":"본품","재고수량":"2","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824321366","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 코롯토 - 루카","PRICE":"1.2","SALE":"0.9","상품 설명":"","구성품":"본품","재고수량":"2","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824321366","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 코롯토 - 메이코","PRICE":"1.2","SALE":"0.9","상품 설명":"","구성품":"본품","재고수량":"2","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824321366","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"No","상태":"품절","상품명":"하츠네미쿠 코롯토 - 카이토","PRICE":"1.2","SALE":"0.9","상품 설명":"","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824321366","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"No","상태":"판매가능","상품명":"하츠네미쿠 피아프로 캐릭터즈 아크릴 디오라마 5종","PRICE":"7.5","SALE":"5.5","상품 설명":"세트 구성으로 판매했을시","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824249235","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 아크릴 디오라마 - 미쿠","PRICE":"1.5","SALE":"1.2","상품 설명":"","구성품":"본품","재고수량":"2","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824249235","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 아크릴 디오라마 - 린&렌","PRICE":"1.5","SALE":"1.2","상품 설명":"","구성품":"본품","재고수량":"2","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824249235","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 아크릴 디오라마 - 루카","PRICE":"1.5","SALE":"1.2","상품 설명":"","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824249235","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 아크릴 디오라마 - 메이코","PRICE":"1.5","SALE":"1.2","상품 설명":"","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824249235","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 아크릴 디오라마 - 카이토","PRICE":"1.5","SALE":"1.2","상품 설명":"","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824249235","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 아크릴 스탠드 - 메이코","PRICE":"1.5","SALE":"1.2","상품 설명":"","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824286264","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"Yes","상태":"판매가능","상품명":"하츠네미쿠 아크릴 스탠드 - 루카","PRICE":"1.5","SALE":"1.2","상품 설명":"","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10824286264","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"No","상태":"판매가능","상품명":"나 혼자만 레벨업(나혼렙) 마그넷  세트 6종","PRICE":"7.2","SALE":"5","상품 설명":"세트 구성으로 판매했을시","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10603237024","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"판매가능","상품명":"나 혼자만 레벨업(나혼렙) 마그넷 세트 - 성진우 vol.1","PRICE":"1.2","SALE":"0.9","상품 설명":"","구성품":"본품","재고수량":"2","판매 페이지":"https://smartstore.naver.com/cchoice/products/10603237024","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"판매가능","상품명":"나 혼자만 레벨업(나혼렙) 마그넷 세트 - 성진우 vol.2","PRICE":"1.2","SALE":"0.9","상품 설명":"","구성품":"본품","재고수량":"2","판매 페이지":"https://smartstore.naver.com/cchoice/products/10603237024","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"판매가능","상품명":"나 혼자만 레벨업(나혼렙) 마그넷 세트 - 성진우 vol.3","PRICE":"1.2","SALE":"0.9","상품 설명":"","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10603237024","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"판매가능","상품명":"나 혼자만 레벨업(나혼렙) 마그넷 세트 - 차해인","PRICE":"1.2","SALE":"0.9","상품 설명":"","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10603237024","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"판매가능","상품명":"나 혼자만 레벨업(나혼렙) 마그넷 세트 - 유진호","PRICE":"1.2","SALE":"0.9","상품 설명":"","구성품":"본품","재고수량":"2","판매 페이지":"https://smartstore.naver.com/cchoice/products/10603237024","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"판매가능","상품명":"나 혼자만 레벨업(나혼렙) 마그넷 세트 - 최종인","PRICE":"1.2","SALE":"0.9","상품 설명":"","구성품":"본품","재고수량":"2","판매 페이지":"https://smartstore.naver.com/cchoice/products/10603237024","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"판매가능","상품명":"나 혼자만 레벨업(나혼렙) 아크릴 무드등","PRICE":"3.2","SALE":"2.5","상품 설명":"","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/10681020289","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"Yes","상태":"판매가능","상품명":"악역의 엔딩은 죽음뿐 아크릴 무드등","PRICE":"2.9","SALE":"2.5","상품 설명":"","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/11102578230","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"No","상태":"판매가능","상품명":"녹음의 관 금속 배치 2종 세트","PRICE":"2.56","SALE":"2","상품 설명":"2종 일괄 판매 ","구성품":"뱃지 2개","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/9380707585","재고 위치":""},{"1":"Yes","2":"No","3":"No","4":"No","상태":"판매가능","상품명":"그녀가 공작저로 가야 했던 사정 금속 배치 2종 세트","PRICE":"2.56","SALE":"2","상품 설명":"2종 일괄판매","구성품":"뱃지 2개","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/9205888451","재고 위치":""},{"1":"Yes","2":"No","3":"No","4":"No","상태":"판매가능","상품명":"악당의 아빠를 꼬셔라 금속배지 십자가","PRICE":"1.28","SALE":"1","상품 설명":"","구성품":"뱃지 1개","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/9380679825","재고 위치":""},{"1":"Yes","2":"No","3":"No","4":"No","상태":"판매가능","상품명":"악당의 아빠를 꼬셔라 금속 책갈피","PRICE":"0.38","SALE":"0.25","상품 설명":"","구성품":"본품","재고수량":"1","판매 페이지":"https://smartstore.naver.com/cchoice/products/9428692493","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"랜드스케이프 서울대 각인","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"4","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"랜드스케이프 무지","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"57","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"파카 조터 50주년 볼펜","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"31","판매 페이지":"","재고 위치":""}],"watch":[{"1":"Yes","2":"No","3":"No","4":"Yes","상태":"판매가능","상품명":"호크마 회중시계","PRICE":"5.9","SALE":"9","상품 설명":"프로젝트문 로보토미 코퍼레이션 호크마 회중시계","구성품":"회중시계/체인/품질보증서/캔/종이슬립","재고수량":"","판매 페이지":"","재고 위치":"창고"},{"1":"Yes","2":"Yes","3":"No","4":"No","상태":"판매가능","상품명":"전독시 회중시계","PRICE":"0","SALE":"11","상품 설명":"와디즈 및 서점에서 펀딩했던 전독시 양장본에 포함된 구성품","구성품":"회중시계/체인/품질보증서/캔/종이슬립","재고수량":"","판매 페이지":"https://www.wadiz.kr/web/campaign/detail/162105","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"No","상태":"판매가능","상품명":"로오히 1주년 회중시계","PRICE":"5.2","SALE":"3","상품 설명":"로드오브히어로즈 1주년 기념 굿즈","구성품":"회중시계/체인/품질보증서/박스/종이슬립/원형사진2종","재고수량":"","판매 페이지":"https://tumblbug.com/klpkorea_x_lord","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"No","상태":"판매가능","상품명":"로오히 3주년 탁상시계","PRICE":"5.9","SALE":"3","상품 설명":"로드오브히어로즈 3주년 기념 굿즈","구성품":"탁상시계/품질보증서/박스/종이슬립/안경닦이","재고수량":"","판매 페이지":"https://tumblbug.com/klpkorea_x_lord2","재고 위치":""},{"1":"No","2":"Yes","3":"Yes","4":"No","상태":"판매가능","상품명":"쿠키런 나침반 회중시계","PRICE":"5.9","SALE":"4","상품 설명":"","구성품":"회중시계/품질보증서/박스/종이슬립/안경닦이","재고수량":"","판매 페이지":"https://showroom.co.kr/product/detail.html?product_no=35129&cate_no=135&display_group=1","재고 위치":""},{"1":"No","2":"Yes","3":"Yes","4":"No","상태":"판매가능","상품명":"쿠키런킹덤 똑딱쿠키 시계탑","PRICE":"18.9","SALE":"9","상품 설명":"와디즈에서 펀딩했던 쿠키런 킹덤 탁상시계","구성품":"","재고수량":"200","판매 페이지":"https://showroom.co.kr/product/detail.html?product_no=35088&cate_no=135&display_group=1","재고 위치":""},{"1":"Yes","2":"No","3":"No","4":"No","상태":"판매가능","상품명":"청와대 손목시게","PRICE":"","SALE":"7","상품 설명":"","구성품":"","재고수량":"100","판매 페이지":"","재고 위치":""},{"1":"Yes","2":"Yes","3":"No","4":"No","상태":"판매가능","상품명":"박정희 메탈 손목시계","PRICE":"18","SALE":"10","상품 설명":"","구성품":"손목시계/박스/종이슬립","재고수량":"200","판매 페이지":"","재고 위치":""},{"1":"Yes","2":"No","3":"No","4":"No","상태":"판매가능","상품명":"김구&윤봉길 회중시계","PRICE":"90","SALE":"40","상품 설명":"광복회에서 vip 선물로 제공되었던 시계","구성품":"회중시계 2종/리플렛/박스/종이슬립","재고수량":"60","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"판매가능","상품명":"윤봉길 회중시계","PRICE":"","SALE":"","상품 설명":"광복회에서 vip 선물로 제공되었던 시계","구성품":"윤봉길 회중시계 1개","재고수량":"90","판매 페이지":"","재고 위치":""},{"1":"Yes","2":"Yes","3":"No","4":"No","상태":"판매가능","상품명":"강철의 연금술사 회중시계 200AP","PRICE":"9.8","SALE":"12","상품 설명":"초침 작동하는 엔틱 모델","구성품":"회중시계/체인2종/가죽지갑/안경닦이/품질보증서/캔","재고수량":"","판매 페이지":"https://showroom.co.kr/product/detail.html?product_no=35123&cate_no=136&display_group=1","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"No","상태":"판매가능","상품명":"강철의 연금술사 회중시계 200SP","PRICE":"9.8","SALE":"12","상품 설명":"초침 작동하는 유광 모델","구성품":"회중시계/체인2종/가죽지갑/안경닦이/품질보증서/캔","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"Yes","2":"No","3":"No","4":"No","상태":"판매가능","상품명":"강철의 연금술사 회중시계 500AP","PRICE":"","SALE":"16","상품 설명":"초침 작동하는 엔틱 모델","구성품":"회중시계/체인2종/가죽지갑/안경닦이/품질보증서/캔","재고수량":"","판매 페이지":"https://www.showroom.co.kr/product/detail.html?product_no=9636&cate_no=136&display_group=1","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"Yes","상태":"판매준비","상품명":"빈티지 앤틱 손목시계 1","PRICE":"","SALE":"3","상품 설명":"정상작동","구성품":"시계 1개 ","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 2","PRICE":"","SALE":"3","상품 설명":"정상작동","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 3","PRICE":"","SALE":"3","상품 설명":"정상작동","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 4","PRICE":"","SALE":"3","상품 설명":"정상작동","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"Yes","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 5","PRICE":"","SALE":"3","상품 설명":"정상작동","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 6","PRICE":"","SALE":"3","상품 설명":"정상작동","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 7","PRICE":"","SALE":"3","상품 설명":"정상작동","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 8","PRICE":"","SALE":"3","상품 설명":"정상작동","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 9","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 10","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 11","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 12","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 13","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 14","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 15","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 16","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 17","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 18","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 19","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 20","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 21","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 22","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"Yes","상태":"","상품명":"빈티지 앤틱 손목시계 23","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"빈티지 에버랜드 회중시계","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"Yes","4":"No","상태":"","상품명":"빈티지 포켓몬 회중시계","PRICE":"","SALE":"3","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 메탈 시계 RE300L_오토","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 가죭 시계 RE275L_브라운","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 메탈 시계 RE535L_실버","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 메탈 시계 RE255L_실버블랙","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 가죭 시계 RE2004M_브라운","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 메탈 시계 RE255M_블랙","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 가죭 시계 RE275M_브라운","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 메탈 시계 RE255M_실버블랙","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 가죭 시계 RE535M_브라운","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 가죭 시계 RE5450M_블랙","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 메탈 시계 RE255L_실버","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 가죭 시계 RE535M_블랙","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 가죭 시계 RE535L_블랙","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 메탈 시계 RE255M_실버","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 가죭 시계 RE2004L_브라운","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 메탈 시계 RE065_","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""},{"1":"No","2":"No","3":"No","4":"No","상태":"","상품명":"레노마 가죭 시계 RE5035_블랙","PRICE":"","SALE":"","상품 설명":"","구성품":"","재고수량":"","판매 페이지":"","재고 위치":""}]};
+
+// localStorage 영구화 (시안 단계 — 추후 Supabase 이관 예정)
+const MARKETDB_LS_KEY = 'klp_marketdb_v1';
+let MARKETDB = null;
+function marketdbLoad() {
+    try {
+        const raw = localStorage.getItem(MARKETDB_LS_KEY);
+        if (raw) { MARKETDB = JSON.parse(raw); return; }
+    } catch (e) { console.warn(e); }
+    MARKETDB = JSON.parse(JSON.stringify(MARKETDB_SEED));
+    ['watch','goods','misc'].forEach(cat => {
+        MARKETDB[cat].forEach(r => {
+            if (r.ceo_junggo===undefined) r.ceo_junggo = (r['중']==='Yes')||(r['1']==='Yes');
+            if (r.ceo_bungae===undefined) r.ceo_bungae = false;
+            if (r.ceo_danggeun===undefined) r.ceo_danggeun = r['당']==='Yes';
+            if (r.iyj_junggo===undefined) r.iyj_junggo = r['2']==='Yes';
+            if (r.iyj_bungae===undefined) r.iyj_bungae = false;
+            if (r.iyj_danggeun===undefined) r.iyj_danggeun = false;
+            if (r.khh_junggo===undefined) r.khh_junggo = r['3']==='Yes';
+            if (r.khh_bungae===undefined) r.khh_bungae = false;
+            if (r.khh_danggeun===undefined) r.khh_danggeun = false;
+            if (r.nko_junggo===undefined) r.nko_junggo = r['4']==='Yes';
+            if (r.nko_bungae===undefined) r.nko_bungae = false;
+            if (!r.image) r.image = '';
+        });
+    });
+    marketdbSave();
+}
+function marketdbSave() {
+    try { localStorage.setItem(MARKETDB_LS_KEY, JSON.stringify(MARKETDB)); }
+    catch (e) { console.error('marketdb save failed', e); }
+}
+
+let marketCurrentCat = 'all';
+let marketCurrentPage = 1;
+const MARKET_PER_PAGE = 50;
+let marketSearchQuery = '';
+
+function marketEsc(s) {
+    return (s||'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function marketParseStatus(s) {
+    if (!s) return '<span class="mbadge stop">-</span>';
+    if (s.indexOf('판매가능')>=0) return '<span class="mbadge ok">판매가능</span>';
+    if (s.indexOf('품절')>=0) return '<span class="mbadge soldout">품절</span>';
+    return '<span class="mbadge stop">'+marketEsc(s)+'</span>';
+}
+
+function marketGetFiltered() {
+    if (!MARKETDB) marketdbLoad();
+    let items = [];
+    if (marketCurrentCat === 'all') {
+        items = [].concat(
+            MARKETDB.watch.map((x,i) => Object.assign({}, x, {_cat:'시계', _catKey:'watch', _idx:i})),
+            MARKETDB.goods.map((x,i) => Object.assign({}, x, {_cat:'굿즈', _catKey:'goods', _idx:i})),
+            MARKETDB.misc.map((x,i) => Object.assign({}, x, {_cat:'기타잡화', _catKey:'misc', _idx:i}))
+        );
+    } else {
+        const catName = marketCurrentCat==='watch'?'시계':marketCurrentCat==='goods'?'굿즈':'기타잡화';
+        items = MARKETDB[marketCurrentCat].map((x,i) => Object.assign({}, x, {_cat:catName, _catKey:marketCurrentCat, _idx:i}));
+    }
+    const q = (marketSearchQuery||'').toLowerCase();
+    if (q) {
+        items = items.filter(r => ((r['상품명']||'')+(r['상품 설명']||'')+(r['구성품']||'')).toLowerCase().indexOf(q)>=0);
+    }
+    return items;
+}
+
+function renderMarketdb() {
+    if (!MARKETDB) marketdbLoad();
+    const tb = document.getElementById('marketTbody');
+    if (!tb) return;
+    const items = marketGetFiltered();
+    const total = items.length;
+    const totalPages = Math.max(1, Math.ceil(total/MARKET_PER_PAGE));
+    if (marketCurrentPage>totalPages) marketCurrentPage = totalPages;
+    if (marketCurrentPage<1) marketCurrentPage = 1;
+    const start = (marketCurrentPage-1)*MARKET_PER_PAGE;
+    const pageItems = items.slice(start, start+MARKET_PER_PAGE);
+
+    updateMarketStatus(items);
+    updateMarketCounts();
+
+    const catClass = {'시계':'watch','굿즈':'goods','기타잡화':'misc'};
+    const catIcon = {'시계':'⌚','굿즈':'🎁','기타잡화':'📦'};
+
+    if (pageItems.length === 0) {
+        tb.innerHTML = '<tr><td colspan="20" style="text-align:center;padding:60px 20px;color:var(--text-tertiary)">상품이 없습니다</td></tr>';
+        renderMarketPagination(0);
+        return;
+    }
+
+    tb.innerHTML = pageItems.map(r => {
+        const pageUrl = r['판매 페이지'];
+        const pageHtml = pageUrl ? '<a href="'+marketEsc(pageUrl)+'" target="_blank" onclick="event.stopPropagation()">바로가기 ↗</a>' : '-';
+        const tcls = catClass[r._cat]||'misc';
+        const ticon = catIcon[r._cat]||'📦';
+        const hasImg = !!r.image;
+        const thumbInner = hasImg
+            ? '<img src="'+r.image+'" style="width:100%;height:100%;object-fit:cover;border-radius:6px">'
+            : ticon;
+        const thumbCls = 'mthumb '+(hasImg?'':tcls);
+        const thumbStyle = hasImg?'padding:0;overflow:hidden;background:#fff':'';
+        const dataImg = hasImg?(' data-img="'+marketEsc(r.image)+'"'):'';
+        const chk = (k,color) => '<div class="mchk '+color+(r[k]?' yes':'')+'" data-cat="'+r._catKey+'" data-idx="'+r._idx+'" data-key="'+k+'" onclick="marketToggleChk(event,this)"></div>';
+        const noprop = ' onclick="event.stopPropagation()"';
+        return '<tr onclick="openMarketModal(\''+r._catKey+'\','+r._idx+')">'+
+            '<td><div class="'+thumbCls+'" data-icon="'+ticon+'" data-cls="'+tcls+'"'+dataImg+' style="'+thumbStyle+'">'+thumbInner+'</div></td>'+
+            '<td>'+marketParseStatus(r['상태'])+'</td>'+
+            '<td class="market-name"><div>'+marketEsc(r['상품명']||'-')+' <span style="font-size:10px;color:var(--text-tertiary);font-weight:500">· '+r._cat+'</span></div>'+(r['상품 설명']?'<div class="desc">'+marketEsc(r['상품 설명']).replace(/\n/g,' ')+'</div>':'')+'</td>'+
+            '<td class="market-price">'+marketEsc(r['PRICE']||'-')+'</td>'+
+            '<td class="market-sale">'+marketEsc(r['SALE']||'-')+'</td>'+
+            '<td class="market-parts">'+marketEsc(r['구성품']||'-')+'</td>'+
+            '<td>'+marketEsc(r['재고수량']||'-')+'</td>'+
+            '<td>'+marketEsc(r['재고 위치']||'-')+'</td>'+
+            '<td>'+pageHtml+'</td>'+
+            '<td class="ceo-cell"'+noprop+'>'+chk('ceo_junggo','ceo')+'</td>'+
+            '<td class="ceo-cell"'+noprop+'>'+chk('ceo_bungae','ceo')+'</td>'+
+            '<td class="ceo-cell mcell-last"'+noprop+'>'+chk('ceo_danggeun','ceo')+'</td>'+
+            '<td class="iyj-cell"'+noprop+'>'+chk('iyj_junggo','iyj')+'</td>'+
+            '<td class="iyj-cell"'+noprop+'>'+chk('iyj_bungae','iyj')+'</td>'+
+            '<td class="iyj-cell mcell-last"'+noprop+'>'+chk('iyj_danggeun','iyj')+'</td>'+
+            '<td class="khh-cell"'+noprop+'>'+chk('khh_junggo','khh')+'</td>'+
+            '<td class="khh-cell"'+noprop+'>'+chk('khh_bungae','khh')+'</td>'+
+            '<td class="khh-cell mcell-last"'+noprop+'>'+chk('khh_danggeun','khh')+'</td>'+
+            '<td class="nko-cell"'+noprop+'>'+chk('nko_junggo','nko')+'</td>'+
+            '<td class="nko-cell"'+noprop+'>'+chk('nko_bungae','nko')+'</td>'+
+        '</tr>';
+    }).join('');
+    renderMarketPagination(totalPages);
+    bindMarketThumbHovers();
+}
+
+function updateMarketCounts() {
+    if (!MARKETDB) return;
+    const all = MARKETDB.watch.length + MARKETDB.goods.length + MARKETDB.misc.length;
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    set('mcnt-all', all);
+    set('mcnt-watch', MARKETDB.watch.length);
+    set('mcnt-goods', MARKETDB.goods.length);
+    set('mcnt-misc', MARKETDB.misc.length);
+}
+
+const MARKET_PERSONS = [
+    { key:'ceo', name:'대표님', fields:['ceo_junggo','ceo_bungae','ceo_danggeun'], labels:['중고','번개','당근'] },
+    { key:'iyj', name:'이현주', fields:['iyj_junggo','iyj_bungae','iyj_danggeun'], labels:['중고','번개','당근'] },
+    { key:'khh', name:'김현호', fields:['khh_junggo','khh_bungae','khh_danggeun'], labels:['중고','번개','당근'] },
+    { key:'nko', name:'뉴코',    fields:['nko_junggo','nko_bungae'],               labels:['중고','번개'] }
+];
+
+function updateMarketStatus(items) {
+    if (!items) items = marketGetFiltered();
+    const total = items.length;
+    const scope = marketCurrentCat==='all'?'전체':marketCurrentCat==='watch'?'시계':marketCurrentCat==='goods'?'굿즈':'기타잡화';
+    const scopeEl = document.getElementById('marketStatusScope');
+    if (scopeEl) scopeEl.textContent = scope + ' · 총 ' + total + '건';
+    const grid = document.getElementById('marketStatusGrid');
+    if (!grid) return;
+    let html = '';
+    MARKET_PERSONS.forEach(p => {
+        const stats = p.fields.map((f,i) => {
+            const n = items.reduce((a,r) => a + (r[f]?1:0), 0);
+            const done = n>0 && n===total ? ' done' : '';
+            return '<div class="stat'+done+'"><span class="plat">'+p.labels[i]+'</span><span class="frac">'+n+' / '+total+'</span></div>';
+        }).join('');
+        html += '<div class="market-person-card '+p.key+'"><div class="who">'+p.name+'</div><div class="stats">'+stats+'</div></div>';
+    });
+    grid.innerHTML = html;
+}
+
+function renderMarketPagination(totalPages) {
+    const pag = document.getElementById('marketPagination');
+    if (!pag) return;
+    if (totalPages<=1) { pag.innerHTML = ''; return; }
+    const btn = (label, page, disabled, active) =>
+        '<button class="filter-chip '+(active?'active':'')+'" '+(disabled?'disabled':'')+' onclick="gotoMarketPage('+page+')" style="min-width:36px">'+label+'</button>';
+    let html = '';
+    html += btn('«', 1, marketCurrentPage===1);
+    html += btn('‹', marketCurrentPage-1, marketCurrentPage===1);
+    let s = Math.max(1, marketCurrentPage-2), e = Math.min(totalPages, s+4);
+    s = Math.max(1, e-4);
+    for (let i=s; i<=e; i++) html += btn(i, i, false, i===marketCurrentPage);
+    html += btn('›', marketCurrentPage+1, marketCurrentPage===totalPages);
+    html += btn('»', totalPages, marketCurrentPage===totalPages);
+    pag.innerHTML = html;
+}
+function gotoMarketPage(p) { marketCurrentPage = p; renderMarketdb(); window.scrollTo({top:0,behavior:'smooth'}); }
+
+function marketToggleChk(ev, el) {
+    ev.stopPropagation();
+    const cat = el.dataset.cat, idx = Number(el.dataset.idx), key = el.dataset.key;
+    if (!MARKETDB[cat] || !MARKETDB[cat][idx]) return;
+    MARKETDB[cat][idx][key] = !MARKETDB[cat][idx][key];
+    el.classList.toggle('yes');
+    marketdbSave();
+    updateMarketStatus();
+}
+
+function bindMarketThumbHovers() {
+    const tt = document.getElementById('marketThumbTooltip');
+    if (!tt) return;
+    document.querySelectorAll('#marketTable .mthumb').forEach(t => {
+        t.addEventListener('mouseenter', () => {
+            const cls = t.dataset.cls||'';
+            const icon = t.dataset.icon||'📦';
+            const img = t.dataset.img;
+            if (img) {
+                tt.className = '';
+                tt.style.background = '#fff';
+                tt.style.padding = '6px';
+                tt.innerHTML = '<img src="'+img+'" style="width:100%;height:100%;object-fit:contain;border-radius:8px">';
+            } else {
+                tt.className = 'mthumb '+cls;
+                tt.style.background = '';
+                tt.style.padding = '';
+                tt.textContent = icon;
+            }
+            tt.style.display = 'flex';
+            const rect = t.getBoundingClientRect();
+            let left = rect.right + 12;
+            if (left+210 > window.innerWidth) left = rect.left - 212;
+            tt.style.left = left+'px';
+            tt.style.top = Math.max(8, rect.top+rect.height/2-100)+'px';
+        });
+        t.addEventListener('mouseleave', () => { tt.style.display = 'none'; });
+    });
+}
+
+// ===== 모달 =====
+let _marketEditCtx = null;
+function openMarketModal(cat, idx) {
+    if (!marketdbCanAccess()) return;
+    if (!MARKETDB) marketdbLoad();
+    const title = document.getElementById('marketModalTitle');
+    const body = document.getElementById('marketModalBody');
+    const isEdit = cat && idx != null && idx >= 0;
+    _marketEditCtx = isEdit ? { cat, idx } : null;
+    const r = isEdit ? MARKETDB[cat][idx] : {};
+    title.textContent = isEdit ? '상품 편집' : '새 상품 추가';
+    const val = k => marketEsc((r[k]||'').toString());
+    const defaultCat = cat || (marketCurrentCat==='all'?'watch':marketCurrentCat);
+    const catOpts = ['watch','goods','misc'].map(c => {
+        const label = c==='watch'?'⌚ 시계':c==='goods'?'🎁 굿즈':'📦 기타잡화';
+        return '<option value="'+c+'"'+(defaultCat===c?' selected':'')+'>'+label+'</option>';
+    }).join('');
+    const statuses = ['판매가능','품절','판매중지','단종'];
+    const curStatus = r['상태']||'판매가능';
+    const statusOpts = statuses.map(s => '<option value="'+s+'"'+(curStatus===s?' selected':'')+'>'+s+'</option>').join('');
+    body.innerHTML =
+        '<div class="form-group"><label class="form-label">상품 이미지</label>'+
+          '<div style="display:flex;gap:12px;align-items:center">'+
+            '<div id="mMImgPreview" style="width:88px;height:88px;border-radius:8px;border:1.5px dashed var(--gray-300);display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:11px;overflow:hidden;background:var(--gray-50);flex-shrink:0">'+(r.image?'<img src="'+r.image+'" style="width:100%;height:100%;object-fit:cover">':'없음')+'</div>'+
+            '<div style="flex:1;display:flex;flex-direction:column;gap:6px">'+
+              '<label style="padding:8px 14px;background:var(--blue);color:#fff;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;text-align:center;width:140px">📁 파일 선택<input type="file" accept="image/*" onchange="handleMarketImgUpload(event)" style="display:none"></label>'+
+              '<button type="button" onclick="clearMarketImg()" style="padding:6px 14px;background:#fee2e2;color:#991b1b;border:none;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;width:140px;'+(r.image?'':'display:none')+'" id="mMImgClearBtn">이미지 제거</button>'+
+              '<span style="font-size:10px;color:var(--text-tertiary)">PNG/JPG · 4MB 이하</span>'+
+            '</div>'+
+            '<input type="hidden" id="mMImage" value="'+(r.image||'')+'">'+
+          '</div>'+
+        '</div>'+
+        '<div class="form-row">'+
+          '<div class="form-group"><label class="form-label">카테고리 *</label><select class="form-select" id="mMCat">'+catOpts+'</select></div>'+
+          '<div class="form-group"><label class="form-label">상태</label><select class="form-select" id="mMStatus">'+statusOpts+'</select></div>'+
+        '</div>'+
+        '<div class="form-group"><label class="form-label">상품명 *</label><input type="text" class="form-input" id="mMName" value="'+val('상품명')+'" placeholder="예: 호크마 회중시계" autofocus></div>'+
+        '<div class="form-row">'+
+          '<div class="form-group"><label class="form-label">PRICE (만원)</label><input type="text" class="form-input" id="mMPrice" value="'+val('PRICE')+'" placeholder="5.9"></div>'+
+          '<div class="form-group"><label class="form-label">SALE (만원)</label><input type="text" class="form-input" id="mMSale" value="'+val('SALE')+'" placeholder="9"></div>'+
+        '</div>'+
+        '<div class="form-group"><label class="form-label">상품 설명</label><textarea class="form-input" id="mMDesc" rows="2" placeholder="상품 설명">'+val('상품 설명')+'</textarea></div>'+
+        '<div class="form-group"><label class="form-label">구성품</label><input type="text" class="form-input" id="mMParts" value="'+val('구성품')+'" placeholder="회중시계/체인/품질보증서"></div>'+
+        '<div class="form-row">'+
+          '<div class="form-group"><label class="form-label">재고수량</label><input type="text" class="form-input" id="mMQty" value="'+val('재고수량')+'"></div>'+
+          '<div class="form-group"><label class="form-label">재고 위치</label><input type="text" class="form-input" id="mMLoc" value="'+val('재고 위치')+'" placeholder="창고"></div>'+
+        '</div>'+
+        '<div class="form-group"><label class="form-label">판매 페이지 URL</label><input type="text" class="form-input" id="mMUrl" value="'+val('판매 페이지')+'" placeholder="https://..."></div>'+
+        '<div style="display:flex;gap:8px;margin-top:16px">'+
+          (isEdit?'<button class="form-submit" style="flex:1;background:var(--red)" onclick="deleteMarketItem()">🗑️ 삭제</button>':'')+
+          '<button class="form-submit" style="flex:1;background:var(--gray-200);color:var(--gray-800)" onclick="closeMarketModal()">취소</button>'+
+          '<button class="form-submit" style="flex:2" onclick="saveMarketItem()">💾 '+(isEdit?'저장':'추가')+'</button>'+
+        '</div>';
+    document.getElementById('marketModalOverlay').classList.add('show');
+    setTimeout(() => { const el = document.getElementById('mMName'); if (el) el.focus(); }, 50);
+}
+function closeMarketModal() {
+    document.getElementById('marketModalOverlay').classList.remove('show');
+}
+function handleMarketImgUpload(ev) {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    if (!f.type.startsWith('image/')) { showToast('이미지 파일만 업로드 가능합니다'); return; }
+    if (f.size > 4*1024*1024) { showToast('4MB 이하만 업로드 가능합니다'); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById('mMImage').value = e.target.result;
+        document.getElementById('mMImgPreview').innerHTML = '<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover">';
+        document.getElementById('mMImgClearBtn').style.display = 'block';
+    };
+    reader.readAsDataURL(f);
+    ev.target.value = '';
+}
+function clearMarketImg() {
+    document.getElementById('mMImage').value = '';
+    document.getElementById('mMImgPreview').innerHTML = '없음';
+    document.getElementById('mMImgClearBtn').style.display = 'none';
+}
+function saveMarketItem() {
+    const newCat = document.getElementById('mMCat').value;
+    const name = document.getElementById('mMName').value.trim();
+    if (!name) { showToast('상품명을 입력해주세요'); return; }
+    const obj = {
+        '상태': document.getElementById('mMStatus').value,
+        '상품명': name,
+        'PRICE': document.getElementById('mMPrice').value.trim(),
+        'SALE': document.getElementById('mMSale').value.trim(),
+        '상품 설명': document.getElementById('mMDesc').value.trim(),
+        '구성품': document.getElementById('mMParts').value.trim(),
+        '재고수량': document.getElementById('mMQty').value.trim(),
+        '재고 위치': document.getElementById('mMLoc').value.trim(),
+        '판매 페이지': document.getElementById('mMUrl').value.trim(),
+        image: document.getElementById('mMImage').value,
+        ceo_junggo: false, ceo_bungae: false, ceo_danggeun: false,
+        iyj_junggo: false, iyj_bungae: false, iyj_danggeun: false,
+        khh_junggo: false, khh_bungae: false, khh_danggeun: false,
+        nko_junggo: false, nko_bungae: false
+    };
+    if (_marketEditCtx) {
+        const old = MARKETDB[_marketEditCtx.cat][_marketEditCtx.idx];
+        Object.keys(old).forEach(k => { if (!(k in obj)) obj[k] = old[k]; });
+        ['ceo_junggo','ceo_bungae','ceo_danggeun','iyj_junggo','iyj_bungae','iyj_danggeun','khh_junggo','khh_bungae','khh_danggeun','nko_junggo','nko_bungae'].forEach(k => {
+            if (old[k] !== undefined) obj[k] = old[k];
+        });
+        if (_marketEditCtx.cat === newCat) {
+            MARKETDB[_marketEditCtx.cat][_marketEditCtx.idx] = obj;
+        } else {
+            MARKETDB[_marketEditCtx.cat].splice(_marketEditCtx.idx, 1);
+            MARKETDB[newCat].unshift(obj);
+        }
+        showToast('상품이 수정되었습니다');
+    } else {
+        MARKETDB[newCat].unshift(obj);
+        showToast('상품이 추가되었습니다');
+    }
+    marketdbSave();
+    closeMarketModal();
+    renderMarketdb();
+}
+function deleteMarketItem() {
+    if (!_marketEditCtx) return;
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    MARKETDB[_marketEditCtx.cat].splice(_marketEditCtx.idx, 1);
+    marketdbSave();
+    closeMarketModal();
+    renderMarketdb();
+    showToast('상품이 삭제되었습니다');
+}
+
+function setupMarketdbHandlers() {
+    document.querySelectorAll('#marketCatBar .filter-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            document.querySelectorAll('#marketCatBar .filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            marketCurrentCat = chip.dataset.mcat;
+            marketCurrentPage = 1;
+            renderMarketdb();
+        });
+    });
+    const search = document.getElementById('marketSearch');
+    if (search) {
+        search.addEventListener('input', e => {
+            marketSearchQuery = e.target.value;
+            marketCurrentPage = 1;
+            renderMarketdb();
+        });
+    }
+    applyMarketdbPermission();
+}
+function applyMarketdbPermission() {
+    const nav = document.getElementById('navMarketdb');
+    if (nav) nav.style.display = marketdbCanAccess() ? '' : 'none';
+}
+
+document.addEventListener('keydown', e => {
+    const tab = document.getElementById('tab-marketdb');
+    const isActive = tab && tab.classList.contains('active');
+    const modal = document.getElementById('marketModalOverlay');
+    const modalOpen = modal && modal.classList.contains('show');
+    if (e.key === 'F2' && isActive && marketdbCanAccess()) {
+        e.preventDefault();
+        openMarketModal(null, null);
+    } else if (e.key === 'Escape' && modalOpen) {
+        closeMarketModal();
+    }
+});

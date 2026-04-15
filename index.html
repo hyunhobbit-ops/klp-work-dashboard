@@ -82,6 +82,10 @@
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8 8-4-4M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                         <span>택배 관리</span>
                     </button>
+                    <button class="nav-item" data-tab="marketdb" id="navMarketdb" style="display:none">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        <span>중고마켓DB</span>
+                    </button>
                 </div>
 
                 <!-- 제안서 그룹 -->
@@ -719,6 +723,94 @@
                     <div id="clientPagination" style="display:flex;justify-content:center;gap:6px;padding:16px;flex-wrap:wrap"></div>
                 </div>
             </main>
+
+            <!-- ===== 중고마켓DB ===== -->
+            <main class="content" id="tab-marketdb">
+                <!-- 업로드 현황 패널 -->
+                <div class="market-status-panel" id="marketStatusPanel">
+                    <div class="market-status-header">
+                        <div class="market-status-title">📊 업로드 현황</div>
+                        <div class="market-status-scope" id="marketStatusScope">전체</div>
+                    </div>
+                    <div class="market-status-row" id="marketStatusGrid"></div>
+                </div>
+
+                <div class="content-toolbar">
+                    <div class="toolbar-left">
+                        <div class="filter-bar" id="marketCatBar">
+                            <button class="filter-chip active" data-mcat="all">전체 <span class="market-cnt" id="mcnt-all">0</span></button>
+                            <button class="filter-chip" data-mcat="watch">⌚ 시계 <span class="market-cnt" id="mcnt-watch">0</span></button>
+                            <button class="filter-chip" data-mcat="goods">🎁 굿즈 <span class="market-cnt" id="mcnt-goods">0</span></button>
+                            <button class="filter-chip" data-mcat="misc">📦 기타잡화 <span class="market-cnt" id="mcnt-misc">0</span></button>
+                        </div>
+                        <div class="search-bar">
+                            <svg width="16" height="16" fill="none" stroke="#999" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                            <input type="text" id="marketSearch" placeholder="상품명·설명·구성품 검색">
+                        </div>
+                    </div>
+                    <div class="toolbar-buttons">
+                        <button class="btn-primary" onclick="openMarketModal(null,null)" title="F2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                            새 상품 (F2)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="page-section">
+                    <div class="market-table-inner">
+                        <table class="data-table market-table" id="marketTable">
+                            <thead>
+                                <tr>
+                                    <th rowspan="2" style="width:54px">이미지</th>
+                                    <th rowspan="2" style="width:64px">상태</th>
+                                    <th rowspan="2" style="width:220px">상품명</th>
+                                    <th rowspan="2" style="width:60px">PRICE<br><span style="font-weight:400;color:var(--text-tertiary);font-size:10px">(만원)</span></th>
+                                    <th rowspan="2" style="width:56px">SALE<br><span style="font-weight:400;color:var(--text-tertiary);font-size:10px">(만원)</span></th>
+                                    <th rowspan="2" style="width:150px">구성품</th>
+                                    <th rowspan="2" style="width:48px">수량</th>
+                                    <th rowspan="2" style="width:66px">재고위치</th>
+                                    <th rowspan="2" style="width:72px">판매<br>페이지</th>
+                                    <th colspan="3" class="mgrp mgrp-ceo mgrp-last">대표님</th>
+                                    <th colspan="3" class="mgrp mgrp-iyj mgrp-last">이현주</th>
+                                    <th colspan="3" class="mgrp mgrp-khh mgrp-last">김현호</th>
+                                    <th colspan="2" class="mgrp mgrp-nko">뉴코</th>
+                                </tr>
+                                <tr>
+                                    <th class="msub msub-ceo">중고</th>
+                                    <th class="msub msub-ceo">번개</th>
+                                    <th class="msub msub-ceo msub-last">당근</th>
+                                    <th class="msub msub-iyj">중고</th>
+                                    <th class="msub msub-iyj">번개</th>
+                                    <th class="msub msub-iyj msub-last">당근</th>
+                                    <th class="msub msub-khh">중고</th>
+                                    <th class="msub msub-khh">번개</th>
+                                    <th class="msub msub-khh msub-last">당근</th>
+                                    <th class="msub msub-nko">중고</th>
+                                    <th class="msub msub-nko">번개</th>
+                                </tr>
+                            </thead>
+                            <tbody id="marketTbody"></tbody>
+                        </table>
+                    </div>
+                    <div id="marketPagination" style="display:flex;justify-content:center;gap:6px;padding:16px;flex-wrap:wrap"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 중고마켓DB 썸네일 hover 툴팁 -->
+    <div id="marketThumbTooltip"></div>
+
+    <!-- 중고마켓DB 편집/추가 모달 -->
+    <div class="modal-overlay" id="marketModalOverlay">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 class="modal-title" id="marketModalTitle">상품 편집</h3>
+                <button class="modal-close" onclick="closeMarketModal()">
+                    <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="modal-body" id="marketModalBody"></div>
         </div>
     </div>
 

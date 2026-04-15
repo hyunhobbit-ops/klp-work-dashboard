@@ -2215,3 +2215,131 @@ body {
 .resp-card-meta { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .resp-card-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--gray-500); font-weight: 500; }
 .resp-card-row strong { color: var(--gray-700); font-weight: 600; }
+
+/* ===== 중고마켓DB ===== */
+.market-status-panel {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  margin-bottom: 18px;
+}
+.market-status-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+.market-status-title { font-size: 14px; font-weight: 800; color: var(--gray-700); letter-spacing: .3px; }
+.market-status-scope { font-size: 12px; color: var(--gray-400); font-weight: 500; }
+.market-status-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.market-person-card {
+  flex: 1; min-width: 200px; border-radius: 10px; padding: 12px 14px;
+  display: flex; align-items: center; gap: 12px;
+}
+.market-person-card .who {
+  font-size: 14px; font-weight: 800; white-space: nowrap; padding-right: 12px;
+  border-right: 1.5px solid rgba(0,0,0,.1); min-width: 78px;
+}
+.market-person-card .stats { display: flex; gap: 8px; flex: 1; }
+.market-person-card .stat {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 8px; background: rgba(255,255,255,.7); border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.market-person-card .stat .plat { font-size: 10px; font-weight: 700; color: var(--gray-500); letter-spacing: .5px; }
+.market-person-card .stat .frac { font-size: 15px; font-weight: 900; color: var(--gray-900); line-height: 1.2; }
+.market-person-card .stat.done { background: #dcfce7; }
+.market-person-card .stat.done .frac { color: #15803d; }
+.market-person-card.ceo { background: #fef3c7; }
+.market-person-card.ceo .who { color: #92400e; border-color: #fbbf24; }
+.market-person-card.iyj { background: #dbeafe; }
+.market-person-card.iyj .who { color: #1e40af; border-color: #93c5fd; }
+.market-person-card.khh { background: #d1fae5; }
+.market-person-card.khh .who { color: #065f46; border-color: #6ee7b7; }
+.market-person-card.nko { background: #ede9fe; }
+.market-person-card.nko .who { color: #5b21b6; border-color: #c4b5fd; }
+
+.market-cnt {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px;
+  background: var(--gray-100); color: var(--gray-500); font-size: 11px; font-weight: 700;
+}
+.filter-chip.active .market-cnt { background: rgba(255,255,255,.22); color: #fff; }
+
+/* 중고마켓DB 테이블 */
+.market-table-inner { overflow: auto; border-radius: 10px; max-height: calc(100vh - 320px); }
+.market-table { min-width: 1220px; border-collapse: separate; border-spacing: 0; }
+.market-table thead th {
+  background: var(--gray-50); font-size: 12px; padding: 10px 4px;
+  position: sticky; top: 0; z-index: 10; letter-spacing: .2px;
+  white-space: nowrap; font-weight: 700; color: var(--gray-700);
+  border-bottom: 1px solid var(--gray-200);
+}
+.market-table thead tr:nth-child(2) th { top: 38px; z-index: 9; }
+.market-table tbody td {
+  padding: 10px 5px; font-size: 13px; vertical-align: middle; text-align: center;
+  border-bottom: 1px solid var(--gray-100);
+}
+.market-table tbody tr { cursor: pointer; }
+.market-table tbody tr:hover { background: var(--gray-50); }
+.market-table tbody td.market-name {
+  text-align: left; font-weight: 700; color: var(--gray-900);
+  min-width: 200px; max-width: 280px; padding-left: 10px; padding-right: 8px;
+}
+.market-table tbody td.market-name .desc {
+  font-weight: 400; color: var(--gray-500); font-size: 12px; margin-top: 3px; line-height: 1.4;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.market-table tbody td.market-parts { text-align: left; color: var(--gray-600); font-size: 12px; max-width: 200px; }
+.market-table tbody td.market-price { font-weight: 700; color: var(--blue); white-space: nowrap; }
+.market-table tbody td.market-sale { color: var(--red); font-weight: 700; white-space: nowrap; }
+.market-table tbody td a { color: var(--blue); text-decoration: none; font-size: 12px; }
+
+/* 그룹 헤더 */
+.mgrp { font-size: 11px; padding: 5px 2px; border-right: 1px solid rgba(0,0,0,.12); }
+.msub { font-size: 11px; padding: 4px 0; font-weight: 700; border-right: 1px dashed rgba(0,0,0,.15); width: 36px; }
+.mgrp-last, .msub-last { border-right: 2px solid var(--gray-300) !important; }
+.mgrp-ceo { background: #fef3c7; color: #92400e; }
+.msub-ceo { background: #fffbeb; color: #92400e; }
+.mgrp-iyj { background: #dbeafe; color: #1e40af; }
+.msub-iyj { background: #eff6ff; color: #1e40af; }
+.mgrp-khh { background: #d1fae5; color: #065f46; }
+.msub-khh { background: #ecfdf5; color: #065f46; }
+.mgrp-nko { background: #ede9fe; color: #5b21b6; }
+.msub-nko { background: #f5f3ff; color: #5b21b6; }
+.market-table tbody td.ceo-cell { background: #fffdf6; }
+.market-table tbody td.iyj-cell { background: #f8fbff; }
+.market-table tbody td.khh-cell { background: #f6fefb; }
+.market-table tbody td.nko-cell { background: #fbfaff; }
+.market-table tbody td.mcell-last { border-right: 2px solid var(--gray-200); }
+
+/* 체크박스 */
+.mchk {
+  width: 20px; height: 20px; border: 1.5px solid var(--gray-300); border-radius: 4px;
+  background: #fff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  transition: all .15s; color: transparent; font-size: 13px; font-weight: 900; line-height: 1;
+}
+.mchk:hover { border-color: var(--blue); }
+.mchk.yes::before { content: '✓'; }
+.mchk.ceo.yes { background: #f59e0b; border-color: #f59e0b; color: #fff; }
+.mchk.iyj.yes { background: #2563eb; border-color: #2563eb; color: #fff; }
+.mchk.khh.yes { background: #10b981; border-color: #10b981; color: #fff; }
+.mchk.nko.yes { background: #8b5cf6; border-color: #8b5cf6; color: #fff; }
+
+/* 썸네일 */
+.mthumb {
+  width: 42px; height: 42px; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 21px; box-shadow: 0 1px 3px rgba(0,0,0,.08); cursor: zoom-in; transition: transform .15s;
+}
+.mthumb:hover { transform: scale(1.08); }
+.mthumb.watch { background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: #fff; }
+.mthumb.goods { background: linear-gradient(135deg, #f97316, #fbbf24); color: #fff; }
+.mthumb.misc { background: linear-gradient(135deg, #10b981, #34d399); color: #fff; }
+#marketThumbTooltip {
+  display: none; position: fixed; width: 200px; height: 200px; border-radius: 12px; z-index: 9999;
+  align-items: center; justify-content: center; font-size: 100px;
+  box-shadow: 0 16px 40px rgba(0,0,0,.28); border: 3px solid #fff; pointer-events: none;
+}
+
+/* 상태 배지 */
+.mbadge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+.mbadge.ok { background: #dcfce7; color: #166534; }
+.mbadge.soldout { background: #fee2e2; color: #991b1b; }
+.mbadge.stop { background: var(--gray-100); color: var(--gray-500); }
