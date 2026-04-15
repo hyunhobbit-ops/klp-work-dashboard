@@ -2279,16 +2279,16 @@ async function showProjectDetail(id) {
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">${checksHtml}</div>
         </div>
 
-        <!-- 디자인확인서 -->
-        <div style="${cardBase}">
-            ${secTitle('🖼️', '디자인확인서')}
-            <div id="dcDocArea">${p.sourceDocNumber ? `<div style="color:var(--gray-500);font-size:13px">디자인확인서 로딩 중...</div>` : `<div style="color:var(--gray-500);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">연결된 디자인확인서가 없습니다. 상단의 "디자인확인서 만들기" 버튼으로 생성하세요.</div>`}</div>
-        </div>
-
-        <!-- 작업요청서 -->
-        <div style="${cardBase}">
-            ${secTitle('📋', '작업요청서')}
-            <div id="wrDocArea">${p.sourceDocNumber ? `<div style="color:var(--gray-500);font-size:13px">작업요청서 로딩 중...</div>` : `<div style="color:var(--gray-500);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">디자인확인서가 먼저 연결되어야 작업요청서를 조회할 수 있습니다</div>`}</div>
+        <!-- 디자인확인서 / 작업요청서 2열 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+            <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:14px 16px;color:var(--gray-900);min-width:0">
+                ${secTitle('🖼️', '디자인확인서')}
+                <div id="dcDocArea">${p.sourceDocNumber ? `<div style="color:var(--gray-500);font-size:13px">디자인확인서 로딩 중...</div>` : `<div style="color:var(--gray-500);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">연결된 디자인확인서가 없습니다. 상단의 "디자인확인서 만들기" 버튼으로 생성하세요.</div>`}</div>
+            </div>
+            <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:14px 16px;color:var(--gray-900);min-width:0">
+                ${secTitle('📋', '작업요청서')}
+                <div id="wrDocArea">${p.sourceDocNumber ? `<div style="color:var(--gray-500);font-size:13px">작업요청서 로딩 중...</div>` : `<div style="color:var(--gray-500);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">디자인확인서가 먼저 연결되어야 작업요청서를 조회할 수 있습니다</div>`}</div>
+            </div>
         </div>
 
         ${p.memo ? `
@@ -2378,9 +2378,31 @@ async function showProjectDetail(id) {
     }
 }
 
-// 상세보기의 DC/WR 다운로드 버튼 — 새 탭으로 doc-generator 열어 자동 렌더+다운로드
+// 상세보기의 DC/WR 다운로드 버튼 — 이미 떠 있는 iframe의 뷰를 사용해 그 자리에서 다운로드
 function downloadDoc(docNum, fmt) {
-    window.open('doc-generator.html#dl-' + fmt + '-' + docNum, '_blank');
+    const iframes = document.querySelectorAll('#dcDocArea iframe, #wrDocArea iframe');
+    const enc = encodeURIComponent(docNum);
+    let target = null;
+    iframes.forEach(f => {
+        const src = f.getAttribute('src') || '';
+        if (src.indexOf('view-' + enc) !== -1 || src.indexOf('view-' + docNum) !== -1) target = f;
+    });
+    if (!target || !target.contentWindow || typeof target.contentWindow.klpEmbedDownload !== 'function') {
+        // fallback: 예전 방식
+        window.open('doc-generator.html#dl-' + fmt + '-' + docNum, '_blank');
+        return;
+    }
+    showToast(fmt.toUpperCase() + ' 생성 중...');
+    try {
+        const ret = target.contentWindow.klpEmbedDownload(fmt);
+        if (ret && typeof ret.then === 'function') {
+            ret.then(() => showToast(fmt.toUpperCase() + ' 다운로드 완료'))
+               .catch(e => { console.error(e); showToast('다운로드 실패: ' + e.message); });
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('다운로드 실패: ' + e.message);
+    }
 }
 
 // =====================================

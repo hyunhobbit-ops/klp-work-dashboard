@@ -668,9 +668,19 @@ async function selectLinkedDC(id){
   document.getElementById('wrPhone').value=shipParts[1]||'';
   document.getElementById('wrAddress').value=shipParts[2]||shipParts.join(' ');
 
-  /* 이미지 복사: 현재 DC 메모리에 이미지가 있으면 복사 */
-  if(mainImg){wrMainImg={url:mainImg.url}}
-  if(subImgs.length>0){wrSubImgs=subImgs.map(function(img){return{url:img.url}})}
+  /* 이미지 복사: DB에 저장된 이미지(images_data)를 최우선, 없으면 현재 DC 메모리 사용 */
+  var dcMain=null,dcSubs=[];
+  if(r.images_data){
+    try{
+      var imgs=unpackImages(r.images_data);
+      if(imgs&&imgs.main&&imgs.main.url)dcMain={url:imgs.main.url};
+      if(imgs&&imgs.subs&&imgs.subs.length)dcSubs=imgs.subs.map(function(im){return{url:im.url}});
+    }catch(e){console.warn('DC 이미지 언팩 실패',e);}
+  }
+  if(!dcMain&&mainImg)dcMain={url:mainImg.url};
+  if(dcSubs.length===0&&subImgs.length>0)dcSubs=subImgs.map(function(img){return{url:img.url}});
+  if(dcMain)wrMainImg=dcMain;
+  if(dcSubs.length>0)wrSubImgs=dcSubs;
   renderWrMainThumb();renderWrSubThumbs();
 
   var info=document.getElementById('wrLinkedInfo');
@@ -1365,6 +1375,14 @@ async function applyProjectPrefillData(pf, opts){
     }
   }catch(e){console.error('auto-dl failed',e);showMsg('❌ 다운로드 실패: '+e.message,true);}
 })();
+
+/* === 부모창 → iframe 다운로드 트리거 (대시보드 상세 모달에서 사용) === */
+window.klpEmbedDownload=function(fmt){
+  try{
+    if(currentMode==='wr'){return dlWr(fmt);}
+    return dl(fmt);
+  }catch(e){console.error('embed download failed',e);throw e;}
+};
 
 /* === URL 해시 기반 임베드 뷰 (#view-DOCNUM) — 외부 페이지에서 iframe으로 문서만 렌더 === */
 (async function applyViewHash(){
