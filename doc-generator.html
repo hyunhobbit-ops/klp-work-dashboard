@@ -231,7 +231,7 @@ body.view-mode html,body.view-mode body{margin:0;padding:0;overflow:hidden;backg
 </div>
 
 <!-- QUOTE OVERLAY -->
-<div id="quoteOverlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;overflow:auto;padding:24px;display:flex;align-items:flex-start;justify-content:center">
+<div id="quoteOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;overflow:auto;padding:24px;align-items:flex-start;justify-content:center">
   <div style="background:#fff;border-radius:12px;max-width:900px;width:100%;margin:auto;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:#F4F3EA;border-bottom:1px solid #e8e8e5">
       <div style="font-size:16px;font-weight:900;color:#16A34A">💰 견적서 미리보기</div>
@@ -886,7 +886,7 @@ function openQuoteFromForm(){
     est:e
   };
   renderQuoteDoc(_quoteData);
-  document.getElementById('quoteOverlay').classList.remove('hidden');
+  document.getElementById('quoteOverlay').style.display='flex';
   document.addEventListener('keydown',_quoteEscHandler);
 }
 
@@ -945,12 +945,12 @@ function openQuoteFromRecord(r){
     est:est
   };
   renderQuoteDoc(_quoteData);
-  document.getElementById('quoteOverlay').classList.remove('hidden');
+  document.getElementById('quoteOverlay').style.display='flex';
   document.addEventListener('keydown',_quoteEscHandler);
 }
 
 function closeQuoteOverlay(){
-  document.getElementById('quoteOverlay').classList.add('hidden');
+  document.getElementById('quoteOverlay').style.display='none';
   document.removeEventListener('keydown',_quoteEscHandler);
 }
 function _quoteEscHandler(e){if(e.key==='Escape'||e.key==='Esc')closeQuoteOverlay()}
