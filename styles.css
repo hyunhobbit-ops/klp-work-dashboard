@@ -2449,10 +2449,9 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 }
 .daily-column.overdue-column .daily-col-title { color: #991b1b; font-weight: 800; }
 .daily-item.overdue-item {
-  background: #fff;
+  background: var(--white);
   border-left: 3px solid #ef4444;
 }
-.daily-item.overdue-item .daily-title { color: #1a1d29; }
 .overdue-date-row {
   display: flex; align-items: center; gap: 6px; margin-top: 4px;
 }
