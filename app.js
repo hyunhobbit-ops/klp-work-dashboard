@@ -5212,9 +5212,9 @@ function renderProposalEditor() {
                 </div>
                 <div class="form-row">
                     <div class="form-group"><label class="form-label">KLP 담당자 연락처</label>
-                        <input type="text" class="form-input" id="epAssigneePhone" value="${ep.assigneePhone || ''}" placeholder="010-0000-0000"></div>
+                        <input type="text" class="form-input" id="epAssigneePhone" value="${ep.assigneePhone || '02-2103-5757'}" placeholder="02-2103-5757"></div>
                     <div class="form-group"><label class="form-label">KLP 담당자 이메일</label>
-                        <input type="email" class="form-input" id="epAssigneeEmail" value="${ep.assigneeEmail || ''}" placeholder="name@klpkorea.com"></div>
+                        <input type="email" class="form-input" id="epAssigneeEmail" value="${ep.assigneeEmail || 'klpkorea@agift.kr'}" placeholder="klpkorea@agift.kr"></div>
                 </div>
                 <div class="form-group"><label class="form-label">상태</label>
                     <select class="form-select" id="epStatus">
@@ -5395,12 +5395,20 @@ function openProposalPreview() {
     renderProposalPreview();
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', _proposalPreviewEscHandler);
+}
+
+function _proposalPreviewEscHandler(e) {
+    if (e.key === 'Escape' || e.key === 'Esc') {
+        closeProposalPreview();
+    }
 }
 
 function closeProposalPreview() {
     const overlay = document.getElementById('proposalPreviewOverlay');
     if (overlay) overlay.classList.remove('show');
     document.body.style.overflow = '';
+    document.removeEventListener('keydown', _proposalPreviewEscHandler);
 }
 
 function setPreviewFilter(f) {
@@ -5539,8 +5547,8 @@ function renderProposalPreview() {
                         </div>
                     </div>
                     <div class="pp-mgr-contact">
-                        <div>📧 ${ep.assigneeEmail || 'sales@klpkorea.com'}</div>
-                        <div>📱 ${ep.assigneePhone || '02-0000-0000'}</div>
+                        <div>📧 ${ep.assigneeEmail || 'klpkorea@agift.kr'}</div>
+                        <div>📱 ${ep.assigneePhone || '02-2103-5757'}</div>
                     </div>
                 </div>
             </div>
