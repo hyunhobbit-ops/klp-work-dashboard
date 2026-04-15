@@ -180,10 +180,7 @@ body.view-mode{background:#fff}
 body.view-mode .mode-bar,body.view-mode .sub-bar,body.view-mode .action-bar{display:none!important}
 body.view-mode .preview-area{padding:0}
 body.view-mode .preview-wrap{box-shadow:none;border-radius:0;max-width:100%;margin:0;overflow:hidden}
-/* 외부 임베드(iframe)에서 A4 원본(794x1123)을 뷰포트 폭에 맞춰 축소 */
-body.view-mode #docEl,body.view-mode #wrDocEl{width:100vw;height:calc(100vw * 1123 / 794);overflow:hidden;position:relative}
-body.view-mode #docEl > div,body.view-mode #wrDocEl > div{transform:scale(calc(100vw / 794));transform-origin:top left}
-body.view-mode html,body.view-mode body{margin:0;padding:0;overflow:hidden}
+body.view-mode html,body.view-mode body{margin:0;padding:0;overflow:hidden;background:#fff}
 </style>
 </head>
 <body>
@@ -1402,8 +1399,34 @@ window.klpEmbedDownload=function(fmt){
     await new Promise(function(resolve){setTimeout(resolve,300);});
     if(r.status==='작업요청서'){showWrTab('preview');}
     else{showDcTab('preview');}
+    /* 임베드 폭에 맞춰 A4 원본을 축소 */
+    setTimeout(fitEmbedToViewport,200);
+    setTimeout(fitEmbedToViewport,700);
+    window.addEventListener('resize',fitEmbedToViewport);
   }catch(e){console.error('view load failed',e);document.body.innerHTML='<div style="padding:20px;color:#c00;font-size:13px;font-family:sans-serif">로드 실패: '+e.message+'</div>';}
 })();
+
+function fitEmbedToViewport(){
+  if(!document.body.classList.contains('view-mode'))return;
+  var vw=document.documentElement.clientWidth||window.innerWidth;
+  if(!vw)return;
+  var scale=vw/794;
+  ['docEl','wrDocEl'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(!el)return;
+    el.style.width=vw+'px';
+    el.style.height=(1123*scale)+'px';
+    el.style.overflow='hidden';
+    el.style.position='relative';
+    var inner=el.firstElementChild;
+    if(inner){
+      inner.style.transformOrigin='top left';
+      inner.style.transform='scale('+scale+')';
+    }
+  });
+  var wraps=document.querySelectorAll('.preview-wrap');
+  wraps.forEach(function(w){w.style.overflow='hidden';w.style.maxWidth='100%';});
+}
 
 /* === 로그인 사용자 기반 본사 담당자 자동 선택 === */
 function getLoginManager(){
