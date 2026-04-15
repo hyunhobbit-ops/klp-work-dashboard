@@ -2409,3 +2409,32 @@ body {
 
 /* 택배관리 판매가 컬럼 — 권한 없는 사용자에겐 숨김 */
 body.hide-delivery-price .delivery-price-col { display: none !important; }
+
+/* 택배관리 오늘 날짜 강조 */
+.data-table tbody tr.delivery-today {
+  background: #fff7e6;
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
+.data-table tbody tr.delivery-today:hover { background: #ffedd5; }
+.data-table tbody tr.delivery-today td { font-weight: 600; }
+[data-theme="dark"] .data-table tbody tr.delivery-today { background: #3a2818; box-shadow: inset 3px 0 0 #f59e0b; }
+[data-theme="dark"] .data-table tbody tr.delivery-today:hover { background: #4a3020; }
+
+.resp-card.delivery-today {
+  border: 2px solid #f59e0b;
+  background: #fff7e6;
+}
+[data-theme="dark"] .resp-card.delivery-today { background: #3a2818; border-color: #f59e0b; }
+
+.today-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 800;
+  background: #f59e0b;
+  color: #fff;
+  border-radius: 10px;
+  margin-left: 6px;
+  letter-spacing: .3px;
+  vertical-align: middle;
+}

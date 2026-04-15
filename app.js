@@ -1853,9 +1853,12 @@ function renderDeliveries() {
 
     const ratingOptions = ['', 'A 단골가능', 'B 대통령시계', 'C 평범', 'X 블랙'];
 
+    const todayStr = (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; })();
     let tableHtml = '';
     let cardHtml = '';
     filtered.forEach(d => {
+        const isToday = d.date === todayStr;
+        const todayCls = isToday ? ' delivery-today' : '';
         const ratingSelect = `<select class="inline-select" onchange="updateDeliveryRating(${d.id}, this.value)">
             ${ratingOptions.map(r => `<option value="${r}" ${d.rating === r ? 'selected' : ''}>${r || '-'}</option>`).join('')}
         </select>`;
@@ -1865,9 +1868,9 @@ function renderDeliveries() {
             <button class="inline-save-btn" onclick="saveTracking(${d.id})">저장</button>
         </div>`;
 
-        tableHtml += `<tr>
+        tableHtml += `<tr class="${todayCls.trim()}">
             <td class="td-check"><input type="checkbox" class="delivery-check" data-id="${d.id}" ${d._checked ? 'checked' : ''}></td>
-            <td class="cell-editable" data-id="${d.id}" data-field="date" data-type="date">${fmtDisplay(d.date)}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="date" data-type="date">${fmtDisplay(d.date)}${isToday ? ' <span class="today-badge">오늘</span>' : ''}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="type" data-type="select" data-options="일반,중고,번개,당근,GS반택,ETSY"><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
             <td class="cell-editable" data-id="${d.id}" data-field="sender" data-type="select" data-options="케이엘피코리아,김관택,이현주,김현호,유지은,구정두,기타">${d.sender}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="recipient"><strong>${d.recipient}</strong></td>
@@ -1884,9 +1887,9 @@ function renderDeliveries() {
             <td style="white-space:nowrap"><button class="edit-btn" onclick="openEditDelivery(${d.id})">편집</button> <button class="edit-btn" onclick="cloneDelivery(${d.id})" title="오늘 날짜로 복제">복제</button></td>
         </tr>`;
 
-        cardHtml += `<div class="resp-card">
+        cardHtml += `<div class="resp-card${todayCls}">
             <div class="resp-card-top">
-                <div class="resp-card-title">${d.recipient}</div>
+                <div class="resp-card-title">${d.recipient}${isToday ? ' <span class="today-badge">오늘</span>' : ''}</div>
                 <div style="display:flex;gap:6px;align-items:center">
                     <span class="badge ${typeBadgeClass(d.type)}">${d.type}</span>
                     <button class="edit-btn" onclick="openEditDelivery(${d.id})">편집</button>
