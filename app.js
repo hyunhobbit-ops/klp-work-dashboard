@@ -1859,7 +1859,7 @@ function renderDeliveries() {
             <td><span class="author-badge">${d.author || '-'}</span></td>
             <td>${trackingCell}</td>
             <td>${ratingSelect}</td>
-            <td><button class="edit-btn" onclick="openEditDelivery(${d.id})">편집</button></td>
+            <td style="white-space:nowrap"><button class="edit-btn" onclick="openEditDelivery(${d.id})">편집</button> <button class="edit-btn" onclick="cloneDelivery(${d.id})" title="오늘 날짜로 복제">복제</button></td>
         </tr>`;
 
         cardHtml += `<div class="resp-card">
@@ -1868,6 +1868,7 @@ function renderDeliveries() {
                 <div style="display:flex;gap:6px;align-items:center">
                     <span class="badge ${typeBadgeClass(d.type)}">${d.type}</span>
                     <button class="edit-btn" onclick="openEditDelivery(${d.id})">편집</button>
+                    <button class="edit-btn" onclick="cloneDelivery(${d.id})" title="오늘 날짜로 복제">복제</button>
                 </div>
             </div>
             <div class="resp-card-meta">
@@ -2015,6 +2016,36 @@ async function saveEditDelivery(id) {
     renderDeliveries();
     renderHome();
     showToast('택배가 수정되었습니다');
+}
+
+async function cloneDelivery(id) {
+    const src = deliveries.find(x => x.id === id);
+    if (!src) { showToast('원본 택배를 찾을 수 없습니다'); return; }
+    if (!confirm(`"${src.recipient}" 택배를 오늘 날짜로 복제하시겠습니까?`)) return;
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    const saved = await dbInsertDelivery({
+        date: todayStr,
+        type: src.type,
+        sender: src.sender,
+        recipient: src.recipient,
+        phone: src.phone,
+        product: src.product,
+        zipcode: src.zipcode,
+        address: src.address,
+        payment: src.payment,
+        price: src.price,
+        memo: src.memo,
+        tracking: '',
+        rating: src.rating,
+        seller: src.seller || '1',
+        author: currentUser ? currentUser.name : '-'
+    });
+    if (!saved) return;
+    deliveries.unshift(saved);
+    renderDeliveries();
+    renderHome();
+    showToast('택배가 복제되었습니다 (오늘 날짜)');
 }
 
 async function deleteDelivery(id) {
