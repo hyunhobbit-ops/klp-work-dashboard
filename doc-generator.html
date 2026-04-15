@@ -852,7 +852,7 @@ function openQuoteFromForm(){
   var dateStr=val('date')||new Date().toISOString().substring(0,10);
   var validUntil=addDaysStr(dateStr,14);
   _quoteData={
-    docNumber:'EST-'+(docNum.replace(/^DC-/,'')||'NEW'),
+    docNumber:docNum,
     date:dateStr,
     validUntil:validUntil,
     companyName:val('companyName'),
@@ -911,7 +911,7 @@ function openQuoteFromRecord(r){
   var shipParts=(r.delivery_address||'').split(' / ');
   var dateStr=r.doc_date||(r.created_at?r.created_at.substring(0,10):new Date().toISOString().substring(0,10));
   _quoteData={
-    docNumber:'EST-'+((r.doc_number||'').replace(/^DC-/,'')||'NEW'),
+    docNumber:r.doc_number||'',
     date:dateStr,
     validUntil:addDaysStr(dateStr,14),
     companyName:r.company_name||'',
@@ -983,84 +983,136 @@ function numToKoreanAmount(n){
   return str+'원 정';
 }
 
+function _qRow(label,value,highlight,isLast){
+  var br=isLast?'':';border-bottom:1px solid #eef0f5';
+  var hl=highlight?';font-weight:800;font-size:11.5px':'';
+  return '<tr><td style="padding:5px 10px;background:#f5f7fa;font-weight:700;color:#4a5568;width:72px;text-align:center;border-right:1px solid #e2e6ee'+br+'">'+label+'</td><td style="padding:5px 10px;color:#1a1d29'+br+hl+'">'+value+'</td></tr>';
+}
+
 function renderQuoteDoc(d){
   var e=d.est||{};
   var grand=e.grand||0;
   var sup=e.sup||0;
   var vat=e.vat||0;
-  var vatLabel=d.unitPriceVat==='VAT 포함'?'VAT포함가':'VAT별도가';
+  var vatLabel=d.unitPriceVat==='VAT 포함'?'부가세 포함가':'부가세 별도가';
   var koreanAmt=numToKoreanAmount(grand);
   var qty=toNum(d.quantity)||0;
   var up=toNum(d.unitPrice)||0;
-  var BC='1px solid #aaa'; /* 단일 색·두께로 통일해 html2canvas 더블라인 방지 */
-  var cellBase='border-right:'+BC+';border-bottom:'+BC+';padding:3px 6px;font-size:10.5px';
 
-  /* 단일 품목 행 + 빈 행 + 총합계 행 (품목코드 컬럼 제거, 5컬럼) */
-  var mainRow='<tr style="height:24px"><td style="'+cellBase+';padding:3px 10px;font-size:11.5px">'+esc(d.productName||'')+'</td><td style="'+cellBase+';text-align:right">'+qty+'</td><td style="'+cellBase+';text-align:right">'+fmtN(up)+'</td><td style="'+cellBase+';text-align:right">'+fmtN(sup)+'</td><td style="border-bottom:'+BC+';padding:3px 6px;font-size:10.5px;text-align:right">'+fmtN(vat)+'</td></tr>';
-  var totalRow='<tr style="height:22px"><td colspan="5" style="border-bottom:'+BC+';padding:3px 6px;text-align:center;font-weight:700;font-size:11.5px;background:#e8e8e8">총합계</td></tr>';
-
-  /* 빈 행에 시안 이미지 rowspan으로 삽입 */
+  /* 시안 이미지 셀 */
   var mi=d.mainImg,si=d.subImgs||[];
-  var imgInnerHtml='';
+  var imgCellContent='';
   if(mi||si.length>0){
-    imgInnerHtml='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px;height:100%">';
-    if(mi)imgInnerHtml+='<img src="'+mi.url+'" style="max-width:260px;max-height:220px;object-fit:contain">';
-    if(si.length>0){imgInnerHtml+='<div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center">';si.forEach(function(img){imgInnerHtml+='<img src="'+img.url+'" style="width:48px;height:48px;object-fit:contain;border:1px solid #ddd">'});imgInnerHtml+='</div>'}
-    imgInnerHtml+='</div>';
-  }
-  var EMPTY_N=15;
-  var emptyRows='';
-  for(var i=0;i<EMPTY_N;i++){
-    if(i===0){
-      emptyRows+='<tr style="height:22px"><td rowspan="'+EMPTY_N+'" style="border-right:'+BC+';border-bottom:'+BC+';vertical-align:middle;text-align:center;padding:0">'+imgInnerHtml+'</td><td style="border-right:'+BC+';border-bottom:'+BC+'"></td><td style="border-right:'+BC+';border-bottom:'+BC+'"></td><td style="border-right:'+BC+';border-bottom:'+BC+'"></td><td style="border-bottom:'+BC+'"></td></tr>';
-    }else{
-      emptyRows+='<tr style="height:22px"><td style="border-right:'+BC+';border-bottom:'+BC+'"></td><td style="border-right:'+BC+';border-bottom:'+BC+'"></td><td style="border-right:'+BC+';border-bottom:'+BC+'"></td><td style="border-bottom:'+BC+'"></td></tr>';
+    imgCellContent='<div style="padding:10px;text-align:center">';
+    if(mi)imgCellContent+='<img src="'+mi.url+'" style="max-width:260px;max-height:220px;object-fit:contain;border-radius:4px">';
+    if(si.length>0){
+      imgCellContent+='<div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:6px">';
+      si.forEach(function(img){imgCellContent+='<img src="'+img.url+'" style="width:44px;height:44px;object-fit:contain;border:1px solid #e2e6ee;border-radius:3px">'});
+      imgCellContent+='</div>';
     }
+    imgCellContent+='</div>';
+  }else{
+    imgCellContent='<div style="display:flex;align-items:center;justify-content:center;min-height:200px;color:#b8bfd0;font-size:11px">시안 이미지 없음</div>';
   }
 
-  document.getElementById('quoteDocEl').innerHTML='<div id="quoteDocInner" style="width:794px;height:1123px;overflow:hidden;background:#fff;font-family:\'Noto Sans KR\',sans-serif;font-size:12px;color:#222;position:relative;padding:24px 40px 24px">'+
-    /* 큰 타이틀 */
-    '<div style="text-align:center;margin-bottom:14px"><div style="font-size:32px;font-weight:900;color:#1F4F8F;letter-spacing:16px;display:inline-block;padding-left:16px">견 적 서</div></div>'+
-    /* 2컬럼 정보 박스 */
-    '<div style="display:flex;border:1px solid #aaa">'+
-      /* 왼쪽 */
-      '<div style="flex:1.05;border-right:1.5px solid #000;display:flex;flex-direction:column">'+
-        '<table style="width:100%;border-collapse:collapse;font-size:10.5px">'+
-          '<tr><td style="border-bottom:1px solid #aaa;padding:3px 10px;background:#eaeaea;font-weight:700;width:70px;text-align:center">발행일</td><td style="border-bottom:1px solid #aaa;padding:3px 10px">'+(d.date?fmtDate(d.date):'')+'</td></tr>'+
-          '<tr><td style="border-bottom:1px solid #aaa;padding:3px 10px;background:#eaeaea;font-weight:700;text-align:center">수 신</td><td style="border-bottom:1px solid #aaa;padding:3px 10px;font-weight:700">'+esc(d.companyName||'')+'</td></tr>'+
-          '<tr><td style="border-bottom:1px solid #aaa;padding:3px 10px;background:#eaeaea;font-weight:700;text-align:center">참 조</td><td style="border-bottom:1px solid #aaa;padding:3px 10px">'+esc(d.contactPerson||'')+'</td></tr>'+
-          '<tr><td style="border-bottom:1px solid #aaa;padding:3px 10px;background:#eaeaea;font-weight:700;text-align:center">TEL/FAX</td><td style="border-bottom:1px solid #aaa;padding:3px 10px"></td></tr>'+
-          '<tr><td style="border-bottom:1px solid #aaa;padding:3px 10px;background:#eaeaea;font-weight:700;text-align:center">결제조건</td><td style="border-bottom:1px solid #aaa;padding:3px 10px"></td></tr>'+
-          '<tr><td style="padding:3px 10px;background:#eaeaea;font-weight:700;text-align:center">유효기간</td><td style="padding:3px 10px;color:#c41e3a;font-weight:700">발행후 7일간 유효합니다</td></tr>'+
-        '</table>'+
-        '<div style="padding:5px 10px;border-top:1px solid #aaa;font-size:10.5px;line-height:1.5;flex:1">1. 귀사의 일익 번창하심을 기원합니다.<br>2. 하기와 같이 견적드리오니 검토하기 바랍니다.</div>'+
+  var headCell='background:#f5f7fa;color:#4a5568;padding:8px 6px;font-weight:700;font-size:10px;letter-spacing:.5px;border-bottom:1px solid #d5dae3';
+  var itemCell='padding:10px 6px;border-bottom:1px solid #eef0f5;text-align:right;color:#0B4F8F;font-weight:700';
+
+  document.getElementById('quoteDocEl').innerHTML=
+    '<div id="quoteDocInner" style="width:794px;height:1123px;overflow:hidden;background:#fff;font-family:\'Noto Sans KR\',sans-serif;color:#1a1d29;position:relative;padding:30px 44px 22px;box-sizing:border-box;display:flex;flex-direction:column">'+
+    /* 상단: 타이틀 중앙 + 메타 우측 (3분할 그리드) */
+    '<div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding-bottom:8px;border-bottom:2px solid #0B4F8F;margin-bottom:10px;gap:14px">'+
+      '<div></div>'+
+      '<div style="text-align:center">'+
+        '<div style="font-family:serif;font-size:10px;color:#C8A35B;letter-spacing:5px;font-weight:700;margin-bottom:2px">ESTIMATE / QUOTATION</div>'+
+        '<div style="font-size:32px;font-weight:900;color:#0B4F8F;letter-spacing:14px;padding-left:14px;display:inline-block;line-height:1.1">견 적 서</div>'+
       '</div>'+
-      /* 오른쪽 */
-      '<div style="flex:1;display:flex;flex-direction:column">'+
-        '<div style="padding:5px 10px;text-align:center;border-bottom:1px solid #aaa;background:#fff"><img src="'+LOGO_DARK+'" style="height:28px"></div>'+
+      '<div style="text-align:right;font-size:9.5px;color:#666;line-height:1.6;white-space:nowrap">'+
+        '문서번호 <b style="color:#0B4F8F">'+esc(d.docNumber||'')+'</b><br>'+
+        '발행일 <b style="color:#0B4F8F">'+(d.date?fmtDate(d.date):'')+'</b>'+
+      '</div>'+
+    '</div>'+
+    /* 수신 / 공급자 2컬럼 */
+    '<div style="display:flex;gap:10px;margin-bottom:12px">'+
+      /* 수신 */
+      '<div style="flex:1;border:1px solid #d5dae3;border-radius:8px;overflow:hidden;background:#fff">'+
+        '<div style="background:#0B4F8F;color:#fff;padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:2px">수 신 · TO</div>'+
         '<table style="width:100%;border-collapse:collapse;font-size:10.5px">'+
-          '<tr><td style="border-bottom:1px solid #aaa;padding:3px 10px;background:#eaeaea;font-weight:700;width:80px;text-align:center">사업자번호</td><td style="border-bottom:1px solid #aaa;padding:3px 10px">114-81-93170</td></tr>'+
-          '<tr><td style="border-bottom:1px solid #aaa;padding:3px 10px;background:#eaeaea;font-weight:700;text-align:center">회사명/대표</td><td style="border-bottom:1px solid #aaa;padding:3px 10px;position:relative">(주)케이엘피코리아 / 김관택<img src="'+STAMP+'" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:54px;height:54px;object-fit:contain;pointer-events:none;mix-blend-mode:multiply"></td></tr>'+
-          '<tr><td style="border-bottom:1px solid #aaa;padding:3px 10px;background:#eaeaea;font-weight:700;text-align:center">주 소</td><td style="border-bottom:1px solid #aaa;padding:3px 10px;font-size:9.5px;line-height:1.35">서울특별시 구로구 디지털로32길 30,<br>코오롱빌란트1차 901호</td></tr>'+
-          '<tr><td style="border-bottom:1px solid #aaa;padding:3px 10px;background:#eaeaea;font-weight:700;text-align:center">업태/종목</td><td style="border-bottom:1px solid #aaa;padding:3px 10px;font-size:9.5px">제조 도매 도소매 / 시계 판촉물 인터넷쇼핑몰</td></tr>'+
-          '<tr><td style="border-bottom:1px solid #aaa;padding:3px 10px;background:#eaeaea;font-weight:700;text-align:center">담 당 자</td><td style="border-bottom:1px solid #aaa;padding:3px 10px">'+esc(d.manager||'')+'</td></tr>'+
-          '<tr><td style="padding:3px 10px;background:#eaeaea;font-weight:700;text-align:center">TEL/FAX</td><td style="padding:3px 10px">02-2103-5757 / 02-2103-5759</td></tr>'+
+          _qRow('거래처',esc(d.companyName||''),true)+
+          _qRow('담당자',esc(d.contactPerson||''))+
+          _qRow('TEL/FAX','')+
+          _qRow('결제조건','')+
+          _qRow('유효기간','<span style="color:#c03545;font-weight:700">발행후 7일간 유효합니다</span>',false,true)+
+        '</table>'+
+        '<div style="padding:7px 12px;background:#f9fafc;border-top:1px solid #eef0f5;font-size:10px;color:#555;line-height:1.6">1. 귀사의 일익 번창하심을 기원합니다.<br>2. 하기와 같이 견적드리오니 검토 부탁드립니다.</div>'+
+      '</div>'+
+      /* 공급자 */
+      '<div style="flex:1;border:1px solid #d5dae3;border-radius:8px;overflow:hidden;background:#fff">'+
+        '<div style="background:linear-gradient(135deg,#2B3856,#0B4F8F);color:#fff;padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:2px">공급자 · FROM</div>'+
+        '<div style="padding:10px 10px 8px;background:#fff;border-bottom:1px solid #eef0f5;text-align:center;position:relative">'+
+          '<img src="'+LOGO_DARK+'" style="height:24px">'+
+          '<img src="'+STAMP+'" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:46px;height:46px;object-fit:contain;pointer-events:none;mix-blend-mode:multiply">'+
+        '</div>'+
+        '<table style="width:100%;border-collapse:collapse;font-size:10.5px">'+
+          _qRow('사업자번호','114-81-93170')+
+          _qRow('대표자','김관택')+
+          _qRow('주 소','<span style="font-size:9.5px;line-height:1.4">서울 구로구 디지털로32길 30,<br>코오롱빌란트1차 901호</span>')+
+          _qRow('업태/종목','<span style="font-size:9.5px">제조·도매 / 시계 판촉물</span>')+
+          _qRow('담 당 자',esc(d.manager||''))+
+          _qRow('TEL/FAX','02-2103-5757',false,true)+
         '</table>'+
       '</div>'+
     '</div>'+
-    /* 견적 금액 바 */
-    '<div style="border:1px solid #aaa;border-top:none;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;background:#fff"><div style="font-size:14px;font-weight:900">견 적 금 액 : '+koreanAmt+'</div><div style="font-size:13px;font-weight:700">(￦'+fmtN(grand)+') / '+vatLabel+'</div></div>'+
+    /* 견적 금액 강조 바 */
+    '<div style="background:linear-gradient(135deg,#0B4F8F 0%,#1a6bb0 100%);color:#fff;padding:14px 20px;border-radius:8px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 12px rgba(11,79,143,.18)">'+
+      '<div>'+
+        '<div style="font-size:10px;letter-spacing:3px;font-weight:600;color:rgba(255,255,255,.85);margin-bottom:3px">TOTAL AMOUNT</div>'+
+        '<div style="font-size:15px;font-weight:800;letter-spacing:.5px">'+koreanAmt+'</div>'+
+      '</div>'+
+      '<div style="text-align:right">'+
+        '<div style="font-size:26px;font-weight:900;letter-spacing:.5px">￦ '+fmtN(grand)+'</div>'+
+        '<div style="font-size:10px;color:rgba(255,255,255,.8);margin-top:1px">'+vatLabel+'</div>'+
+      '</div>'+
+    '</div>'+
     /* 품목 테이블 */
-    '<table style="width:100%;border-collapse:collapse;border:1px solid #aaa;border-top:none">'+
-      '<thead><tr style="background:#d5d5d5"><th style="border-right:1px solid #aaa;border-bottom:1px solid #aaa;padding:6px 4px;font-size:11px">품 명 및 규 격</th><th style="border-right:1px solid #aaa;border-bottom:1px solid #aaa;padding:6px 4px;font-size:11px;width:54px">수 량</th><th style="border-right:1px solid #aaa;border-bottom:1px solid #aaa;padding:6px 4px;font-size:11px;width:96px">단 가</th><th style="border-right:1px solid #aaa;border-bottom:1px solid #aaa;padding:6px 4px;font-size:11px;width:108px">공 급 가 액</th><th style="border-bottom:1px solid #aaa;padding:6px 4px;font-size:11px;width:96px">부 가 세</th></tr></thead>'+
-      '<tbody>'+mainRow+totalRow+emptyRows+'</tbody>'+
-    '</table>'+
-    /* 공급가액/VAT/합계 요약 행 */
-    '<table style="width:100%;border-collapse:collapse;border:1px solid #aaa;border-top:none"><tr><td style="border-right:1px solid #aaa;padding:8px 10px;background:#eaeaea;font-weight:700;text-align:center;width:78px">공급가액</td><td style="border-right:1px solid #aaa;padding:8px 10px;text-align:right;font-weight:700">'+fmtN(sup)+'</td><td style="border-right:1px solid #aaa;padding:8px 10px;background:#eaeaea;font-weight:700;text-align:center;width:50px">VAT</td><td style="border-right:1px solid #aaa;padding:8px 10px;text-align:right;font-weight:700">'+fmtN(vat)+'</td><td style="border-right:1px solid #aaa;padding:8px 10px;background:#eaeaea;font-weight:700;text-align:center;width:58px">합  계</td><td style="padding:8px 10px;text-align:right;font-weight:900;font-size:14px">'+fmtN(grand)+'</td></tr></table>'+
+    '<div style="border:1px solid #d5dae3;border-radius:8px 8px 0 0;overflow:hidden;background:#fff;flex:1;display:flex;flex-direction:column">'+
+      '<table style="width:100%;border-collapse:collapse;font-size:10.5px">'+
+        '<thead><tr>'+
+          '<th style="'+headCell+';text-align:left;padding-left:12px">품 명 및 규 격</th>'+
+          '<th style="'+headCell+';width:54px">수 량</th>'+
+          '<th style="'+headCell+';width:96px">단 가</th>'+
+          '<th style="'+headCell+';width:108px">공 급 가 액</th>'+
+          '<th style="'+headCell+';width:96px">부 가 세</th>'+
+        '</tr></thead>'+
+        '<tbody>'+
+          '<tr>'+
+            '<td style="padding:10px 12px;border-bottom:1px solid #eef0f5;font-weight:700;color:#1a1d29;font-size:11px">'+esc(d.productName||'')+'</td>'+
+            '<td style="'+itemCell+'">'+qty+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN(up)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN(sup)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN(vat)+'</td>'+
+          '</tr>'+
+          '<tr><td colspan="5" style="padding:0;vertical-align:middle;text-align:center;border-bottom:1px solid #eef0f5">'+imgCellContent+'</td></tr>'+
+          '<tr><td colspan="5" style="background:#f5f7fa;text-align:center;font-weight:700;color:#4a5568;font-size:10.5px;padding:6px">- 이 하 여 백 -</td></tr>'+
+        '</tbody>'+
+      '</table>'+
+    '</div>'+
+    /* 합계 푸터 */
+    '<div style="display:flex;border:1px solid #d5dae3;border-top:2px solid #0B4F8F;border-radius:0 0 8px 8px;overflow:hidden;background:#f5f7fa">'+
+      '<div style="flex:1;padding:10px 14px;border-right:1px solid #e2e6ee"><div style="font-size:9px;font-weight:700;color:#6b7280;letter-spacing:2px">공급가액 · SUBTOTAL</div><div style="font-size:15px;font-weight:800;color:#1a1d29;margin-top:2px">'+fmtN(sup)+'</div></div>'+
+      '<div style="flex:1;padding:10px 14px;border-right:1px solid #e2e6ee"><div style="font-size:9px;font-weight:700;color:#6b7280;letter-spacing:2px">부가세 · VAT</div><div style="font-size:15px;font-weight:800;color:#1a1d29;margin-top:2px">'+fmtN(vat)+'</div></div>'+
+      '<div style="flex:1;padding:10px 14px;background:#0B4F8F;color:#fff"><div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.8);letter-spacing:2px">합 계 · TOTAL</div><div style="font-size:18px;font-weight:800;color:#fff;margin-top:2px">'+fmtN(grand)+'</div></div>'+
+    '</div>'+
     /* 비고 */
-    '<table style="width:100%;border-collapse:collapse;border:1px solid #aaa;border-top:none;margin-bottom:10px"><tr><td style="border-right:1px solid #aaa;width:54px;text-align:center;background:#eaeaea;font-weight:700;padding:8px;vertical-align:middle">비  고</td><td style="padding:8px 12px;height:48px;vertical-align:top;font-size:11px"></td></tr></table>'+
+    '<div style="display:flex;border:1px solid #d5dae3;border-radius:8px;overflow:hidden;margin-top:10px;background:#fff">'+
+      '<div style="background:#f5f7fa;padding:10px 14px;font-weight:700;font-size:10.5px;color:#4a5568;border-right:1px solid #e2e6ee;display:flex;align-items:center;min-width:60px">비 고</div>'+
+      '<div style="padding:10px 14px;flex:1;font-size:10px;color:#666;min-height:36px;line-height:1.6">• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.<br>• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.</div>'+
+    '</div>'+
     /* 푸터 */
-    '<div style="font-size:10px;color:#555;line-height:1.6;padding-top:4px;display:flex;justify-content:space-between;align-items:center"><div>시계전문몰: <span style="color:#1F4F8F">www.showroom.co.kr</span> &nbsp; 판촉용품몰: <span style="color:#1F4F8F">www.agift.kr</span></div><div style="color:#c41e3a;font-weight:700">디자인이메일: klpkorea@agift.kr</div></div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid #e2e6ee;font-size:9px;color:#888">'+
+      '<div>시계전문몰 <span style="color:#0B4F8F;font-weight:600">www.showroom.co.kr</span> &nbsp;·&nbsp; 판촉용품몰 <span style="color:#0B4F8F;font-weight:600">www.agift.kr</span></div>'+
+      '<div style="color:#c03545;font-weight:700">klpkorea@agift.kr</div>'+
+    '</div>'+
   '</div>';
 }
 
