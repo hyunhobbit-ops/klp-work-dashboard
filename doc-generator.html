@@ -781,7 +781,7 @@ function buildDoc(){
   var dcShipAddr=[val('dcRecipient'),val('dcPhone'),val('dcAddress')].filter(function(v){return v}).join(' / ')||'확인 필요';
   var leftRows=[['품명',val('productName')],['수량',qtyStr],['단가',fmtP(val('unitPrice'))+' ('+val('unitPriceVat')+')'],['색상',val('color')],['인쇄 색상/사이즈',val('printColorSize')],['납기',val('deliveryDate')?fmtDate(val('deliveryDate'))+' 출고':'']];
   var shCostStr=shCost?fmtN(shCost)+' ('+val('shippingVat')+')':'-';
-  var rightRows=[['인쇄 방법',val('printMethod')]];if(val('printMethod')!=='없음')rightRows.push(['인쇄비',printFeeStr]);rightRows.push(['포장',val('packaging')]);rightRows.push(['포장비',pkgFeeStr]);if(shType)rightRows.push(['배송',shType+(shType==='택배'&&toNum(val('shippingBoxes'))?' ('+val('shippingBoxes')+'박스)':'')]);if(shCost)rightRows.push(['배송비',shCostStr]);
+  var rightRows=[['인쇄 방법',valField('printMethod')]];if(val('printMethod')!=='없음')rightRows.push(['인쇄비',printFeeStr]);rightRows.push(['포장',valField('packaging')]);rightRows.push(['포장비',pkgFeeStr]);if(shType)rightRows.push(['배송',shType+(shType==='택배'&&toNum(val('shippingBoxes'))?' ('+val('shippingBoxes')+'박스)':'')]);if(shCost)rightRows.push(['배송비',shCostStr]);
   function ic(k,v){return '<tr><td style="padding:5px 12px;font-weight:500;color:#999;font-size:10px;letter-spacing:.3px;border-bottom:1px solid #f0f0f0;width:110px;vertical-align:top">'+k+'</td><td style="padding:5px 12px;font-size:11.5px;border-bottom:1px solid #f0f0f0;color:#222;font-weight:500">'+v+'</td></tr>'}
   /* 배송 정보 블록 */
   var dcShipHtml='<div style="padding:8px 0;border-top:1px solid #e8e8e5;flex-shrink:0"><div style="font-size:10px;font-weight:700;color:#888;letter-spacing:1.5px;margin-bottom:5px">배송 정보</div><table style="width:100%;border-collapse:collapse;font-size:11px"><tr><td style="padding:3px 0;color:#555;font-weight:600;width:60px">수령인</td><td style="padding:3px 0;color:#222">'+esc(val('dcRecipient')||'확인 필요')+'</td></tr><tr><td style="padding:3px 0;color:#555;font-weight:600">연락처</td><td style="padding:3px 0;color:#222">'+esc(val('dcPhone')||'확인 필요')+'</td></tr><tr><td style="padding:3px 0;color:#555;font-weight:600">주소</td><td style="padding:3px 0;color:#222">'+esc(val('dcAddress')||'확인 필요')+'</td></tr></table></div>';
@@ -838,9 +838,9 @@ function buildWrDoc(){
   function row(k,v){return '<tr><td style="padding:5px 12px;font-weight:600;color:#888;font-size:10px;letter-spacing:.3px;border-bottom:1px solid #f0f0f0;width:110px;vertical-align:top;background:#fafaf8">'+k+'</td><td style="padding:5px 12px;font-size:11px;border-bottom:1px solid #f0f0f0;color:#222;font-weight:500">'+v+'</td></tr>'}
 
   var leftRows=[['품명',esc(val('wrProduct'))],['수량',qtyStr],['단가',fmtP(val('wrUnitPrice'))+' ('+val('wrUnitPriceVat')+')'],['색상',esc(val('wrColor'))],['인쇄 색상/사이즈',esc(val('wrPrintColorSize'))]];
-  var rightRows=[['인쇄 방법',esc(val('wrPrintMethod'))]];
+  var rightRows=[['인쇄 방법',esc(valField('wrPrintMethod'))]];
   if(val('wrPrintMethod')!=='없음'&&pf>0)rightRows.push(['인쇄비',printFeeStr]);
-  rightRows.push(['포장',esc(val('wrPackaging'))]);
+  rightRows.push(['포장',esc(valField('wrPackaging'))]);
   rightRows.push(['포장비',pkgFeeStr]);
   var wrShCost=getWrShipCost();var wrShType=val('wrShippingType');
   if(wrShType){rightRows.push(['배송',wrShType+(wrShType==='택배'&&toNum(val('wrShippingBoxes'))?' ('+val('wrShippingBoxes')+'박스)':'')]);if(wrShCost)rightRows.push(['배송비',fmtN(wrShCost)+' ('+val('wrShippingVat')+')'])}
@@ -909,11 +909,11 @@ function openQuoteFromForm(){
     unitPriceVat:val('unitPriceVat'),
     color:val('color'),
     printColorSize:val('printColorSize'),
-    printMethod:val('printMethod'),
+    printMethod:valField('printMethod'),
     printFee:val('printFee'),
     printFeeVat:val('printFeeVat'),
     printFeeApply:val('printFeeApply'),
-    packaging:val('packaging'),
+    packaging:valField('packaging'),
     packagingFee:val('packagingFee'),
     packagingFeeVat:val('packagingFeeVat'),
     packagingFeeApply:val('packagingFeeApply'),
@@ -1206,7 +1206,7 @@ async function dlQuote(type){
 async function saveToDb(){if(!validate())return;var e=window._est;var seq=Math.max(1,parseInt(document.getElementById('docSeq').value)||1);
   var imgData=await packImages(mainImg,subImgs,400,400);
   var docNum=Y+'_'+String(seq).padStart(4,'0');
-  var data={doc_number:docNum,doc_date:val('date')||null,company_name:val('companyName'),contact_person:val('contactPerson'),title:val('title'),manager:val('manager'),product_name:val('productName'),quantity:toNum(val('quantity')),unit:val('unit'),unit_price:toNum(val('unitPrice')),unit_price_vat:val('unitPriceVat'),color:val('color'),print_color_size:val('printColorSize'),print_method:val('printMethod'),print_fee:toNum(val('printFee'))||0,print_fee_vat:val('printFeeVat'),print_fee_apply:val('printFeeApply'),packaging:val('packaging'),packaging_fee:toNum(val('packagingFee'))||0,packaging_fee_vat:val('packagingFeeVat'),packaging_fee_apply:val('packagingFeeApply'),shipping_type:val('shippingType')||'',shipping_cost:getDcShipCost()||0,shipping_cost_per_box:toNum(val('shippingPerBox'))||0,shipping_boxes:toNum(val('shippingBoxes'))||0,shipping_vat:val('shippingVat')||'VAT 별도',delivery_date:val('deliveryDate')||null,delivery_address:val('dcRecipient')+' / '+val('dcPhone')+' / '+val('dcAddress'),show_payment_notice:document.getElementById('showPaymentNotice').checked,total_amount:e?e.grand:0,status:'작성중',images_data:imgData};
+  var data={doc_number:docNum,doc_date:val('date')||null,company_name:val('companyName'),contact_person:val('contactPerson'),title:val('title'),manager:val('manager'),product_name:val('productName'),quantity:toNum(val('quantity')),unit:val('unit'),unit_price:toNum(val('unitPrice')),unit_price_vat:val('unitPriceVat'),color:val('color'),print_color_size:val('printColorSize'),print_method:valField('printMethod'),print_fee:toNum(val('printFee'))||0,print_fee_vat:val('printFeeVat'),print_fee_apply:val('printFeeApply'),packaging:valField('packaging'),packaging_fee:toNum(val('packagingFee'))||0,packaging_fee_vat:val('packagingFeeVat'),packaging_fee_apply:val('packagingFeeApply'),shipping_type:val('shippingType')||'',shipping_cost:getDcShipCost()||0,shipping_cost_per_box:toNum(val('shippingPerBox'))||0,shipping_boxes:toNum(val('shippingBoxes'))||0,shipping_vat:val('shippingVat')||'VAT 별도',delivery_date:val('deliveryDate')||null,delivery_address:val('dcRecipient')+' / '+val('dcPhone')+' / '+val('dcAddress'),show_payment_notice:document.getElementById('showPaymentNotice').checked,total_amount:e?e.grand:0,status:'작성중',images_data:imgData};
   try{
     /* 같은 문서번호 존재 여부 확인 */
     var existing=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(docNum)+'&select=id','GET');
@@ -1252,11 +1252,11 @@ async function saveWrToDb(){
     unit_price_vat:val('wrUnitPriceVat'),
     color:val('wrColor'),
     print_color_size:val('wrPrintColorSize'),
-    print_method:val('wrPrintMethod'),
+    print_method:valField('wrPrintMethod'),
     print_fee:toNum(val('wrPrintFee'))||0,
     print_fee_vat:val('wrPrintFeeVat')||'VAT 별도',
     print_fee_apply:val('wrPrintFeeApply')||'1개당',
-    packaging:val('wrPackaging'),
+    packaging:valField('wrPackaging'),
     packaging_fee:toNum(val('wrPkgFee'))||0,
     packaging_fee_vat:val('wrPkgFeeVat')||'VAT 별도',
     packaging_fee_apply:val('wrPkgFeeApply')||'1개당',
@@ -1504,11 +1504,16 @@ async function loadRecord(id){
       document.getElementById('wrUnitPriceVat').value=r.unit_price_vat||'VAT 별도';
       document.getElementById('wrColor').value=r.color||'-';
       document.getElementById('wrPrintColorSize').value=r.print_color_size||'시안 확인';
-      document.getElementById('wrPrintMethod').value=r.print_method||'없음';toggleWrPrintFee();
+      var wrPmStd=['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'];
+      var wrPmVal=r.print_method||'없음';
+      if(wrPmStd.indexOf(wrPmVal)===-1){document.getElementById('wrPrintMethod').value='기타';try{document.getElementById('wrPrintMethodCustom').value=wrPmVal;document.getElementById('wrPrintMethodCustom').classList.remove('hidden')}catch(e){}}else{document.getElementById('wrPrintMethod').value=wrPmVal}
+      toggleWrPrintFee();
       document.getElementById('wrPrintFee').value=r.print_fee||'';
       document.getElementById('wrPrintFeeVat').value=r.print_fee_vat||'VAT 별도';
       document.getElementById('wrPrintFeeApply').value=r.print_fee_apply||'1개당';
-      document.getElementById('wrPackaging').value=r.packaging||'개별박스';
+      var wrPkStd=['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'];
+      var wrPkVal=r.packaging||'개별박스';
+      if(wrPkStd.indexOf(wrPkVal)===-1){document.getElementById('wrPackaging').value='기타';try{document.getElementById('wrPackagingCustom').value=wrPkVal;document.getElementById('wrPackagingCustom').classList.remove('hidden')}catch(e){}}else{document.getElementById('wrPackaging').value=wrPkVal}
       document.getElementById('wrPkgFee').value=r.packaging_fee||'';
       document.getElementById('wrPkgFeeVat').value=r.packaging_fee_vat||'VAT 별도';
       document.getElementById('wrPkgFeeApply').value=r.packaging_fee_apply||'1개당';
@@ -1567,11 +1572,16 @@ async function loadRecord(id){
       document.getElementById('unitPriceVat').value=r.unit_price_vat||'VAT 별도';
       document.getElementById('color').value=r.color||'-';
       document.getElementById('printColorSize').value=r.print_color_size||'시안 확인';
-      document.getElementById('printMethod').value=r.print_method||'없음';togglePrintFee();
+      var pmStdLoad=['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'];
+      var pmVal=r.print_method||'없음';
+      if(pmStdLoad.indexOf(pmVal)===-1){document.getElementById('printMethod').value='기타';document.getElementById('printMethodCustom').value=pmVal;document.getElementById('printMethodCustom').classList.remove('hidden')}else{document.getElementById('printMethod').value=pmVal}
+      togglePrintFee();
       document.getElementById('printFee').value=r.print_fee||'';
       document.getElementById('printFeeVat').value=r.print_fee_vat||'VAT 별도';
       document.getElementById('printFeeApply').value=r.print_fee_apply||'1개당';
-      document.getElementById('packaging').value=r.packaging||'개별박스';
+      var pkStdLoad=['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'];
+      var pkVal=r.packaging||'개별박스';
+      if(pkStdLoad.indexOf(pkVal)===-1){document.getElementById('packaging').value='기타';document.getElementById('packagingCustom').value=pkVal;document.getElementById('packagingCustom').classList.remove('hidden')}else{document.getElementById('packaging').value=pkVal}
       document.getElementById('packagingFee').value=r.packaging_fee||'';
       document.getElementById('packagingFeeVat').value=r.packaging_fee_vat||'VAT 별도';
       document.getElementById('packagingFeeApply').value=r.packaging_fee_apply||'1개당';
