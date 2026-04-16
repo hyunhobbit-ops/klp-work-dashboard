@@ -421,8 +421,22 @@ function switchTab(tabId, fromHistory = false) {
     }
 }
 
-// 브라우저 뒤로/앞으로 → 해시에 맞춰 탭 전환
+// 브라우저 뒤로/앞으로 → 모달 열려있으면 모달만 닫기, 아니면 탭 전환
 window.addEventListener('popstate', () => {
+    const modalOverlay = document.getElementById('modalOverlay');
+    const detailOverlay = document.getElementById('detailOverlay');
+    const modalOpen = modalOverlay && modalOverlay.classList.contains('show');
+    const detailOpen = detailOverlay && detailOverlay.classList.contains('show');
+
+    if (modalOpen) {
+        closeModal(true);
+        return;
+    }
+    if (detailOpen) {
+        detailOverlay.classList.remove('show');
+        return;
+    }
+
     const hash = (location.hash || '').replace('#', '') || 'home';
     if (document.getElementById('tab-' + hash)) {
         switchTab(hash, true);
@@ -1599,7 +1613,7 @@ function openCalendarAdd(person, dateStr) {
     const labelHtml = labelOptions.map(l => `<option value="${l}">${l}</option>`).join('');
 
     body.innerHTML = `
-        <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="quickTaskName" placeholder="할 일 입력" autofocus></div>
+        <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="quickTaskName" placeholder="할 일 입력" ></div>
         <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="quickTaskAssignee">${assigneeHtml}</select></div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="quickTaskDate" value="${dateStr}"></div>
@@ -1609,7 +1623,7 @@ function openCalendarAdd(person, dateStr) {
         <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="quickTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
         <div class="form-group"><label class="form-label">고객사</label>${buildClientDatalistField('quickTaskClient', '', 'quickClientList')}</div>
         <button class="form-submit" onclick="addQuickTask()">할 일 추가</button>`;
-    document.getElementById('modalOverlay').classList.add('show');
+    document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
 }
 
 function switchDailyFilter(filter) {
@@ -1632,7 +1646,7 @@ function openQuickTask(assignee) {
     const labelHtml = labelOptions.map(l => `<option value="${l}">${l}</option>`).join('');
 
     body.innerHTML = `
-        <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="quickTaskName" placeholder="할 일 입력" autofocus></div>
+        <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="quickTaskName" placeholder="할 일 입력" ></div>
         <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="quickTaskAssignee">${assigneeHtml}</select></div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="quickTaskDate" value="${fmtDate(currentDate)}"></div>
@@ -1642,7 +1656,7 @@ function openQuickTask(assignee) {
         <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="quickTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
         <div class="form-group"><label class="form-label">고객사</label>${buildClientDatalistField('quickTaskClient', '', 'quickClientList')}</div>
         <button class="form-submit" onclick="addQuickTask()">할 일 추가</button>`;
-    document.getElementById('modalOverlay').classList.add('show');
+    document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
 }
 
 async function addQuickTask() {
@@ -1724,7 +1738,7 @@ function openEditTask(id) {
     const priorityHtml = priorityOptions.map(([v,l]) => `<option value="${v}" ${v === t.priority ? 'selected' : ''}>${l}</option>`).join('');
 
     body.innerHTML = `
-        <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="editTaskName" value="${t.task.replace(/\s*\(마감일\)\s*$/, '')}" autofocus></div>
+        <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="editTaskName" value="${t.task.replace(/\s*\(마감일\)\s*$/, '')}" ></div>
         <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="editTaskAssignee">${assigneeHtml}</select></div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="editTaskDate" value="${t.date}"></div>
@@ -1737,7 +1751,7 @@ function openEditTask(id) {
             <button class="form-submit" style="flex:1;" onclick="saveEditTask(${id})">수정 완료</button>
             <button class="form-submit" style="flex:0;background:var(--red);min-width:80px;" onclick="deleteTask(${id})">삭제</button>
         </div>`;
-    document.getElementById('modalOverlay').classList.add('show');
+    document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
 }
 
 async function saveEditTask(id) {
@@ -2057,7 +2071,7 @@ function openEditDelivery(id) {
             }
         });
     }
-    document.getElementById('modalOverlay').classList.add('show');
+    document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
 }
 
 async function saveEditDelivery(id) {
@@ -2171,7 +2185,7 @@ async function showProjectDetail(id) {
     title.textContent = `${p.client || ''} — ${p.name}`;
 
     const escFn = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
-    const row = (label, val) => `<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--gray-100)"><div style="width:100px;color:var(--gray-500);font-size:12px;font-weight:600">${label}</div><div style="flex:1;font-size:14px;color:var(--gray-900)">${escFn(val) || '-'}</div></div>`;
+    const row = (label, val) => `<div class="m-detail-row" style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--gray-100)"><div style="width:100px;color:var(--gray-500);font-size:12px;font-weight:600">${label}</div><div style="flex:1;font-size:14px;color:var(--gray-900)">${escFn(val) || '-'}</div></div>`;
 
     // 금액 계산
     const revenue = p.revenue || 0;
@@ -2244,7 +2258,7 @@ async function showProjectDetail(id) {
         </div>
 
         <!-- 요약 스트립 -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+        <div class="m-detail-summary has-dday" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
             <div style="background:var(--blue-light);border:1px solid var(--gray-200);border-radius:10px;padding:12px;text-align:center">
                 <div style="font-size:11px;color:var(--gray-500);font-weight:700;margin-bottom:4px">매출</div>
                 <div style="font-size:17px;font-weight:800;color:var(--blue)">${revenue.toLocaleString()}<span style="font-size:12px">원</span></div>
@@ -2264,9 +2278,9 @@ async function showProjectDetail(id) {
         </div>
 
         <!-- 기본 정보 -->
-        <div style="${cardBase}">
-            ${secTitle('📋', '기본 정보')}
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
+        <div class="m-sec-card" style="${cardBase}">
+            <div class="m-sec-title">${secTitle('📋', '기본 정보')}</div>
+            <div class="m-detail-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
                 <div>
                     ${row('매출처', p.client)}
                     ${row('매출처 담당자', p.contactPerson)}
@@ -2283,9 +2297,9 @@ async function showProjectDetail(id) {
         </div>
 
         <!-- 제품 정보 -->
-        <div style="${cardBase}">
-            ${secTitle('📦', '제품 정보')}
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
+        <div class="m-sec-card" style="${cardBase}">
+            <div class="m-sec-title">${secTitle('📦', '제품 정보')}</div>
+            <div class="m-detail-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
                 <div>
                     ${row('품명', p.name)}
                     ${row('수량', `${qty.toLocaleString()} ${p.unit || ''}`)}
@@ -2300,7 +2314,7 @@ async function showProjectDetail(id) {
         </div>
 
         <!-- 금액 상세 (매출·매입 나란히) -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div class="m-finance-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
             <div style="background:var(--blue-light);border:1.5px solid var(--gray-200);border-left:4px solid var(--blue);border-radius:10px;padding:14px 16px;color:var(--gray-900)">
                 <div style="font-size:14px;font-weight:800;color:var(--blue);padding-bottom:8px;margin-bottom:8px;border-bottom:2px solid var(--gray-200)">💰 매출 상세</div>
                 <div style="font-size:11px;color:var(--gray-500);margin-bottom:6px">단가 ${(p.unitPrice||0).toLocaleString()}원 × ${qty.toLocaleString()}${p.unit||''} (${salesVatLabel})</div>
@@ -2329,9 +2343,9 @@ async function showProjectDetail(id) {
         </div>
 
         <!-- 납기 및 배송 -->
-        <div style="${cardBase}">
-            ${secTitle('🚚', '납기 및 배송')}
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
+        <div class="m-sec-card" style="${cardBase}">
+            <div class="m-sec-title">${secTitle('🚚', '납기 및 배송')}</div>
+            <div class="m-detail-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px">
                 <div>
                     ${row('납기일', p.deadline)}
                     ${row('수령인', p.recipient)}
@@ -2344,13 +2358,13 @@ async function showProjectDetail(id) {
         </div>
 
         <!-- 체크리스트 -->
-        <div style="${cardBase}">
-            ${secTitle('✅', '진행 체크리스트')}
-            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">${checksHtml}</div>
+        <div class="m-sec-card" style="${cardBase}">
+            <div class="m-sec-title">${secTitle('✅', '진행 체크리스트')}</div>
+            <div class="m-detail-4col" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">${checksHtml}</div>
         </div>
 
         <!-- 디자인확인서 / 작업요청서 2열 -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="m-doc-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
             <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:14px 16px;color:var(--gray-900);min-width:0">
                 ${secTitle('🖼️', '디자인확인서')}
                 <div id="dcDocArea">${p.sourceDocNumber ? `<div style="color:var(--gray-500);font-size:13px">디자인확인서 로딩 중...</div>` : `<div style="color:var(--gray-500);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">연결된 디자인확인서가 없습니다. 상단의 "디자인확인서 만들기" 버튼으로 생성하세요.</div>`}</div>
@@ -2368,7 +2382,7 @@ async function showProjectDetail(id) {
         </div>` : ''}
 
         <!-- 액션 버튼 -->
-        <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+        <div class="m-detail-actions" style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
             <button class="form-submit" style="flex:1 1 180px;background:var(--blue)" onclick="createDocFromProject(${id},'dc')">📄 디자인확인서 만들기</button>
             <button class="form-submit" style="flex:1 1 180px;background:var(--klp-orange,#E67E22)" onclick="createDocFromProject(${id},'wr')">📋 작업요청서 만들기</button>
             <button class="form-submit" style="flex:1 1 160px;background:#16A34A" onclick="createQuoteFromProject(${id})">💰 견적서 만들기</button>
@@ -2376,7 +2390,7 @@ async function showProjectDetail(id) {
             <button class="form-submit" style="flex:1 1 100px;background:var(--gray-200);color:var(--gray-800)" onclick="closeModal()">닫기</button>
         </div>`;
     const overlay = document.getElementById('modalOverlay');
-    overlay.classList.add('show');
+    overlay.classList.add('show'); openModalHistory();
     overlay.classList.add('modal-wide');
 
     // DC / WR 비동기 로드
@@ -2809,7 +2823,7 @@ function openEditProject(id) {
             <button class="form-submit" style="flex:2" onclick="updateProject(${p.id})">💾 수정 저장</button>
         </div>`;
     const overlay = document.getElementById('modalOverlay');
-    overlay.classList.add('show');
+    overlay.classList.add('show'); openModalHistory();
     overlay.classList.add('modal-wide');
     setTimeout(() => { calcEditProjectRevenue(); calcEditSupplierTotal(); }, 0);
 }
@@ -3332,7 +3346,7 @@ function openModal(type) {
         openProductDBModal(null);
         return;
     }
-    document.getElementById('modalOverlay').classList.add('show');
+    document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
     const mb = document.getElementById('modalBody');
     if (mb) mb.scrollTop = 0;
 }
@@ -3424,10 +3438,19 @@ function calcSupplierTotal() {
     _renderMargin('newProjectMarginDisplay', _parseKRW('newProjectRevenueDisplay'), total);
 }
 
-function closeModal() {
+function openModalHistory() {
+    if (!history.state || !history.state.modal) {
+        history.pushState({ modal: true }, '');
+    }
+}
+function closeModal(fromPopstate) {
     const overlay = document.getElementById('modalOverlay');
+    const wasOpen = overlay.classList.contains('show');
     overlay.classList.remove('show');
     overlay.classList.remove('modal-wide');
+    if (wasOpen && !fromPopstate && history.state && history.state.modal) {
+        history.back();
+    }
 }
 
 // ===== Add Handlers =====
@@ -4168,7 +4191,7 @@ function openClientModal(existing) {
     const v = k => (c[k] || '').toString().replace(/"/g, '&quot;');
     body.innerHTML = `
         <div class="form-row">
-            <div class="form-group"><label class="form-label">회사명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="cliCompanyName" value="${v('companyName')}" placeholder="회사명" autofocus></div>
+            <div class="form-group"><label class="form-label">회사명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="cliCompanyName" value="${v('companyName')}" placeholder="회사명" ></div>
             <div class="form-group"><label class="form-label">대표자</label><input type="text" class="form-input" id="cliCeo" value="${v('ceo')}"></div>
         </div>
         <div class="form-row">
@@ -4210,7 +4233,7 @@ function openClientModal(existing) {
             ${existing ? `<button class="form-submit" style="flex:1;background:var(--red)" onclick="deleteClient(${c.id})">🗑️ 삭제</button>` : ''}
             <button class="form-submit" style="flex:2" onclick="${existing ? `saveEditClient(${c.id})` : 'addClient()'}">💾 ${existing ? '수정 저장' : '추가'}</button>
         </div>`;
-    document.getElementById('modalOverlay').classList.add('show');
+    document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
 }
 
 function readClientForm() {
@@ -4364,7 +4387,7 @@ function openClientDetail(id) {
             <button class="form-submit" style="flex:1;background:var(--gray-200);color:var(--gray-800)" onclick="closeModal()">닫기</button>
         </div>`;
     const overlay = document.getElementById('modalOverlay');
-    overlay.classList.add('show');
+    overlay.classList.add('show'); openModalHistory();
     overlay.classList.add('modal-wide');
 }
 
@@ -4973,7 +4996,7 @@ function openProductDBModal(editId) {
             ${p ? `<button class="form-delete-btn" onclick="deleteProduct(${p.id})">🗑️ 삭제</button>` : ''}
         </div>
     `;
-    overlay.classList.add('show');
+    overlay.classList.add('show'); openModalHistory();
     const mb = document.getElementById('modalBody');
     if (mb) mb.scrollTop = 0;
 }
@@ -5409,7 +5432,7 @@ function openProductPicker() {
             <button class="form-submit" style="flex:1" onclick="confirmProductPicker()">선택 완료</button>
         </div>
     `;
-    overlay.classList.add('show');
+    overlay.classList.add('show'); openModalHistory();
 }
 
 function confirmProductPicker() {
@@ -6194,7 +6217,7 @@ async function openMarketModal(cat, idx) {
           '<div class="form-group"><label class="form-label">카테고리 *</label><select class="form-select" id="mMCat">'+catOpts+'</select></div>'+
           '<div class="form-group"><label class="form-label">상태</label><select class="form-select" id="mMStatus">'+statusOpts+'</select></div>'+
         '</div>'+
-        '<div class="form-group"><label class="form-label">상품명 *</label><input type="text" class="form-input" id="mMName" value="'+val('상품명')+'" placeholder="예: 호크마 회중시계" autofocus></div>'+
+        '<div class="form-group"><label class="form-label">상품명 *</label><input type="text" class="form-input" id="mMName" value="'+val('상품명')+'" placeholder="예: 호크마 회중시계" ></div>'+
         '<div class="form-row">'+
           '<div class="form-group"><label class="form-label">PRICE (만원)</label><input type="text" class="form-input" id="mMPrice" value="'+val('PRICE')+'" placeholder="5.9"></div>'+
           '<div class="form-group"><label class="form-label">SALE (만원)</label><input type="text" class="form-input" id="mMSale" value="'+val('SALE')+'" placeholder="9"></div>'+

@@ -1,0 +1,503 @@
+/* ============================================================
+   mobile.css — 모바일 전용 스타일 (≤1023px)
+   PC에서는 로드되지 않음 (media query in <link>)
+   ============================================================ */
+
+/* ============================
+   공통 모바일 기반
+   ============================ */
+@media (max-width: 1023px) {
+    /* 전체 폭 오버플로우 방지 */
+    html, body {
+        overflow-x: hidden !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+    }
+    .main-wrap {
+        overflow-x: hidden;
+        max-width: 100vw;
+    }
+
+    /* 노치 디바이스 safe area */
+    .topbar {
+        padding: 0 max(16px, env(safe-area-inset-left)) !important;
+        height: 52px;
+        padding-top: env(safe-area-inset-top) !important;
+    }
+    .topbar-title { font-size: 15px; }
+    .content {
+        padding: 16px max(16px, env(safe-area-inset-left)) 32px !important;
+    }
+}
+
+/* ============================
+   1. 홈 화면
+   ============================ */
+@media (max-width: 767px) {
+    /* 인사말 */
+    .home-greeting { margin-bottom: 16px; }
+    .greeting-title { font-size: 18px !important; }
+    .greeting-date { font-size: 12px; }
+
+    /* 히어로 배너 */
+    .hero-banner {
+        padding: 14px 16px;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .hero-banner-logo { width: 32px; height: 32px; font-size: 14px; border-radius: 8px; }
+    .hero-banner-title { font-size: 14px; }
+    .hero-banner-label { font-size: 10px; }
+    .hero-banner-goals {
+        margin-left: 0;
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
+    .hero-goal {
+        padding: 6px 8px;
+        font-size: 11px;
+        justify-content: center;
+    }
+
+    /* 마감 카드 */
+    .deadline-cards {
+        grid-template-columns: 1fr !important;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    .deadline-card {
+        min-height: auto;
+        padding: 12px 14px;
+        gap: 8px;
+        overflow: hidden;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    .deadline-card-label { font-size: 12px; }
+    .deadline-card-body { overflow: hidden; }
+    .deadline-card-row {
+        max-width: 100%;
+        overflow: hidden;
+        gap: 4px !important;
+        padding: 4px 6px !important;
+    }
+    .deadline-card-row .name {
+        font-size: 12px;
+        min-width: 0;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .deadline-card-row .kind-tag {
+        font-size: 9px !important;
+        padding: 1px 4px !important;
+        margin-right: 2px !important;
+        flex-shrink: 0;
+    }
+    .deadline-card-row .meta {
+        font-size: 10px;
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+    .deadline-card-row .dday {
+        font-size: 10px;
+        padding: 1px 6px;
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+
+    /* 요약 카드 */
+    .summary-row {
+        grid-template-columns: 1fr 1fr 1fr !important;
+        gap: 8px !important;
+        margin-bottom: 16px;
+    }
+    .summary-card {
+        padding: 12px 10px !important;
+        gap: 8px !important;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    .summary-icon {
+        width: 36px !important;
+        height: 36px !important;
+        border-radius: 10px !important;
+    }
+    .summary-icon svg { width: 18px; height: 18px; }
+    .summary-label { font-size: 11px !important; }
+    .summary-value { font-size: 18px !important; }
+
+    /* 업무 현황 그리드 */
+    .dash-grid-async {
+        grid-template-columns: 1fr !important;
+        gap: 12px;
+    }
+    .home-section-title { font-size: 14px; margin-top: 16px !important; margin-bottom: 10px; }
+
+    /* 바로가기 미니 카드 */
+    .quick-mini {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        padding: 0 14px 14px;
+    }
+    .quick-mini-card { padding: 10px 8px; }
+    .quick-mini-icon { width: 32px; height: 32px; border-radius: 8px; }
+    .quick-mini-icon svg { width: 14px; height: 14px; }
+    .quick-mini-label { font-size: 11px; }
+    .quick-mini-sub { font-size: 10px; }
+
+    /* 대시 패널 */
+    .dash-panel { border-radius: 10px; }
+    .panel-header { padding: 12px 14px; }
+    .panel-title { font-size: 14px !important; }
+    .panel-body { padding: 10px 14px 14px; }
+}
+
+/* ============================
+   2. 모달 (모든 모달 공통)
+   ============================ */
+@media (max-width: 1023px) {
+    /* 오버레이 — 하단 정렬(슬라이드업 느낌) */
+    .modal-overlay.show {
+        align-items: flex-end !important;
+        justify-content: center !important;
+    }
+
+    /* 모달 풀폭, 하단 시트 스타일 */
+    .modal {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        min-height: 0 !important;
+        max-height: 92vh !important;
+        height: auto !important;
+        border-radius: 16px 16px 0 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* wide 모달도 동일 */
+    .modal-overlay.modal-wide .modal {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        max-height: 95vh !important;
+        height: auto !important;
+        border-radius: 16px 16px 0 0 !important;
+        margin: 0 !important;
+    }
+
+    .modal-header {
+        padding: 16px 16px 0;
+        position: sticky;
+        top: 0;
+        background: var(--white);
+        z-index: 2;
+    }
+    .modal-title { font-size: 16px; }
+    .modal-body { padding: 14px 16px 24px; }
+    .modal-overlay.modal-wide .modal-body {
+        padding: 12px 16px 24px;
+    }
+
+    /* 폼 행 1열 */
+    .form-row {
+        grid-template-columns: 1fr !important;
+        gap: 8px;
+    }
+
+    /* 폼 입력 터치 최적화 */
+    .form-input, .form-select {
+        font-size: 16px !important;
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 767px) {
+    /* 상세 모달 내부 그리드 → 1열 */
+    .m-detail-summary {
+        grid-template-columns: 1fr 1fr 1fr !important;
+        gap: 8px !important;
+    }
+    .m-detail-summary > div {
+        padding: 10px 8px !important;
+    }
+    .m-detail-summary > div > div:first-child {
+        font-size: 10px !important;
+    }
+    .m-detail-summary > div > div:last-child {
+        font-size: 14px !important;
+    }
+    .m-detail-summary > div > div:last-child span {
+        font-size: 10px !important;
+    }
+
+    /* 4열 요약 → 납기 아래 줄로 */
+    .m-detail-summary.has-dday {
+        grid-template-columns: 1fr 1fr !important;
+    }
+
+    .m-detail-2col {
+        grid-template-columns: 1fr !important;
+        gap: 0 !important;
+    }
+
+    .m-detail-4col {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 6px !important;
+    }
+
+    .m-detail-actions {
+        flex-direction: column !important;
+    }
+    .m-detail-actions button {
+        flex: none !important;
+        width: 100% !important;
+    }
+
+    /* 기본 정보 행 */
+    .m-detail-row {
+        gap: 8px !important;
+    }
+    .m-detail-row > div:first-child {
+        width: 80px !important;
+        min-width: 80px !important;
+        font-size: 11px !important;
+    }
+    .m-detail-row > div:last-child {
+        font-size: 13px !important;
+        word-break: break-all;
+    }
+
+    /* 금액 카드 세로 배치 */
+    .m-finance-grid {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+
+    /* DC/WR 카드 세로 배치 */
+    .m-doc-grid {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+
+    /* 섹션 카드 패딩 축소 */
+    .m-sec-card {
+        padding: 12px 14px !important;
+        margin-bottom: 10px !important;
+    }
+
+    /* 섹션 제목 */
+    .m-sec-title {
+        font-size: 13px !important;
+        padding-bottom: 6px !important;
+        margin-bottom: 8px !important;
+    }
+}
+
+/* ============================
+   3. 택배 관리
+   ============================ */
+@media (max-width: 1023px) {
+    /* 카드 그리드 모바일 최적화 */
+    #tab-delivery .card-grid {
+        grid-template-columns: 1fr !important;
+        gap: 10px;
+    }
+    #tab-delivery .resp-card {
+        padding: 14px 16px;
+    }
+    #tab-delivery .resp-card-title {
+        font-size: 14px;
+        line-height: 1.3;
+    }
+    #tab-delivery .resp-card-row {
+        font-size: 11px;
+        gap: 4px;
+    }
+
+    /* 툴바 */
+    #tab-delivery .content-toolbar {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 8px;
+    }
+    #tab-delivery .toolbar-left {
+        flex-direction: column;
+        width: 100%;
+    }
+    #tab-delivery .toolbar-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        width: 100%;
+    }
+    #tab-delivery .toolbar-buttons .btn-primary,
+    #tab-delivery .toolbar-buttons .btn-export {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-size: 12px;
+        padding: 8px 10px;
+    }
+    #tab-delivery .search-bar {
+        width: 100% !important;
+    }
+
+    /* 필터 행 */
+    .delivery-toolbar-row {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .date-filter {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    .date-filter select {
+        font-size: 12px;
+        padding: 6px 8px;
+    }
+}
+
+@media (max-width: 767px) {
+    /* 택배 카드 내용 더 컴팩트하게 */
+    #tab-delivery .resp-card {
+        padding: 12px 14px;
+    }
+    #tab-delivery .resp-card-title {
+        font-size: 13px;
+    }
+}
+
+/* ============================
+   4. 일일계획표
+   ============================ */
+@media (max-width: 1023px) {
+    #tab-daily .content-toolbar {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 8px;
+    }
+    #tab-daily .search-bar {
+        width: 100% !important;
+    }
+
+    /* 탭 필터 가로 스크롤 */
+    .daily-person-filter,
+    .daily-tab-bar {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap !important;
+        gap: 6px;
+        padding-bottom: 4px;
+    }
+    .daily-person-filter::-webkit-scrollbar,
+    .daily-tab-bar::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* 컬럼 그리드 1열 */
+    .daily-columns {
+        grid-template-columns: 1fr !important;
+        gap: 12px;
+    }
+}
+
+@media (max-width: 767px) {
+    /* 일일계획표 컬럼 최적화 */
+    .daily-column {
+        border-radius: 10px;
+    }
+    .daily-col-header {
+        padding: 10px 14px;
+    }
+    .daily-col-header span:first-child {
+        font-size: 13px;
+    }
+    .daily-col-body {
+        padding: 8px 10px;
+        max-height: 400px;
+    }
+
+    /* 할 일 아이템 */
+    .daily-item {
+        padding: 10px;
+        gap: 8px;
+    }
+    .daily-title {
+        font-size: 13px !important;
+    }
+    .daily-info {
+        font-size: 11px;
+    }
+    .daily-tag {
+        font-size: 10px;
+        padding: 1px 6px;
+    }
+    .daily-checkbox {
+        width: 20px;
+        height: 20px;
+        min-width: 20px;
+    }
+
+    /* 인라인 입력 */
+    .daily-inline-input {
+        font-size: 13px;
+        padding: 8px 10px;
+    }
+
+    /* 컬럼 추가 버튼 */
+    .daily-add-btn {
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+
+    /* 미완료 컬럼 */
+    .daily-column.overdue-column .daily-col-header span:first-child {
+        font-size: 12px;
+    }
+}
+
+/* ============================
+   5. 공통 모바일 유틸
+   ============================ */
+@media (max-width: 767px) {
+    /* 필터 칩 */
+    .filter-chip {
+        font-size: 12px;
+        padding: 5px 10px;
+    }
+
+    /* 페이지네이션 */
+    .pagination-btn {
+        min-width: 32px;
+        height: 32px;
+        font-size: 12px;
+    }
+
+    /* 토스트 */
+    .toast {
+        font-size: 13px;
+        padding: 10px 20px;
+        bottom: 20px;
+        max-width: 90vw;
+        white-space: normal;
+        text-align: center;
+    }
+
+    /* 배지 */
+    .badge {
+        font-size: 10px;
+        padding: 2px 6px;
+    }
+
+    /* 사이드바 오버레이 개선 */
+    .sidebar {
+        width: 260px;
+    }
+}
