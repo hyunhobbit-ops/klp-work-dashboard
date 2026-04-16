@@ -2180,6 +2180,8 @@ body {
     .content { padding: 20px 20px 40px; }
     .topbar { padding: 0 20px; }
     .table-wrap { display: none; }
+    #tab-clients .table-wrap { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    #tab-clients .data-table { min-width: 1100px; }
     .card-grid { display: grid; grid-template-columns: 1fr 1fr; }
     .search-bar { width: 220px; }
 }
