@@ -2386,7 +2386,6 @@ async function showProjectDetail(id) {
             <div style="background:${hasSupplier ? 'var(--orange-light)' : 'var(--gray-50)'};border:1.5px solid var(--gray-200);border-left:4px solid ${hasSupplier ? 'var(--orange)' : 'var(--gray-300)'};border-radius:10px;padding:14px 16px;color:var(--gray-900)">
                 <div style="font-size:14px;font-weight:800;color:${hasSupplier ? 'var(--orange)' : 'var(--gray-500)'};padding-bottom:8px;margin-bottom:8px;border-bottom:2px solid var(--gray-200)">🏭 매입 상세</div>
                 ${!hasSupplier ? `<div style="color:var(--gray-500);font-size:13px;padding:20px 0;text-align:center">매입처 정보 없음</div>` : `
-                    <div style="font-size:13px;color:var(--gray-900);margin-bottom:4px"><strong>${escFn(p.supplier)}</strong>${p.supplierContact ? `<span style="color:var(--gray-500);font-size:12px"> · ${escFn(p.supplierContact)}</span>` : ''}</div>
                     <div style="font-size:11px;color:var(--gray-500);margin-bottom:6px">매입단가 ${(p.supplierUnitPrice||0).toLocaleString()}원 × ${qty.toLocaleString()}${p.unit||''} (${supVatLabel})</div>
                     ${brLine('제품 합계', supProduct)}
                     ${brLine('＋ 매입 인쇄비', supPrint)}
