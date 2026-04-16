@@ -917,6 +917,9 @@ function openQuoteFromForm(){
     packagingFee:val('packagingFee'),
     packagingFeeVat:val('packagingFeeVat'),
     packagingFeeApply:val('packagingFeeApply'),
+    shippingType:val('shippingType'),
+    shippingCost:getDcShipCost(),
+    shippingVat:val('shippingVat'),
     deliveryDate:val('deliveryDate'),
     recipient:val('dcRecipient'),
     phone:val('dcPhone'),
@@ -944,8 +947,10 @@ function openQuoteFromRecord(r){
   var hasPk=pkf>0;
   var pkT=0;if(hasPk)pkT=(r.packaging_fee_apply==='1개당')?pkf*qty:pkf;
   var pkV=(r.packaging_fee_vat==='VAT 별도')?Math.round(pkT*.1):0;
-  var sup=prodT+prT+pkT,vat=prodV+prV+pkV,grand=sup+vat;
-  var est={prodT:prodT,prT:prT,pkT:pkT,sup:sup,vat:vat,grand:grand,hasPr:hasPr,hasPk:hasPk};
+  var shf=Number(r.shipping_cost)||0;var hasSh=shf>0;
+  var shV=(hasSh&&(r.shipping_vat||'VAT 별도')==='VAT 별도')?Math.round(shf*.1):0;
+  var sup=prodT+prT+pkT+shf,vat=prodV+prV+pkV+shV,grand=sup+vat;
+  var est={prodT:prodT,prT:prT,pkT:pkT,shT:shf,sup:sup,vat:vat,grand:grand,hasPr:hasPr,hasPk:hasPk,hasSh:hasSh};
   /* 이미지 언팩 */
   var mi=null,si=[];
   if(r.images_data){
@@ -976,6 +981,9 @@ function openQuoteFromRecord(r){
     packagingFee:pkf,
     packagingFeeVat:r.packaging_fee_vat||'VAT 별도',
     packagingFeeApply:r.packaging_fee_apply||'1개당',
+    shippingType:r.shipping_type||'',
+    shippingCost:shf,
+    shippingVat:r.shipping_vat||'VAT 별도',
     deliveryDate:r.delivery_date||'',
     recipient:shipParts[0]||'',
     phone:shipParts[1]||'',
@@ -1148,6 +1156,13 @@ function renderQuoteDoc(d){
             '<td style="'+itemCell+'">'+fmtN(toNum(d.packagingFee)||0)+'</td>'+
             '<td style="'+itemCell+'">'+fmtN(e.pkT||0)+'</td>'+
             '<td style="'+itemCell+'">'+fmtN((d.packagingFeeVat==='VAT 별도')?Math.round((e.pkT||0)*.1):0)+'</td>'+
+          '</tr>':'')+
+          (e.hasSh?'<tr>'+
+            '<td style="padding:8px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10.5px">배송비 ('+(d.shippingType||'')+')<span style="font-size:9px;color:#888"> / '+esc(d.shippingVat||'VAT 별도')+'</span></td>'+
+            '<td style="'+itemCell+'">1</td>'+
+            '<td style="'+itemCell+'">'+fmtN(d.shippingCost||0)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN(e.shT||0)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN((d.shippingVat==='VAT 별도')?Math.round((e.shT||0)*.1):0)+'</td>'+
           '</tr>':'')+
           '<tr><td colspan="5" style="padding:0;vertical-align:middle;text-align:center;border-bottom:1px solid #eef0f5">'+imgCellContent+'</td></tr>'+
           '<tr><td colspan="5" style="background:#f5f7fa;text-align:center;font-weight:700;color:#4a5568;font-size:10.5px;padding:6px">- 이 하 여 백 -</td></tr>'+
