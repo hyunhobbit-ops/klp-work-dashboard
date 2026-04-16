@@ -946,8 +946,10 @@ function toggleShippingFields(prefix) {
     const type = document.getElementById(prefix + 'ProjectShippingType').value;
     const boxCalc = document.getElementById(prefix + 'ShippingBoxCalc');
     const directCost = document.getElementById(prefix + 'ShippingCostDirect');
+    const vatGroup = document.getElementById(prefix + 'ShippingVatGroup');
     if (boxCalc) boxCalc.style.display = type === '택배' ? 'block' : 'none';
     if (directCost) directCost.style.display = type === '퀵' ? 'block' : 'none';
+    if (vatGroup) vatGroup.style.display = type ? 'block' : 'none';
 }
 
 function calcShippingCost(prefix) {
@@ -2784,12 +2786,19 @@ function openEditProject(id) {
                 </div>
             </div>
             <div class="form-section-title">🚚 배송비</div>
-            <div class="form-row" style="grid-template-columns:1fr 1fr">
+            <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
                 <div class="form-group"><label class="form-label">배송 방법</label>
                     <select class="form-select" id="editProjectShippingType" onchange="toggleShippingFields('edit')">
                         <option value="" ${!p.shippingType?'selected':''}>없음</option>
                         <option value="택배" ${p.shippingType==='택배'?'selected':''}>택배</option>
                         <option value="퀵" ${p.shippingType==='퀵'?'selected':''}>퀵</option>
+                    </select>
+                </div>
+                <div class="form-group" id="editShippingVatGroup" style="display:${p.shippingType?'block':'none'}">
+                    <label class="form-label">배송비 VAT</label>
+                    <select class="form-select" id="editProjectShippingVat">
+                        <option ${(p.shippingVat||'VAT 별도')==='VAT 별도'?'selected':''}>VAT 별도</option>
+                        <option ${p.shippingVat==='VAT 포함'?'selected':''}>VAT 포함</option>
                     </select>
                 </div>
                 <div class="form-group" id="editShippingCostDirect" style="display:${p.shippingType==='퀵'?'block':'none'}">
@@ -3033,6 +3042,7 @@ async function updateProject(id) {
         supplierPackagingFeeApply,
         supplierRevenue,
         shippingType: getVal('editProjectShippingType'),
+        shippingVat: getVal('editProjectShippingVat') || 'VAT 별도',
         shippingCostPerBox: readProjectNumber('editProjectShipPerBox'),
         shippingBoxes: readProjectNumber('editProjectShipBoxes'),
         shippingCost: getShippingCost('edit'),
@@ -3086,6 +3096,7 @@ async function updateProject(id) {
                 supplier_packaging_fee_apply: p.supplierPackagingFeeApply || '1개당',
                 supplier_revenue: p.supplierRevenue || 0,
                 shipping_type: p.shippingType || '',
+                shipping_vat: p.shippingVat || 'VAT 별도',
                 shipping_cost_per_box: p.shippingCostPerBox || 0,
                 shipping_boxes: p.shippingBoxes || 0,
                 shipping_cost: p.shippingCost || 0
@@ -3260,12 +3271,19 @@ function openModal(type) {
                         </div>
                     </div>
                     <div class="form-section-title">🚚 배송비</div>
-                    <div class="form-row" style="grid-template-columns:1fr 1fr">
+                    <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
                         <div class="form-group"><label class="form-label">배송 방법</label>
                             <select class="form-select" id="newProjectShippingType" onchange="toggleShippingFields('new')">
                                 <option value="">없음</option>
                                 <option value="택배">택배</option>
                                 <option value="퀵">퀵</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="newShippingVatGroup" style="display:none">
+                            <label class="form-label">배송비 VAT</label>
+                            <select class="form-select" id="newProjectShippingVat">
+                                <option>VAT 별도</option>
+                                <option>VAT 포함</option>
                             </select>
                         </div>
                         <div class="form-group" id="newShippingCostDirect" style="display:none">
@@ -3619,6 +3637,7 @@ async function addProject(type) {
         packCost: getInt('newProjectPackFee'),
         shipCost: getShippingCost('new'),
         shippingType: getVal('newProjectShippingType'),
+        shippingVat: getVal('newProjectShippingVat') || 'VAT 별도',
         shippingCostPerBox: readProjectNumber('newProjectShipPerBox'),
         shippingBoxes: readProjectNumber('newProjectShipBoxes'),
         shippingCost: getShippingCost('new'),
@@ -3702,6 +3721,7 @@ async function addProject(type) {
                 supplier_packaging_fee_apply: newProject.supplierPackagingFeeApply || '1개당',
                 supplier_revenue: newProject.supplierRevenue || 0,
                 shipping_type: newProject.shippingType || '',
+                shipping_vat: newProject.shippingVat || 'VAT 별도',
                 shipping_cost_per_box: newProject.shippingCostPerBox || 0,
                 shipping_boxes: newProject.shippingBoxes || 0,
                 shipping_cost: newProject.shippingCost || 0
@@ -3775,6 +3795,7 @@ async function loadDomesticProjectsFromDb() {
                 packCost: r.packaging_fee || 0,
                 shipCost: r.shipping_cost || 0,
                 shippingType: r.shipping_type || '',
+                shippingVat: r.shipping_vat || 'VAT 별도',
                 shippingCostPerBox: r.shipping_cost_per_box || 0,
                 shippingBoxes: r.shipping_boxes || 0,
                 shippingCost: r.shipping_cost || 0,
