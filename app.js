@@ -2254,6 +2254,16 @@ async function showProjectDetail(id) {
     const salesPrint = feeCompute(p.printFee, p.printFeeVat, p.printFeeApply);
     const salesPack = feeCompute(p.packagingFee, p.packagingFeeVat, p.packagingFeeApply);
 
+    // 배송비 계산
+    const shipCompute = (cost, vatLabel) => {
+        if (!cost) return 0;
+        if ((vatLabel || 'VAT 별도') === 'VAT 별도') return Math.round(cost * 1.1);
+        return cost;
+    };
+    const salesShipRaw = p.shippingCost || 0;
+    const salesShip = shipCompute(salesShipRaw, p.shippingVat);
+    const salesShipLabel = p.shippingType ? `${p.shippingType}` : '';
+
     // 매입 내역
     const supVatLabel = p.supplierUnitPriceVat || 'VAT 별도';
     const supProduct = supVatLabel === 'VAT 별도'
@@ -2261,6 +2271,9 @@ async function showProjectDetail(id) {
         : (p.supplierUnitPrice || 0) * qty;
     const supPrint = feeCompute(p.supplierPrintFee, p.supplierPrintFeeVat, p.supplierPrintFeeApply);
     const supPack = feeCompute(p.supplierPackagingFee, p.supplierPackagingFeeVat, p.supplierPackagingFeeApply);
+    const supShipRaw = p.supplierShippingCost || 0;
+    const supShip = shipCompute(supShipRaw, p.supplierShippingVat);
+    const supShipLabel = p.supplierShippingType ? `${p.supplierShippingType}` : '';
 
     // D-Day
     let dday = '';
@@ -2351,6 +2364,7 @@ async function showProjectDetail(id) {
                     ${row('인쇄 색상/사이즈', p.printColorSize)}
                     ${row('인쇄 방법', p.printMethod)}
                     ${row('포장', p.packaging)}
+                    ${p.shippingType ? row('배송', `${p.shippingType}${p.shippingType === '택배' && p.shippingBoxes ? ` (${p.shippingBoxes}박스)` : ''}`) : ''}
                 </div>
             </div>
         </div>
@@ -2363,6 +2377,7 @@ async function showProjectDetail(id) {
                 ${brLine('제품 합계', salesProduct)}
                 ${brLine('＋ 인쇄비', salesPrint)}
                 ${brLine('＋ 포장비', salesPack)}
+                ${salesShip ? brLine(`＋ 배송비 (${salesShipLabel})`, salesShip) : ''}
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-top:8px;background:var(--white);border:1px solid var(--gray-200);border-radius:8px">
                     <span style="font-weight:800;color:var(--blue);font-size:13px">매출액</span>
                     <strong style="font-size:18px;color:var(--blue)">${revenue.toLocaleString()}원</strong>
@@ -2376,6 +2391,7 @@ async function showProjectDetail(id) {
                     ${brLine('제품 합계', supProduct)}
                     ${brLine('＋ 매입 인쇄비', supPrint)}
                     ${brLine('＋ 매입 포장비', supPack)}
+                    ${supShip ? brLine(`＋ 매입 배송비 (${supShipLabel})`, supShip) : ''}
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-top:8px;background:var(--white);border:1px solid var(--gray-200);border-radius:8px">
                         <span style="font-weight:800;color:var(--orange);font-size:13px">매입액</span>
                         <strong style="font-size:18px;color:var(--orange)">${purchaseTotal.toLocaleString()}원</strong>
