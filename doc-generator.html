@@ -1089,9 +1089,23 @@ function renderQuoteDoc(d){
             '<td style="padding:10px 12px;border-bottom:1px solid #eef0f5;font-weight:700;color:#1a1d29;font-size:11px">'+esc(d.productName||'')+'</td>'+
             '<td style="'+itemCell+'">'+qty+'</td>'+
             '<td style="'+itemCell+'">'+fmtN(up)+'</td>'+
-            '<td style="'+itemCell+'">'+fmtN(sup)+'</td>'+
-            '<td style="'+itemCell+'">'+fmtN(vat)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN(e.prodT||0)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN((d.unitPriceVat==='VAT 별도')?Math.round((e.prodT||0)*.1):0)+'</td>'+
           '</tr>'+
+          (e.hasPr?'<tr>'+
+            '<td style="padding:8px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10.5px">인쇄비 ('+esc(d.printMethod||'')+') <span style="font-size:9px;color:#888">'+esc(d.printFeeApply||'1개당')+' / '+esc(d.printFeeVat||'VAT 별도')+'</span></td>'+
+            '<td style="'+itemCell+'">'+(d.printFeeApply==='1개당'?qty:1)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN(toNum(d.printFee)||0)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN(e.prT||0)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN((d.printFeeVat==='VAT 별도')?Math.round((e.prT||0)*.1):0)+'</td>'+
+          '</tr>':'')+
+          (e.hasPk?'<tr>'+
+            '<td style="padding:8px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10.5px">포장비 ('+esc(d.packaging||'')+') <span style="font-size:9px;color:#888">'+esc(d.packagingFeeApply||'1개당')+' / '+esc(d.packagingFeeVat||'VAT 별도')+'</span></td>'+
+            '<td style="'+itemCell+'">'+(d.packagingFeeApply==='1개당'?qty:1)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN(toNum(d.packagingFee)||0)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN(e.pkT||0)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN((d.packagingFeeVat==='VAT 별도')?Math.round((e.pkT||0)*.1):0)+'</td>'+
+          '</tr>':'')+
           '<tr><td colspan="5" style="padding:0;vertical-align:middle;text-align:center;border-bottom:1px solid #eef0f5">'+imgCellContent+'</td></tr>'+
           '<tr><td colspan="5" style="background:#f5f7fa;text-align:center;font-weight:700;color:#4a5568;font-size:10.5px;padding:6px">- 이 하 여 백 -</td></tr>'+
         '</tbody>'+
