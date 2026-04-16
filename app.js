@@ -934,6 +934,42 @@ function readProjectNumber(id) {
     return parseInt(String(el.value).replace(/[^0-9]/g, '')) || 0;
 }
 
+function toggleCustomInput(selectId, inputId) {
+    const sel = document.getElementById(selectId);
+    const inp = document.getElementById(inputId);
+    if (!sel || !inp) return;
+    inp.style.display = sel.value === '기타' ? 'block' : 'none';
+    if (sel.value !== '기타') inp.value = '';
+}
+
+function toggleShippingFields(prefix) {
+    const type = document.getElementById(prefix + 'ProjectShippingType').value;
+    const boxCalc = document.getElementById(prefix + 'ShippingBoxCalc');
+    const directCost = document.getElementById(prefix + 'ShippingCostDirect');
+    if (boxCalc) boxCalc.style.display = type === '택배' ? 'block' : 'none';
+    if (directCost) directCost.style.display = type === '퀵' ? 'block' : 'none';
+}
+
+function calcShippingCost(prefix) {
+    const perBox = readProjectNumber(prefix + 'ProjectShipPerBox');
+    const boxes = readProjectNumber(prefix + 'ProjectShipBoxes');
+    const total = perBox * boxes;
+    const el = document.getElementById(prefix + 'ProjectShipTotal');
+    if (el) el.textContent = total.toLocaleString() + ' 원';
+}
+
+function getShippingCost(prefix) {
+    const type = document.getElementById(prefix + 'ProjectShippingType');
+    if (!type) return 0;
+    if (type.value === '택배') {
+        return readProjectNumber(prefix + 'ProjectShipPerBox') * readProjectNumber(prefix + 'ProjectShipBoxes');
+    }
+    if (type.value === '퀵') {
+        return readProjectNumber(prefix + 'ProjectShippingCost');
+    }
+    return 0;
+}
+
 function toggleProjectExpand(id) {
     if (expandedProjectIds.has(id)) {
         expandedProjectIds.delete(id);
@@ -2695,9 +2731,14 @@ function openEditProject(id) {
             <div class="form-section-title">🖨️ 인쇄 / 포장 <span style="font-size:12px;font-weight:600;color:var(--blue);margin-left:6px">(매출 기준)</span></div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">인쇄 방법</label>
-                    <select class="form-select" id="editProjectPrintMethod">
-                        ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u=>`<option ${p.printMethod===u?'selected':''}>${u}</option>`).join('')}
+                    <select class="form-select" id="editProjectPrintMethod" onchange="toggleCustomInput('editProjectPrintMethod','editProjectPrintMethodCustom')">
+                        ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u=>{
+                            const isCustom = !['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].includes(p.printMethod);
+                            const selected = p.printMethod===u || (u==='기타' && isCustom);
+                            return `<option ${selected?'selected':''}>${u}</option>`;
+                        }).join('')}
                     </select>
+                    <input type="text" class="form-input" id="editProjectPrintMethodCustom" placeholder="인쇄 방법 직접 입력" value="${!['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타',''].includes(p.printMethod) ? p.printMethod : ''}" style="margin-top:6px;display:${!['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타',''].includes(p.printMethod) || p.printMethod==='기타' ? 'block' : 'none'}">
                 </div>
             </div>
             <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
@@ -2717,9 +2758,14 @@ function openEditProject(id) {
             </div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">포장</label>
-                    <select class="form-select" id="editProjectPackaging">
-                        ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u=>`<option ${p.packaging===u?'selected':''}>${u}</option>`).join('')}
+                    <select class="form-select" id="editProjectPackaging" onchange="toggleCustomInput('editProjectPackaging','editProjectPackagingCustom')">
+                        ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u=>{
+                            const isCustom = !['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타',''].includes(p.packaging);
+                            const selected = p.packaging===u || (u==='기타' && isCustom);
+                            return `<option ${selected?'selected':''}>${u}</option>`;
+                        }).join('')}
                     </select>
+                    <input type="text" class="form-input" id="editProjectPackagingCustom" placeholder="포장 방법 직접 입력" value="${!['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타',''].includes(p.packaging) ? p.packaging : ''}" style="margin-top:6px;display:${!['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타',''].includes(p.packaging) || p.packaging==='기타' ? 'block' : 'none'}">
                 </div>
             </div>
             <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
@@ -2735,6 +2781,33 @@ function openEditProject(id) {
                         <option ${packagingFeeApply==='1개당'?'selected':''}>1개당</option>
                         <option ${packagingFeeApply==='일괄'?'selected':''}>일괄</option>
                     </select>
+                </div>
+            </div>
+            <div class="form-section-title">🚚 배송비</div>
+            <div class="form-row" style="grid-template-columns:1fr 1fr">
+                <div class="form-group"><label class="form-label">배송 방법</label>
+                    <select class="form-select" id="editProjectShippingType" onchange="toggleShippingFields('edit')">
+                        <option value="" ${!p.shippingType?'selected':''}>없음</option>
+                        <option value="택배" ${p.shippingType==='택배'?'selected':''}>택배</option>
+                        <option value="퀵" ${p.shippingType==='퀵'?'selected':''}>퀵</option>
+                    </select>
+                </div>
+                <div class="form-group" id="editShippingCostDirect" style="display:${p.shippingType==='퀵'?'block':'none'}">
+                    <label class="form-label">배송비</label>
+                    <input type="text" inputmode="numeric" class="form-input" id="editProjectShippingCost" value="${p.shippingCost ? Number(p.shippingCost).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this)">
+                </div>
+            </div>
+            <div id="editShippingBoxCalc" style="display:${p.shippingType==='택배'?'block':'none'}">
+                <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
+                    <div class="form-group"><label class="form-label">박스당 배송비</label>
+                        <input type="text" inputmode="numeric" class="form-input" id="editProjectShipPerBox" value="${p.shippingCostPerBox ? Number(p.shippingCostPerBox).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcShippingCost('edit')">
+                    </div>
+                    <div class="form-group"><label class="form-label">박스 수</label>
+                        <input type="text" inputmode="numeric" class="form-input" id="editProjectShipBoxes" value="${p.shippingBoxes ? Number(p.shippingBoxes).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcShippingCost('edit')">
+                    </div>
+                    <div class="form-group"><label class="form-label">총 배송비</label>
+                        <div class="form-input" id="editProjectShipTotal" style="background:var(--gray-50);color:var(--gray-700);font-weight:700">${p.shippingCost ? Number(p.shippingCost).toLocaleString() + ' 원' : '0 원'}</div>
+                    </div>
                 </div>
             </div>
             <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid var(--gray-200)">
@@ -2939,12 +3012,12 @@ async function updateProject(id) {
         unit: getVal('editProjectUnit'),
         color: getVal('editProjectColor'),
         printColorSize: getVal('editProjectPrintColorSize'),
-        printMethod: getVal('editProjectPrintMethod'),
+        printMethod: getVal('editProjectPrintMethod') === '기타' ? (getVal('editProjectPrintMethodCustom') || '기타') : getVal('editProjectPrintMethod'),
         printFee: readProjectNumber('editProjectPrintFee'),
         printCost: readProjectNumber('editProjectPrintFee'),
         printFeeVat: getVal('editProjectPrintFeeVat'),
         printFeeApply: getVal('editProjectPrintFeeApply'),
-        packaging: getVal('editProjectPackaging'),
+        packaging: getVal('editProjectPackaging') === '기타' ? (getVal('editProjectPackagingCustom') || '기타') : getVal('editProjectPackaging'),
         packagingFee: readProjectNumber('editProjectPackFee'),
         packCost: readProjectNumber('editProjectPackFee'),
         packagingFeeVat: getVal('editProjectPackFeeVat'),
@@ -2959,6 +3032,10 @@ async function updateProject(id) {
         supplierPackagingFeeVat,
         supplierPackagingFeeApply,
         supplierRevenue,
+        shippingType: getVal('editProjectShippingType'),
+        shippingCostPerBox: readProjectNumber('editProjectShipPerBox'),
+        shippingBoxes: readProjectNumber('editProjectShipBoxes'),
+        shippingCost: getShippingCost('edit'),
         deadline: getVal('editProjectDeadline'),
         recipient: getVal('editProjectRecipient'),
         phone: getVal('editProjectPhone'),
@@ -3007,7 +3084,11 @@ async function updateProject(id) {
                 supplier_packaging_fee: p.supplierPackagingFee || 0,
                 supplier_packaging_fee_vat: p.supplierPackagingFeeVat || 'VAT 별도',
                 supplier_packaging_fee_apply: p.supplierPackagingFeeApply || '1개당',
-                supplier_revenue: p.supplierRevenue || 0
+                supplier_revenue: p.supplierRevenue || 0,
+                shipping_type: p.shippingType || '',
+                shipping_cost_per_box: p.shippingCostPerBox || 0,
+                shipping_boxes: p.shippingBoxes || 0,
+                shipping_cost: p.shippingCost || 0
             }).eq('id', id);
             if (error) throw error;
         } catch (err) {
@@ -3138,9 +3219,14 @@ function openModal(type) {
                     <div class="form-section-title">🖨️ 인쇄 / 포장 <span style="font-size:12px;font-weight:600;color:var(--blue);margin-left:6px">(매출 기준)</span></div>
                     <div class="form-row">
                         <div class="form-group"><label class="form-label">인쇄 방법</label>
-                            <select class="form-select" id="newProjectPrintMethod">
-                                ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u=>`<option ${v('printMethod')===u?'selected':''}>${u}</option>`).join('')}
+                            <select class="form-select" id="newProjectPrintMethod" onchange="toggleCustomInput('newProjectPrintMethod','newProjectPrintMethodCustom')">
+                                ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u=>{
+                                    const isCustom = v('printMethod') && !['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].includes(v('printMethod'));
+                                    const selected = v('printMethod')===u || (u==='기타' && isCustom);
+                                    return `<option ${selected?'selected':''}>${u}</option>`;
+                                }).join('')}
                             </select>
+                            <input type="text" class="form-input" id="newProjectPrintMethodCustom" placeholder="인쇄 방법 직접 입력" value="${!['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타',''].includes(v('printMethod')) ? v('printMethod') : ''}" style="margin-top:6px;display:none">
                         </div>
                     </div>
                     <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
@@ -3154,9 +3240,14 @@ function openModal(type) {
                     </div>
                     <div class="form-row">
                         <div class="form-group"><label class="form-label">포장</label>
-                            <select class="form-select" id="newProjectPackaging">
-                                ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u=>`<option ${v('packaging')===u?'selected':''}>${u}</option>`).join('')}
+                            <select class="form-select" id="newProjectPackaging" onchange="toggleCustomInput('newProjectPackaging','newProjectPackagingCustom')">
+                                ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u=>{
+                                    const isCustom = v('packaging') && !['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].includes(v('packaging'));
+                                    const selected = v('packaging')===u || (u==='기타' && isCustom);
+                                    return `<option ${selected?'selected':''}>${u}</option>`;
+                                }).join('')}
                             </select>
+                            <input type="text" class="form-input" id="newProjectPackagingCustom" placeholder="포장 방법 직접 입력" value="${!['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타',''].includes(v('packaging')) ? v('packaging') : ''}" style="margin-top:6px;display:none">
                         </div>
                     </div>
                     <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
@@ -3166,6 +3257,33 @@ function openModal(type) {
                         </div>
                         <div class="form-group"><label class="form-label">적용 방식</label>
                             <select class="form-select" id="newProjectPackFeeApply" onchange="calcProjectRevenue()"><option>1개당</option><option>일괄</option></select>
+                        </div>
+                    </div>
+                    <div class="form-section-title">🚚 배송비</div>
+                    <div class="form-row" style="grid-template-columns:1fr 1fr">
+                        <div class="form-group"><label class="form-label">배송 방법</label>
+                            <select class="form-select" id="newProjectShippingType" onchange="toggleShippingFields('new')">
+                                <option value="">없음</option>
+                                <option value="택배">택배</option>
+                                <option value="퀵">퀵</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="newShippingCostDirect" style="display:none">
+                            <label class="form-label">배송비</label>
+                            <input type="text" inputmode="numeric" class="form-input" id="newProjectShippingCost" placeholder="0" oninput="fmtProjectNumberInput(this)">
+                        </div>
+                    </div>
+                    <div id="newShippingBoxCalc" style="display:none">
+                        <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
+                            <div class="form-group"><label class="form-label">박스당 배송비</label>
+                                <input type="text" inputmode="numeric" class="form-input" id="newProjectShipPerBox" placeholder="0" oninput="fmtProjectNumberInput(this);calcShippingCost('new')">
+                            </div>
+                            <div class="form-group"><label class="form-label">박스 수</label>
+                                <input type="text" inputmode="numeric" class="form-input" id="newProjectShipBoxes" placeholder="0" oninput="fmtProjectNumberInput(this);calcShippingCost('new')">
+                            </div>
+                            <div class="form-group"><label class="form-label">총 배송비</label>
+                                <div class="form-input" id="newProjectShipTotal" style="background:var(--gray-50);color:var(--gray-700);font-weight:700">0 원</div>
+                            </div>
                         </div>
                     </div>
                     <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid var(--gray-200)">
@@ -3489,17 +3607,21 @@ async function addProject(type) {
         unit: getVal('newProjectUnit') || '개',
         color: getVal('newProjectColor'),
         printColorSize: getVal('newProjectPrintColorSize'),
-        printMethod: getVal('newProjectPrintMethod'),
+        printMethod: getVal('newProjectPrintMethod') === '기타' ? (getVal('newProjectPrintMethodCustom') || '기타') : getVal('newProjectPrintMethod'),
         printFee: getInt('newProjectPrintFee'),
         printFeeVat: getVal('newProjectPrintFeeVat') || 'VAT 별도',
         printFeeApply: getVal('newProjectPrintFeeApply') || '1개당',
-        packaging: getVal('newProjectPackaging'),
+        packaging: getVal('newProjectPackaging') === '기타' ? (getVal('newProjectPackagingCustom') || '기타') : getVal('newProjectPackaging'),
         packagingFee: getInt('newProjectPackFee'),
         packagingFeeVat: getVal('newProjectPackFeeVat') || 'VAT 별도',
         packagingFeeApply: getVal('newProjectPackFeeApply') || '1개당',
         printCost: getInt('newProjectPrintFee'),
         packCost: getInt('newProjectPackFee'),
-        shipCost: getInt('newProjectShipCost'),
+        shipCost: getShippingCost('new'),
+        shippingType: getVal('newProjectShippingType'),
+        shippingCostPerBox: readProjectNumber('newProjectShipPerBox'),
+        shippingBoxes: readProjectNumber('newProjectShipBoxes'),
+        shippingCost: getShippingCost('new'),
         startDate: fmtDate(new Date()),
         deadline: document.getElementById('newProjectDeadline').value,
         recipient: getVal('newProjectRecipient'),
@@ -3578,7 +3700,11 @@ async function addProject(type) {
                 supplier_packaging_fee: newProject.supplierPackagingFee || 0,
                 supplier_packaging_fee_vat: newProject.supplierPackagingFeeVat || 'VAT 별도',
                 supplier_packaging_fee_apply: newProject.supplierPackagingFeeApply || '1개당',
-                supplier_revenue: newProject.supplierRevenue || 0
+                supplier_revenue: newProject.supplierRevenue || 0,
+                shipping_type: newProject.shippingType || '',
+                shipping_cost_per_box: newProject.shippingCostPerBox || 0,
+                shipping_boxes: newProject.shippingBoxes || 0,
+                shipping_cost: newProject.shippingCost || 0
             }).select().single();
             if (error) throw error;
             if (data) newProject.id = data.id;
@@ -3647,7 +3773,11 @@ async function loadDomesticProjectsFromDb() {
                 supplierRevenue: r.supplier_revenue || 0,
                 printCost: r.print_fee || 0,
                 packCost: r.packaging_fee || 0,
-                shipCost: 0,
+                shipCost: r.shipping_cost || 0,
+                shippingType: r.shipping_type || '',
+                shippingCostPerBox: r.shipping_cost_per_box || 0,
+                shippingBoxes: r.shipping_boxes || 0,
+                shippingCost: r.shipping_cost || 0,
                 startDate: r.start_date || '',
                 deadline: r.delivery_date || '',
                 recipient: r.recipient || '',
