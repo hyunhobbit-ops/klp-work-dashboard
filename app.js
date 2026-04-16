@@ -955,10 +955,10 @@ function toggleShippingFields(prefix) {
 }
 
 function calcShippingCost(prefix) {
-    const perBox = readProjectNumber(prefix + 'ProjectShipPerBox');
-    const boxes = readProjectNumber(prefix + 'ProjectShipBoxes');
+    const perBox = readProjectNumber(prefix + 'ProjectShipPerBox') || readProjectNumber(prefix + 'ShipPerBox');
+    const boxes = readProjectNumber(prefix + 'ProjectShipBoxes') || readProjectNumber(prefix + 'ShipBoxes');
     const total = perBox * boxes;
-    const el = document.getElementById(prefix + 'ProjectShipTotal');
+    const el = document.getElementById(prefix + 'ProjectShipTotal') || document.getElementById(prefix + 'ShipTotal');
     if (el) el.textContent = total.toLocaleString() + ' 원';
 }
 
