@@ -943,10 +943,12 @@ function toggleCustomInput(selectId, inputId) {
 }
 
 function toggleShippingFields(prefix) {
-    const type = document.getElementById(prefix + 'ProjectShippingType').value;
-    const boxCalc = document.getElementById(prefix + 'ShippingBoxCalc');
-    const directCost = document.getElementById(prefix + 'ShippingCostDirect');
-    const vatGroup = document.getElementById(prefix + 'ShippingVatGroup');
+    const typeEl = document.getElementById(prefix + 'ProjectShippingType') || document.getElementById(prefix + 'ShippingType');
+    if (!typeEl) return;
+    const type = typeEl.value;
+    const boxCalc = document.getElementById(prefix + 'ShippingBoxCalc') || document.getElementById(prefix + 'ProjectShippingBoxCalc');
+    const directCost = document.getElementById(prefix + 'ShippingCostDirect') || document.getElementById(prefix + 'ProjectShippingCostDirect');
+    const vatGroup = document.getElementById(prefix + 'ShippingVatGroup') || document.getElementById(prefix + 'ProjectShippingVatGroup');
     if (boxCalc) boxCalc.style.display = type === '택배' ? 'block' : 'none';
     if (directCost) directCost.style.display = type === '퀵' ? 'block' : 'none';
     if (vatGroup) vatGroup.style.display = type ? 'block' : 'none';
@@ -961,13 +963,15 @@ function calcShippingCost(prefix) {
 }
 
 function getShippingCost(prefix) {
-    const type = document.getElementById(prefix + 'ProjectShippingType');
+    const type = document.getElementById(prefix + 'ProjectShippingType') || document.getElementById(prefix + 'ShippingType');
     if (!type) return 0;
     if (type.value === '택배') {
-        return readProjectNumber(prefix + 'ProjectShipPerBox') * readProjectNumber(prefix + 'ProjectShipBoxes');
+        const perBox = readProjectNumber(prefix + 'ProjectShipPerBox') || readProjectNumber(prefix + 'ShipPerBox');
+        const boxes = readProjectNumber(prefix + 'ProjectShipBoxes') || readProjectNumber(prefix + 'ShipBoxes');
+        return perBox * boxes;
     }
     if (type.value === '퀵') {
-        return readProjectNumber(prefix + 'ProjectShippingCost');
+        return readProjectNumber(prefix + 'ProjectShippingCost') || readProjectNumber(prefix + 'ShippingCost');
     }
     return 0;
 }
@@ -2788,7 +2792,7 @@ function openEditProject(id) {
             <div class="form-section-title">🚚 배송비</div>
             <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
                 <div class="form-group"><label class="form-label">배송 방법</label>
-                    <select class="form-select" id="editProjectShippingType" onchange="toggleShippingFields('edit')">
+                    <select class="form-select" id="editProjectShippingType" onchange="toggleShippingFields('edit');calcEditProjectRevenue()">
                         <option value="" ${!p.shippingType?'selected':''}>없음</option>
                         <option value="택배" ${p.shippingType==='택배'?'selected':''}>택배</option>
                         <option value="퀵" ${p.shippingType==='퀵'?'selected':''}>퀵</option>
@@ -2796,23 +2800,23 @@ function openEditProject(id) {
                 </div>
                 <div class="form-group" id="editShippingVatGroup" style="display:${p.shippingType?'block':'none'}">
                     <label class="form-label">배송비 VAT</label>
-                    <select class="form-select" id="editProjectShippingVat">
+                    <select class="form-select" id="editProjectShippingVat" onchange="calcEditProjectRevenue()">
                         <option ${(p.shippingVat||'VAT 별도')==='VAT 별도'?'selected':''}>VAT 별도</option>
                         <option ${p.shippingVat==='VAT 포함'?'selected':''}>VAT 포함</option>
                     </select>
                 </div>
                 <div class="form-group" id="editShippingCostDirect" style="display:${p.shippingType==='퀵'?'block':'none'}">
                     <label class="form-label">배송비</label>
-                    <input type="text" inputmode="numeric" class="form-input" id="editProjectShippingCost" value="${p.shippingCost ? Number(p.shippingCost).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this)">
+                    <input type="text" inputmode="numeric" class="form-input" id="editProjectShippingCost" value="${p.shippingCost ? Number(p.shippingCost).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcEditProjectRevenue()">
                 </div>
             </div>
             <div id="editShippingBoxCalc" style="display:${p.shippingType==='택배'?'block':'none'}">
                 <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
                     <div class="form-group"><label class="form-label">박스당 배송비</label>
-                        <input type="text" inputmode="numeric" class="form-input" id="editProjectShipPerBox" value="${p.shippingCostPerBox ? Number(p.shippingCostPerBox).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcShippingCost('edit')">
+                        <input type="text" inputmode="numeric" class="form-input" id="editProjectShipPerBox" value="${p.shippingCostPerBox ? Number(p.shippingCostPerBox).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcShippingCost('edit');calcEditProjectRevenue()">
                     </div>
                     <div class="form-group"><label class="form-label">박스 수</label>
-                        <input type="text" inputmode="numeric" class="form-input" id="editProjectShipBoxes" value="${p.shippingBoxes ? Number(p.shippingBoxes).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcShippingCost('edit')">
+                        <input type="text" inputmode="numeric" class="form-input" id="editProjectShipBoxes" value="${p.shippingBoxes ? Number(p.shippingBoxes).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcShippingCost('edit');calcEditProjectRevenue()">
                     </div>
                     <div class="form-group"><label class="form-label">총 배송비</label>
                         <div class="form-input" id="editProjectShipTotal" style="background:var(--gray-50);color:var(--gray-700);font-weight:700">${p.shippingCost ? Number(p.shippingCost).toLocaleString() + ' 원' : '0 원'}</div>
@@ -2865,6 +2869,40 @@ function openEditProject(id) {
                         <option ${supPackFeeApply==='1개당'?'selected':''}>1개당</option>
                         <option ${supPackFeeApply==='일괄'?'selected':''}>일괄</option>
                     </select>
+                </div>
+            </div>
+            <div style="font-size:13px;font-weight:800;color:var(--klp-orange,#E67E22);margin:14px 0 8px;padding-bottom:6px;border-bottom:1px solid #FFE0CC">🚚 매입 배송비</div>
+            <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
+                <div class="form-group"><label class="form-label">배송 방법</label>
+                    <select class="form-select" id="editProjectSupShippingType" onchange="toggleShippingFields('editProjectSup');calcEditSupplierTotal()">
+                        <option value="" ${!p.supplierShippingType?'selected':''}>없음</option>
+                        <option value="택배" ${p.supplierShippingType==='택배'?'selected':''}>택배</option>
+                        <option value="퀵" ${p.supplierShippingType==='퀵'?'selected':''}>퀵</option>
+                    </select>
+                </div>
+                <div class="form-group" id="editProjectSupShippingVatGroup" style="display:${p.supplierShippingType?'block':'none'}">
+                    <label class="form-label">배송비 VAT</label>
+                    <select class="form-select" id="editProjectSupShippingVat" onchange="calcEditSupplierTotal()">
+                        <option ${(p.supplierShippingVat||'VAT 별도')==='VAT 별도'?'selected':''}>VAT 별도</option>
+                        <option ${p.supplierShippingVat==='VAT 포함'?'selected':''}>VAT 포함</option>
+                    </select>
+                </div>
+                <div class="form-group" id="editProjectSupShippingCostDirect" style="display:${p.supplierShippingType==='퀵'?'block':'none'}">
+                    <label class="form-label">배송비</label>
+                    <input type="text" inputmode="numeric" class="form-input" id="editProjectSupShippingCost" value="${p.supplierShippingCost ? Number(p.supplierShippingCost).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcEditSupplierTotal()">
+                </div>
+            </div>
+            <div id="editProjectSupShippingBoxCalc" style="display:${p.supplierShippingType==='택배'?'block':'none'}">
+                <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
+                    <div class="form-group"><label class="form-label">박스당 배송비</label>
+                        <input type="text" inputmode="numeric" class="form-input" id="editProjectSupShipPerBox" value="${p.supplierShippingCostPerBox ? Number(p.supplierShippingCostPerBox).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcShippingCost('editProjectSup');calcEditSupplierTotal()">
+                    </div>
+                    <div class="form-group"><label class="form-label">박스 수</label>
+                        <input type="text" inputmode="numeric" class="form-input" id="editProjectSupShipBoxes" value="${p.supplierShippingBoxes ? Number(p.supplierShippingBoxes).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcShippingCost('editProjectSup');calcEditSupplierTotal()">
+                    </div>
+                    <div class="form-group"><label class="form-label">총 배송비</label>
+                        <div class="form-input" id="editProjectSupShipTotal" style="background:var(--white);color:var(--gray-700);font-weight:700">${p.supplierShippingCost ? Number(p.supplierShippingCost).toLocaleString() + ' 원' : '0 원'}</div>
+                    </div>
                 </div>
             </div>
             <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid #FFE0CC">
@@ -2921,10 +2959,11 @@ function calcEditProjectRevenue() {
     if (vat === 'exclude') productTotal = Math.round(productTotal * 1.1);
     const printTotal = _feeComponent('editProjectPrintFee','editProjectPrintFeeVat','editProjectPrintFeeApply',qty);
     const packTotal = _feeComponent('editProjectPackFee','editProjectPackFeeVat','editProjectPackFeeApply',qty);
-    const revenue = productTotal + printTotal + packTotal;
+    const shippingTotal = _shippingComponent('editProjectShippingType','editProjectShippingVat','editProjectShippingCost','editProjectShipPerBox','editProjectShipBoxes');
+    const revenue = productTotal + printTotal + packTotal + shippingTotal;
     displayEl.textContent = revenue.toLocaleString() + ' 원';
     const bd = document.getElementById('editProjectRevenueBreakdown');
-    if (bd) bd.innerHTML = _breakdownHtml(productTotal, printTotal, packTotal);
+    if (bd) bd.innerHTML = _breakdownHtml(productTotal, printTotal, packTotal, shippingTotal);
     _renderMargin('editProjectMarginDisplay', revenue, _parseKRW('editProjectSupTotalDisplay'));
 }
 
@@ -2951,10 +2990,11 @@ function calcEditSupplierTotal() {
     if (vat === 'exclude') productTotal = Math.round(productTotal * 1.1);
     const printTotal = _feeComponent('editProjectSupPrintFee','editProjectSupPrintFeeVat','editProjectSupPrintFeeApply',qty);
     const packTotal = _feeComponent('editProjectSupPackFee','editProjectSupPackFeeVat','editProjectSupPackFeeApply',qty);
-    const total = productTotal + printTotal + packTotal;
+    const shippingTotal = _shippingComponent('editProjectSupShippingType','editProjectSupShippingVat','editProjectSupShippingCost','editProjectSupShipPerBox','editProjectSupShipBoxes');
+    const total = productTotal + printTotal + packTotal + shippingTotal;
     displayEl.textContent = total.toLocaleString() + ' 원';
     const bd = document.getElementById('editProjectSupBreakdown');
-    if (bd) bd.innerHTML = _breakdownHtml(productTotal, printTotal, packTotal);
+    if (bd) bd.innerHTML = _breakdownHtml(productTotal, printTotal, packTotal, shippingTotal);
     _renderMargin('editProjectMarginDisplay', _parseKRW('editProjectRevenueDisplay'), total);
 }
 
@@ -2977,7 +3017,8 @@ async function updateProject(id) {
     // 매출액 = 단가 + 인쇄비 환산 + 포장비 환산
     const printTotal = _feeComponent('editProjectPrintFee','editProjectPrintFeeVat','editProjectPrintFeeApply',qty);
     const packTotal = _feeComponent('editProjectPackFee','editProjectPackFeeVat','editProjectPackFeeApply',qty);
-    const revenue = productTotal + printTotal + packTotal;
+    const shipTotal = _shippingComponent('editProjectShippingType','editProjectShippingVat','editProjectShippingCost','editProjectShipPerBox','editProjectShipBoxes');
+    const revenue = productTotal + printTotal + packTotal + shipTotal;
 
     // 매입처 상세
     const supplierName = getVal('editProjectSupplier');
@@ -3000,7 +3041,8 @@ async function updateProject(id) {
         if (supplierVat === 'exclude') supProductTotal = Math.round(supProductTotal * 1.1);
         const supPrintTotal = _feeComponent('editProjectSupPrintFee','editProjectSupPrintFeeVat','editProjectSupPrintFeeApply',qty);
         const supPackTotal = _feeComponent('editProjectSupPackFee','editProjectSupPackFeeVat','editProjectSupPackFeeApply',qty);
-        supplierRevenue = supProductTotal + supPrintTotal + supPackTotal;
+        const supShipTotal = _shippingComponent('editProjectSupShippingType','editProjectSupShippingVat','editProjectSupShippingCost','editProjectSupShipPerBox','editProjectSupShipBoxes');
+        supplierRevenue = supProductTotal + supPrintTotal + supPackTotal + supShipTotal;
     }
 
     const newChecks = {};
@@ -3041,6 +3083,11 @@ async function updateProject(id) {
         supplierPackagingFeeVat,
         supplierPackagingFeeApply,
         supplierRevenue,
+        supplierShippingType: getVal('editProjectSupShippingType'),
+        supplierShippingVat: getVal('editProjectSupShippingVat') || 'VAT 별도',
+        supplierShippingCostPerBox: readProjectNumber('editProjectSupShipPerBox'),
+        supplierShippingBoxes: readProjectNumber('editProjectSupShipBoxes'),
+        supplierShippingCost: getShippingCost('editProjectSup'),
         shippingType: getVal('editProjectShippingType'),
         shippingVat: getVal('editProjectShippingVat') || 'VAT 별도',
         shippingCostPerBox: readProjectNumber('editProjectShipPerBox'),
@@ -3095,6 +3142,11 @@ async function updateProject(id) {
                 supplier_packaging_fee_vat: p.supplierPackagingFeeVat || 'VAT 별도',
                 supplier_packaging_fee_apply: p.supplierPackagingFeeApply || '1개당',
                 supplier_revenue: p.supplierRevenue || 0,
+                supplier_shipping_type: p.supplierShippingType || '',
+                supplier_shipping_vat: p.supplierShippingVat || 'VAT 별도',
+                supplier_shipping_cost_per_box: p.supplierShippingCostPerBox || 0,
+                supplier_shipping_boxes: p.supplierShippingBoxes || 0,
+                supplier_shipping_cost: p.supplierShippingCost || 0,
                 shipping_type: p.shippingType || '',
                 shipping_vat: p.shippingVat || 'VAT 별도',
                 shipping_cost_per_box: p.shippingCostPerBox || 0,
@@ -3500,10 +3552,26 @@ function _feeComponent(feeId, vatId, applyId, qty) {
     return total;
 }
 
-// 매출/매입 내역 한 줄
-function _breakdownHtml(productTotal, printTotal, packTotal, accent) {
+function _shippingComponent(typeId, vatId, costId, perBoxId, boxesId) {
+    const typeEl = document.getElementById(typeId);
+    if (!typeEl || !typeEl.value) return 0;
+    const vatEl = document.getElementById(vatId);
+    const vatExclude = vatEl ? vatEl.value === 'VAT 별도' : true;
+    let cost = 0;
+    if (typeEl.value === '택배') {
+        cost = readProjectNumber(perBoxId) * readProjectNumber(boxesId);
+    } else if (typeEl.value === '퀵') {
+        cost = readProjectNumber(costId);
+    }
+    if (vatExclude && cost > 0) cost = Math.round(cost * 1.1);
+    return cost;
+}
+
+function _breakdownHtml(productTotal, printTotal, packTotal, shippingTotal) {
     const r = (label, val) => `<div style="display:flex;justify-content:space-between;padding:3px 0"><span>${label}</span><strong style="color:var(--text-primary)">${val.toLocaleString()}원</strong></div>`;
-    return r('제품 (단가 × 수량)', productTotal) + r('＋ 인쇄비', printTotal) + r('＋ 포장비', packTotal);
+    let html = r('제품 (단가 × 수량)', productTotal) + r('＋ 인쇄비', printTotal) + r('＋ 포장비', packTotal);
+    if (shippingTotal) html += r('＋ 배송비', shippingTotal);
+    return html;
 }
 
 // 마진 카드 렌더 — 매입액이 0이면 표시 안 함
@@ -3537,10 +3605,11 @@ function calcProjectRevenue() {
     if (vat === 'exclude') productTotal = Math.round(productTotal * 1.1);
     const printTotal = _feeComponent('newProjectPrintFee', 'newProjectPrintFeeVat', 'newProjectPrintFeeApply', qty);
     const packTotal = _feeComponent('newProjectPackFee', 'newProjectPackFeeVat', 'newProjectPackFeeApply', qty);
-    const revenue = productTotal + printTotal + packTotal;
+    const shippingTotal = _shippingComponent('newProjectShippingType','newProjectShippingVat','newProjectShippingCost','newProjectShipPerBox','newProjectShipBoxes');
+    const revenue = productTotal + printTotal + packTotal + shippingTotal;
     displayEl.textContent = revenue.toLocaleString() + ' 원';
     const bd = document.getElementById('newProjectRevenueBreakdown');
-    if (bd) bd.innerHTML = _breakdownHtml(productTotal, printTotal, packTotal);
+    if (bd) bd.innerHTML = _breakdownHtml(productTotal, printTotal, packTotal, shippingTotal);
     _renderMargin('newProjectMarginDisplay', revenue, _parseKRW('newProjectSupTotalDisplay'));
 }
 
@@ -3567,10 +3636,11 @@ function calcSupplierTotal() {
     if (vat === 'exclude') productTotal = Math.round(productTotal * 1.1);
     const printTotal = _feeComponent('newProjectSupPrintFee', 'newProjectSupPrintFeeVat', 'newProjectSupPrintFeeApply', qty);
     const packTotal = _feeComponent('newProjectSupPackFee', 'newProjectSupPackFeeVat', 'newProjectSupPackFeeApply', qty);
-    const total = productTotal + printTotal + packTotal;
+    const shippingTotal = _shippingComponent('newProjectSupShippingType','newProjectSupShippingVat','newProjectSupShippingCost','newProjectSupShipPerBox','newProjectSupShipBoxes');
+    const total = productTotal + printTotal + packTotal + shippingTotal;
     displayEl.textContent = total.toLocaleString() + ' 원';
     const bd = document.getElementById('newProjectSupBreakdown');
-    if (bd) bd.innerHTML = _breakdownHtml(productTotal, printTotal, packTotal);
+    if (bd) bd.innerHTML = _breakdownHtml(productTotal, printTotal, packTotal, shippingTotal);
     _renderMargin('newProjectMarginDisplay', _parseKRW('newProjectRevenueDisplay'), total);
 }
 
@@ -3605,7 +3675,8 @@ async function addProject(type) {
     const isDomesticForm = type === 'domestic';
     const printTotal = isDomesticForm ? _feeComponent('newProjectPrintFee','newProjectPrintFeeVat','newProjectPrintFeeApply',qty) : 0;
     const packTotal = isDomesticForm ? _feeComponent('newProjectPackFee','newProjectPackFeeVat','newProjectPackFeeApply',qty) : 0;
-    const revenue = productTotal + printTotal + packTotal;
+    const newShipTotal = isDomesticForm ? _shippingComponent('newProjectShippingType','newProjectShippingVat','newProjectShippingCost','newProjectShipPerBox','newProjectShipBoxes') : 0;
+    const revenue = productTotal + printTotal + packTotal + newShipTotal;
 
     const assignee = currentUser ? currentUser.name : '';
     const getVal = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
@@ -3791,6 +3862,11 @@ async function loadDomesticProjectsFromDb() {
                 supplierPackagingFeeVat: r.supplier_packaging_fee_vat || 'VAT 별도',
                 supplierPackagingFeeApply: r.supplier_packaging_fee_apply || '1개당',
                 supplierRevenue: r.supplier_revenue || 0,
+                supplierShippingType: r.supplier_shipping_type || '',
+                supplierShippingVat: r.supplier_shipping_vat || 'VAT 별도',
+                supplierShippingCostPerBox: r.supplier_shipping_cost_per_box || 0,
+                supplierShippingBoxes: r.supplier_shipping_boxes || 0,
+                supplierShippingCost: r.supplier_shipping_cost || 0,
                 printCost: r.print_fee || 0,
                 packCost: r.packaging_fee || 0,
                 shipCost: r.shipping_cost || 0,
