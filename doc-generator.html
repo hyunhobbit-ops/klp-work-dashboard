@@ -758,6 +758,7 @@ function buildDoc(){
   var printFeeStr=pf?fmtP(val('printFee'))+' ('+val('printFeeVat')+'/'+val('printFeeApply')+')':'-';
   var pkgFeeStr=pkf?fmtP(val('packagingFee'))+' ('+val('packagingFeeVat')+'/'+val('packagingFeeApply')+')':'-';
   var e=window._est;var showPay=document.getElementById('showPaymentNotice').checked;
+  var shCost=getDcShipCost();var shType=val('shippingType');
   /* ---- 하단 고정 영역 높이 계산 ---- */
   /* 푸터(약40) + 면책(약44) + 결제문구(약24) + 견적(가변) */
   var fixedBottom=80; /* 푸터+면책 기본 */
