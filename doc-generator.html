@@ -1638,12 +1638,15 @@ async function applyProjectPrefillData(pf, opts){
     setVal('unitPriceVat',pf.unitPriceVat);
     setVal('color',pf.color);
     setVal('printColorSize',pf.printColorSize);
-    setVal('printMethod',pf.printMethod);
-    try{togglePrintFee();}catch(e){}
+    var pmStd=['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'];
+    if(pf.printMethod&&pmStd.indexOf(pf.printMethod)===-1){setVal('printMethod','기타');setVal('printMethodCustom',pf.printMethod)}else{setVal('printMethod',pf.printMethod)}
+    try{togglePrintCustom('printMethod','printMethodWrap','printMethodCustom');togglePrintFee();}catch(e){}
     setVal('printFee',pf.printFee);
     setVal('printFeeVat',pf.printFeeVat);
     setVal('printFeeApply',pf.printFeeApply);
-    setVal('packaging',pf.packaging);
+    var pkStd=['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'];
+    if(pf.packaging&&pkStd.indexOf(pf.packaging)===-1){setVal('packaging','기타');setVal('packagingCustom',pf.packaging)}else{setVal('packaging',pf.packaging)}
+    try{togglePrintCustom('packaging','packagingWrap','packagingCustom');}catch(e){}
     setVal('packagingFee',pf.packagingFee);
     setVal('packagingFeeVat',pf.packagingFeeVat);
     setVal('packagingFeeApply',pf.packagingFeeApply);
@@ -1681,12 +1684,15 @@ async function applyProjectPrefillData(pf, opts){
     setVal('wrUnitPriceVat',pf.unitPriceVat);
     setVal('wrColor',pf.color);
     setVal('wrPrintColorSize',pf.printColorSize);
-    setVal('wrPrintMethod',pf.printMethod);
-    try{toggleWrPrintFee();}catch(e){}
+    var pmStd2=['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'];
+    if(pf.printMethod&&pmStd2.indexOf(pf.printMethod)===-1){setVal('wrPrintMethod','기타');setVal('wrPrintMethodCustom',pf.printMethod)}else{setVal('wrPrintMethod',pf.printMethod)}
+    try{togglePrintCustom('wrPrintMethod','wrPrintMethodWrap','wrPrintMethodCustom');toggleWrPrintFee();}catch(e){}
     setVal('wrPrintFee',pf.printFee);
     setVal('wrPrintFeeVat',pf.printFeeVat);
     setVal('wrPrintFeeApply',pf.printFeeApply);
-    setVal('wrPackaging',pf.packaging);
+    var pkStd2=['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'];
+    if(pf.packaging&&pkStd2.indexOf(pf.packaging)===-1){setVal('wrPackaging','기타');setVal('wrPackagingCustom',pf.packaging)}else{setVal('wrPackaging',pf.packaging)}
+    try{togglePrintCustom('wrPackaging','wrPackagingWrap','wrPackagingCustom');}catch(e){}
     setVal('wrPkgFee',pf.packagingFee);
     setVal('wrPkgFeeVat',pf.packagingFeeVat);
     setVal('wrPkgFeeApply',pf.packagingFeeApply);
