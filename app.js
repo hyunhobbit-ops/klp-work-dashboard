@@ -652,7 +652,7 @@ function renderHome() {
                 ddayLabel = `D-${diff}`;
                 ddayBg = 'var(--gray-100)'; ddayColor = 'var(--gray-700)';
             }
-            const name = isTask ? it.task : ((it.client ? it.client + ' ' : '') + it.name);
+            const name = isTask ? it.task : ((it.client ? it.client + ' - ' : '') + it.name);
             const owner = isTask
                 ? (it.assignee || '-')
                 : (it.assignees && it.assignees.length ? it.assignees.join(', ') : (it.manager || '-'));
