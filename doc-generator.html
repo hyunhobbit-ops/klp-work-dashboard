@@ -431,9 +431,9 @@ function resizeImgToBase64(dataUrl,maxW,maxH,quality){
 }
 async function packImages(main,subs,maxW,maxH){
   var result={main:null,subs:[]};
-  if(main&&main.url)result.main=await resizeImgToBase64(main.url,maxW||400,maxH||400,0.5);
+  if(main&&main.url)result.main=await resizeImgToBase64(main.url,maxW||800,maxH||800,0.85);
   for(var i=0;i<subs.length;i++){
-    var s=await resizeImgToBase64(subs[i].url,maxW||200,maxH||200,0.4);
+    var s=await resizeImgToBase64(subs[i].url,maxW||500,maxH||500,0.8);
     if(s)result.subs.push(s);
   }
   return JSON.stringify(result);
