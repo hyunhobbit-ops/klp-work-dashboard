@@ -7595,7 +7595,7 @@ function renderTempQuoteDoc(g) {
       </div>
       <div style="text-align:right">
         <div style="font-size:26px;font-weight:900;letter-spacing:.5px">￦ ${fmtNTemp(grand)}</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.8);margin-top:1px">부가세 별도가</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.8);margin-top:1px">부가세 포함가</div>
       </div>
     </div>
     <!-- 품목 테이블 -->
