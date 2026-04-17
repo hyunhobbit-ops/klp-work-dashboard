@@ -227,8 +227,8 @@ let currentDeliveryMonth = String(new Date().getMonth() + 1).padStart(2, '0');
 // ===== Page Titles =====
 const pageTitles = {
     home: '홈',
-    'projects-domestic': '프로젝트 진행사항 — 국내',
-    'projects-overseas': '프로젝트 진행사항 — 해외',
+    'projects-domestic': '프로젝트 — 국내',
+    'projects-overseas': '프로젝트 — 해외',
     daily: '일일계획표',
     delivery: '택배 관리',
     'product-db': '상품 DB',
