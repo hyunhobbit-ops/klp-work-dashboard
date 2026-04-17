@@ -619,13 +619,15 @@ function renderHome() {
         });
     const taskDeadlines = dailyTasks
         .filter(t => {
-            if (t.done || !t.deadline || t.isDeadlineCopy) return false;
+            if (t.done || t.isDeadlineCopy) return false;
+            if (!t.deadline && !t.date) return false;
             return t.assignee === meName || t.assignee === '전체';
         })
         .map(t => {
-            const d = new Date(t.deadline + 'T00:00:00');
+            const dl = t.deadline || t.date;
+            const d = new Date(dl + 'T00:00:00');
             const diff = Math.round((d - today0) / 86400000);
-            return { kind: 'task', item: t, diff };
+            return { kind: 'task', item: { ...t, deadline: dl }, diff };
         });
     // 프로젝트를 먼저, 그 다음 할 일. 같은 종류 내에서는 마감일 빠른 순.
     const sortFn = (a, b) => {
