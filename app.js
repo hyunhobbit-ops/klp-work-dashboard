@@ -6793,13 +6793,13 @@ function renderTempProjects() {
         const gClient = (g.client || '').replace(/'/g, "\\'");
         const gContact = (g.clientContact || '').replace(/'/g, "\\'");
         rowHtml += `<tr class="temp-group-add-row" data-group="${gi}" style="background:${bgColor}">
-            <td><input id="tempGrpItem_${gi}" placeholder="품목 추가" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit"></td>
-            <td><input id="tempGrpUnitPrice_${gi}" placeholder="매출단가" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit;text-align:right" oninput="fmtCommaTemp(this)"></td>
-            <td><input id="tempGrpQty_${gi}" placeholder="수량" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit;text-align:right" oninput="fmtCommaTemp(this)"></td>
+            <td><input id="tempGrpItem_${gi}" placeholder="품목 추가" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit;color:var(--gray-900)"></td>
+            <td><input id="tempGrpUnitPrice_${gi}" placeholder="매출단가" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit;color:var(--gray-900);text-align:right" oninput="fmtCommaTemp(this)"></td>
+            <td><input id="tempGrpQty_${gi}" placeholder="수량" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit;color:var(--gray-900);text-align:right" oninput="fmtCommaTemp(this)"></td>
             <td></td>
-            <td><input id="tempGrpSupplier_${gi}" list="tempClientList" placeholder="매입처" autocomplete="off" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit"></td>
-            <td><input id="tempGrpSupContact_${gi}" placeholder="담당자" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit"></td>
-            <td><input id="tempGrpSupUnitPrice_${gi}" placeholder="매입단가" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit;text-align:right" oninput="fmtCommaTemp(this)"></td>
+            <td><input id="tempGrpSupplier_${gi}" list="tempClientList" placeholder="매입처" autocomplete="off" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit;color:var(--gray-900)"></td>
+            <td><input id="tempGrpSupContact_${gi}" placeholder="담당자" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit;color:var(--gray-900)"></td>
+            <td><input id="tempGrpSupUnitPrice_${gi}" placeholder="매입단가" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit;color:var(--gray-900);text-align:right" oninput="fmtCommaTemp(this)"></td>
             <td></td>
             <td></td>
             <td><button class="btn-primary" onclick="saveTempGroupItem(${gi},'${gDate}','${gClient}','${gContact}')" style="padding:5px 12px;font-size:12px;white-space:nowrap">+ 추가</button></td>
