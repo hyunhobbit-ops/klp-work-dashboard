@@ -416,9 +416,9 @@ function switchTab(tabId, fromHistory = false) {
         }
     }
 
-    // 임시 프로젝트 탭 열릴 때 렌더 + 인라인 초기화
+    // 임시 프로젝트 탭 열릴 때 DB 로드 + 인라인 초기화
     if (tabId === 'projects-temp') {
-        renderTempProjects();
+        loadTempProjects();
         const dateEl = document.getElementById('tempInDate');
         if (dateEl && !dateEl.value) dateEl.value = getTodayStr();
         buildTempClientDatalist();
@@ -6635,11 +6635,7 @@ document.addEventListener('keydown', e => {
 // 임시 프로젝트
 // =====================================
 let tempGroups = [];
-const tempProjects = [
-    { id: -1, date: '2026-04-17', client: '삼성전자', clientContact: '박과장', item: '텀블러 각인', unitPrice: 15000, unitPriceVat: 'VAT 별도', supplierUnitPrice: 10500, supplierUnitPriceVat: 'VAT 별도', qty: 200, revenue: 3105500, supplier: '대한기프트', supplierContact: '김사장', supplierRevenue: 2170000, printMethod: '레이저각인', printFee: 500, printFeeApply: '1개당', printFeeVat: 'VAT 별도', packMethod: '기본박스', packagingFee: 0, packagingFeeApply: '일괄', packagingFeeVat: 'VAT 별도', labelFee: 0, labelFeeVat: 'VAT 별도', shippingBoxes: 2, shippingFee: 5500, shippingFeeVat: 'VAT 포함', supPrintMethod: '레이저각인', supPrintFee: 300, supPrintFeeApply: '1개당', supPrintFeeVat: 'VAT 별도', supPackMethod: '기본박스', supPackagingFee: 0, supPackagingFeeApply: '일괄', supPackagingFeeVat: 'VAT 별도', supLabelFee: 0, supLabelFeeVat: 'VAT 별도', supShippingBoxes: 2, supShippingFee: 10000, supShippingFeeVat: 'VAT 별도' },
-    { id: -2, date: '2026-04-17', client: '삼성전자', clientContact: '박과장', item: '볼펜 세트', unitPrice: 8000, unitPriceVat: 'VAT 포함', supplierUnitPrice: 5600, supplierUnitPriceVat: 'VAT 별도', qty: 500, revenue: 4000000, supplier: '한국판촉', supplierContact: '이대리', supplierRevenue: 2800000, printMethod: '실크인쇄', printFee: 0, printFeeApply: '1개당', printFeeVat: 'VAT 별도', packMethod: '선물포장', packagingFee: 0, packagingFeeApply: '일괄', packagingFeeVat: 'VAT 별도', labelFee: 0, labelFeeVat: 'VAT 별도', shippingBoxes: 0, shippingFee: 0, shippingFeeVat: 'VAT 별도', supPrintMethod: '없음', supPrintFee: 0, supPrintFeeApply: '1개당', supPrintFeeVat: 'VAT 별도', supPackMethod: '기본박스', supPackagingFee: 0, supPackagingFeeApply: '일괄', supPackagingFeeVat: 'VAT 별도', supLabelFee: 0, supLabelFeeVat: 'VAT 별도', supShippingBoxes: 0, supShippingFee: 0, supShippingFeeVat: 'VAT 별도' },
-    { id: -3, date: '2026-04-16', client: 'LG화학', clientContact: '최부장', item: '에코백 실크인쇄', unitPrice: 12000, unitPriceVat: 'VAT 별도', supplierUnitPrice: 8000, supplierUnitPriceVat: 'VAT 별도', qty: 300, revenue: 3708250, supplier: '대한기프트', supplierContact: '김사장', supplierRevenue: 2480000, printMethod: '실크인쇄', printFee: 0, printFeeApply: '1개당', printFeeVat: 'VAT 별도', packMethod: '기본박스', packagingFee: 100000, packagingFeeApply: '일괄', packagingFeeVat: 'VAT 별도', labelFee: 0, labelFeeVat: 'VAT 별도', shippingBoxes: 3, shippingFee: 8250, shippingFeeVat: 'VAT 포함', supPrintMethod: '실크인쇄', supPrintFee: 0, supPrintFeeApply: '1개당', supPrintFeeVat: 'VAT 별도', supPackMethod: '기본박스', supPackagingFee: 80000, supPackagingFeeApply: '일괄', supPackagingFeeVat: 'VAT 별도', supLabelFee: 0, supLabelFeeVat: 'VAT 별도', supShippingBoxes: 0, supShippingFee: 0, supShippingFeeVat: 'VAT 별도' }
-];
+const tempProjects = [];
 
 async function loadTempProjects() {
     try {
