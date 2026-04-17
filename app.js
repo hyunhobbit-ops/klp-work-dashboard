@@ -6668,6 +6668,7 @@ async function loadTempProjects() {
                 packagingFee: r.packaging_fee || 0,
                 packagingFeeApply: r.packaging_fee_apply || '일괄',
                 packagingFeeVat: r.packaging_fee_vat || 'VAT 별도',
+                labelAvail: r.label_avail || '불가능',
                 labelFee: r.label_fee || 0,
                 labelFeeApply: r.label_fee_apply || '1개당',
                 labelFeeVat: r.label_fee_vat || 'VAT 별도',
@@ -6682,6 +6683,7 @@ async function loadTempProjects() {
                 supPackagingFee: r.sup_packaging_fee || 0,
                 supPackagingFeeApply: r.sup_packaging_fee_apply || '일괄',
                 supPackagingFeeVat: r.sup_packaging_fee_vat || 'VAT 별도',
+                supLabelAvail: r.sup_label_avail || '불가능',
                 supLabelFee: r.sup_label_fee || 0,
                 supLabelFeeApply: r.sup_label_fee_apply || '1개당',
                 supLabelFeeVat: r.sup_label_fee_vat || 'VAT 별도',
@@ -7235,7 +7237,8 @@ function openTempGroupEdit(gi) {
         </div>
         <div style="background:var(--white);border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid var(--gray-200)">
             <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px">🏷 라벨</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:end">
+            <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr 1fr;gap:6px;align-items:end">
+                <div><label style="${LB}">부착</label><select id="${prefix}_la_${i}" style="${SS}"><option${(data.la||'불가능')==='가능'?' selected':''}>가능</option><option${(data.la||'불가능')!=='가능'?' selected':''}>불가능</option></select></div>
                 <div><label style="${LB}">단가</label><input id="${prefix}_lf_${i}" value="${fmtV(data.lf)}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
                 <div><label style="${LB}">적용</label><select id="${prefix}_lfa_${i}" style="${SS}" onchange="${RC(prefix,i,qty)}"><option${(data.lfa||'1개당')==='1개당'?' selected':''}>1개당</option><option${data.lfa==='일괄'?' selected':''}>일괄</option></select></div>
                 <div><label style="${LB}">VAT</label><select id="${prefix}_lfv_${i}" style="${SS}">${vatOpts(data.lfv)}</select></div>
@@ -7265,7 +7268,7 @@ function openTempGroupEdit(gi) {
                     <div><label style="${LB}">단가</label><input id="tge_up_${i}" value="${fmtV(p.unitPrice)}" placeholder="0" oninput="fmtCommaTemp(this)" style="${IS};text-align:right"></div>
                     <div><label style="${LB}">VAT</label><select id="tge_upv_${i}" style="${SS}">${vatOpts(p.unitPriceVat)}</select></div>
                 </div>
-                ${feeSection('tge', i, { pm: p.printMethod, pf: p.printFee, pfa: p.printFeeApply, pfv: p.printFeeVat, pkm: p.packMethod, pkf: p.packagingFee, pkfa: p.packagingFeeApply, pkfv: p.packagingFeeVat, lf: p.labelFee, lfa: p.labelFeeApply, lfv: p.labelFeeVat, sb: p.shippingBoxes, sf: p.shippingFee, sfv: p.shippingFeeVat }, p.qty || 0)}
+                ${feeSection('tge', i, { pm: p.printMethod, pf: p.printFee, pfa: p.printFeeApply, pfv: p.printFeeVat, pkm: p.packMethod, pkf: p.packagingFee, pkfa: p.packagingFeeApply, pkfv: p.packagingFeeVat, la: p.labelAvail, lf: p.labelFee, lfa: p.labelFeeApply, lfv: p.labelFeeVat, sb: p.shippingBoxes, sf: p.shippingFee, sfv: p.shippingFeeVat }, p.qty || 0)}
             </div>
             <!-- 매입 -->
             <div style="${secStyle('#E67E22', 'rgba(230,126,34,0.05)')}">
@@ -7274,7 +7277,7 @@ function openTempGroupEdit(gi) {
                     <div><label style="${LB}">단가</label><input id="tge_sup_${i}" value="${fmtV(p.supplierUnitPrice)}" placeholder="0" oninput="fmtCommaTemp(this)" style="${IS};text-align:right"></div>
                     <div><label style="${LB}">VAT</label><select id="tge_supv_${i}" style="${SS}">${vatOpts(p.supplierUnitPriceVat)}</select></div>
                 </div>
-                ${feeSection('tgs', i, { pm: p.supPrintMethod, pf: p.supPrintFee, pfa: p.supPrintFeeApply, pfv: p.supPrintFeeVat, pkm: p.supPackMethod, pkf: p.supPackagingFee, pkfa: p.supPackagingFeeApply, pkfv: p.supPackagingFeeVat, lf: p.supLabelFee, lfa: p.supLabelFeeApply, lfv: p.supLabelFeeVat, sb: p.supShippingBoxes, sf: p.supShippingFee, sfv: p.supShippingFeeVat }, p.qty || 0)}
+                ${feeSection('tgs', i, { pm: p.supPrintMethod, pf: p.supPrintFee, pfa: p.supPrintFeeApply, pfv: p.supPrintFeeVat, pkm: p.supPackMethod, pkf: p.supPackagingFee, pkfa: p.supPackagingFeeApply, pkfv: p.supPackagingFeeVat, la: p.supLabelAvail, lf: p.supLabelFee, lfa: p.supLabelFeeApply, lfv: p.supLabelFeeVat, sb: p.supShippingBoxes, sf: p.supShippingFee, sfv: p.supShippingFeeVat }, p.qty || 0)}
             </div>
         </div>
     </div>`).join('');
@@ -7334,6 +7337,7 @@ async function saveTempGroupEdit(gi) {
         p.packagingFeeVat = getVal(`tge_pkfv_${i}`);
 
         // 라벨
+        p.labelAvail = getVal(`tge_la_${i}`);
         p.labelFee = getNum(`tge_lf_${i}`);
         p.labelFeeApply = getVal(`tge_lfa_${i}`);
         p.labelFeeVat = getVal(`tge_lfv_${i}`);
@@ -7352,6 +7356,7 @@ async function saveTempGroupEdit(gi) {
         p.supPackagingFee = getNum(`tgs_pkf_${i}`);
         p.supPackagingFeeApply = getVal(`tgs_pkfa_${i}`);
         p.supPackagingFeeVat = getVal(`tgs_pkfv_${i}`);
+        p.supLabelAvail = getVal(`tgs_la_${i}`);
         p.supLabelFee = getNum(`tgs_lf_${i}`);
         p.supLabelFeeApply = getVal(`tgs_lfa_${i}`);
         p.supLabelFeeVat = getVal(`tgs_lfv_${i}`);
@@ -7376,6 +7381,7 @@ async function saveTempGroupEdit(gi) {
             packaging_fee: p.packagingFee,
             packaging_fee_apply: p.packagingFeeApply,
             packaging_fee_vat: p.packagingFeeVat,
+            label_avail: p.labelAvail,
             label_fee: p.labelFee,
             label_fee_apply: p.labelFeeApply,
             label_fee_vat: p.labelFeeVat,
@@ -7390,6 +7396,7 @@ async function saveTempGroupEdit(gi) {
             sup_packaging_fee: p.supPackagingFee,
             sup_packaging_fee_apply: p.supPackagingFeeApply,
             sup_packaging_fee_vat: p.supPackagingFeeVat,
+            sup_label_avail: p.supLabelAvail,
             sup_label_fee: p.supLabelFee,
             sup_label_fee_apply: p.supLabelFeeApply,
             sup_label_fee_vat: p.supLabelFeeVat,
@@ -7495,12 +7502,14 @@ function renderTempQuoteDoc(g) {
 
         // 부대비용 행
         const qty = p.qty || 0;
+        const hasPrint = p.printMethod && p.printMethod !== '없음';
+        const hasLabel = p.labelAvail === '가능';
         const fees = [
-            { name: '인쇄비' + (p.printMethod && p.printMethod !== '없음' ? ' (' + p.printMethod + ')' : ''), unitVal: p.printFee || 0, apply: p.printFeeApply || '1개당', vat: p.printFeeVat },
-            { name: '포장비' + (p.packMethod && p.packMethod !== '기본박스' ? ' (' + p.packMethod + ')' : ''), unitVal: p.packagingFee || 0, apply: p.packagingFeeApply || '일괄', vat: p.packagingFeeVat },
-            { name: '라벨비', unitVal: p.labelFee || 0, apply: p.labelFeeApply || '1개당', vat: p.labelFeeVat },
-            { name: '택배비', unitVal: p.shippingFee || 0, apply: '박스', fQtyOverride: p.shippingBoxes || 0, vat: p.shippingFeeVat }
-        ].filter(f => f.unitVal > 0);
+            hasPrint ? { name: '인쇄비 (' + (p.printMethod || '') + ')', unitVal: p.printFee || 0, apply: p.printFeeApply || '1개당', vat: p.printFeeVat } : null,
+            { name: '포장비 (' + (p.packMethod || '기본박스') + ')', unitVal: p.packagingFee || 0, apply: p.packagingFeeApply || '일괄', vat: p.packagingFeeVat },
+            hasLabel ? { name: '라벨비', unitVal: p.labelFee || 0, apply: p.labelFeeApply || '1개당', vat: p.labelFeeVat } : null,
+            { name: (p.shippingFee || 0) > 0 ? '택배비' : '택배비 포함', unitVal: p.shippingFee || 0, apply: '박스', fQtyOverride: p.shippingBoxes || 0, vat: p.shippingFeeVat }
+        ].filter(Boolean);
 
         fees.forEach(f => {
             const fQty = f.fQtyOverride !== undefined ? f.fQtyOverride : (f.apply === '1개당' ? qty : 1);
