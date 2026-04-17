@@ -7289,7 +7289,7 @@ function openTempGroupEdit(gi) {
     ${itemsHtml}
     <div style="background:var(--gray-50);border-radius:14px;padding:16px;margin-bottom:14px">
         <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:var(--gray-900)">견적서 비고</div>
-        <textarea id="tge_quoteNote" rows="4" placeholder="• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.&#10;• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다." style="${IS};resize:vertical;min-height:80px;line-height:1.6">${g.quoteNote || ''}</textarea>
+        <textarea id="tge_quoteNote" rows="4" style="${IS};resize:vertical;min-height:80px;line-height:1.6">${g.quoteNote || '• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.\n• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.'}</textarea>
     </div>
     <button class="btn-primary" onclick="saveTempGroupEdit(${gi})" style="width:100%;padding:14px;font-size:15px;margin-top:4px">저장</button>`;
 
