@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="mobile.css?v=20260416a" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script>
         // 다크모드 FOUC 방지 — 페인트 전에 즉시 적용
         try {
@@ -68,6 +70,9 @@
                             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                             <span>프로젝트</span>
                         </div>
+                        <button class="nav-item nav-sub-item" data-tab="projects-temp">
+                            <span>임시</span>
+                        </button>
                         <button class="nav-item nav-sub-item" data-tab="projects-domestic">
                             <span>국내</span>
                         </button>
@@ -345,6 +350,62 @@
             </main>
 
             <!-- ===== Projects ===== -->
+            <!-- ===== 임시 프로젝트 ===== -->
+            <main class="content" id="tab-projects-temp">
+                <div class="table-wrap">
+                    <table class="data-table" id="tempProjectTable">
+                        <thead>
+                            <tr>
+                                <th>날짜</th>
+                                <th>매출처</th>
+                                <th>담당자</th>
+                                <th>품목</th>
+                                <th>매출단가</th>
+                                <th>수량</th>
+                                <th>매출액 (VAT포함)</th>
+                                <th>매입처</th>
+                                <th>담당자</th>
+                                <th>매입단가</th>
+                                <th>매입액 (VAT포함)</th>
+                                <th>마진</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tempProjectTableBody"></tbody>
+                        <tfoot>
+                            <tr id="tempInlineRow" style="background:var(--gray-50)">
+                                <td><input type="date" id="tempInDate" style="padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%;background:var(--white);font-family:inherit"></td>
+                                <td><input id="tempInClient" list="tempClientList" placeholder="매출처" autocomplete="off" style="padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%;background:var(--white);font-family:inherit"></td>
+                                <td><input id="tempInClientContact" placeholder="담당자" style="padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%;background:var(--white);font-family:inherit"></td>
+                                <td><input id="tempInItem" placeholder="품목" style="padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%;background:var(--white);font-family:inherit"></td>
+                                <td><input id="tempInUnitPrice" placeholder="0" style="padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%;background:var(--white);font-family:inherit;text-align:right" oninput="fmtCommaTemp(this);calcTempInline()"></td>
+                                <td><input id="tempInQty" placeholder="0" style="padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%;background:var(--white);font-family:inherit;text-align:right" oninput="fmtCommaTemp(this);calcTempInline()"></td>
+                                <td><span id="tempInRevenue" style="font-size:13px;color:var(--text-tertiary)">-</span></td>
+                                <td><input id="tempInSupplier" list="tempClientList" placeholder="매입처" autocomplete="off" style="padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%;background:var(--white);font-family:inherit"></td>
+                                <td><input id="tempInSupContact" placeholder="담당자" style="padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%;background:var(--white);font-family:inherit"></td>
+                                <td><input id="tempInSupUnitPrice" placeholder="0" style="padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%;background:var(--white);font-family:inherit;text-align:right" oninput="fmtCommaTemp(this);calcTempInline()"></td>
+                                <td><span id="tempInSupRevenue" style="font-size:13px;color:var(--text-tertiary)">-</span></td>
+                                <td><span id="tempInMargin" style="font-size:13px;color:var(--text-tertiary)">-</span></td>
+                                <td><button class="btn-primary" onclick="saveTempInline()" style="padding:6px 14px;font-size:13px;white-space:nowrap">추가</button></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div class="card-grid" id="tempProjectCardGrid"></div>
+            </main>
+
+            <!-- 임시 프로젝트 견적서 오버레이 -->
+            <div id="tempQuoteOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;overflow-y:auto;backdrop-filter:blur(4px)">
+                <div style="max-width:860px;margin:24px auto;padding:16px">
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+                        <button id="btnTempQuoteJpg" onclick="dlTempQuote('jpg')" style="padding:8px 16px;border-radius:10px;border:none;background:#1B64DA;color:#fff;font-weight:700;cursor:pointer;font-family:inherit">JPG 다운로드</button>
+                        <button id="btnTempQuotePdf" onclick="dlTempQuote('pdf')" style="padding:8px 16px;border-radius:10px;border:none;background:#16A34A;color:#fff;font-weight:700;cursor:pointer;font-family:inherit">PDF 다운로드</button>
+                        <button onclick="closeTempQuote()" style="margin-left:auto;padding:8px 16px;border-radius:10px;border:none;background:var(--gray-200);color:var(--gray-700);font-weight:700;cursor:pointer;font-family:inherit">닫기</button>
+                    </div>
+                    <div style="padding:20px;background:#f0f0f0;border-radius:12px"><div id="tempQuoteDocEl" style="margin:0 auto"></div></div>
+                </div>
+            </div>
+
             <!-- ===== 국내 프로젝트 ===== -->
             <main class="content" id="tab-projects-domestic">
                 <div class="content-toolbar">
@@ -850,6 +911,7 @@
         <svg class="icon-moon" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
         <svg class="icon-sun" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
     </button>
+    <script src="klp-assets.js"></script>
     <script src="app.js?v=20260414c"></script>
 </body>
 </html>

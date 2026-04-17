@@ -227,6 +227,7 @@ let currentDeliveryMonth = String(new Date().getMonth() + 1).padStart(2, '0');
 // ===== Page Titles =====
 const pageTitles = {
     home: '홈',
+    'projects-temp': '프로젝트 — 임시',
     'projects-domestic': '프로젝트 — 국내',
     'projects-overseas': '프로젝트 — 해외',
     daily: '일일계획표',
@@ -413,6 +414,14 @@ function switchTab(tabId, fromHistory = false) {
         if (location.hash !== newHash) {
             history.pushState({ tab: tabId }, '', newHash);
         }
+    }
+
+    // 임시 프로젝트 탭 열릴 때 렌더 + 인라인 초기화
+    if (tabId === 'projects-temp') {
+        renderTempProjects();
+        const dateEl = document.getElementById('tempInDate');
+        if (dateEl && !dateEl.value) dateEl.value = getTodayStr();
+        buildTempClientDatalist();
     }
 
     // 중고마켓DB 탭 열릴 때 렌더
@@ -4957,7 +4966,16 @@ document.addEventListener('dblclick', (e) => {
     const entity = cell.dataset.entity || 'delivery';
 
     let row, dbUpdate, rerender;
-    if (entity === 'client') {
+    const tempFieldMap = { item: 'item', unitPrice: 'unit_price', unitPriceVat: 'unit_price_vat', supplierUnitPrice: 'supplier_unit_price', supplierUnitPriceVat: 'supplier_unit_price_vat', qty: 'qty', supplier: 'supplier', supplierContact: 'supplier_contact', date: 'date', client: 'client', clientContact: 'client_contact', revenue: 'revenue', supplierRevenue: 'supplier_revenue', printMethod: 'print_method', printFee: 'print_fee', printFeeApply: 'print_fee_apply', printFeeVat: 'print_fee_vat', packMethod: 'pack_method', packagingFee: 'packaging_fee', packagingFeeApply: 'packaging_fee_apply', packagingFeeVat: 'packaging_fee_vat', labelFee: 'label_fee', labelFeeVat: 'label_fee_vat', shippingBoxes: 'shipping_boxes', shippingFee: 'shipping_fee', shippingFeeVat: 'shipping_fee_vat' };
+    if (entity === 'temp') {
+        row = tempProjects.find(x => x.id === id);
+        dbUpdate = (patch) => {
+            const dbPatch = {};
+            for (const [k, v] of Object.entries(patch)) dbPatch[tempFieldMap[k] || k] = v;
+            return sb.from('projects_temp').update(dbPatch).eq('id', id);
+        };
+        rerender = renderTempProjects;
+    } else if (entity === 'client') {
         row = clients.find(x => x.id === id);
         dbUpdate = (patch) => dbUpdateClient(id, patch);
         rerender = renderClients;
@@ -5032,7 +5050,15 @@ document.addEventListener('dblclick', (e) => {
             } else {
                 row[field] = input.value.trim();
             }
-            await dbUpdate({ [field]: row[field] });
+            const patch = { [field]: row[field] };
+            // temp entity: 단가·수량 변경 시 매출액/매입액 재계산
+            if (entity === 'temp' && ['unitPrice', 'supplierUnitPrice', 'qty'].includes(field)) {
+                row.revenue = calcTempGroupRevenue(row);
+                row.supplierRevenue = calcTempGroupSupRevenue(row);
+                patch.revenue = row.revenue;
+                patch.supplierRevenue = row.supplierRevenue;
+            }
+            await dbUpdate(patch);
             rerender();
             showToast('수정되었습니다');
         };
@@ -6604,3 +6630,1029 @@ document.addEventListener('keydown', e => {
         closeMarketModal();
     }
 });
+
+// =====================================
+// 임시 프로젝트
+// =====================================
+let tempGroups = [];
+const tempProjects = [
+    { id: -1, date: '2026-04-17', client: '삼성전자', clientContact: '박과장', item: '텀블러 각인', unitPrice: 15000, unitPriceVat: 'VAT 별도', supplierUnitPrice: 10500, supplierUnitPriceVat: 'VAT 별도', qty: 200, revenue: 3105500, supplier: '대한기프트', supplierContact: '김사장', supplierRevenue: 2170000, printMethod: '레이저각인', printFee: 500, printFeeApply: '1개당', printFeeVat: 'VAT 별도', packMethod: '기본박스', packagingFee: 0, packagingFeeApply: '일괄', packagingFeeVat: 'VAT 별도', labelFee: 0, labelFeeVat: 'VAT 별도', shippingBoxes: 2, shippingFee: 5500, shippingFeeVat: 'VAT 포함', supPrintMethod: '레이저각인', supPrintFee: 300, supPrintFeeApply: '1개당', supPrintFeeVat: 'VAT 별도', supPackMethod: '기본박스', supPackagingFee: 0, supPackagingFeeApply: '일괄', supPackagingFeeVat: 'VAT 별도', supLabelFee: 0, supLabelFeeVat: 'VAT 별도', supShippingBoxes: 2, supShippingFee: 10000, supShippingFeeVat: 'VAT 별도' },
+    { id: -2, date: '2026-04-17', client: '삼성전자', clientContact: '박과장', item: '볼펜 세트', unitPrice: 8000, unitPriceVat: 'VAT 포함', supplierUnitPrice: 5600, supplierUnitPriceVat: 'VAT 별도', qty: 500, revenue: 4000000, supplier: '한국판촉', supplierContact: '이대리', supplierRevenue: 2800000, printMethod: '실크인쇄', printFee: 0, printFeeApply: '1개당', printFeeVat: 'VAT 별도', packMethod: '선물포장', packagingFee: 0, packagingFeeApply: '일괄', packagingFeeVat: 'VAT 별도', labelFee: 0, labelFeeVat: 'VAT 별도', shippingBoxes: 0, shippingFee: 0, shippingFeeVat: 'VAT 별도', supPrintMethod: '없음', supPrintFee: 0, supPrintFeeApply: '1개당', supPrintFeeVat: 'VAT 별도', supPackMethod: '기본박스', supPackagingFee: 0, supPackagingFeeApply: '일괄', supPackagingFeeVat: 'VAT 별도', supLabelFee: 0, supLabelFeeVat: 'VAT 별도', supShippingBoxes: 0, supShippingFee: 0, supShippingFeeVat: 'VAT 별도' },
+    { id: -3, date: '2026-04-16', client: 'LG화학', clientContact: '최부장', item: '에코백 실크인쇄', unitPrice: 12000, unitPriceVat: 'VAT 별도', supplierUnitPrice: 8000, supplierUnitPriceVat: 'VAT 별도', qty: 300, revenue: 3708250, supplier: '대한기프트', supplierContact: '김사장', supplierRevenue: 2480000, printMethod: '실크인쇄', printFee: 0, printFeeApply: '1개당', printFeeVat: 'VAT 별도', packMethod: '기본박스', packagingFee: 100000, packagingFeeApply: '일괄', packagingFeeVat: 'VAT 별도', labelFee: 0, labelFeeVat: 'VAT 별도', shippingBoxes: 3, shippingFee: 8250, shippingFeeVat: 'VAT 포함', supPrintMethod: '실크인쇄', supPrintFee: 0, supPrintFeeApply: '1개당', supPrintFeeVat: 'VAT 별도', supPackMethod: '기본박스', supPackagingFee: 80000, supPackagingFeeApply: '일괄', supPackagingFeeVat: 'VAT 별도', supLabelFee: 0, supLabelFeeVat: 'VAT 별도', supShippingBoxes: 0, supShippingFee: 0, supShippingFeeVat: 'VAT 별도' }
+];
+
+async function loadTempProjects() {
+    try {
+        const { data, error } = await sb.from('projects_temp').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        tempProjects.length = 0;
+        (data || []).forEach(r => {
+            tempProjects.push({
+                id: r.id,
+                date: r.date || '',
+                client: r.client || '',
+                clientContact: r.client_contact || '',
+                supplier: r.supplier || '',
+                supplierContact: r.supplier_contact || '',
+                item: r.item || '',
+                unitPrice: r.unit_price || 0,
+                unitPriceVat: r.unit_price_vat || 'VAT 별도',
+                supplierUnitPrice: r.supplier_unit_price || 0,
+                supplierUnitPriceVat: r.supplier_unit_price_vat || 'VAT 별도',
+                qty: r.qty || 0,
+                revenue: r.revenue || 0,
+                supplierRevenue: r.supplier_revenue || 0,
+                printMethod: r.print_method || '없음',
+                printFee: r.print_fee || 0,
+                printFeeApply: r.print_fee_apply || '1개당',
+                printFeeVat: r.print_fee_vat || 'VAT 별도',
+                packMethod: r.pack_method || '기본박스',
+                packagingFee: r.packaging_fee || 0,
+                packagingFeeApply: r.packaging_fee_apply || '일괄',
+                packagingFeeVat: r.packaging_fee_vat || 'VAT 별도',
+                labelFee: r.label_fee || 0,
+                labelFeeApply: r.label_fee_apply || '1개당',
+                labelFeeVat: r.label_fee_vat || 'VAT 별도',
+                shippingBoxes: r.shipping_boxes || 0,
+                shippingFee: r.shipping_fee || 0,
+                shippingFeeVat: r.shipping_fee_vat || 'VAT 별도',
+                supPrintMethod: r.sup_print_method || '없음',
+                supPrintFee: r.sup_print_fee || 0,
+                supPrintFeeApply: r.sup_print_fee_apply || '1개당',
+                supPrintFeeVat: r.sup_print_fee_vat || 'VAT 별도',
+                supPackMethod: r.sup_pack_method || '기본박스',
+                supPackagingFee: r.sup_packaging_fee || 0,
+                supPackagingFeeApply: r.sup_packaging_fee_apply || '일괄',
+                supPackagingFeeVat: r.sup_packaging_fee_vat || 'VAT 별도',
+                supLabelFee: r.sup_label_fee || 0,
+                supLabelFeeApply: r.sup_label_fee_apply || '1개당',
+                supLabelFeeVat: r.sup_label_fee_vat || 'VAT 별도',
+                supShippingBoxes: r.sup_shipping_boxes || 0,
+                supShippingFee: r.sup_shipping_fee || 0,
+                supShippingFeeVat: r.sup_shipping_fee_vat || 'VAT 별도'
+            });
+        });
+    } catch (err) {
+        console.error('임시 프로젝트 로드 실패:', err.message);
+    }
+    renderTempProjects();
+}
+
+function renderTempProjects() {
+    const tbody = document.getElementById('tempProjectTableBody');
+    const cardGrid = document.getElementById('tempProjectCardGrid');
+    if (!tbody) return;
+
+    const pill = (bg, fg, text) => `<span style="display:inline-block;padding:4px 10px;border-radius:6px;background:${bg};color:${fg};font-weight:800;font-size:13px;white-space:nowrap">${text}</span>`;
+
+    // 날짜+매출처 기준 그룹핑
+    const sorted = [...tempProjects].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (a.client || '').localeCompare(b.client || ''));
+    tempGroups = [];
+    const groups = tempGroups;
+    sorted.forEach(p => {
+        const key = (p.date || '') + '||' + (p.client || '');
+        let g = groups.find(x => x.key === key);
+        if (!g) { g = { key, date: p.date, client: p.client, clientContact: p.clientContact, items: [] }; groups.push(g); }
+        g.items.push(p);
+    });
+
+    let rowHtml = '';
+    let cardHtml = '';
+    const groupColors = ['var(--white)', 'var(--gray-50)'];
+
+    groups.forEach((g, gi) => {
+        const bgColor = groupColors[gi % 2];
+        const dateStr = g.date ? g.date.replace(/-/g, '.') : '-';
+        const rowspan = g.items.length;
+
+        g.items.forEach((p, pi) => {
+            const revWithVat = calcTempRevenueWithVat(p);
+            const supWithVat = calcTempSupRevenueWithVat(p);
+            const margin = revWithVat - supWithVat;
+            const marginPct = revWithVat > 0 ? Math.round((margin / revWithVat) * 100) : 0;
+            const revenueStr = pill('#E8F4FD', '#1B64DA', revWithVat.toLocaleString() + '원');
+            const purchaseStr = supWithVat > 0
+                ? pill('#FFF2E6', '#E67E22', supWithVat.toLocaleString() + '원')
+                : '<span style="color:var(--text-tertiary)">-</span>';
+            const marginStr = supWithVat > 0
+                ? (margin >= 0
+                    ? pill('#E8F8EF', '#12B76A', margin.toLocaleString() + '원 (' + marginPct + '%)')
+                    : pill('#FEECEC', '#E03131', margin.toLocaleString() + '원 (' + marginPct + '%)'))
+                : '<span style="color:var(--text-tertiary)">-</span>';
+
+            const borderTop = pi === 0 && gi > 0 ? 'border-top:2px solid var(--gray-200);' : '';
+            rowHtml += `<tr style="background:${bgColor};${borderTop}">`;
+            // rowspan +1 for the group inline add row
+            const rs = rowspan + 1;
+            const ce = (field, type) => `class="cell-editable" data-id="${p.id}" data-field="${field}" data-type="${type || 'text'}" data-entity="temp"`;
+            if (pi === 0) {
+                rowHtml += `<td rowspan="${rs}" ${ce('date','date')} style="vertical-align:middle;font-weight:600;background:${bgColor};${borderTop};cursor:pointer">${dateStr}</td>`;
+                rowHtml += `<td rowspan="${rs}" ${ce('client')} style="vertical-align:middle;background:${bgColor};${borderTop};cursor:pointer"><strong>${g.client || '-'}</strong></td>`;
+                rowHtml += `<td rowspan="${rs}" ${ce('clientContact')} style="vertical-align:middle;background:${bgColor};${borderTop};cursor:pointer">${g.clientContact || '-'}</td>`;
+            }
+            const vatBadge = v => v === 'VAT 포함' ? '<div style="font-size:10px;color:#E67E22;font-weight:600">VAT포함</div>' : '<div style="font-size:10px;color:#1B64DA;font-weight:600">VAT별도</div>';
+            const printTotal = (p.printFeeApply === '1개당') ? (p.printFee || 0) * (p.qty || 0) : (p.printFee || 0);
+            const packTotal = (p.packagingFeeApply === '1개당') ? (p.packagingFee || 0) * (p.qty || 0) : (p.packagingFee || 0);
+            const labelTotal = calcTempFeeTotal(p.labelFee, p.labelFeeApply || '1개당', p.qty || 0);
+            const shipTotal = (p.shippingFee || 0) * (p.shippingBoxes || 0);
+            const feeDetails = [
+                printTotal > 0 ? `인쇄 ${printTotal.toLocaleString()}` : '',
+                packTotal > 0 ? `포장 ${packTotal.toLocaleString()}` : '',
+                labelTotal > 0 ? `라벨 ${labelTotal.toLocaleString()}` : '',
+                shipTotal > 0 ? `택배 ${shipTotal.toLocaleString()}` : ''
+            ].filter(Boolean);
+            const feeBadge = feeDetails.length > 0 ? `<div style="margin-top:4px;font-size:10px;color:var(--text-tertiary);line-height:1.5">${feeDetails.map(f => '+' + f).join('<br>')}</div>` : '';
+
+            // 매입 부대비용
+            const supPrintTotal = calcTempFeeTotal(p.supPrintFee, p.supPrintFeeApply, p.qty || 0);
+            const supPackTotal = calcTempFeeTotal(p.supPackagingFee, p.supPackagingFeeApply, p.qty || 0);
+            const supLabelTotal = calcTempFeeTotal(p.supLabelFee, p.supLabelFeeApply || '1개당', p.qty || 0);
+            const supShipTotal = (p.supShippingFee || 0) * (p.supShippingBoxes || 0);
+            const supFeeDetails = [
+                supPrintTotal > 0 ? `인쇄 ${supPrintTotal.toLocaleString()}` : '',
+                supPackTotal > 0 ? `포장 ${supPackTotal.toLocaleString()}` : '',
+                supLabelTotal > 0 ? `라벨 ${supLabelTotal.toLocaleString()}` : '',
+                supShipTotal > 0 ? `택배 ${supShipTotal.toLocaleString()}` : ''
+            ].filter(Boolean);
+            const supFeeBadge = supFeeDetails.length > 0 ? `<div style="margin-top:4px;font-size:10px;color:var(--text-tertiary);line-height:1.5">${supFeeDetails.map(f => '+' + f).join('<br>')}</div>` : '';
+
+            rowHtml += `<td ${ce('item')} style="cursor:pointer">${p.item || '-'}</td>
+            <td ${ce('unitPrice','number')} style="cursor:pointer">${p.unitPrice ? p.unitPrice.toLocaleString() + '원' : '-'}${vatBadge(p.unitPriceVat)}</td>
+            <td ${ce('qty','number')} style="cursor:pointer">${p.qty ? p.qty.toLocaleString() : '-'}</td>
+            <td>${revenueStr}${feeBadge}</td>
+            <td ${ce('supplier')} style="cursor:pointer">${p.supplier || '-'}</td>
+            <td ${ce('supplierContact')} style="cursor:pointer">${p.supplierContact || '-'}</td>
+            <td ${ce('supplierUnitPrice','number')} style="cursor:pointer">${p.supplierUnitPrice ? p.supplierUnitPrice.toLocaleString() + '원' : '-'}${vatBadge(p.supplierUnitPriceVat)}</td>
+            <td>${purchaseStr}${supFeeBadge}</td>
+            <td>${marginStr}</td>
+            <td style="white-space:nowrap">
+                ${pi === 0 ? `<button class="edit-btn" onclick="openTempGroupEdit(${gi})" style="color:#1B64DA;margin-right:4px">편집</button>` : ''}
+                ${pi === 0 ? `<button class="edit-btn" onclick="openTempQuote(${gi})" style="color:#16A34A;margin-right:4px">견적서</button>` : ''}
+                <button class="edit-btn" onclick="deleteTempProject(${p.id})" style="color:var(--toss-red)">삭제</button>
+            </td></tr>`;
+        });
+
+        // 그룹 내 품목 추가 인라인 행
+        const gDate = (g.date || '').replace(/'/g, "\\'");
+        const gClient = (g.client || '').replace(/'/g, "\\'");
+        const gContact = (g.clientContact || '').replace(/'/g, "\\'");
+        rowHtml += `<tr class="temp-group-add-row" data-group="${gi}" style="background:${bgColor}">
+            <td><input id="tempGrpItem_${gi}" placeholder="품목 추가" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit"></td>
+            <td><input id="tempGrpUnitPrice_${gi}" placeholder="매출단가" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit;text-align:right" oninput="fmtCommaTemp(this)"></td>
+            <td><input id="tempGrpQty_${gi}" placeholder="수량" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit;text-align:right" oninput="fmtCommaTemp(this)"></td>
+            <td></td>
+            <td><input id="tempGrpSupplier_${gi}" list="tempClientList" placeholder="매입처" autocomplete="off" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit"></td>
+            <td><input id="tempGrpSupContact_${gi}" placeholder="담당자" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit"></td>
+            <td><input id="tempGrpSupUnitPrice_${gi}" placeholder="매입단가" style="padding:5px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;width:100%;background:var(--white);font-family:inherit;text-align:right" oninput="fmtCommaTemp(this)"></td>
+            <td></td>
+            <td></td>
+            <td><button class="btn-primary" onclick="saveTempGroupItem(${gi},'${gDate}','${gClient}','${gContact}')" style="padding:5px 12px;font-size:12px;white-space:nowrap">+ 추가</button></td>
+        </tr>`;
+
+        // 카드뷰 — 그룹 단위
+        const totalRev = g.items.reduce((s, p) => s + calcTempRevenueWithVat(p), 0);
+        const totalSup = g.items.reduce((s, p) => s + calcTempSupRevenueWithVat(p), 0);
+        const totalMargin = totalRev - totalSup;
+        const totalMarginPct = totalRev > 0 ? Math.round((totalMargin / totalRev) * 100) : 0;
+        cardHtml += `<div class="resp-card" onclick="openTempProjectModal(${g.items[0].id})">
+            <div class="resp-card-top">
+                <div class="resp-card-title">${g.client || '-'}${g.clientContact ? ' · ' + g.clientContact : ''}</div>
+                <span style="font-size:12px;color:var(--text-tertiary)">${dateStr}</span>
+            </div>
+            <div class="resp-card-meta">
+                <div class="resp-card-row">${g.items.map(p => p.item).join(', ')}</div>
+                <div class="resp-card-row" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+                    ${pill('#E8F4FD', '#1B64DA', totalRev.toLocaleString() + '원')}
+                    ${totalSup > 0 ? pill('#FFF2E6', '#E67E22', totalSup.toLocaleString() + '원') : ''}
+                    ${totalSup > 0 ? (totalMargin >= 0
+                        ? pill('#E8F8EF', '#12B76A', totalMargin.toLocaleString() + '원 (' + totalMarginPct + '%)')
+                        : pill('#FEECEC', '#E03131', totalMargin.toLocaleString() + '원 (' + totalMarginPct + '%)')) : ''}
+                </div>
+            </div>
+        </div>`;
+    });
+
+    if (!rowHtml) {
+        rowHtml = '<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-tertiary)">등록된 임시 프로젝트가 없습니다</td></tr>';
+    }
+    tbody.innerHTML = rowHtml;
+    if (cardGrid) cardGrid.innerHTML = cardHtml;
+}
+
+function getTodayStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function calcTempAmounts() {
+    const price = Number((document.getElementById('tempUnitPrice').value || '').replace(/[^0-9]/g, '')) || 0;
+    const supPrice = Number((document.getElementById('tempSupUnitPrice').value || '').replace(/[^0-9]/g, '')) || 0;
+    const qty = Number((document.getElementById('tempQty').value || '').replace(/[^0-9]/g, '')) || 0;
+    const revEl = document.getElementById('tempRevenue');
+    const supRevEl = document.getElementById('tempSupRevenue');
+    revEl.value = (price * qty) ? (price * qty).toLocaleString() : '';
+    supRevEl.value = (supPrice * qty) ? (supPrice * qty).toLocaleString() : '';
+}
+
+function openTempProjectModal(id) {
+    const p = id ? tempProjects.find(x => x.id === id) : null;
+    const isEdit = !!p;
+    const today = getTodayStr();
+
+    const html = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <h2 style="margin:0;font-size:18px">${isEdit ? '임시 프로젝트 편집' : '새 임시 프로젝트'}</h2>
+        <button onclick="closeTempModal()" style="background:var(--gray-100);border:none;font-size:20px;cursor:pointer;color:var(--gray-500);padding:6px 10px;border-radius:10px">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="field"><label>날짜</label><input type="date" id="tempDate" value="${isEdit ? (p.date || today) : today}"></div>
+        <div style="display:flex;gap:12px">
+            <div class="field" style="flex:2"><label>매출처</label><input id="tempClient" list="tempClientList" autocomplete="off" value="${isEdit ? (p.client || '') : ''}" placeholder="매출처명"></div>
+            <div class="field" style="flex:1"><label>담당자</label><input id="tempClientContact" value="${isEdit ? (p.clientContact || '') : ''}" placeholder="담당자명"></div>
+        </div>
+        <div class="field"><label>품목</label><input id="tempItem" value="${isEdit ? (p.item || '') : ''}" placeholder="품목명"></div>
+        <div style="display:flex;gap:12px">
+            <div class="field" style="flex:1"><label>매출단가</label><input id="tempUnitPrice" value="${isEdit ? (p.unitPrice || '') : ''}" placeholder="0" oninput="fmtCommaTemp(this);calcTempAmounts()"></div>
+            <div class="field" style="flex:1"><label>매입단가</label><input id="tempSupUnitPrice" value="${isEdit ? (p.supplierUnitPrice || '') : ''}" placeholder="0" oninput="fmtCommaTemp(this);calcTempAmounts()"></div>
+            <div class="field" style="flex:1"><label>수량</label><input id="tempQty" value="${isEdit ? (p.qty || '') : ''}" placeholder="0" oninput="fmtCommaTemp(this);calcTempAmounts()"></div>
+        </div>
+        <div style="display:flex;gap:12px">
+            <div class="field" style="flex:1"><label>매출액</label><input id="tempRevenue" value="${isEdit ? (p.revenue || '') : ''}" placeholder="자동계산" readonly style="background:var(--gray-100);cursor:default"></div>
+            <div class="field" style="flex:1"><label>매입액</label><input id="tempSupRevenue" value="${isEdit ? (p.supplierRevenue || '') : ''}" placeholder="자동계산" readonly style="background:var(--gray-100);cursor:default"></div>
+        </div>
+        <div style="display:flex;gap:12px">
+            <div class="field" style="flex:2"><label>매입처</label><input id="tempSupplier" list="tempClientList" autocomplete="off" value="${isEdit ? (p.supplier || '') : ''}" placeholder="매입처명"></div>
+            <div class="field" style="flex:1"><label>담당자</label><input id="tempSupContact" value="${isEdit ? (p.supplierContact || '') : ''}" placeholder="담당자명"></div>
+        </div>
+        <button class="btn-primary" onclick="saveTempProject(${id || 'null'})" style="width:100%;padding:14px;font-size:15px;margin-top:4px">
+            ${isEdit ? '수정' : '저장'}
+        </button>
+    </div>`;
+
+    let overlay = document.getElementById('tempModalOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'tempModalOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px)';
+        overlay.addEventListener('click', e => { if (e.target === overlay) closeTempModal(); });
+        document.body.appendChild(overlay);
+    }
+    overlay.innerHTML = `<div style="background:var(--white);border-radius:20px;padding:28px;width:90%;max-width:480px;box-shadow:0 16px 48px rgba(0,0,0,.15)">${html}</div>`;
+    overlay.style.display = 'flex';
+
+    // 콤마 포맷 적용
+    ['tempUnitPrice', 'tempSupUnitPrice', 'tempQty', 'tempRevenue', 'tempSupRevenue'].forEach(elId => {
+        const el = document.getElementById(elId);
+        if (el && el.value) el.value = Number(el.value).toLocaleString();
+    });
+}
+
+function closeTempModal() {
+    const overlay = document.getElementById('tempModalOverlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+function fmtCommaTemp(el) {
+    const raw = el.value.replace(/[^0-9]/g, '');
+    el.value = raw ? Number(raw).toLocaleString() : '';
+}
+
+async function saveTempProject(id) {
+    const date = document.getElementById('tempDate').value || getTodayStr();
+    const client = document.getElementById('tempClient').value.trim();
+    const clientContact = document.getElementById('tempClientContact').value.trim();
+    const supplier = document.getElementById('tempSupplier').value.trim();
+    const supplierContact = document.getElementById('tempSupContact').value.trim();
+    const item = document.getElementById('tempItem').value.trim();
+    const unitPrice = Number((document.getElementById('tempUnitPrice').value || '').replace(/[^0-9]/g, '')) || 0;
+    const supplierUnitPrice = Number((document.getElementById('tempSupUnitPrice').value || '').replace(/[^0-9]/g, '')) || 0;
+    const qty = Number((document.getElementById('tempQty').value || '').replace(/[^0-9]/g, '')) || 0;
+    const revenue = unitPrice * qty;
+    const supplierRevenue = supplierUnitPrice * qty;
+
+    if (!client && !item) {
+        showToast('매출처 또는 품목을 입력해주세요');
+        return;
+    }
+
+    const row = { date, client, client_contact: clientContact, supplier, supplier_contact: supplierContact, item, unit_price: unitPrice, supplier_unit_price: supplierUnitPrice, qty, revenue, supplier_revenue: supplierRevenue };
+
+    try {
+        if (id) {
+            const { error } = await sb.from('projects_temp').update(row).eq('id', id);
+            if (error) throw error;
+            const p = tempProjects.find(x => x.id === id);
+            if (p) { p.date = date; p.client = client; p.clientContact = clientContact; p.supplier = supplier; p.supplierContact = supplierContact; p.item = item; p.unitPrice = unitPrice; p.supplierUnitPrice = supplierUnitPrice; p.qty = qty; p.revenue = revenue; p.supplierRevenue = supplierRevenue; }
+            showToast('수정 완료');
+        } else {
+            const { data, error } = await sb.from('projects_temp').insert(row).select().single();
+            if (error) throw error;
+            tempProjects.unshift({ id: data.id, date, client, clientContact, supplier, supplierContact, item, unitPrice, supplierUnitPrice, qty, revenue, supplierRevenue });
+            showToast('저장 완료');
+        }
+    } catch (err) {
+        console.error('임시 프로젝트 저장 실패:', err);
+        showToast('저장 실패: ' + err.message);
+        return;
+    }
+
+    closeTempModal();
+    renderTempProjects();
+}
+
+function buildTempClientDatalist() {
+    let dl = document.getElementById('tempClientList');
+    if (!dl) {
+        dl = document.createElement('datalist');
+        dl.id = 'tempClientList';
+        document.body.appendChild(dl);
+    }
+    const names = clients
+        .map(c => c.companyName)
+        .filter(Boolean)
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .sort((a, b) => a.localeCompare(b));
+    dl.innerHTML = names.map(n => `<option value="${n.replace(/"/g, '&quot;')}"></option>`).join('');
+}
+
+async function saveTempGroupItem(gi, date, client, clientContact) {
+    const item = document.getElementById(`tempGrpItem_${gi}`).value.trim();
+    const unitPrice = Number((document.getElementById(`tempGrpUnitPrice_${gi}`).value || '').replace(/[^0-9]/g, '')) || 0;
+    const qty = Number((document.getElementById(`tempGrpQty_${gi}`).value || '').replace(/[^0-9]/g, '')) || 0;
+    const supplier = document.getElementById(`tempGrpSupplier_${gi}`).value.trim();
+    const supplierContact = document.getElementById(`tempGrpSupContact_${gi}`).value.trim();
+    const supplierUnitPrice = Number((document.getElementById(`tempGrpSupUnitPrice_${gi}`).value || '').replace(/[^0-9]/g, '')) || 0;
+    const revenue = unitPrice * qty;
+    const supplierRevenue = supplierUnitPrice * qty;
+
+    if (!item) { showToast('품목을 입력해주세요'); return; }
+
+    const row = { date, client, client_contact: clientContact, supplier, supplier_contact: supplierContact, item, unit_price: unitPrice, supplier_unit_price: supplierUnitPrice, qty, revenue, supplier_revenue: supplierRevenue, unit_price_vat: 'VAT 별도', supplier_unit_price_vat: 'VAT 별도', print_fee: 0, packaging_fee: 0, label_fee: 0, shipping_fee: 0 };
+
+    try {
+        const { data, error } = await sb.from('projects_temp').insert(row).select().single();
+        if (error) throw error;
+        tempProjects.unshift({ id: data.id, date, client, clientContact, supplier, supplierContact, item, unitPrice, supplierUnitPrice, qty, revenue, supplierRevenue, unitPriceVat: 'VAT 별도', supplierUnitPriceVat: 'VAT 별도', printFee: 0, packagingFee: 0, labelFee: 0, shippingFee: 0 });
+        showToast('추가 완료');
+    } catch (err) {
+        console.error('임시 프로젝트 저장 실패:', err);
+        showToast('저장 실패: ' + err.message);
+        return;
+    }
+    renderTempProjects();
+}
+
+// 그룹 내 인라인 행에서 Enter 키로 저장
+document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.closest('.temp-group-add-row')) {
+        e.preventDefault();
+        const row = e.target.closest('.temp-group-add-row');
+        row.querySelector('.btn-primary').click();
+    }
+});
+
+function calcTempInline() {
+    const price = Number((document.getElementById('tempInUnitPrice').value || '').replace(/[^0-9]/g, '')) || 0;
+    const supPrice = Number((document.getElementById('tempInSupUnitPrice').value || '').replace(/[^0-9]/g, '')) || 0;
+    const qty = Number((document.getElementById('tempInQty').value || '').replace(/[^0-9]/g, '')) || 0;
+    const rev = price * qty;
+    const supRev = supPrice * qty;
+    const margin = rev - supRev;
+    const pill = (bg, fg, text) => `<span style="display:inline-block;padding:4px 10px;border-radius:6px;background:${bg};color:${fg};font-weight:800;font-size:13px;white-space:nowrap">${text}</span>`;
+    document.getElementById('tempInRevenue').innerHTML = rev ? pill('#E8F4FD', '#1B64DA', rev.toLocaleString() + '원') : '-';
+    document.getElementById('tempInSupRevenue').innerHTML = supRev ? pill('#FFF2E6', '#E67E22', supRev.toLocaleString() + '원') : '-';
+    if (rev && supRev) {
+        const pct = Math.round((margin / rev) * 100);
+        document.getElementById('tempInMargin').innerHTML = margin >= 0
+            ? pill('#E8F8EF', '#12B76A', margin.toLocaleString() + '원 (' + pct + '%)')
+            : pill('#FEECEC', '#E03131', margin.toLocaleString() + '원 (' + pct + '%)');
+    } else {
+        document.getElementById('tempInMargin').innerHTML = '-';
+    }
+}
+
+async function saveTempInline() {
+    const date = document.getElementById('tempInDate').value || getTodayStr();
+    const client = document.getElementById('tempInClient').value.trim();
+    const clientContact = document.getElementById('tempInClientContact').value.trim();
+    const item = document.getElementById('tempInItem').value.trim();
+    const unitPrice = Number((document.getElementById('tempInUnitPrice').value || '').replace(/[^0-9]/g, '')) || 0;
+    const supplierUnitPrice = Number((document.getElementById('tempInSupUnitPrice').value || '').replace(/[^0-9]/g, '')) || 0;
+    const qty = Number((document.getElementById('tempInQty').value || '').replace(/[^0-9]/g, '')) || 0;
+    const supplier = document.getElementById('tempInSupplier').value.trim();
+    const supplierContact = document.getElementById('tempInSupContact').value.trim();
+    const revenue = unitPrice * qty;
+    const supplierRevenue = supplierUnitPrice * qty;
+
+    if (!client && !item) {
+        showToast('매출처 또는 품목을 입력해주세요');
+        return;
+    }
+
+    const row = { date, client, client_contact: clientContact, supplier, supplier_contact: supplierContact, item, unit_price: unitPrice, supplier_unit_price: supplierUnitPrice, qty, revenue, supplier_revenue: supplierRevenue, unit_price_vat: 'VAT 별도', supplier_unit_price_vat: 'VAT 별도', print_fee: 0, packaging_fee: 0, label_fee: 0, shipping_fee: 0 };
+
+    try {
+        const { data, error } = await sb.from('projects_temp').insert(row).select().single();
+        if (error) throw error;
+        tempProjects.unshift({ id: data.id, date, client, clientContact, supplier, supplierContact, item, unitPrice, supplierUnitPrice, qty, revenue, supplierRevenue, unitPriceVat: 'VAT 별도', supplierUnitPriceVat: 'VAT 별도', printFee: 0, packagingFee: 0, labelFee: 0, shippingFee: 0 });
+        showToast('저장 완료');
+    } catch (err) {
+        console.error('임시 프로젝트 저장 실패:', err);
+        showToast('저장 실패: ' + err.message);
+        return;
+    }
+
+    // 인라인 입력 초기화 — 날짜·매출처·담당자는 유지 (같은 프로젝트에 품목 연속 추가용)
+    document.getElementById('tempInItem').value = '';
+    document.getElementById('tempInUnitPrice').value = '';
+    document.getElementById('tempInSupUnitPrice').value = '';
+    document.getElementById('tempInQty').value = '';
+    document.getElementById('tempInSupplier').value = '';
+    document.getElementById('tempInSupContact').value = '';
+    document.getElementById('tempInRevenue').innerHTML = '-';
+    document.getElementById('tempInSupRevenue').innerHTML = '-';
+    document.getElementById('tempInMargin').innerHTML = '-';
+    document.getElementById('tempInItem').focus();
+    renderTempProjects();
+}
+
+// 인라인 입력에서 Enter 키로 저장
+document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.closest('#tempInlineRow')) {
+        e.preventDefault();
+        saveTempInline();
+    }
+});
+
+async function deleteTempProject(id) {
+    if (!confirm('삭제하시겠습니까?')) return;
+    try {
+        const { error } = await sb.from('projects_temp').delete().eq('id', id);
+        if (error) throw error;
+        const idx = tempProjects.findIndex(x => x.id === id);
+        if (idx >= 0) tempProjects.splice(idx, 1);
+        showToast('삭제 완료');
+        renderTempProjects();
+    } catch (err) {
+        console.error('임시 프로젝트 삭제 실패:', err);
+        showToast('삭제 실패: ' + err.message);
+    }
+}
+
+// =====================================
+// 임시 프로젝트 견적서
+// =====================================
+// =====================================
+// 임시 프로젝트 그룹 편집 모달 (VAT + 부대비용)
+// =====================================
+function calcTempFeeTotal(fee, apply, qty) {
+    return (apply === '1개당') ? (fee || 0) * qty : (fee || 0);
+}
+
+// VAT 포함가 기준 매출액
+function calcTempRevenueWithVat(p) {
+    const qty = p.qty || 0;
+    const addVat = (amount, vat) => vat === 'VAT 포함' ? amount : Math.round(amount * 1.1);
+    let total = addVat((p.unitPrice || 0) * qty, p.unitPriceVat);
+    total += addVat(calcTempFeeTotal(p.printFee, p.printFeeApply, qty), p.printFeeVat);
+    total += addVat(calcTempFeeTotal(p.packagingFee, p.packagingFeeApply, qty), p.packagingFeeVat);
+    total += addVat(calcTempFeeTotal(p.labelFee, p.labelFeeApply || '1개당', qty), p.labelFeeVat);
+    total += addVat((p.shippingFee || 0) * (p.shippingBoxes || 0), p.shippingFeeVat);
+    return total;
+}
+
+// VAT 포함가 기준 매입액
+function calcTempSupRevenueWithVat(p) {
+    const qty = p.qty || 0;
+    const addVat = (amount, vat) => vat === 'VAT 포함' ? amount : Math.round(amount * 1.1);
+    let total = addVat((p.supplierUnitPrice || 0) * qty, p.supplierUnitPriceVat);
+    total += addVat(calcTempFeeTotal(p.supPrintFee, p.supPrintFeeApply, qty), p.supPrintFeeVat);
+    total += addVat(calcTempFeeTotal(p.supPackagingFee, p.supPackagingFeeApply, qty), p.supPackagingFeeVat);
+    total += addVat(calcTempFeeTotal(p.supLabelFee, p.supLabelFeeApply || '1개당', qty), p.supLabelFeeVat);
+    total += addVat((p.supShippingFee || 0) * (p.supShippingBoxes || 0), p.supShippingFeeVat);
+    return total;
+}
+
+function calcTempGroupRevenue(p) {
+    const qty = p.qty || 0;
+    return (p.unitPrice || 0) * qty
+        + calcTempFeeTotal(p.printFee, p.printFeeApply, qty)
+        + calcTempFeeTotal(p.packagingFee, p.packagingFeeApply, qty)
+        + calcTempFeeTotal(p.labelFee, p.labelFeeApply || '1개당', qty)
+        + (p.shippingFee || 0) * (p.shippingBoxes || 0);
+}
+
+function calcTempGroupSupRevenue(p) {
+    const qty = p.qty || 0;
+    return (p.supplierUnitPrice || 0) * qty
+        + calcTempFeeTotal(p.supPrintFee, p.supPrintFeeApply, qty)
+        + calcTempFeeTotal(p.supPackagingFee, p.supPackagingFeeApply, qty)
+        + calcTempFeeTotal(p.supLabelFee, p.supLabelFeeApply || '1개당', qty)
+        + (p.supShippingFee || 0) * (p.supShippingBoxes || 0);
+}
+
+// 기타 선택 시 커스텀 입력 토글
+function toggleTempCustom(selectEl, inputId) {
+    const inp = document.getElementById(inputId);
+    if (inp) inp.style.display = selectEl.value === '기타' ? 'block' : 'none';
+}
+
+// 부대비용 실시간 토탈 계산
+function recalcTempFeeRow(prefix, i, qty) {
+    const getN = id => Number((document.getElementById(id)?.value || '').replace(/[^0-9]/g, '')) || 0;
+    const getV = id => document.getElementById(id)?.value || '';
+
+    // 인쇄
+    const pf = getN(`${prefix}_pf_${i}`), pfa = getV(`${prefix}_pfa_${i}`);
+    const pfT = pfa === '1개당' ? pf * qty : pf;
+    const pfEl = document.getElementById(`${prefix}_pf_total_${i}`);
+    if (pfEl) pfEl.textContent = pfT ? `= ${pfT.toLocaleString()}원` : '';
+
+    // 포장
+    const pkf = getN(`${prefix}_pkf_${i}`), pkfa = getV(`${prefix}_pkfa_${i}`);
+    const pkfT = pkfa === '1개당' ? pkf * qty : pkf;
+    const pkfEl = document.getElementById(`${prefix}_pkf_total_${i}`);
+    if (pkfEl) pkfEl.textContent = pkfT ? `= ${pkfT.toLocaleString()}원` : '';
+
+    // 라벨
+    const lf = getN(`${prefix}_lf_${i}`), lfa = getV(`${prefix}_lfa_${i}`);
+    const lfT = lfa === '1개당' ? lf * qty : lf;
+    const lfEl = document.getElementById(`${prefix}_lf_total_${i}`);
+    if (lfEl) lfEl.textContent = lfT ? `= ${lfT.toLocaleString()}원` : '';
+
+    // 택배
+    const sf = getN(`${prefix}_sf_${i}`), sb = getN(`${prefix}_sb_${i}`);
+    const sfT = sf * sb;
+    const sfEl = document.getElementById(`${prefix}_sf_total_${i}`);
+    if (sfEl) sfEl.textContent = sfT ? `= ${sfT.toLocaleString()}원` : '';
+}
+
+function openTempGroupEdit(gi) {
+    const g = tempGroups[gi];
+    if (!g || !g.items.length) return;
+
+    const vatOpts = v => `<option${v !== 'VAT 포함' ? ' selected' : ''}>VAT 별도</option><option${v === 'VAT 포함' ? ' selected' : ''}>VAT 포함</option>`;
+    const fmtV = n => n ? Number(n).toLocaleString() : '';
+    const IS = 'padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:13px;width:100%;background:var(--white);font-family:inherit;color:var(--gray-900)';
+    const SS = 'padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:12px;background:var(--white);font-family:inherit;width:100%;color:var(--gray-900)';
+    const LB = 'font-size:11px;color:var(--gray-500);font-weight:600;margin-bottom:2px';
+    const printMethods = ['없음','레이저각인','실크인쇄','패드인쇄','UV인쇄','전사인쇄','기타'];
+    const packMethods = ['기본박스','선물포장','전용케이스','전용보관함','에어캡','기타'];
+
+    // 기타 포함 방법 옵션 (기존 목록에 없으면 기타로 표시)
+    const printMethodOpts = (v) => {
+        const isCustom = v && !printMethods.includes(v);
+        return printMethods.map(m => `<option${(isCustom ? '기타' : (v||'없음'))===m?' selected':''}>${m}</option>`).join('');
+    };
+    const packMethodOpts = (v) => {
+        const isCustom = v && !packMethods.includes(v);
+        return packMethods.map(m => `<option${(isCustom ? '기타' : (v||'기본박스'))===m?' selected':''}>${m}</option>`).join('');
+    };
+    const customVal = (v, list) => (v && !list.includes(v)) ? v : '';
+    const customDisplay = (v, list) => (v && !list.includes(v)) || v === '기타' ? 'block' : 'none';
+    const RC = (prefix, i, qty) => `recalcTempFeeRow('${prefix}',${i},${qty})`;
+    const TL = 'font-size:11px;font-weight:700;color:#1B64DA;margin-top:4px;min-height:16px';
+
+    // 부대비용 섹션 HTML 헬퍼 (compact 2-col layout)
+    const feeSection = (prefix, i, data, qty) => `
+        <div style="background:var(--white);border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid var(--gray-200)">
+            <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px">🖨 인쇄</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end">
+                <div><label style="${LB}">방법</label><select id="${prefix}_pm_${i}" style="${SS}" onchange="toggleTempCustom(this,'${prefix}_pmc_${i}')">${printMethodOpts(data.pm)}</select><input id="${prefix}_pmc_${i}" placeholder="직접 입력" value="${customVal(data.pm, printMethods)}" style="${IS};margin-top:4px;display:${customDisplay(data.pm, printMethods)}"></div>
+                <div><label style="${LB}">금액</label><input id="${prefix}_pf_${i}" value="${fmtV(data.pf)}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
+                <div><label style="${LB}">적용</label><select id="${prefix}_pfa_${i}" style="${SS}" onchange="${RC(prefix,i,qty)}"><option${(data.pfa||'1개당')==='1개당'?' selected':''}>1개당</option><option${data.pfa==='일괄'?' selected':''}>일괄</option></select></div>
+                <div><label style="${LB}">VAT</label><select id="${prefix}_pfv_${i}" style="${SS}">${vatOpts(data.pfv)}</select></div>
+            </div>
+            <div id="${prefix}_pf_total_${i}" style="${TL}"></div>
+        </div>
+        <div style="background:var(--white);border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid var(--gray-200)">
+            <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px">📦 포장</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end">
+                <div><label style="${LB}">방법</label><select id="${prefix}_pkm_${i}" style="${SS}" onchange="toggleTempCustom(this,'${prefix}_pkmc_${i}')">${packMethodOpts(data.pkm)}</select><input id="${prefix}_pkmc_${i}" placeholder="직접 입력" value="${customVal(data.pkm, packMethods)}" style="${IS};margin-top:4px;display:${customDisplay(data.pkm, packMethods)}"></div>
+                <div><label style="${LB}">금액</label><input id="${prefix}_pkf_${i}" value="${fmtV(data.pkf)}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
+                <div><label style="${LB}">적용</label><select id="${prefix}_pkfa_${i}" style="${SS}" onchange="${RC(prefix,i,qty)}"><option${(data.pkfa||'일괄')==='1개당'?' selected':''}>1개당</option><option${(data.pkfa||'일괄')==='일괄'?' selected':''}>일괄</option></select></div>
+                <div><label style="${LB}">VAT</label><select id="${prefix}_pkfv_${i}" style="${SS}">${vatOpts(data.pkfv)}</select></div>
+            </div>
+            <div id="${prefix}_pkf_total_${i}" style="${TL}"></div>
+        </div>
+        <div style="background:var(--white);border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid var(--gray-200)">
+            <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px">🏷 라벨</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:end">
+                <div><label style="${LB}">단가</label><input id="${prefix}_lf_${i}" value="${fmtV(data.lf)}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
+                <div><label style="${LB}">적용</label><select id="${prefix}_lfa_${i}" style="${SS}" onchange="${RC(prefix,i,qty)}"><option${(data.lfa||'1개당')==='1개당'?' selected':''}>1개당</option><option${data.lfa==='일괄'?' selected':''}>일괄</option></select></div>
+                <div><label style="${LB}">VAT</label><select id="${prefix}_lfv_${i}" style="${SS}">${vatOpts(data.lfv)}</select></div>
+            </div>
+            <div id="${prefix}_lf_total_${i}" style="${TL}"></div>
+        </div>
+        <div style="background:var(--white);border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid var(--gray-200)">
+            <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px">🚚 택배</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:end">
+                <div><label style="${LB}">박스수</label><input id="${prefix}_sb_${i}" value="${data.sb || ''}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
+                <div><label style="${LB}">박스당 단가</label><input id="${prefix}_sf_${i}" value="${fmtV(data.sf)}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
+                <div><label style="${LB}">VAT</label><select id="${prefix}_sfv_${i}" style="${SS}">${vatOpts(data.sfv)}</select></div>
+            </div>
+            <div id="${prefix}_sf_total_${i}" style="${TL}"></div>
+        </div>`;
+
+    const secStyle = (color, bg) => `border-left:3px solid ${color};background:${bg};border-radius:10px;padding:14px;margin-bottom:10px`;
+
+    let itemsHtml = g.items.map((p, i) => `
+    <div style="background:var(--gray-50);border-radius:14px;padding:16px;margin-bottom:14px">
+        <div style="font-weight:700;font-size:15px;margin-bottom:14px;color:var(--gray-900)">${p.item || '품목 ' + (i + 1)}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <!-- 매출 -->
+            <div style="${secStyle('#1B64DA', 'rgba(27,100,218,0.05)')}">
+                <div style="font-size:13px;font-weight:800;color:#1B64DA;margin-bottom:10px">매출</div>
+                <div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:end;margin-bottom:10px">
+                    <div><label style="${LB}">단가</label><input id="tge_up_${i}" value="${fmtV(p.unitPrice)}" placeholder="0" oninput="fmtCommaTemp(this)" style="${IS};text-align:right"></div>
+                    <div><label style="${LB}">VAT</label><select id="tge_upv_${i}" style="${SS}">${vatOpts(p.unitPriceVat)}</select></div>
+                </div>
+                ${feeSection('tge', i, { pm: p.printMethod, pf: p.printFee, pfa: p.printFeeApply, pfv: p.printFeeVat, pkm: p.packMethod, pkf: p.packagingFee, pkfa: p.packagingFeeApply, pkfv: p.packagingFeeVat, lf: p.labelFee, lfa: p.labelFeeApply, lfv: p.labelFeeVat, sb: p.shippingBoxes, sf: p.shippingFee, sfv: p.shippingFeeVat }, p.qty || 0)}
+            </div>
+            <!-- 매입 -->
+            <div style="${secStyle('#E67E22', 'rgba(230,126,34,0.05)')}">
+                <div style="font-size:13px;font-weight:800;color:#E67E22;margin-bottom:10px">매입</div>
+                <div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:end;margin-bottom:10px">
+                    <div><label style="${LB}">단가</label><input id="tge_sup_${i}" value="${fmtV(p.supplierUnitPrice)}" placeholder="0" oninput="fmtCommaTemp(this)" style="${IS};text-align:right"></div>
+                    <div><label style="${LB}">VAT</label><select id="tge_supv_${i}" style="${SS}">${vatOpts(p.supplierUnitPriceVat)}</select></div>
+                </div>
+                ${feeSection('tgs', i, { pm: p.supPrintMethod, pf: p.supPrintFee, pfa: p.supPrintFeeApply, pfv: p.supPrintFeeVat, pkm: p.supPackMethod, pkf: p.supPackagingFee, pkfa: p.supPackagingFeeApply, pkfv: p.supPackagingFeeVat, lf: p.supLabelFee, lfa: p.supLabelFeeApply, lfv: p.supLabelFeeVat, sb: p.supShippingBoxes, sf: p.supShippingFee, sfv: p.supShippingFeeVat }, p.qty || 0)}
+            </div>
+        </div>
+    </div>`).join('');
+
+    const html = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h2 style="margin:0;font-size:17px">${g.client || '-'} · ${(g.date || '').replace(/-/g, '.')} 상세 편집</h2>
+        <button onclick="closeTempModal()" style="background:var(--gray-100);border:none;font-size:20px;cursor:pointer;color:var(--gray-500);padding:6px 10px;border-radius:10px">✕</button>
+    </div>
+    ${itemsHtml}
+    <button class="btn-primary" onclick="saveTempGroupEdit(${gi})" style="width:100%;padding:14px;font-size:15px;margin-top:4px">저장</button>`;
+
+    let overlay = document.getElementById('tempModalOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'tempModalOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px)';
+        overlay.addEventListener('click', e => { if (e.target === overlay) closeTempModal(); });
+        document.body.appendChild(overlay);
+    }
+    overlay.innerHTML = `<div style="background:var(--white);border-radius:20px;padding:28px;width:95%;max-width:960px;max-height:85vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,.15)">${html}</div>`;
+    overlay.style.display = 'flex';
+
+    // 초기 토탈 계산
+    g.items.forEach((p, i) => {
+        recalcTempFeeRow('tge', i, p.qty || 0);
+        recalcTempFeeRow('tgs', i, p.qty || 0);
+    });
+}
+
+async function saveTempGroupEdit(gi) {
+    const g = tempGroups[gi];
+    if (!g) return;
+
+    const getNum = id => Number((document.getElementById(id)?.value || '').replace(/[^0-9]/g, '')) || 0;
+    const getVal = id => document.getElementById(id)?.value || '';
+
+    for (let i = 0; i < g.items.length; i++) {
+        const p = g.items[i];
+
+        // 단가
+        p.unitPrice = getNum(`tge_up_${i}`);
+        p.unitPriceVat = getVal(`tge_upv_${i}`);
+        p.supplierUnitPrice = getNum(`tge_sup_${i}`);
+        p.supplierUnitPriceVat = getVal(`tge_supv_${i}`);
+
+        // 인쇄 (기타 시 커스텀 값)
+        p.printMethod = getVal(`tge_pm_${i}`) === '기타' ? (getVal(`tge_pmc_${i}`) || '기타') : getVal(`tge_pm_${i}`);
+        p.printFee = getNum(`tge_pf_${i}`);
+        p.printFeeApply = getVal(`tge_pfa_${i}`);
+        p.printFeeVat = getVal(`tge_pfv_${i}`);
+
+        // 포장 (기타 시 커스텀 값)
+        p.packMethod = getVal(`tge_pkm_${i}`) === '기타' ? (getVal(`tge_pkmc_${i}`) || '기타') : getVal(`tge_pkm_${i}`);
+        p.packagingFee = getNum(`tge_pkf_${i}`);
+        p.packagingFeeApply = getVal(`tge_pkfa_${i}`);
+        p.packagingFeeVat = getVal(`tge_pkfv_${i}`);
+
+        // 라벨
+        p.labelFee = getNum(`tge_lf_${i}`);
+        p.labelFeeApply = getVal(`tge_lfa_${i}`);
+        p.labelFeeVat = getVal(`tge_lfv_${i}`);
+
+        // 택배
+        p.shippingBoxes = getNum(`tge_sb_${i}`);
+        p.shippingFee = getNum(`tge_sf_${i}`);
+        p.shippingFeeVat = getVal(`tge_sfv_${i}`);
+
+        // 매입 부대비용
+        p.supPrintMethod = getVal(`tgs_pm_${i}`) === '기타' ? (getVal(`tgs_pmc_${i}`) || '기타') : getVal(`tgs_pm_${i}`);
+        p.supPrintFee = getNum(`tgs_pf_${i}`);
+        p.supPrintFeeApply = getVal(`tgs_pfa_${i}`);
+        p.supPrintFeeVat = getVal(`tgs_pfv_${i}`);
+        p.supPackMethod = getVal(`tgs_pkm_${i}`) === '기타' ? (getVal(`tgs_pkmc_${i}`) || '기타') : getVal(`tgs_pkm_${i}`);
+        p.supPackagingFee = getNum(`tgs_pkf_${i}`);
+        p.supPackagingFeeApply = getVal(`tgs_pkfa_${i}`);
+        p.supPackagingFeeVat = getVal(`tgs_pkfv_${i}`);
+        p.supLabelFee = getNum(`tgs_lf_${i}`);
+        p.supLabelFeeApply = getVal(`tgs_lfa_${i}`);
+        p.supLabelFeeVat = getVal(`tgs_lfv_${i}`);
+        p.supShippingBoxes = getNum(`tgs_sb_${i}`);
+        p.supShippingFee = getNum(`tgs_sf_${i}`);
+        p.supShippingFeeVat = getVal(`tgs_sfv_${i}`);
+
+        // 매출액/매입액 재계산
+        p.revenue = calcTempGroupRevenue(p);
+        p.supplierRevenue = calcTempGroupSupRevenue(p);
+
+        const dbRow = {
+            unit_price: p.unitPrice,
+            unit_price_vat: p.unitPriceVat,
+            supplier_unit_price: p.supplierUnitPrice,
+            supplier_unit_price_vat: p.supplierUnitPriceVat,
+            print_method: p.printMethod,
+            print_fee: p.printFee,
+            print_fee_apply: p.printFeeApply,
+            print_fee_vat: p.printFeeVat,
+            pack_method: p.packMethod,
+            packaging_fee: p.packagingFee,
+            packaging_fee_apply: p.packagingFeeApply,
+            packaging_fee_vat: p.packagingFeeVat,
+            label_fee: p.labelFee,
+            label_fee_apply: p.labelFeeApply,
+            label_fee_vat: p.labelFeeVat,
+            shipping_boxes: p.shippingBoxes,
+            shipping_fee: p.shippingFee,
+            shipping_fee_vat: p.shippingFeeVat,
+            sup_print_method: p.supPrintMethod,
+            sup_print_fee: p.supPrintFee,
+            sup_print_fee_apply: p.supPrintFeeApply,
+            sup_print_fee_vat: p.supPrintFeeVat,
+            sup_pack_method: p.supPackMethod,
+            sup_packaging_fee: p.supPackagingFee,
+            sup_packaging_fee_apply: p.supPackagingFeeApply,
+            sup_packaging_fee_vat: p.supPackagingFeeVat,
+            sup_label_fee: p.supLabelFee,
+            sup_label_fee_apply: p.supLabelFeeApply,
+            sup_label_fee_vat: p.supLabelFeeVat,
+            sup_shipping_boxes: p.supShippingBoxes,
+            sup_shipping_fee: p.supShippingFee,
+            sup_shipping_fee_vat: p.supShippingFeeVat,
+            revenue: p.revenue,
+            supplier_revenue: p.supplierRevenue
+        };
+
+        try {
+            await sb.from('projects_temp').update(dbRow).eq('id', p.id);
+        } catch (err) {
+            console.error('저장 실패:', err);
+            showToast('저장 실패: ' + err.message);
+            return;
+        }
+    }
+
+    showToast('저장 완료');
+    closeTempModal();
+    renderTempProjects();
+}
+
+let _tempQuoteGroup = null;
+
+function _qRowTemp(k, v, first, last) {
+    const bt = first ? '' : 'border-top:1px solid #eef0f5;';
+    const bb = last ? '' : 'border-bottom:1px solid #eef0f5;';
+    return `<tr><td style="padding:5px 10px;background:#f5f7fa;font-weight:700;color:#4a5568;width:72px;text-align:center;border-right:1px solid #e2e6ee;${bt}${bb}">${k}</td><td style="padding:5px 10px;color:#1a1d29;${bt}${bb}">${v}</td></tr>`;
+}
+
+function fmtNTemp(n) { return (n || 0).toLocaleString(); }
+
+function numToKoreanAmountTemp(n) {
+    if (!n || n <= 0) return '';
+    const units = ['', '만', '억', '조'];
+    const digits = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
+    const subs = ['', '천', '백', '십'];
+    let result = '', num = Math.floor(n);
+    for (let i = 0; num > 0 && i < units.length; i++) {
+        const part = num % 10000; num = Math.floor(num / 10000);
+        if (part === 0) continue;
+        let partStr = '';
+        let p = part;
+        for (let j = 0; j < 4; j++) {
+            const d = p % 10; p = Math.floor(p / 10);
+            if (d === 0) continue;
+            partStr = (d === 1 && j > 0 ? '' : digits[d]) + subs[j] + partStr;
+        }
+        result = partStr + units[i] + result;
+    }
+    return '일금 ' + result + '원정 (￦' + fmtNTemp(Math.floor(n)) + ')';
+}
+
+function openTempQuote(gi) {
+    const g = tempGroups[gi];
+    if (!g || !g.items.length) return;
+    _tempQuoteGroup = g;
+    renderTempQuoteDoc(g);
+    document.getElementById('tempQuoteOverlay').style.display = 'block';
+}
+
+function closeTempQuote() {
+    document.getElementById('tempQuoteOverlay').style.display = 'none';
+    _tempQuoteGroup = null;
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('tempQuoteOverlay').style.display !== 'none') closeTempQuote();
+});
+
+function renderTempQuoteDoc(g) {
+    const items = g.items;
+    const dateStr = g.date || '';
+    const fmtDate = d => d ? d.replace(/-/g, '.') : '';
+    const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    // 품목별 계산 (VAT 포함/별도 반영)
+    let totalSup = 0, totalVat = 0;
+    const ic = 'padding:10px 6px;border-bottom:1px solid #eef0f5;text-align:right;color:#0B4F8F;font-weight:700';
+    const icSub = 'padding:6px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10px';
+    const itemRows = items.map(p => {
+        const rawProd = (p.unitPrice || 0) * (p.qty || 0);
+        let prodT, prodV;
+        if (p.unitPriceVat === 'VAT 포함') {
+            prodT = Math.round(rawProd / 1.1);
+            prodV = rawProd - prodT;
+        } else {
+            prodT = rawProd;
+            prodV = Math.round(prodT * 0.1);
+        }
+        totalSup += prodT;
+        totalVat += prodV;
+
+        let rows = `<tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #eef0f5;font-weight:700;color:#1a1d29;font-size:11px">${esc(p.item || '')}${p.unitPriceVat === 'VAT 포함' ? ' <span style="font-size:9px;color:#888">(VAT포함)</span>' : ''}</td>
+            <td style="${ic}">${fmtNTemp(p.qty || 0)}</td>
+            <td style="${ic}">${fmtNTemp(p.unitPrice || 0)}</td>
+            <td style="${ic}">${fmtNTemp(prodT)}</td>
+            <td style="${ic}">${fmtNTemp(prodV)}</td>
+        </tr>`;
+
+        // 부대비용 행
+        const qty = p.qty || 0;
+        const fees = [
+            { name: '인쇄비' + (p.printMethod && p.printMethod !== '없음' ? ' (' + p.printMethod + ')' : ''), unitVal: p.printFee || 0, apply: p.printFeeApply || '1개당', vat: p.printFeeVat },
+            { name: '포장비' + (p.packMethod && p.packMethod !== '기본박스' ? ' (' + p.packMethod + ')' : ''), unitVal: p.packagingFee || 0, apply: p.packagingFeeApply || '일괄', vat: p.packagingFeeVat },
+            { name: '라벨비', unitVal: p.labelFee || 0, apply: p.labelFeeApply || '1개당', vat: p.labelFeeVat },
+            { name: '택배비', unitVal: p.shippingFee || 0, apply: '박스', fQtyOverride: p.shippingBoxes || 0, vat: p.shippingFeeVat }
+        ].filter(f => f.unitVal > 0);
+
+        fees.forEach(f => {
+            const fQty = f.fQtyOverride !== undefined ? f.fQtyOverride : (f.apply === '1개당' ? qty : 1);
+            const fTotal = f.unitVal * fQty;
+            let fSup, fV;
+            if (f.vat === 'VAT 포함') {
+                fSup = Math.round(fTotal / 1.1);
+                fV = fTotal - fSup;
+            } else {
+                fSup = fTotal;
+                fV = Math.round(fTotal * 0.1);
+            }
+            totalSup += fSup;
+            totalVat += fV;
+            const applyLabel = f.apply === '1개당' ? ' <span style="font-size:9px;color:#888">1개당</span>' : (f.apply === '박스' ? ' <span style="font-size:9px;color:#888">' + fQty + '박스</span>' : '');
+            rows += `<tr>
+                <td style="${icSub}">　└ ${f.name}${applyLabel}${f.vat === 'VAT 포함' ? ' <span style="color:#E67E22">(포함)</span>' : ''}</td>
+                <td style="${icSub};text-align:right">${fQty}</td>
+                <td style="${icSub};text-align:right">${fmtNTemp(f.unitVal)}</td>
+                <td style="${icSub};text-align:right">${fmtNTemp(fSup)}</td>
+                <td style="${icSub};text-align:right">${fmtNTemp(fV)}</td>
+            </tr>`;
+        });
+
+        return rows;
+    }).join('');
+
+    const grand = totalSup + totalVat;
+    const koreanAmt = numToKoreanAmountTemp(grand);
+
+    const headCell = 'background:#f5f7fa;color:#4a5568;padding:8px 6px;font-weight:700;font-size:10px;letter-spacing:.5px;border-bottom:1px solid #d5dae3';
+
+    const manager = currentUser ? currentUser.name : '';
+
+    document.getElementById('tempQuoteDocEl').innerHTML =
+    `<div id="tempQuoteDocInner" style="width:794px;height:1123px;overflow:hidden;background:#fff;font-family:'Noto Sans KR',sans-serif;color:#1a1d29;position:relative;padding:30px 44px 22px;box-sizing:border-box;display:flex;flex-direction:column">
+    <!-- 상단 -->
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding-bottom:8px;border-bottom:2px solid #0B4F8F;margin-bottom:10px;gap:14px">
+      <div></div>
+      <div style="text-align:center">
+        <div style="font-family:serif;font-size:10px;color:#C8A35B;letter-spacing:5px;font-weight:700;margin-bottom:2px">ESTIMATE / QUOTATION</div>
+        <div style="font-size:32px;font-weight:900;color:#0B4F8F;letter-spacing:14px;padding-left:14px;display:inline-block;line-height:1.1">견 적 서</div>
+      </div>
+      <div style="text-align:right;font-size:9.5px;color:#666;line-height:1.6;white-space:nowrap">
+        발행일 <b style="color:#0B4F8F">${fmtDate(dateStr)}</b>
+      </div>
+    </div>
+    <!-- 수신/공급자 -->
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <div style="flex:1;border:1px solid #d5dae3;border-radius:8px;overflow:hidden;background:#fff">
+        <div style="background:#0B4F8F;color:#fff;padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:2px">수 신 · TO</div>
+        <table style="width:100%;border-collapse:collapse;font-size:10.5px">
+          ${_qRowTemp('거래처', '<b>' + esc(g.client || '') + '</b>', true)}
+          ${_qRowTemp('담당자', esc(g.clientContact || ''))}
+          ${_qRowTemp('TEL/FAX', '')}
+          ${_qRowTemp('결제조건', '')}
+          ${_qRowTemp('유효기간', '<span style="color:#c03545;font-weight:700">발행후 7일간 유효합니다</span>', false, true)}
+        </table>
+        <div style="padding:7px 12px;background:#f9fafc;border-top:1px solid #eef0f5;font-size:10px;color:#555;line-height:1.6">1. 귀사의 일익 번창하심을 기원합니다.<br>2. 하기와 같이 견적드리오니 검토 부탁드립니다.</div>
+      </div>
+      <div style="flex:1;border:1px solid #d5dae3;border-radius:8px;overflow:hidden;background:#fff">
+        <div style="background:linear-gradient(135deg,#2B3856,#0B4F8F);color:#fff;padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:2px">공급자 · FROM</div>
+        <div style="padding:10px 10px 8px;background:#fff;border-bottom:1px solid #eef0f5;text-align:center;position:relative">
+          <img src="${typeof LOGO_DARK !== 'undefined' ? LOGO_DARK : ''}" style="height:24px">
+          <img src="${typeof STAMP !== 'undefined' ? STAMP : ''}" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:46px;height:46px;object-fit:contain;pointer-events:none;mix-blend-mode:multiply">
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:10.5px">
+          ${_qRowTemp('사업자번호', '114-81-93170')}
+          ${_qRowTemp('대표자', '김관택')}
+          ${_qRowTemp('주 소', '<span style="font-size:9.5px;line-height:1.4">서울 구로구 디지털로32길 30,<br>코오롱빌란트1차 901호</span>')}
+          ${_qRowTemp('업태/종목', '<span style="font-size:9.5px">제조·도매 / 시계 판촉물</span>')}
+          ${_qRowTemp('담 당 자', esc(manager))}
+          ${_qRowTemp('TEL/FAX', '02-2103-5757', false, true)}
+        </table>
+      </div>
+    </div>
+    <!-- 금액 바 -->
+    <div style="background:linear-gradient(135deg,#0B4F8F 0%,#1a6bb0 100%);color:#fff;padding:14px 20px;border-radius:8px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 12px rgba(11,79,143,.18)">
+      <div>
+        <div style="font-size:10px;letter-spacing:3px;font-weight:600;color:rgba(255,255,255,.85);margin-bottom:3px">TOTAL AMOUNT</div>
+        <div style="font-size:15px;font-weight:800;letter-spacing:.5px">${koreanAmt}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:26px;font-weight:900;letter-spacing:.5px">￦ ${fmtNTemp(grand)}</div>
+        <div style="font-size:10px;color:rgba(255,255,255,.8);margin-top:1px">부가세 별도가</div>
+      </div>
+    </div>
+    <!-- 품목 테이블 -->
+    <div style="border:1px solid #d5dae3;border-radius:8px 8px 0 0;overflow:hidden;background:#fff;flex:1;display:flex;flex-direction:column">
+      <table style="width:100%;border-collapse:collapse;font-size:10.5px">
+        <thead><tr>
+          <th style="${headCell};text-align:left;padding-left:12px">품 명 및 규 격</th>
+          <th style="${headCell};width:54px">수 량</th>
+          <th style="${headCell};width:96px">단 가</th>
+          <th style="${headCell};width:108px">공 급 가 액</th>
+          <th style="${headCell};width:96px">부 가 세</th>
+        </tr></thead>
+        <tbody>
+          ${itemRows}
+          <tr><td colspan="5" style="background:#f5f7fa;text-align:center;font-weight:700;color:#4a5568;font-size:10.5px;padding:6px">- 이 하 여 백 -</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- 합계 -->
+    <div style="display:flex;border:1px solid #d5dae3;border-top:2px solid #0B4F8F;border-radius:0 0 8px 8px;overflow:hidden;background:#f5f7fa">
+      <div style="flex:1;padding:10px 14px;border-right:1px solid #e2e6ee"><div style="font-size:9px;font-weight:700;color:#6b7280;letter-spacing:2px">공급가액 · SUBTOTAL</div><div style="font-size:15px;font-weight:800;color:#1a1d29;margin-top:2px">${fmtNTemp(totalSup)}</div></div>
+      <div style="flex:1;padding:10px 14px;border-right:1px solid #e2e6ee"><div style="font-size:9px;font-weight:700;color:#6b7280;letter-spacing:2px">부가세 · VAT</div><div style="font-size:15px;font-weight:800;color:#1a1d29;margin-top:2px">${fmtNTemp(totalVat)}</div></div>
+      <div style="flex:1;padding:10px 14px;background:#0B4F8F;color:#fff"><div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.8);letter-spacing:2px">합 계 · TOTAL</div><div style="font-size:18px;font-weight:800;color:#fff;margin-top:2px">${fmtNTemp(grand)}</div></div>
+    </div>
+    <!-- 비고 -->
+    <div style="display:flex;border:1px solid #d5dae3;border-radius:8px;overflow:hidden;margin-top:10px;background:#fff">
+      <div style="background:#f5f7fa;padding:10px 14px;font-weight:700;font-size:10.5px;color:#4a5568;border-right:1px solid #e2e6ee;display:flex;align-items:center;min-width:60px">비 고</div>
+      <div style="padding:10px 14px;flex:1;font-size:10px;color:#666;min-height:36px;line-height:1.6">• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.<br>• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.</div>
+    </div>
+    <!-- 푸터 -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid #e2e6ee;font-size:9px;color:#888">
+      <div>시계전문몰 <span style="color:#0B4F8F;font-weight:600">www.showroom.co.kr</span> &nbsp;·&nbsp; 판촉용품몰 <span style="color:#0B4F8F;font-weight:600">www.agift.kr</span></div>
+      <div style="color:#c03545;font-weight:700">klpkorea@agift.kr</div>
+    </div>
+    </div>`;
+}
+
+async function dlTempQuote(type) {
+    if (!_tempQuoteGroup) return;
+    const el = document.getElementById('tempQuoteDocEl');
+    const b1 = document.getElementById('btnTempQuoteJpg');
+    const b2 = document.getElementById('btnTempQuotePdf');
+    b1.disabled = b2.disabled = true;
+    b1.textContent = '생성 중...';
+    b2.textContent = '생성 중...';
+    try {
+        const canvas = await html2canvas(el, { scale: 3, useCORS: true, backgroundColor: '#fff', logging: false, width: 794, height: 1123, windowWidth: 794, windowHeight: 1123 });
+        const dateP = (_tempQuoteGroup.date || '').replace(/-/g, '');
+        const fname = dateP + '_케이엘피코리아_' + (_tempQuoteGroup.client || '업체') + '_견적서';
+        if (type === 'jpg') {
+            const a = document.createElement('a');
+            a.download = fname + '.jpg';
+            a.href = canvas.toDataURL('image/jpeg', 0.92);
+            a.click();
+        } else {
+            const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pw = pdf.internal.pageSize.getWidth();
+            const ph = pdf.internal.pageSize.getHeight();
+            pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pw, ph);
+            pdf.save(fname + '.pdf');
+        }
+    } catch (err) {
+        alert('오류: ' + err.message);
+    }
+    b1.disabled = b2.disabled = false;
+    b1.textContent = 'JPG 다운로드';
+    b2.textContent = 'PDF 다운로드';
+}
