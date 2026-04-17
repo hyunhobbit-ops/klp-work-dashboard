@@ -6687,7 +6687,8 @@ async function loadTempProjects() {
                 supLabelFeeVat: r.sup_label_fee_vat || 'VAT 별도',
                 supShippingBoxes: r.sup_shipping_boxes || 0,
                 supShippingFee: r.sup_shipping_fee || 0,
-                supShippingFeeVat: r.sup_shipping_fee_vat || 'VAT 별도'
+                supShippingFeeVat: r.sup_shipping_fee_vat || 'VAT 별도',
+                quoteNote: r.quote_note || ''
             });
         });
     } catch (err) {
@@ -6710,7 +6711,8 @@ function renderTempProjects() {
     sorted.forEach(p => {
         const key = (p.date || '') + '||' + (p.client || '');
         let g = groups.find(x => x.key === key);
-        if (!g) { g = { key, date: p.date, client: p.client, clientContact: p.clientContact, items: [] }; groups.push(g); }
+        if (!g) { g = { key, date: p.date, client: p.client, clientContact: p.clientContact, quoteNote: p.quoteNote || '', items: [] }; groups.push(g); }
+        if (!g.quoteNote && p.quoteNote) g.quoteNote = p.quoteNote;
         g.items.push(p);
     });
 
@@ -7285,6 +7287,10 @@ function openTempGroupEdit(gi) {
         <button onclick="closeTempModal()" style="background:var(--gray-100);border:none;font-size:20px;cursor:pointer;color:var(--gray-500);padding:6px 10px;border-radius:10px">✕</button>
     </div>
     ${itemsHtml}
+    <div style="background:var(--gray-50);border-radius:14px;padding:16px;margin-bottom:14px">
+        <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:var(--gray-900)">견적서 비고</div>
+        <textarea id="tge_quoteNote" rows="4" placeholder="• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.&#10;• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다." style="${IS};resize:vertical;min-height:80px;line-height:1.6">${g.quoteNote || ''}</textarea>
+    </div>
     <button class="btn-primary" onclick="saveTempGroupEdit(${gi})" style="width:100%;padding:14px;font-size:15px;margin-top:4px">저장</button>`;
 
     let overlay = document.getElementById('tempModalOverlay');
@@ -7312,8 +7318,11 @@ async function saveTempGroupEdit(gi) {
     const getNum = id => Number((document.getElementById(id)?.value || '').replace(/[^0-9]/g, '')) || 0;
     const getVal = id => document.getElementById(id)?.value || '';
 
+    const quoteNote = document.getElementById('tge_quoteNote')?.value || '';
+
     for (let i = 0; i < g.items.length; i++) {
         const p = g.items[i];
+        p.quoteNote = quoteNote;
 
         // 단가
         p.unitPrice = getNum(`tge_up_${i}`);
@@ -7397,7 +7406,8 @@ async function saveTempGroupEdit(gi) {
             sup_shipping_fee: p.supShippingFee,
             sup_shipping_fee_vat: p.supShippingFeeVat,
             revenue: p.revenue,
-            supplier_revenue: p.supplierRevenue
+            supplier_revenue: p.supplierRevenue,
+            quote_note: p.quoteNote
         };
 
         try {
@@ -7613,7 +7623,7 @@ function renderTempQuoteDoc(g) {
     <!-- 비고 -->
     <div style="display:flex;border:1px solid #d5dae3;border-radius:8px;overflow:hidden;margin-top:10px;background:#fff">
       <div style="background:#f5f7fa;padding:10px 14px;font-weight:700;font-size:10.5px;color:#4a5568;border-right:1px solid #e2e6ee;display:flex;align-items:center;min-width:60px">비 고</div>
-      <div style="padding:10px 14px;flex:1;font-size:10px;color:#666;min-height:36px;line-height:1.6">• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.<br>• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.</div>
+      <div style="padding:10px 14px;flex:1;font-size:10px;color:#666;min-height:36px;line-height:1.6;white-space:pre-line">${esc(g.quoteNote || '• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.\n• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.')}</div>
     </div>
     <!-- 푸터 -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid #e2e6ee;font-size:9px;color:#888">
