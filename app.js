@@ -904,10 +904,17 @@ async function updateProjectStatus(id, newStatus) {
     const p = projects.find(x => x.id === id);
     if (!p) return;
     p.status = newStatus;
+    const update = { status: newStatus };
+    // 상태를 '완료'로 바꾸면 체크리스트 전체 체크
+    if (newStatus === '완료') {
+        if (!p.checks) p.checks = {};
+        CHECK_ITEMS.forEach(item => { p.checks[item.key] = true; });
+        update.checks = p.checks;
+    }
     renderProjects();
     if (p.category !== '해외 주문') {
         try {
-            const { error } = await sb.from('projects_domestic').update({ status: newStatus }).eq('id', id);
+            const { error } = await sb.from('projects_domestic').update(update).eq('id', id);
             if (error) throw error;
             showToast('상태가 변경되었습니다');
         } catch (err) {
@@ -922,10 +929,17 @@ async function toggleProjectCheck(id, key) {
     if (!p) return;
     if (!p.checks) p.checks = {};
     p.checks[key] = !p.checks[key];
+    const update = { checks: p.checks };
+    // 체크리스트 전체 체크 시 상태를 '완료'로 자동 변경
+    const allChecked = CHECK_ITEMS.every(item => !!p.checks[item.key]);
+    if (allChecked && p.status !== '완료') {
+        p.status = '완료';
+        update.status = '완료';
+    }
     renderProjects();
     if (p.category !== '해외 주문') {
         try {
-            const { error } = await sb.from('projects_domestic').update({ checks: p.checks }).eq('id', id);
+            const { error } = await sb.from('projects_domestic').update(update).eq('id', id);
             if (error) throw error;
         } catch (err) {
             console.error('체크 저장 실패', err);
@@ -3082,13 +3096,21 @@ async function updateProject(id) {
         newChecks[k] = el ? el.checked : false;
     });
 
+    let newStatus = getVal('editProjectStatus');
+    // 상태 '완료' → 체크리스트 전체 체크, 체크리스트 전체 체크 → 상태 '완료'
+    if (newStatus === '완료') {
+        CHECK_ITEMS.forEach(item => { newChecks[item.key] = true; });
+    } else if (CHECK_ITEMS.every(item => !!newChecks[item.key])) {
+        newStatus = '완료';
+    }
+
     Object.assign(p, {
         name, client,
         supplier: supplierName,
         contactPerson: getVal('editProjectContact'),
         title: '',
         manager: getVal('editProjectManager'),
-        status: getVal('editProjectStatus'),
+        status: newStatus,
         supplierContact: getVal('editProjectSupplierContact'),
         unitPrice, qty, vat, revenue,
         unit: getVal('editProjectUnit'),
