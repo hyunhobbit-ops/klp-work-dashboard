@@ -4900,23 +4900,32 @@ function formatPhoneInput(e) {
     const input = e.target;
     const digits = input.value.replace(/\D/g, '');
     let formatted = '';
-    // 0502, 0508로 시작하는 번호는 4-4-4 양식 (0000-0000-0000)
-    if (digits.startsWith('0502') || digits.startsWith('0508')) {
-        if (digits.length <= 4) {
-            formatted = digits;
-        } else if (digits.length <= 8) {
-            formatted = digits.slice(0, 4) + '-' + digits.slice(4);
-        } else {
-            formatted = digits.slice(0, 4) + '-' + digits.slice(4, 8) + '-' + digits.slice(8, 12);
-        }
+    const isSafety = digits.startsWith('0502') || digits.startsWith('0508');
+    const isSeoul  = digits.startsWith('02') && !isSafety;
+    const isMobile = /^01[0-9]/.test(digits);
+
+    if (isSafety) {
+        // 안심번호 4-4-4
+        if (digits.length <= 4) formatted = digits;
+        else if (digits.length <= 8) formatted = digits.slice(0, 4) + '-' + digits.slice(4);
+        else formatted = digits.slice(0, 4) + '-' + digits.slice(4, 8) + '-' + digits.slice(8, 12);
+    } else if (isSeoul) {
+        // 서울 02: 2-3-4 (9자리) / 2-4-4 (10자리)
+        if (digits.length <= 2) formatted = digits;
+        else if (digits.length <= 5) formatted = digits.slice(0, 2) + '-' + digits.slice(2);
+        else if (digits.length <= 9) formatted = digits.slice(0, 2) + '-' + digits.slice(2, 5) + '-' + digits.slice(5, 9);
+        else formatted = digits.slice(0, 2) + '-' + digits.slice(2, 6) + '-' + digits.slice(6, 10);
+    } else if (isMobile) {
+        // 휴대폰 010/011~: 3-4-4 (11자리)
+        if (digits.length <= 3) formatted = digits;
+        else if (digits.length <= 7) formatted = digits.slice(0, 3) + '-' + digits.slice(3);
+        else formatted = digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
     } else {
-        if (digits.length <= 3) {
-            formatted = digits;
-        } else if (digits.length <= 7) {
-            formatted = digits.slice(0, 3) + '-' + digits.slice(3);
-        } else {
-            formatted = digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
-        }
+        // 지역번호 3자리 (031/032/033/041/042/043/044/051/.../070/0303): 3-3-4 (10자리) / 3-4-4 (11자리)
+        if (digits.length <= 3) formatted = digits;
+        else if (digits.length <= 6) formatted = digits.slice(0, 3) + '-' + digits.slice(3);
+        else if (digits.length <= 10) formatted = digits.slice(0, 3) + '-' + digits.slice(3, 6) + '-' + digits.slice(6, 10);
+        else formatted = digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
     }
     input.value = formatted;
 }
