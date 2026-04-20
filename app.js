@@ -8115,17 +8115,17 @@ function openPlanningPostDetail(postId) {
             <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">${repliesHtml || `<div style="color:var(--gray-400);font-size:12px;padding:12px;text-align:center;border:1px dashed var(--gray-200);border-radius:8px">아직 답글이 없습니다</div>`}</div>
             <div style="background:var(--white);border:1.5px solid var(--blue);border-radius:10px;padding:12px">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-                    <select id="planningPostCategory" style="padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px">${catOpts}</select>
-                    <input id="planningPostAuthor" placeholder="작성자" value="${planningEsc(currentUser ? currentUser.name : '')}" style="padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px">
+                    <select id="planningPostCategory" style="padding:8px 10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px">${catOpts}</select>
+                    <input id="planningPostAuthor" placeholder="작성자" value="${planningEsc(currentUser ? currentUser.name : '')}" style="padding:8px 10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px">
                 </div>
-                <textarea id="planningPostContent" placeholder="답글을 입력하세요..." rows="2" style="width:100%;padding:10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;margin-bottom:8px"></textarea>
+                <textarea id="planningPostContent" placeholder="답글을 입력하세요..." rows="2" style="width:100%;padding:10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;margin-bottom:8px"></textarea>
                 <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-                    <label style="padding:7px 10px;background:var(--gray-100);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                    <label style="padding:7px 10px;background:var(--gray-100);color:var(--gray-900);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
                         📷 이미지
                         <input type="file" accept="image/*" multiple onchange="handlePlanningImageFiles(event)" style="display:none">
                     </label>
-                    <input id="planningPostImageUrl" placeholder="또는 이미지 URL" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:12px">
-                    <button type="button" onclick="addPlanningImageUrl()" style="padding:7px 10px;background:var(--gray-100);border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">추가</button>
+                    <input id="planningPostImageUrl" placeholder="또는 이미지 URL" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:12px">
+                    <button type="button" onclick="addPlanningImageUrl()" style="padding:7px 10px;background:var(--gray-100);color:var(--gray-900);border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">추가</button>
                 </div>
                 <div id="planningImagePreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
                 <button onclick="submitPlanningReply(${post.id})" style="width:100%;padding:9px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">↩ 답글 작성</button>
@@ -8200,12 +8200,12 @@ function openPlanningPostEditor() {
         </div>
         <div class="form-group"><label class="form-label">📷 이미지 (선택)</label>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <label style="padding:8px 12px;background:var(--gray-100);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                <label style="padding:8px 12px;background:var(--gray-100);color:var(--gray-900);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
                     이미지 파일 선택
                     <input type="file" accept="image/*" multiple onchange="handlePlanningImageFiles(event)" style="display:none">
                 </label>
-                <input id="planningPostImageUrl" placeholder="또는 이미지 URL" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px">
-                <button type="button" onclick="addPlanningImageUrl()" style="padding:8px 12px;background:var(--gray-100);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">URL 추가</button>
+                <input id="planningPostImageUrl" placeholder="또는 이미지 URL" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px">
+                <button type="button" onclick="addPlanningImageUrl()" style="padding:8px 12px;background:var(--gray-100);color:var(--gray-900);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">URL 추가</button>
             </div>
             <div id="planningImagePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
         </div>
