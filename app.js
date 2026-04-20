@@ -7896,7 +7896,7 @@ function renderPlanningList() {
                     </div>
                     <button onclick="openNewPlanningModal('${period.key}')" style="padding:7px 14px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">+ 새 ${period.label}</button>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">${cards}${quickAddCard(period.key)}</div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px">${cards}${quickAddCard(period.key)}</div>
             </div>
         </section>`;
     }).join('');
