@@ -2035,12 +2035,12 @@ function renderDeliveries() {
             <td class="td-check"><input type="checkbox" class="delivery-check" data-id="${d.id}" ${d._checked ? 'checked' : ''}></td>
             <td class="cell-editable" data-id="${d.id}" data-field="date" data-type="date">${fmtDisplay(d.date)}${isToday ? ' <span class="today-badge">오늘</span>' : ''}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="type" data-type="select" data-options="일반,중고,번개,당근,GS반택,ETSY"><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
-            <td class="cell-editable" data-id="${d.id}" data-field="sender" data-type="select" data-options="케이엘피코리아,김관택,이현주,김현호,유지은,구정두,황선영,(이현주),기타">${d.sender}</td>
-            <td class="cell-editable" data-id="${d.id}" data-field="recipient"><strong>${d.recipient}</strong></td>
+            <td class="cell-editable" data-id="${d.id}" data-field="sender" data-type="select" data-options="케이엘피코리아,김관택,이현주,김현호,유지은,구정두,황선영,(이현주),기타" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.sender}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="recipient" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><strong>${d.recipient}</strong></td>
             <td class="cell-editable" data-id="${d.id}" data-field="phone">${d.phone || '-'}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="product">${d.product}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="zipcode">${d.zipcode || '-'}</td>
-            <td class="cell-editable" data-id="${d.id}" data-field="address" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.address}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="address" style="min-width:320px;word-break:break-all">${d.address}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="payment" data-type="select" data-options="선불,착불">${d.payment}</td>
             <td class="cell-editable delivery-price-col" data-id="${d.id}" data-field="price" data-type="number">${d.price ? d.price.toLocaleString() + '원' : '-'}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="memo">${d.memo || '-'}</td>
