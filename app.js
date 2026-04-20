@@ -4840,8 +4840,8 @@ function formatPhoneInput(e) {
     const input = e.target;
     const digits = input.value.replace(/\D/g, '');
     let formatted = '';
-    // 0502로 시작하는 번호는 4-4-4 양식 (0000-0000-0000)
-    if (digits.startsWith('0502')) {
+    // 0502, 0508로 시작하는 번호는 4-4-4 양식 (0000-0000-0000)
+    if (digits.startsWith('0502') || digits.startsWith('0508')) {
         if (digits.length <= 4) {
             formatted = digits;
         } else if (digits.length <= 8) {
