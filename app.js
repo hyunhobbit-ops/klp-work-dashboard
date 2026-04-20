@@ -7706,6 +7706,12 @@ const PLANNING_CATEGORIES = [
     { key: 'etc', label: '기타', icon: '💬', bg: '#F3F4F6', fg: '#4B5563' }
 ];
 const PLANNING_STATUSES = ['진행 중', '보류', '완료'];
+const PLANNING_PERIODS = [
+    { key: 'week',  label: '주간 프로젝트', icon: '📆', sub: '이번 주 단위로 관리하는 프로젝트' },
+    { key: 'month', label: '월간 프로젝트', icon: '🗓️', sub: '한 달 단위로 관리하는 프로젝트' },
+    { key: 'year',  label: '연간 프로젝트', icon: '📅', sub: '연간 단위로 관리하는 장기 프로젝트' }
+];
+const PLANNING_ASSIGNEES = ['이현주', '김현호', '유지은', '구정두', '김관택', '대표님', '황선영'];
 let planningProjects = [];
 let currentPlanningProjectId = null;
 
@@ -7726,6 +7732,20 @@ function planningCategoryMeta(key) {
 }
 function planningEsc(s) {
     return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function planningDDay(dateStr) {
+    if (!dateStr) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const d = new Date(dateStr); d.setHours(0, 0, 0, 0);
+    if (isNaN(d.getTime())) return null;
+    const diff = Math.round((d - today) / 86400000);
+    let label, color;
+    if (diff < 0) { label = `D+${-diff}`; color = '#9CA3AF'; }
+    else if (diff === 0) { label = 'D-DAY'; color = '#DC2626'; }
+    else if (diff <= 7) { label = `D-${diff}`; color = '#EA580C'; }
+    else if (diff <= 30) { label = `D-${diff}`; color = '#2563EB'; }
+    else { label = `D-${diff}`; color = '#6B7280'; }
+    return { diff, label, color };
 }
 function planningFmtDate(iso) {
     if (!iso) return '';
@@ -7756,7 +7776,7 @@ function renderPlanning() {
 }
 
 function renderPlanningList() {
-    const cards = planningProjects.slice().sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt)).map(p => {
+    const renderProjectCard = p => {
         const postCount = (p.posts || []).length;
         const last = (p.posts || []).reduce((m, x) => (!m || new Date(x.createdAt) > new Date(m.createdAt)) ? x : m, null);
         const lastStr = last ? `${planningEsc(last.author)} · ${planningFmtDate(last.createdAt)}` : '아직 게시물 없음';
@@ -7765,12 +7785,18 @@ function renderPlanningList() {
         const posts = p.posts || [];
         const doneCount = posts.filter(x => (x.taskStatus || 'todo') === 'done').length;
         const progressPct = posts.length ? Math.round((doneCount / posts.length) * 100) : 0;
+        const dd = planningDDay(p.deadline);
+        const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap">${dd.label}</span>` : '';
         return `
         <div onclick="openPlanningProject(${p.id})" style="background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:10px" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 12px rgba(0,0,0,0.06)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
                 <div style="font-size:16px;font-weight:800;color:var(--gray-900);line-height:1.3">${planningEsc(p.name)}</div>
-                <span style="background:${statusBg};color:${statusColor};font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap">${p.status}</span>
+                <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
+                    ${ddBadge}
+                    <span style="background:${statusBg};color:${statusColor};font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap">${p.status}</span>
+                </div>
             </div>
+            ${p.deadline ? `<div style="font-size:12px;color:var(--gray-500)">⏰ 마감 ${planningEsc(p.deadline)}</div>` : ''}
             ${p.description ? `<div style="font-size:13px;color:var(--gray-500);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(p.description)}</div>` : ''}
             ${posts.length ? `
             <div style="padding-top:4px">
@@ -7782,26 +7808,44 @@ function renderPlanningList() {
                 <span>${lastStr}</span>
             </div>
         </div>`;
-    }).join('');
+    };
 
-    const empty = !planningProjects.length ? `
-        <div style="grid-column:1/-1;background:var(--gray-50);border:2px dashed var(--gray-200);border-radius:12px;padding:60px 20px;text-align:center;color:var(--gray-500)">
-            <div style="font-size:48px;margin-bottom:12px">🧩</div>
-            <div style="font-size:15px;font-weight:700;color:var(--gray-900);margin-bottom:6px">아직 프로젝트가 없어요</div>
-            <div style="font-size:13px;margin-bottom:16px">새 프로젝트를 만들어 팀과 함께 아이디어를 모아보세요</div>
-            <button onclick="openNewPlanningModal()" style="padding:10px 20px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">+ 새 프로젝트</button>
-        </div>` : '';
+    const sections = PLANNING_PERIODS.map(period => {
+        const items = planningProjects
+            .filter(p => (p.period || 'month') === period.key)
+            .sort((a, b) => {
+                const da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+                const db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+                if (da !== db) return da - db;
+                return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+            });
+        const cards = items.map(renderProjectCard).join('');
+        const emptyCard = !items.length ? `<div style="grid-column:1/-1;background:var(--gray-50);border:2px dashed var(--gray-200);border-radius:10px;padding:28px 16px;text-align:center;color:var(--gray-500);font-size:13px">아직 ${period.label}가 없습니다</div>` : '';
+        return `
+        <section style="margin-bottom:28px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <span style="font-size:22px">${period.icon}</span>
+                    <div>
+                        <div style="font-size:16px;font-weight:800;color:var(--gray-900)">${period.label} <span style="font-size:12px;color:var(--gray-500);font-weight:700;margin-left:6px">${items.length}개</span></div>
+                        <div style="font-size:11px;color:var(--gray-500)">${period.sub}</div>
+                    </div>
+                </div>
+                <button onclick="openNewPlanningModal('${period.key}')" style="padding:7px 14px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">+ 새 ${period.label}</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">${cards}${emptyCard}</div>
+        </section>`;
+    }).join('');
 
     return `
         <div style="padding:20px 24px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
                 <div>
                     <div style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">프로젝트 협업 공간</div>
-                    <div style="font-size:13px;color:var(--gray-500)">프로젝트를 클릭하면 칸반보드가 열립니다 <span style="color:var(--yellow);font-weight:700">(로컬 시안 · localStorage 저장)</span></div>
+                    <div style="font-size:13px;color:var(--gray-500)">주간 · 월간 · 연간 단위로 프로젝트를 관리하고, 클릭하면 칸반보드가 열립니다 <span style="color:var(--yellow);font-weight:700">(로컬 시안 · localStorage 저장)</span></div>
                 </div>
-                <button onclick="openNewPlanningModal()" style="padding:10px 18px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer">+ 새 프로젝트</button>
             </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">${cards}${empty}</div>
+            ${sections}
         </div>`;
 }
 
@@ -7825,12 +7869,20 @@ function renderPlanningDetail(p) {
         const thumbHtml = imgs.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px">${imgs.slice(0,3).map(src => `<img src="${planningEsc(src)}" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid var(--gray-200)">`).join('')}${imgs.length > 3 ? `<div style="width:46px;height:46px;background:var(--gray-100);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--gray-500)">+${imgs.length-3}</div>` : ''}</div>` : '';
         const replyCount = (byParent[post.id] || []).length;
         const preview = String(post.content || '').slice(0, 80);
+        const dd = planningDDay(post.deadline);
+        const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px">${dd.label}</span>` : '';
+        const vendorTag = post.vendor ? `<span style="color:var(--orange);font-size:11px;font-weight:700">🏭 ${planningEsc(post.vendor)}</span>` : '';
+        const assignees = Array.isArray(post.assignees) ? post.assignees : [];
+        const assigneeHtml = assignees.length ? `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:6px">${assignees.map(n => `<span style="background:var(--gray-100);color:var(--gray-700,#374151);font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">${planningEsc(n)}</span>`).join('')}</div>` : '';
         return `
         <div draggable="true" ondragstart="planningPostDragStart(event,${post.id})" ondragend="planningPostDragEnd(event)" onclick="openPlanningPostDetail(${post.id})" style="background:var(--white);border:1px solid var(--gray-200);border-left:3px solid ${meta.fg};border-radius:10px;padding:10px 12px;cursor:grab;transition:all .12s;user-select:none" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.08)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
                 <span style="background:${meta.bg};color:${meta.fg};font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px">${meta.icon} ${meta.label}</span>
+                ${ddBadge}
             </div>
             ${preview ? `<div style="font-size:13px;color:var(--gray-900);line-height:1.45;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(preview)}${post.content.length > 80 ? '...' : ''}</div>` : `<div style="font-size:12px;color:var(--gray-400);font-style:italic">내용 없음</div>`}
+            ${vendorTag ? `<div style="margin-top:6px">${vendorTag}</div>` : ''}
+            ${assigneeHtml}
             ${thumbHtml}
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--gray-200);font-size:11px;color:var(--gray-500)">
                 <span><strong style="color:var(--gray-900);font-weight:700">${planningEsc(post.author)}</strong></span>
@@ -7962,6 +8014,14 @@ function openPlanningPostDetail(postId) {
 
     const body = document.getElementById('modalBody');
     if (!body) return;
+    const dd = planningDDay(post.deadline);
+    const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px">${dd.label}</span>` : '';
+    const assignees = Array.isArray(post.assignees) ? post.assignees : [];
+    const metaRows = [];
+    if (post.vendor) metaRows.push(`<div style="font-size:12px;color:var(--gray-600,#4B5563)"><span style="color:var(--gray-500)">🏭 거래처:</span> <strong style="color:var(--orange)">${planningEsc(post.vendor)}</strong></div>`);
+    if (post.deadline) metaRows.push(`<div style="font-size:12px;color:var(--gray-600,#4B5563)"><span style="color:var(--gray-500)">⏰ 마감일:</span> <strong>${planningEsc(post.deadline)}</strong> ${ddBadge}</div>`);
+    if (assignees.length) metaRows.push(`<div style="font-size:12px;color:var(--gray-600,#4B5563);display:flex;gap:4px;align-items:center;flex-wrap:wrap"><span style="color:var(--gray-500)">👥 담당:</span> ${assignees.map(n => `<span style="background:var(--blue-light);color:var(--blue);font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">${planningEsc(n)}</span>`).join('')}</div>`);
+    const metaBlock = metaRows.length ? `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;padding:10px 12px;background:var(--gray-50);border-radius:8px;border:1px solid var(--gray-200)">${metaRows.join('')}</div>` : '';
     body.innerHTML = `
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
             <span style="background:${meta.bg};color:${meta.fg};font-size:12px;font-weight:800;padding:4px 10px;border-radius:6px">${meta.icon} ${meta.label}</span>
@@ -7971,6 +8031,7 @@ function openPlanningPostDetail(postId) {
             <button onclick="deletePlanningPost(${post.id});closeModal()" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer">삭제</button>
         </div>
         <div style="display:flex;gap:6px;margin-bottom:14px">${taskStatusBadges}</div>
+        ${metaBlock}
         <div style="font-size:14px;color:var(--gray-900);white-space:pre-wrap;line-height:1.6;padding:12px;background:var(--gray-50);border-radius:8px">${planningEsc(post.content || '(내용 없음)')}</div>
         ${imgHtml}
         <div style="margin-top:18px">
@@ -8014,29 +8075,65 @@ function setPlanningPostTaskStatus(postId, newStatus) {
 }
 
 let planningPostEditorMode = null;
+let planningPendingAssignees = [];
+function togglePlanningAssignee(name) {
+    const i = planningPendingAssignees.indexOf(name);
+    if (i >= 0) planningPendingAssignees.splice(i, 1);
+    else planningPendingAssignees.push(name);
+    const wrap = document.getElementById('planningAssigneeChips');
+    if (wrap) wrap.innerHTML = renderPlanningAssigneeChips();
+}
+function renderPlanningAssigneeChips() {
+    return PLANNING_ASSIGNEES.map(n => {
+        const active = planningPendingAssignees.includes(n);
+        return `<button type="button" onclick="togglePlanningAssignee('${planningEsc(n)}')" style="padding:6px 12px;border:1px solid ${active ? 'var(--blue)' : 'var(--gray-200)'};background:${active ? 'var(--blue-light)' : 'var(--white)'};color:${active ? 'var(--blue)' : 'var(--gray-600,#4B5563)'};border-radius:20px;font-size:12px;font-weight:700;cursor:pointer">${active ? '✓ ' : ''}${planningEsc(n)}</button>`;
+    }).join('');
+}
 function openPlanningPostEditor() {
+    const proj = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!proj) return;
     const body = document.getElementById('modalBody');
     if (!body) return;
     const mode = planningPostEditorMode || { mode: 'new', taskStatus: 'todo', parentId: null };
     const col = (PLANNING_TASK_STATUSES.find(s => s.key === mode.taskStatus) || PLANNING_TASK_STATUSES[0]);
     const catOpts = PLANNING_CATEGORIES.map(c => `<option value="${c.key}">${c.icon} ${c.label}</option>`).join('');
+    planningPendingAssignees = [];
     body.innerHTML = `
-        <div class="form-section-title">+ 새 카드 <span style="background:${col.bg};color:${col.text};font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;margin-left:8px">${col.label}</span></div>
+        <div class="form-section-title">📌 <span style="color:var(--blue)">${planningEsc(proj.name)}</span>의 새 항목 추가 <span style="background:${col.bg};color:${col.text};font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;margin-left:8px">${col.label}</span></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-            <select id="planningPostCategory" class="form-select">${catOpts}</select>
-            <input id="planningPostAuthor" class="form-input" placeholder="작성자" value="${planningEsc(currentUser ? currentUser.name : '')}">
+            <div class="form-group" style="margin:0"><label class="form-label">카테고리</label>
+                <select id="planningPostCategory" class="form-select">${catOpts}</select>
+            </div>
+            <div class="form-group" style="margin:0"><label class="form-label">작성자</label>
+                <input id="planningPostAuthor" class="form-input" placeholder="작성자" value="${planningEsc(currentUser ? currentUser.name : '')}">
+            </div>
         </div>
-        <textarea id="planningPostContent" class="form-input" rows="4" placeholder="내용을 입력하세요..." style="font-family:inherit"></textarea>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
-            <label style="padding:8px 12px;background:var(--gray-100);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-                📷 이미지 파일
-                <input type="file" accept="image/*" multiple onchange="handlePlanningImageFiles(event)" style="display:none">
-            </label>
-            <input id="planningPostImageUrl" placeholder="또는 이미지 URL" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px">
-            <button type="button" onclick="addPlanningImageUrl()" style="padding:8px 12px;background:var(--gray-100);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">URL 추가</button>
+        <div class="form-group"><label class="form-label">내용</label>
+            <textarea id="planningPostContent" class="form-input" rows="4" placeholder="내용을 입력하세요..." style="font-family:inherit"></textarea>
         </div>
-        <div id="planningImagePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
-        <button class="form-submit" style="background:var(--blue);margin-top:14px" onclick="submitPlanningCard()">저장</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="form-group"><label class="form-label">🏭 거래처 (선택)</label>
+                <input id="planningPostVendor" class="form-input" placeholder="예: OO사, XX공장">
+            </div>
+            <div class="form-group"><label class="form-label">⏰ 마감일 (선택)</label>
+                <input id="planningPostDeadline" class="form-input" type="date">
+            </div>
+        </div>
+        <div class="form-group"><label class="form-label">👥 담당자 (여러 명 선택 가능)</label>
+            <div id="planningAssigneeChips" style="display:flex;flex-wrap:wrap;gap:6px">${renderPlanningAssigneeChips()}</div>
+        </div>
+        <div class="form-group"><label class="form-label">📷 이미지 (선택)</label>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <label style="padding:8px 12px;background:var(--gray-100);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                    이미지 파일 선택
+                    <input type="file" accept="image/*" multiple onchange="handlePlanningImageFiles(event)" style="display:none">
+                </label>
+                <input id="planningPostImageUrl" placeholder="또는 이미지 URL" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px">
+                <button type="button" onclick="addPlanningImageUrl()" style="padding:8px 12px;background:var(--gray-100);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">URL 추가</button>
+            </div>
+            <div id="planningImagePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
+        </div>
+        <button class="form-submit" style="background:var(--blue);margin-top:6px" onclick="submitPlanningCard()">저장</button>
     `;
     document.getElementById('modalOverlay').classList.add('show');
     planningPendingImages = [];
@@ -8051,10 +8148,13 @@ function submitPlanningCard() {
     if (!content && !planningPendingImages.length) { showToast('내용 또는 이미지를 입력하세요'); return; }
     const author = (document.getElementById('planningPostAuthor').value || '').trim() || (currentUser ? currentUser.name : '익명');
     const category = document.getElementById('planningPostCategory').value;
+    const vendor = (document.getElementById('planningPostVendor').value || '').trim();
+    const deadline = document.getElementById('planningPostDeadline').value || '';
     const mode = planningPostEditorMode || { taskStatus: 'todo', parentId: null };
     const post = {
         id: Date.now(),
-        author, category, content,
+        author, category, content, vendor, deadline,
+        assignees: planningPendingAssignees.slice(),
         images: planningPendingImages.slice(),
         taskStatus: mode.taskStatus || 'todo',
         parentId: mode.parentId || null,
@@ -8071,6 +8171,7 @@ function submitPlanningCard() {
         return;
     }
     planningPendingImages = [];
+    planningPendingAssignees = [];
     planningPostEditorMode = null;
     closeModal();
     renderPlanning();
@@ -8116,15 +8217,24 @@ function closePlanningProject() {
     renderPlanning();
 }
 
-function openNewPlanningModal() {
+function openNewPlanningModal(defaultPeriod) {
     const body = document.getElementById('modalBody');
     if (!body) return;
+    const pd = defaultPeriod || 'month';
     body.innerHTML = `
         <div class="form-section-title">+ 새 프로젝트</div>
         <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="newPlanningName" class="form-input" placeholder="예: 원데이강의 준비, 시계 부품 구입"></div>
         <div class="form-group"><label class="form-label">설명 (선택)</label><textarea id="newPlanningDesc" class="form-input" rows="3" placeholder="이 프로젝트의 목표, 배경을 적어주세요"></textarea></div>
-        <div class="form-group"><label class="form-label">상태</label>
-            <select id="newPlanningStatus" class="form-select">${PLANNING_STATUSES.map(s => `<option value="${s}">${s}</option>`).join('')}</select>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div class="form-group"><label class="form-label">기간 구분</label>
+                <select id="newPlanningPeriod" class="form-select">${PLANNING_PERIODS.map(pp => `<option value="${pp.key}" ${pp.key === pd ? 'selected' : ''}>${pp.icon} ${pp.label}</option>`).join('')}</select>
+            </div>
+            <div class="form-group"><label class="form-label">마감일</label>
+                <input id="newPlanningDeadline" class="form-input" type="date">
+            </div>
+            <div class="form-group"><label class="form-label">상태</label>
+                <select id="newPlanningStatus" class="form-select">${PLANNING_STATUSES.map(s => `<option value="${s}">${s}</option>`).join('')}</select>
+            </div>
         </div>
         <button class="form-submit" style="background:var(--blue)" onclick="savePlanningProject()">저장</button>
     `;
@@ -8136,12 +8246,21 @@ function openEditPlanningModal(id) {
     if (!p) return;
     const body = document.getElementById('modalBody');
     if (!body) return;
+    const pd = p.period || 'month';
     body.innerHTML = `
         <div class="form-section-title">✏️ 프로젝트 편집</div>
         <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="editPlanningName" class="form-input" value="${planningEsc(p.name)}"></div>
         <div class="form-group"><label class="form-label">설명</label><textarea id="editPlanningDesc" class="form-input" rows="3">${planningEsc(p.description || '')}</textarea></div>
-        <div class="form-group"><label class="form-label">상태</label>
-            <select id="editPlanningStatus" class="form-select">${PLANNING_STATUSES.map(s => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div class="form-group"><label class="form-label">기간 구분</label>
+                <select id="editPlanningPeriod" class="form-select">${PLANNING_PERIODS.map(pp => `<option value="${pp.key}" ${pp.key === pd ? 'selected' : ''}>${pp.icon} ${pp.label}</option>`).join('')}</select>
+            </div>
+            <div class="form-group"><label class="form-label">마감일</label>
+                <input id="editPlanningDeadline" class="form-input" type="date" value="${planningEsc(p.deadline || '')}">
+            </div>
+            <div class="form-group"><label class="form-label">상태</label>
+                <select id="editPlanningStatus" class="form-select">${PLANNING_STATUSES.map(s => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+            </div>
         </div>
         <button class="form-submit" style="background:var(--blue)" onclick="savePlanningProjectEdit(${id})">저장</button>
     `;
@@ -8152,10 +8271,12 @@ function savePlanningProject() {
     if (!name) { showToast('프로젝트 이름을 입력하세요'); return; }
     const desc = (document.getElementById('newPlanningDesc').value || '').trim();
     const status = document.getElementById('newPlanningStatus').value;
+    const period = document.getElementById('newPlanningPeriod').value;
+    const deadline = document.getElementById('newPlanningDeadline').value || '';
     const nowIso = new Date().toISOString();
     const proj = {
         id: Date.now(),
-        name, description: desc, status,
+        name, description: desc, status, period, deadline,
         createdBy: currentUser ? currentUser.name : '익명',
         createdAt: nowIso, updatedAt: nowIso,
         posts: []
@@ -8175,6 +8296,8 @@ function savePlanningProjectEdit(id) {
     p.name = name;
     p.description = (document.getElementById('editPlanningDesc').value || '').trim();
     p.status = document.getElementById('editPlanningStatus').value;
+    p.period = document.getElementById('editPlanningPeriod').value;
+    p.deadline = document.getElementById('editPlanningDeadline').value || '';
     p.updatedAt = new Date().toISOString();
     savePlanningProjects();
     closeModal();
