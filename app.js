@@ -45,6 +45,7 @@ function updateSidebarUser() {
     document.getElementById('userName').textContent = currentUser.name;
     document.getElementById('userRole').textContent = currentUser.role;
     try { applyMarketdbPermission(); } catch (e) {}
+    try { applyPlanningPermission(); } catch (e) {}
     try { applyDeliveryPricePermission(); } catch (e) {}
 }
 
@@ -387,6 +388,11 @@ function switchTab(tabId, fromHistory = false) {
 
     // 중고마켓DB 권한 체크 — 비인가 사용자는 홈으로 리다이렉트
     if (tabId === 'marketdb' && !marketdbCanAccess()) {
+        showToast('접근 권한이 없습니다');
+        tabId = 'home';
+    }
+    // 프로젝트(협업) 권한 체크
+    if (tabId === 'planning' && !planningCanAccess()) {
         showToast('접근 권한이 없습니다');
         tabId = 'home';
     }
@@ -7747,6 +7753,19 @@ const PLANNING_CATEGORIES_ACCESS = [
     { key: 'family',   label: '가족', icon: '🏠', bg: '#FCE7F3', fg: '#BE185D', note: '모두 공유' }
 ];
 const PLANNING_ASSIGNEES = ['이현주', '김현호', '유지은', '구정두', '대표님'];
+const PLANNING_ALLOWED = ['김관택', '이현주', '김현호']; // loginName 기준 (김관택 = 대표님)
+
+function planningCanAccess() {
+    if (!currentUser) return false;
+    const login = currentUser.loginName || currentUser.name;
+    return PLANNING_ALLOWED.includes(login);
+}
+function applyPlanningPermission() {
+    const nav = document.getElementById('navPlanning');
+    if (nav) nav.style.display = planningCanAccess() ? '' : 'none';
+    const homeSec = document.getElementById('homePlanningSection');
+    if (homeSec) homeSec.style.display = planningCanAccess() ? '' : 'none';
+}
 
 function planningCurrentOwner() {
     return currentUser ? (currentUser.loginName || String(currentUser.id || currentUser.name)) : '';
@@ -7853,6 +7872,7 @@ async function loadPlanningProjects() {
 }
 
 async function renderPlanningHomeSection() {
+    if (!planningCanAccess()) return;
     try {
         if (!planningLoaded) await loadPlanningProjects();
         const me = currentUser ? (currentUser.name || '') : '';
