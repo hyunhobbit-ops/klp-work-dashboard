@@ -7702,12 +7702,10 @@ const PLANNING_CATEGORIES = [
     { key: 'research', label: '조사',   icon: '🔍', bg: '#F5F3FF', fg: '#7C3AED' },
     { key: 'material', label: '자료',   icon: '📎', bg: '#ECFDF5', fg: '#059669' },
     { key: 'urgent',   label: '긴급',   icon: '🔴', bg: '#FEF2F2', fg: '#DC2626' },
-    { key: 'high',     label: '높음',   icon: '🟡', bg: '#FFFBEB', fg: '#D97706' },
     { key: 'normal',   label: '보통',   icon: '🟢', bg: '#F0FDF4', fg: '#16A34A' }
 ];
 const PLANNING_CATEGORY_TO_PRIORITY = {
     urgent: '🔴 긴급',
-    high: '🟡 높음',
     normal: '🟢 보통',
     propose: '🟡 보통',
     research: '🟡 보통',
@@ -7957,20 +7955,18 @@ function renderPlanningDetail(p) {
         const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px">${dd.label}</span>` : '';
         const vendorTag = post.vendor ? `<div style="color:var(--orange);font-size:14px;font-weight:700;margin-top:8px">🏭 ${planningEsc(post.vendor)}</div>` : '';
         const assignees = Array.isArray(post.assignees) ? post.assignees : [];
-        const assigneeHtml = assignees.length ? `<div style="margin-top:10px;font-size:15px;line-height:1.5;color:var(--gray-900)"><span style="color:var(--gray-500);font-weight:700">담당자:</span> <strong style="font-weight:800">${assignees.map(planningEsc).join(', ')}</strong></div>` : '';
-        const replyHtml = replyCount > 0 ? `<span style="font-size:14px;color:var(--blue);font-weight:800;white-space:nowrap">💬 댓글 : ${replyCount}개</span>` : '';
+        const assigneeText = assignees.length ? `<span style="font-size:15px;color:var(--gray-900)"><span style="color:var(--gray-500);font-weight:700">담당자:</span> <strong style="font-weight:800">${assignees.map(planningEsc).join(', ')}</strong></span>` : '<span></span>';
+        const replyText = replyCount > 0 ? `<span style="font-size:14px;color:var(--blue);font-weight:800;white-space:nowrap">💬 댓글 : ${replyCount}개</span>` : '';
+        const assigneeRow = (assignees.length || replyCount > 0) ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:12px;flex-wrap:wrap">${assigneeText}${replyText}</div>` : '';
         return `
         <div draggable="true" ondragstart="planningPostDragStart(event,${post.id})" ondragend="planningPostDragEnd(event)" onclick="openPlanningPostDetail(${post.id})" style="background:var(--white);border:1px solid var(--gray-200);border-left:4px solid ${meta.fg};border-radius:12px;padding:14px 16px;cursor:grab;transition:all .12s;user-select:none" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 10px rgba(0,0,0,0.08)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                    <span style="background:${meta.bg};color:${meta.fg};font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px">${meta.icon} ${meta.label}</span>
-                    ${ddBadge}
-                </div>
-                ${replyHtml}
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                <span style="background:${meta.bg};color:${meta.fg};font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px">${meta.icon} ${meta.label}</span>
+                ${ddBadge}
             </div>
             ${preview ? `<div style="font-size:15px;color:var(--gray-900);line-height:1.55;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(preview)}${post.content.length > 100 ? '...' : ''}</div>` : `<div style="font-size:14px;color:var(--gray-400);font-style:italic">내용 없음</div>`}
             ${vendorTag}
-            ${assigneeHtml}
+            ${assigneeRow}
             ${thumbHtml}
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed var(--gray-200);font-size:13px;color:var(--gray-500);flex-wrap:wrap;gap:6px">
                 <span><span style="color:var(--gray-500);font-weight:700">작성자:</span> <strong style="color:var(--gray-900);font-weight:800;font-size:14px">${planningEsc(post.author)}</strong></span>
