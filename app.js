@@ -628,24 +628,8 @@ function renderHome() {
     document.getElementById('todayTasks').textContent = myTodayItems.length;
     document.getElementById('completionRate').textContent = rate + '%';
 
-    // 이번 달 매입매출 집계 — 마감일 또는 시작일이 이번 달이면 포함
-    const inMonth = (p) => {
-        const key = p.deadline || p.startDate;
-        return typeof key === 'string' && key.startsWith(monthPrefix);
-    };
-    const monthProjects = projects.filter(inMonth);
-    const monthRevenue = monthProjects.reduce((s, p) => s + (p.revenue || 0), 0);
-    const monthPurchase = monthProjects.reduce((s, p) => s + (p.supplierRevenue || 0), 0);
-    const monthMargin = monthRevenue - monthPurchase;
-    const marginEl = document.getElementById('monthMargin');
-    const revEl = document.getElementById('monthRevenue');
-    const purEl = document.getElementById('monthPurchase');
-    if (revEl) revEl.textContent = monthRevenue.toLocaleString() + '원';
-    if (purEl) purEl.textContent = monthPurchase.toLocaleString() + '원';
-    if (marginEl) {
-        marginEl.textContent = monthMargin.toLocaleString() + '원';
-        marginEl.style.color = monthMargin < 0 ? 'var(--red)' : '';
-    }
+    // 프로젝트 섹션 집계 — 홈에서 보여주는 planning 데이터 (비동기 로드)
+    renderPlanningHomeSection();
 
     // Quick menu counts
     const qP = document.getElementById('qProjects'); if (qP) qP.textContent = `${activeCount}건 진행`;
@@ -713,7 +697,7 @@ function renderHome() {
             const owner = isTask
                 ? (it.assignee || '-')
                 : (it.assignees && it.assignees.length ? it.assignees.join(', ') : (it.manager || '-'));
-            const tag = isTask ? '할 일' : '프로젝트';
+            const tag = isTask ? '할 일' : '매입매출';
             const tagColor = isTask ? 'var(--orange)' : 'var(--blue)';
             const tagBg = isTask ? 'var(--orange-light)' : 'var(--blue-light)';
             const onclick = isTask
@@ -754,7 +738,7 @@ function renderHome() {
                 <div class="urgent-name">${p.name}</div>
                 <div class="urgent-sub">${p.assignees.join(', ')} · 마감 ${fmtDisplay(p.deadline)}</div>
             </div>
-            <span class="urgent-type">프로젝트</span>
+            <span class="urgent-type">매입매출</span>
         </div>`;
     });
     urgentTasks.forEach(t => {
@@ -7865,6 +7849,74 @@ async function loadPlanningProjects() {
     } catch (err) {
         console.error('planning load fail', err);
         showToast('프로젝트 로드 실패: ' + err.message);
+    }
+}
+
+async function renderPlanningHomeSection() {
+    try {
+        if (!planningLoaded) await loadPlanningProjects();
+        const me = currentUser ? (currentUser.name || '') : '';
+        const visible = planningProjects.filter(p => {
+            if ((p.access || 'company') !== 'personal') return true;
+            const owner = planningCurrentOwner();
+            return !!owner && p.ownerLogin === owner;
+        });
+        const today = new Date(); today.setHours(0,0,0,0);
+        const plus7 = new Date(today); plus7.setDate(today.getDate() + 7);
+        let myTodo = 0;
+        let weekDue = 0;
+        const rows = [];
+        for (const proj of visible) {
+            const posts = proj.posts || [];
+            for (const post of posts) {
+                if (post.parentId) continue;
+                const assignees = Array.isArray(post.assignees) ? post.assignees : [];
+                const isMine = me && assignees.includes(me);
+                if (isMine && (post.taskStatus || 'todo') !== 'done') myTodo++;
+                if (post.deadline) {
+                    const d = new Date(post.deadline); d.setHours(0,0,0,0);
+                    if (d >= today && d <= plus7 && (post.taskStatus || 'todo') !== 'done') weekDue++;
+                }
+                if (isMine && (post.taskStatus || 'todo') !== 'done') {
+                    rows.push({ proj, post });
+                }
+            }
+        }
+        const totalEl = document.getElementById('planningTotalCount');
+        const todoEl = document.getElementById('planningMyTodo');
+        const weekEl = document.getElementById('planningWeekDue');
+        if (totalEl) totalEl.textContent = visible.length;
+        if (todoEl) todoEl.textContent = myTodo;
+        if (weekEl) weekEl.textContent = weekDue;
+        const listEl = document.getElementById('planningHomeList');
+        if (!listEl) return;
+        if (!rows.length) {
+            listEl.innerHTML = `<div class="deadline-card-empty">담당 중인 할 일이 없습니다</div>`;
+            return;
+        }
+        rows.sort((a, b) => {
+            const da = a.post.deadline ? new Date(a.post.deadline).getTime() : Infinity;
+            const db = b.post.deadline ? new Date(b.post.deadline).getTime() : Infinity;
+            return da - db;
+        });
+        const statusColors = { todo: ['#F3F4F6','#4B5563','할 일'], doing: ['#EFF6FF','#2563EB','진행 중'], done: ['#ECFDF5','#059669','완료'] };
+        listEl.innerHTML = rows.slice(0, 6).map(({ proj, post }) => {
+            const s = statusColors[post.taskStatus || 'todo'];
+            const ddStr = post.deadline ? planningFmtDate(post.deadline) : '미정';
+            const dd = planningDDay(post.deadline);
+            const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:11px;font-weight:800;padding:2px 7px;border-radius:5px">${dd.label}</span>` : '';
+            const preview = String(post.content || '').slice(0, 60);
+            return `<div onclick="switchTab('planning');setTimeout(()=>openPlanningProject(${proj.id}),60)" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--gray-100);cursor:pointer;transition:background .1s" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background='transparent'">
+                <span style="background:${s[0]};color:${s[1]};font-size:11px;font-weight:800;padding:3px 8px;border-radius:5px;white-space:nowrap">${s[2]}</span>
+                <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;font-weight:700;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${planningEsc(proj.name)} · ${planningEsc(preview)}${post.content && post.content.length > 60 ? '...' : ''}</div>
+                    <div style="font-size:11px;color:var(--gray-500);margin-top:2px">마감 ${planningEsc(ddStr)}</div>
+                </div>
+                ${ddBadge}
+            </div>`;
+        }).join('');
+    } catch (err) {
+        console.error('planning home render fail', err);
     }
 }
 
