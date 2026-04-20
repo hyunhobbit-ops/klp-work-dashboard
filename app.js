@@ -7698,13 +7698,21 @@ async function dlTempQuote(type) {
 // ===== 프로젝트 (계획/협업) — localStorage 프로토타입 =====
 const PLANNING_STORAGE_KEY = 'klp_planning_projects';
 const PLANNING_CATEGORIES = [
-    { key: 'propose', label: '제안', icon: '💡', bg: '#EFF6FF', fg: '#2563EB' },
-    { key: 'research', label: '조사', icon: '🔍', bg: '#F5F3FF', fg: '#7C3AED' },
-    { key: 'material', label: '자료', icon: '📎', bg: '#ECFDF5', fg: '#059669' },
-    { key: 'vendor', label: '거래처', icon: '🏭', bg: '#FFF7ED', fg: '#EA580C' },
-    { key: 'price', label: '가격', icon: '💰', bg: '#FEFCE8', fg: '#CA8A04' },
-    { key: 'etc', label: '기타', icon: '💬', bg: '#F3F4F6', fg: '#4B5563' }
+    { key: 'propose',  label: '제안',   icon: '💡', bg: '#EFF6FF', fg: '#2563EB' },
+    { key: 'research', label: '조사',   icon: '🔍', bg: '#F5F3FF', fg: '#7C3AED' },
+    { key: 'material', label: '자료',   icon: '📎', bg: '#ECFDF5', fg: '#059669' },
+    { key: 'urgent',   label: '긴급',   icon: '🔴', bg: '#FEF2F2', fg: '#DC2626' },
+    { key: 'high',     label: '높음',   icon: '🟡', bg: '#FFFBEB', fg: '#D97706' },
+    { key: 'normal',   label: '보통',   icon: '🟢', bg: '#F0FDF4', fg: '#16A34A' }
 ];
+const PLANNING_CATEGORY_TO_PRIORITY = {
+    urgent: '🔴 긴급',
+    high: '🟡 높음',
+    normal: '🟢 보통',
+    propose: '🟡 보통',
+    research: '🟡 보통',
+    material: '🟡 보통'
+};
 const PLANNING_STATUSES = ['진행 중', '보류', '완료'];
 const PLANNING_PERIODS = [
     { key: 'week',  label: '주간 프로젝트', icon: '📆', sub: '이번 주 단위로 관리하는 프로젝트' },
@@ -7950,17 +7958,19 @@ function renderPlanningDetail(p) {
         const vendorTag = post.vendor ? `<div style="color:var(--orange);font-size:14px;font-weight:700;margin-top:8px">🏭 ${planningEsc(post.vendor)}</div>` : '';
         const assignees = Array.isArray(post.assignees) ? post.assignees : [];
         const assigneeHtml = assignees.length ? `<div style="margin-top:10px;font-size:15px;line-height:1.5;color:var(--gray-900)"><span style="color:var(--gray-500);font-weight:700">담당자:</span> <strong style="font-weight:800">${assignees.map(planningEsc).join(', ')}</strong></div>` : '';
-        const replyHtml = replyCount > 0 ? `<div style="margin-top:8px;font-size:15px;color:var(--blue);font-weight:800">💬 댓글 : ${replyCount}개</div>` : '';
+        const replyHtml = replyCount > 0 ? `<span style="font-size:14px;color:var(--blue);font-weight:800;white-space:nowrap">💬 댓글 : ${replyCount}개</span>` : '';
         return `
         <div draggable="true" ondragstart="planningPostDragStart(event,${post.id})" ondragend="planningPostDragEnd(event)" onclick="openPlanningPostDetail(${post.id})" style="background:var(--white);border:1px solid var(--gray-200);border-left:4px solid ${meta.fg};border-radius:12px;padding:14px 16px;cursor:grab;transition:all .12s;user-select:none" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 10px rgba(0,0,0,0.08)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-                <span style="background:${meta.bg};color:${meta.fg};font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px">${meta.icon} ${meta.label}</span>
-                ${ddBadge}
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span style="background:${meta.bg};color:${meta.fg};font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px">${meta.icon} ${meta.label}</span>
+                    ${ddBadge}
+                </div>
+                ${replyHtml}
             </div>
             ${preview ? `<div style="font-size:15px;color:var(--gray-900);line-height:1.55;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(preview)}${post.content.length > 100 ? '...' : ''}</div>` : `<div style="font-size:14px;color:var(--gray-400);font-style:italic">내용 없음</div>`}
             ${vendorTag}
             ${assigneeHtml}
-            ${replyHtml}
             ${thumbHtml}
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed var(--gray-200);font-size:13px;color:var(--gray-500);flex-wrap:wrap;gap:6px">
                 <span><span style="color:var(--gray-500);font-weight:700">작성자:</span> <strong style="color:var(--gray-900);font-weight:800;font-size:14px">${planningEsc(post.author)}</strong></span>
@@ -8219,7 +8229,7 @@ function openPlanningPostEditor() {
     setTimeout(() => { const el = document.getElementById('planningPostContent'); if (el) el.focus(); }, 60);
 }
 
-function submitPlanningCard() {
+async function submitPlanningCard() {
     const p = planningProjects.find(x => x.id === currentPlanningProjectId);
     if (!p) return;
     const content = (document.getElementById('planningPostContent').value || '').trim();
@@ -8248,11 +8258,47 @@ function submitPlanningCard() {
         p.posts.pop();
         return;
     }
+    // 담당자 일일계획표에 자동 등록 (작성일·마감일)
+    try {
+        await syncPlanningCardToDaily(p, post);
+    } catch (err) {
+        console.error('일일계획표 동기화 실패', err);
+    }
     planningPendingImages = [];
     planningPendingAssignees = [];
     planningPostEditorMode = null;
     closeModal();
     renderPlanning();
+}
+
+async function syncPlanningCardToDaily(project, post) {
+    const assignees = Array.isArray(post.assignees) ? post.assignees : [];
+    if (!assignees.length) return;
+    const priority = PLANNING_CATEGORY_TO_PRIORITY[post.category] || '🟡 보통';
+    const createdDate = (post.createdAt || new Date().toISOString()).slice(0, 10);
+    const summary = (post.content || '(내용 없음)').replace(/\s+/g, ' ').slice(0, 50);
+    const baseTitle = `[${project.name}] ${summary}`;
+    const insertedIds = [];
+    for (const person of assignees) {
+        const makeTask = (date, suffix, labelText) => ({
+            task: `${baseTitle}${suffix}`,
+            date, assignee: person, target: '',
+            priority, done: false,
+            deadline: post.deadline || '',
+            label: labelText, client: project.name || ''
+        });
+        // 작성일 태스크
+        const saved1 = await dbInsertTask(makeTask(createdDate, ' · 작성', '프로젝트 작성'));
+        if (saved1) { dailyTasks.push(saved1); insertedIds.push(saved1.id); }
+        // 마감일 태스크 (있고 작성일과 다를 때만)
+        if (post.deadline && post.deadline !== createdDate) {
+            const saved2 = await dbInsertTask(makeTask(post.deadline, ' · 마감 ⏰', '프로젝트 마감'));
+            if (saved2) { dailyTasks.push(saved2); insertedIds.push(saved2.id); }
+        }
+    }
+    try { renderDaily(); } catch (_) {}
+    try { renderHome(); } catch (_) {}
+    if (insertedIds.length) showToast(`일일계획표에 ${insertedIds.length}건 자동 등록`);
 }
 
 function submitPlanningReply(parentPostId) {
