@@ -429,6 +429,11 @@ function switchTab(tabId, fromHistory = false) {
     if (tabId === 'marketdb') {
         try { renderMarketdb(); } catch (e) { console.error('renderMarketdb failed', e); }
     }
+
+    // 프로젝트(계획/협업) 탭 열릴 때 렌더
+    if (tabId === 'planning') {
+        try { renderPlanning(); } catch (e) { console.error('renderPlanning failed', e); }
+    }
 }
 
 // 브라우저 뒤로/앞으로 → 모달 열려있으면 모달만 닫기, 아니면 탭 전환
@@ -7688,4 +7693,562 @@ async function dlTempQuote(type) {
     b1.disabled = b2.disabled = false;
     b1.textContent = 'JPG 다운로드';
     b2.textContent = 'PDF 다운로드';
+}
+
+// ===== 프로젝트 (계획/협업) — localStorage 프로토타입 =====
+const PLANNING_STORAGE_KEY = 'klp_planning_projects';
+const PLANNING_CATEGORIES = [
+    { key: 'propose', label: '제안', icon: '💡', bg: '#EFF6FF', fg: '#2563EB' },
+    { key: 'research', label: '조사', icon: '🔍', bg: '#F5F3FF', fg: '#7C3AED' },
+    { key: 'material', label: '자료', icon: '📎', bg: '#ECFDF5', fg: '#059669' },
+    { key: 'vendor', label: '거래처', icon: '🏭', bg: '#FFF7ED', fg: '#EA580C' },
+    { key: 'price', label: '가격', icon: '💰', bg: '#FEFCE8', fg: '#CA8A04' },
+    { key: 'etc', label: '기타', icon: '💬', bg: '#F3F4F6', fg: '#4B5563' }
+];
+const PLANNING_STATUSES = ['진행 중', '보류', '완료'];
+let planningProjects = [];
+let currentPlanningProjectId = null;
+
+function loadPlanningProjects() {
+    try {
+        const raw = localStorage.getItem(PLANNING_STORAGE_KEY);
+        planningProjects = raw ? JSON.parse(raw) : [];
+    } catch (e) {
+        console.error('planning load fail', e);
+        planningProjects = [];
+    }
+}
+function savePlanningProjects() {
+    localStorage.setItem(PLANNING_STORAGE_KEY, JSON.stringify(planningProjects));
+}
+function planningCategoryMeta(key) {
+    return PLANNING_CATEGORIES.find(c => c.key === key) || PLANNING_CATEGORIES[PLANNING_CATEGORIES.length - 1];
+}
+function planningEsc(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+function planningFmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return '방금';
+    if (diffMin < 60) return `${diffMin}분 전`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${diffH}시간 전`;
+    const diffD = Math.floor(diffH / 24);
+    if (diffD < 7) return `${diffD}일 전`;
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function renderPlanning() {
+    loadPlanningProjects();
+    const root = document.getElementById('planningRoot');
+    if (!root) return;
+    if (currentPlanningProjectId == null) {
+        root.innerHTML = renderPlanningList();
+    } else {
+        const proj = planningProjects.find(p => p.id === currentPlanningProjectId);
+        if (!proj) { currentPlanningProjectId = null; root.innerHTML = renderPlanningList(); return; }
+        root.innerHTML = renderPlanningDetail(proj);
+    }
+}
+
+function renderPlanningList() {
+    const cards = planningProjects.slice().sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt)).map(p => {
+        const postCount = (p.posts || []).length;
+        const last = (p.posts || []).reduce((m, x) => (!m || new Date(x.createdAt) > new Date(m.createdAt)) ? x : m, null);
+        const lastStr = last ? `${planningEsc(last.author)} · ${planningFmtDate(last.createdAt)}` : '아직 게시물 없음';
+        const statusColor = p.status === '완료' ? 'var(--green)' : p.status === '보류' ? 'var(--gray-500)' : 'var(--blue)';
+        const statusBg = p.status === '완료' ? 'var(--green-light)' : p.status === '보류' ? 'var(--gray-100)' : 'var(--blue-light)';
+        const posts = p.posts || [];
+        const doneCount = posts.filter(x => (x.taskStatus || 'todo') === 'done').length;
+        const progressPct = posts.length ? Math.round((doneCount / posts.length) * 100) : 0;
+        return `
+        <div onclick="openPlanningProject(${p.id})" style="background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:10px" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 12px rgba(0,0,0,0.06)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                <div style="font-size:16px;font-weight:800;color:var(--gray-900);line-height:1.3">${planningEsc(p.name)}</div>
+                <span style="background:${statusBg};color:${statusColor};font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap">${p.status}</span>
+            </div>
+            ${p.description ? `<div style="font-size:13px;color:var(--gray-500);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(p.description)}</div>` : ''}
+            ${posts.length ? `
+            <div style="padding-top:4px">
+                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray-500);margin-bottom:4px"><span>완료 ${doneCount}/${posts.length}</span><span>${progressPct}%</span></div>
+                <div style="height:6px;background:var(--gray-100);border-radius:3px;overflow:hidden"><div style="width:${progressPct}%;height:100%;background:var(--green);transition:width .2s"></div></div>
+            </div>` : ''}
+            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px dashed var(--gray-200);font-size:12px;color:var(--gray-500)">
+                <span>💬 <strong style="color:var(--gray-900);font-weight:700">${postCount}</strong>개 카드</span>
+                <span>${lastStr}</span>
+            </div>
+        </div>`;
+    }).join('');
+
+    const empty = !planningProjects.length ? `
+        <div style="grid-column:1/-1;background:var(--gray-50);border:2px dashed var(--gray-200);border-radius:12px;padding:60px 20px;text-align:center;color:var(--gray-500)">
+            <div style="font-size:48px;margin-bottom:12px">🧩</div>
+            <div style="font-size:15px;font-weight:700;color:var(--gray-900);margin-bottom:6px">아직 프로젝트가 없어요</div>
+            <div style="font-size:13px;margin-bottom:16px">새 프로젝트를 만들어 팀과 함께 아이디어를 모아보세요</div>
+            <button onclick="openNewPlanningModal()" style="padding:10px 20px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">+ 새 프로젝트</button>
+        </div>` : '';
+
+    return `
+        <div style="padding:20px 24px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+                <div>
+                    <div style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">프로젝트 협업 공간</div>
+                    <div style="font-size:13px;color:var(--gray-500)">프로젝트를 클릭하면 칸반보드가 열립니다 <span style="color:var(--yellow);font-weight:700">(로컬 시안 · localStorage 저장)</span></div>
+                </div>
+                <button onclick="openNewPlanningModal()" style="padding:10px 18px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer">+ 새 프로젝트</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">${cards}${empty}</div>
+        </div>`;
+}
+
+const PLANNING_TASK_STATUSES = [
+    { key: 'todo',  label: '할 일',   bar: '#9CA3AF', bg: '#F3F4F6', text: '#4B5563' },
+    { key: 'doing', label: '진행 중', bar: '#2563EB', bg: '#EFF6FF', text: '#2563EB' },
+    { key: 'done',  label: '완료',    bar: '#059669', bg: '#ECFDF5', text: '#059669' }
+];
+
+function renderPlanningDetail(p) {
+    const posts = (p.posts || []).slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const parents = posts.filter(x => !x.parentId);
+    const byParent = posts.reduce((acc, x) => {
+        if (x.parentId) (acc[x.parentId] = acc[x.parentId] || []).push(x);
+        return acc;
+    }, {});
+
+    const renderCard = (post) => {
+        const meta = planningCategoryMeta(post.category);
+        const imgs = Array.isArray(post.images) ? post.images : (post.image ? [post.image] : []);
+        const thumbHtml = imgs.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px">${imgs.slice(0,3).map(src => `<img src="${planningEsc(src)}" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid var(--gray-200)">`).join('')}${imgs.length > 3 ? `<div style="width:46px;height:46px;background:var(--gray-100);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--gray-500)">+${imgs.length-3}</div>` : ''}</div>` : '';
+        const replyCount = (byParent[post.id] || []).length;
+        const preview = String(post.content || '').slice(0, 80);
+        return `
+        <div draggable="true" ondragstart="planningPostDragStart(event,${post.id})" ondragend="planningPostDragEnd(event)" onclick="openPlanningPostDetail(${post.id})" style="background:var(--white);border:1px solid var(--gray-200);border-left:3px solid ${meta.fg};border-radius:10px;padding:10px 12px;cursor:grab;transition:all .12s;user-select:none" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.08)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+                <span style="background:${meta.bg};color:${meta.fg};font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px">${meta.icon} ${meta.label}</span>
+            </div>
+            ${preview ? `<div style="font-size:13px;color:var(--gray-900);line-height:1.45;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(preview)}${post.content.length > 80 ? '...' : ''}</div>` : `<div style="font-size:12px;color:var(--gray-400);font-style:italic">내용 없음</div>`}
+            ${thumbHtml}
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--gray-200);font-size:11px;color:var(--gray-500)">
+                <span><strong style="color:var(--gray-900);font-weight:700">${planningEsc(post.author)}</strong></span>
+                <span>${replyCount > 0 ? `↩ ${replyCount} · ` : ''}${planningFmtDate(post.createdAt)}</span>
+            </div>
+        </div>`;
+    };
+
+    const columns = PLANNING_TASK_STATUSES.map(col => {
+        const items = parents.filter(x => (x.taskStatus || 'todo') === col.key);
+        const cardsHtml = items.map(renderCard).join('');
+        const emptyCol = !items.length ? `<div style="color:var(--gray-400);font-size:12px;text-align:center;padding:24px 0;border:1px dashed var(--gray-200);border-radius:8px">비어 있음</div>` : '';
+        return `
+        <div class="planning-post-col" ondragover="planningPostDragOver(event)" ondragleave="planningPostDragLeave(event)" ondrop="planningPostDrop(event,'${col.key}')" style="flex:1;min-width:270px;background:var(--gray-50);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;transition:background .15s">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span style="width:8px;height:8px;border-radius:50%;background:${col.bar}"></span>
+                    <span style="font-size:13px;font-weight:800;color:${col.text}">${col.label}</span>
+                    <span style="background:${col.bg};color:${col.text};font-size:11px;font-weight:800;padding:2px 8px;border-radius:10px">${items.length}</span>
+                </div>
+                <button onclick="openNewPlanningPostForColumn('${col.key}')" title="이 컬럼에 새 카드" style="background:none;border:none;color:var(--gray-500);font-size:18px;line-height:1;cursor:pointer;padding:0 4px">+</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;min-height:80px">${cardsHtml}${emptyCol}</div>
+        </div>`;
+    }).join('');
+
+    const statusOpts = PLANNING_STATUSES.map(s => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('');
+
+    return `
+        <div style="padding:20px 24px">
+            <button onclick="closePlanningProject()" style="background:none;border:none;color:var(--gray-500);font-size:13px;cursor:pointer;padding:4px 0;margin-bottom:12px">← 프로젝트 목록</button>
+            <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:18px 20px;margin-bottom:16px">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+                    <div style="flex:1;min-width:0">
+                        <div style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">${planningEsc(p.name)}</div>
+                        ${p.description ? `<div style="font-size:13px;color:var(--gray-500);line-height:1.5;white-space:pre-wrap">${planningEsc(p.description)}</div>` : ''}
+                        <div style="font-size:11px;color:var(--gray-500);margin-top:8px">만든 사람: ${planningEsc(p.createdBy)} · ${planningFmtDate(p.createdAt)}</div>
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                        <select onchange="updatePlanningStatus(${p.id}, this.value)" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:8px;font-weight:700;font-size:12px">${statusOpts}</select>
+                        <button onclick="openNewPlanningPostForColumn('todo')" style="padding:6px 12px;background:var(--blue);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ 새 카드</button>
+                        <button onclick="openEditPlanningModal(${p.id})" style="padding:6px 10px;background:var(--gray-100);border:none;border-radius:8px;font-size:12px;cursor:pointer">✏️ 편집</button>
+                        <button onclick="deletePlanningProject(${p.id})" style="padding:6px 10px;background:var(--red-light,#FEE);color:var(--red);border:none;border-radius:8px;font-size:12px;cursor:pointer">삭제</button>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch">${columns}</div>
+        </div>`;
+}
+
+let planningPostDragId = null;
+function planningPostDragStart(ev, id) {
+    planningPostDragId = id;
+    ev.dataTransfer.effectAllowed = 'move';
+    try { ev.dataTransfer.setData('text/plain', String(id)); } catch (_) {}
+    ev.currentTarget.style.opacity = '0.5';
+    ev.stopPropagation();
+}
+function planningPostDragEnd(ev) {
+    ev.currentTarget.style.opacity = '';
+    planningPostDragId = null;
+}
+function planningPostDragOver(ev) {
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    ev.currentTarget.style.background = 'var(--blue-light)';
+}
+function planningPostDragLeave(ev) {
+    if (ev.currentTarget.contains(ev.relatedTarget)) return;
+    ev.currentTarget.style.background = '';
+}
+function planningPostDrop(ev, newStatus) {
+    ev.preventDefault();
+    ev.currentTarget.style.background = '';
+    const id = planningPostDragId || parseInt(ev.dataTransfer.getData('text/plain'), 10);
+    if (!id) return;
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!p) return;
+    const post = (p.posts || []).find(x => x.id === id);
+    if (!post) return;
+    if ((post.taskStatus || 'todo') === newStatus) return;
+    post.taskStatus = newStatus;
+    p.updatedAt = new Date().toISOString();
+    savePlanningProjects();
+    renderPlanning();
+    const label = (PLANNING_TASK_STATUSES.find(s => s.key === newStatus) || {}).label || newStatus;
+    showToast(`→ ${label}`);
+}
+
+function openNewPlanningPostForColumn(taskStatus) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!p) return;
+    planningPostEditorMode = { mode: 'new', taskStatus, parentId: null };
+    openPlanningPostEditor();
+}
+
+function openPlanningPostDetail(postId) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!p) return;
+    const post = (p.posts || []).find(x => x.id === postId);
+    if (!post) return;
+    const replies = (p.posts || []).filter(x => x.parentId === postId).sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const meta = planningCategoryMeta(post.category);
+    const imgs = Array.isArray(post.images) ? post.images : (post.image ? [post.image] : []);
+    const imgHtml = imgs.length ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">${imgs.map(src => `<img src="${planningEsc(src)}" style="max-width:220px;max-height:220px;border-radius:8px;border:1px solid var(--gray-200);cursor:zoom-in;object-fit:cover" onclick="openPlanningImage('${String(src).replace(/'/g,'&#39;')}')">`).join('')}</div>` : '';
+    const taskStatusBadges = PLANNING_TASK_STATUSES.map(s => {
+        const active = (post.taskStatus || 'todo') === s.key;
+        return `<button onclick="setPlanningPostTaskStatus(${post.id},'${s.key}')" style="padding:4px 10px;border:1px solid ${active ? s.bar : 'var(--gray-200)'};background:${active ? s.bg : 'var(--white)'};color:${active ? s.text : 'var(--gray-500)'};border-radius:6px;font-size:11px;font-weight:800;cursor:pointer">${s.label}</button>`;
+    }).join('');
+    const repliesHtml = replies.map(r => {
+        const rm = planningCategoryMeta(r.category);
+        const rImgs = Array.isArray(r.images) ? r.images : (r.image ? [r.image] : []);
+        const rImgHtml = rImgs.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${rImgs.map(src => `<img src="${planningEsc(src)}" style="max-width:140px;max-height:140px;border-radius:6px;border:1px solid var(--gray-200);cursor:zoom-in;object-fit:cover" onclick="openPlanningImage('${String(src).replace(/'/g,'&#39;')}')">`).join('')}</div>` : '';
+        return `<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-left:3px solid ${rm.fg};border-radius:8px;padding:10px 12px;margin-left:24px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px;flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                    <span style="background:${rm.bg};color:${rm.fg};font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px">${rm.icon} ${rm.label}</span>
+                    <strong style="font-size:12px;color:var(--gray-900)">${planningEsc(r.author)}</strong>
+                    <span style="font-size:11px;color:var(--gray-500)">${planningFmtDate(r.createdAt)}</span>
+                </div>
+                <button onclick="deletePlanningPost(${r.id})" style="background:none;border:none;color:var(--red);font-size:11px;cursor:pointer">삭제</button>
+            </div>
+            <div style="font-size:13px;color:var(--gray-900);white-space:pre-wrap;line-height:1.5">${planningEsc(r.content)}</div>
+            ${rImgHtml}
+        </div>`;
+    }).join('');
+
+    const catOpts = PLANNING_CATEGORIES.map(c => `<option value="${c.key}">${c.icon} ${c.label}</option>`).join('');
+
+    const body = document.getElementById('modalBody');
+    if (!body) return;
+    body.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <span style="background:${meta.bg};color:${meta.fg};font-size:12px;font-weight:800;padding:4px 10px;border-radius:6px">${meta.icon} ${meta.label}</span>
+            <strong style="font-size:14px;color:var(--gray-900)">${planningEsc(post.author)}</strong>
+            <span style="font-size:12px;color:var(--gray-500)">${planningFmtDate(post.createdAt)}</span>
+            <div style="flex:1"></div>
+            <button onclick="deletePlanningPost(${post.id});closeModal()" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer">삭제</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:14px">${taskStatusBadges}</div>
+        <div style="font-size:14px;color:var(--gray-900);white-space:pre-wrap;line-height:1.6;padding:12px;background:var(--gray-50);border-radius:8px">${planningEsc(post.content || '(내용 없음)')}</div>
+        ${imgHtml}
+        <div style="margin-top:18px">
+            <div style="font-size:13px;font-weight:800;color:var(--gray-900);margin-bottom:10px">↩ 답글 ${replies.length}</div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">${repliesHtml || `<div style="color:var(--gray-400);font-size:12px;padding:12px;text-align:center;border:1px dashed var(--gray-200);border-radius:8px">아직 답글이 없습니다</div>`}</div>
+            <div style="background:var(--white);border:1.5px solid var(--blue);border-radius:10px;padding:12px">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+                    <select id="planningPostCategory" style="padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px">${catOpts}</select>
+                    <input id="planningPostAuthor" placeholder="작성자" value="${planningEsc(currentUser ? currentUser.name : '')}" style="padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px">
+                </div>
+                <textarea id="planningPostContent" placeholder="답글을 입력하세요..." rows="2" style="width:100%;padding:10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;margin-bottom:8px"></textarea>
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+                    <label style="padding:7px 10px;background:var(--gray-100);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                        📷 이미지
+                        <input type="file" accept="image/*" multiple onchange="handlePlanningImageFiles(event)" style="display:none">
+                    </label>
+                    <input id="planningPostImageUrl" placeholder="또는 이미지 URL" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:12px">
+                    <button type="button" onclick="addPlanningImageUrl()" style="padding:7px 10px;background:var(--gray-100);border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">추가</button>
+                </div>
+                <div id="planningImagePreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
+                <button onclick="submitPlanningReply(${post.id})" style="width:100%;padding:9px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">↩ 답글 작성</button>
+            </div>
+        </div>
+    `;
+    document.getElementById('modalOverlay').classList.add('show');
+    planningPendingImages = [];
+    refreshPlanningImagePreview();
+}
+
+function setPlanningPostTaskStatus(postId, newStatus) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!p) return;
+    const post = (p.posts || []).find(x => x.id === postId);
+    if (!post) return;
+    post.taskStatus = newStatus;
+    p.updatedAt = new Date().toISOString();
+    savePlanningProjects();
+    openPlanningPostDetail(postId);
+    const label = (PLANNING_TASK_STATUSES.find(s => s.key === newStatus) || {}).label || newStatus;
+    showToast(`→ ${label}`);
+}
+
+let planningPostEditorMode = null;
+function openPlanningPostEditor() {
+    const body = document.getElementById('modalBody');
+    if (!body) return;
+    const mode = planningPostEditorMode || { mode: 'new', taskStatus: 'todo', parentId: null };
+    const col = (PLANNING_TASK_STATUSES.find(s => s.key === mode.taskStatus) || PLANNING_TASK_STATUSES[0]);
+    const catOpts = PLANNING_CATEGORIES.map(c => `<option value="${c.key}">${c.icon} ${c.label}</option>`).join('');
+    body.innerHTML = `
+        <div class="form-section-title">+ 새 카드 <span style="background:${col.bg};color:${col.text};font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;margin-left:8px">${col.label}</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <select id="planningPostCategory" class="form-select">${catOpts}</select>
+            <input id="planningPostAuthor" class="form-input" placeholder="작성자" value="${planningEsc(currentUser ? currentUser.name : '')}">
+        </div>
+        <textarea id="planningPostContent" class="form-input" rows="4" placeholder="내용을 입력하세요..." style="font-family:inherit"></textarea>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+            <label style="padding:8px 12px;background:var(--gray-100);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                📷 이미지 파일
+                <input type="file" accept="image/*" multiple onchange="handlePlanningImageFiles(event)" style="display:none">
+            </label>
+            <input id="planningPostImageUrl" placeholder="또는 이미지 URL" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--gray-200);border-radius:8px;font-size:13px">
+            <button type="button" onclick="addPlanningImageUrl()" style="padding:8px 12px;background:var(--gray-100);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">URL 추가</button>
+        </div>
+        <div id="planningImagePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
+        <button class="form-submit" style="background:var(--blue);margin-top:14px" onclick="submitPlanningCard()">저장</button>
+    `;
+    document.getElementById('modalOverlay').classList.add('show');
+    planningPendingImages = [];
+    refreshPlanningImagePreview();
+    setTimeout(() => { const el = document.getElementById('planningPostContent'); if (el) el.focus(); }, 60);
+}
+
+function submitPlanningCard() {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!p) return;
+    const content = (document.getElementById('planningPostContent').value || '').trim();
+    if (!content && !planningPendingImages.length) { showToast('내용 또는 이미지를 입력하세요'); return; }
+    const author = (document.getElementById('planningPostAuthor').value || '').trim() || (currentUser ? currentUser.name : '익명');
+    const category = document.getElementById('planningPostCategory').value;
+    const mode = planningPostEditorMode || { taskStatus: 'todo', parentId: null };
+    const post = {
+        id: Date.now(),
+        author, category, content,
+        images: planningPendingImages.slice(),
+        taskStatus: mode.taskStatus || 'todo',
+        parentId: mode.parentId || null,
+        createdAt: new Date().toISOString()
+    };
+    p.posts = p.posts || [];
+    p.posts.push(post);
+    p.updatedAt = post.createdAt;
+    try {
+        savePlanningProjects();
+    } catch (err) {
+        showToast('저장 실패(용량 초과일 수 있음): ' + err.message);
+        p.posts.pop();
+        return;
+    }
+    planningPendingImages = [];
+    planningPostEditorMode = null;
+    closeModal();
+    renderPlanning();
+}
+
+function submitPlanningReply(parentPostId) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!p) return;
+    const content = (document.getElementById('planningPostContent').value || '').trim();
+    if (!content && !planningPendingImages.length) { showToast('내용 또는 이미지를 입력하세요'); return; }
+    const author = (document.getElementById('planningPostAuthor').value || '').trim() || (currentUser ? currentUser.name : '익명');
+    const category = document.getElementById('planningPostCategory').value;
+    const post = {
+        id: Date.now(),
+        author, category, content,
+        images: planningPendingImages.slice(),
+        parentId: parentPostId,
+        createdAt: new Date().toISOString()
+    };
+    p.posts = p.posts || [];
+    p.posts.push(post);
+    p.updatedAt = post.createdAt;
+    try {
+        savePlanningProjects();
+    } catch (err) {
+        showToast('저장 실패(용량 초과): ' + err.message);
+        p.posts.pop();
+        return;
+    }
+    planningPendingImages = [];
+    openPlanningPostDetail(parentPostId);
+    renderPlanning();
+}
+
+function openPlanningProject(id) {
+    currentPlanningProjectId = id;
+    planningPendingImages = [];
+    renderPlanning();
+}
+function closePlanningProject() {
+    currentPlanningProjectId = null;
+    planningPendingImages = [];
+    renderPlanning();
+}
+
+function openNewPlanningModal() {
+    const body = document.getElementById('modalBody');
+    if (!body) return;
+    body.innerHTML = `
+        <div class="form-section-title">+ 새 프로젝트</div>
+        <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="newPlanningName" class="form-input" placeholder="예: 원데이강의 준비, 시계 부품 구입"></div>
+        <div class="form-group"><label class="form-label">설명 (선택)</label><textarea id="newPlanningDesc" class="form-input" rows="3" placeholder="이 프로젝트의 목표, 배경을 적어주세요"></textarea></div>
+        <div class="form-group"><label class="form-label">상태</label>
+            <select id="newPlanningStatus" class="form-select">${PLANNING_STATUSES.map(s => `<option value="${s}">${s}</option>`).join('')}</select>
+        </div>
+        <button class="form-submit" style="background:var(--blue)" onclick="savePlanningProject()">저장</button>
+    `;
+    document.getElementById('modalOverlay').classList.add('show');
+    setTimeout(() => { const el = document.getElementById('newPlanningName'); if (el) el.focus(); }, 50);
+}
+function openEditPlanningModal(id) {
+    const p = planningProjects.find(x => x.id === id);
+    if (!p) return;
+    const body = document.getElementById('modalBody');
+    if (!body) return;
+    body.innerHTML = `
+        <div class="form-section-title">✏️ 프로젝트 편집</div>
+        <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="editPlanningName" class="form-input" value="${planningEsc(p.name)}"></div>
+        <div class="form-group"><label class="form-label">설명</label><textarea id="editPlanningDesc" class="form-input" rows="3">${planningEsc(p.description || '')}</textarea></div>
+        <div class="form-group"><label class="form-label">상태</label>
+            <select id="editPlanningStatus" class="form-select">${PLANNING_STATUSES.map(s => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+        </div>
+        <button class="form-submit" style="background:var(--blue)" onclick="savePlanningProjectEdit(${id})">저장</button>
+    `;
+    document.getElementById('modalOverlay').classList.add('show');
+}
+function savePlanningProject() {
+    const name = (document.getElementById('newPlanningName').value || '').trim();
+    if (!name) { showToast('프로젝트 이름을 입력하세요'); return; }
+    const desc = (document.getElementById('newPlanningDesc').value || '').trim();
+    const status = document.getElementById('newPlanningStatus').value;
+    const nowIso = new Date().toISOString();
+    const proj = {
+        id: Date.now(),
+        name, description: desc, status,
+        createdBy: currentUser ? currentUser.name : '익명',
+        createdAt: nowIso, updatedAt: nowIso,
+        posts: []
+    };
+    planningProjects.push(proj);
+    savePlanningProjects();
+    closeModal();
+    currentPlanningProjectId = proj.id;
+    renderPlanning();
+    showToast('프로젝트를 만들었습니다');
+}
+function savePlanningProjectEdit(id) {
+    const p = planningProjects.find(x => x.id === id);
+    if (!p) return;
+    const name = (document.getElementById('editPlanningName').value || '').trim();
+    if (!name) { showToast('이름을 입력하세요'); return; }
+    p.name = name;
+    p.description = (document.getElementById('editPlanningDesc').value || '').trim();
+    p.status = document.getElementById('editPlanningStatus').value;
+    p.updatedAt = new Date().toISOString();
+    savePlanningProjects();
+    closeModal();
+    renderPlanning();
+    showToast('수정되었습니다');
+}
+function deletePlanningProject(id) {
+    if (!confirm('이 프로젝트를 삭제할까요? 모든 게시물이 함께 사라집니다.')) return;
+    planningProjects = planningProjects.filter(x => x.id !== id);
+    savePlanningProjects();
+    currentPlanningProjectId = null;
+    renderPlanning();
+    showToast('삭제되었습니다');
+}
+function updatePlanningStatus(id, newStatus) {
+    const p = planningProjects.find(x => x.id === id);
+    if (!p) return;
+    p.status = newStatus;
+    p.updatedAt = new Date().toISOString();
+    savePlanningProjects();
+    showToast(`상태: ${newStatus}`);
+}
+let planningPendingImages = [];
+function refreshPlanningImagePreview() {
+    const box = document.getElementById('planningImagePreview');
+    if (!box) return;
+    box.innerHTML = planningPendingImages.map((src, i) => `
+        <div style="position:relative;display:inline-block">
+            <img src="${planningEsc(src)}" style="width:80px;height:80px;object-fit:cover;border:1px solid var(--gray-200);border-radius:8px">
+            <button type="button" onclick="removePlanningPendingImage(${i})" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--red);color:white;border:none;font-size:12px;font-weight:700;cursor:pointer;line-height:1">×</button>
+        </div>`).join('');
+}
+function removePlanningPendingImage(idx) {
+    planningPendingImages.splice(idx, 1);
+    refreshPlanningImagePreview();
+}
+function handlePlanningImageFiles(ev) {
+    const files = Array.from(ev.target.files || []);
+    files.forEach(file => {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            planningPendingImages.push(e.target.result);
+            refreshPlanningImagePreview();
+        };
+        reader.readAsDataURL(file);
+    });
+    ev.target.value = '';
+}
+function addPlanningImageUrl() {
+    const el = document.getElementById('planningPostImageUrl');
+    if (!el) return;
+    const url = (el.value || '').trim();
+    if (!url) return;
+    planningPendingImages.push(url);
+    el.value = '';
+    refreshPlanningImagePreview();
+}
+function openPlanningImage(src) {
+    const win = window.open('', '_blank');
+    if (win) win.document.write(`<title>이미지</title><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${src}" style="max-width:100%;max-height:100vh"></body>`);
+}
+function deletePlanningPost(postId) {
+    if (!confirm('이 카드를 삭제할까요? (답글도 함께 삭제)')) return;
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!p) return;
+    const target = (p.posts || []).find(x => x.id === postId);
+    const isReply = target && target.parentId;
+    p.posts = (p.posts || []).filter(x => x.id !== postId && x.parentId !== postId);
+    p.updatedAt = new Date().toISOString();
+    savePlanningProjects();
+    const modalOpen = document.getElementById('modalOverlay').classList.contains('show');
+    if (isReply && modalOpen) {
+        openPlanningPostDetail(target.parentId);
+    }
+    renderPlanning();
 }
