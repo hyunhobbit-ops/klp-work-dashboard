@@ -8149,17 +8149,20 @@ function renderPlanningDetail(p) {
         const assigneeRow = (assignees.length || replyCount > 0) ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:12px;flex-wrap:wrap">${assigneeText}${replyText}</div>` : '';
         return `
         <div draggable="true" ondragstart="planningPostDragStart(event,${post.id})" ondragend="planningPostDragEnd(event)" onclick="openPlanningPostDetail(${post.id})" style="background:var(--white);border:1px solid var(--gray-200);border-left:4px solid ${meta.fg};border-radius:12px;padding:14px 16px;cursor:grab;transition:all .12s;user-select:none" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 10px rgba(0,0,0,0.08)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-                <span style="background:${meta.bg};color:${meta.fg};font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px">${meta.icon} ${meta.label}</span>
-                ${ddBadge}
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span style="background:${meta.bg};color:${meta.fg};font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px">${meta.icon} ${meta.label}</span>
+                    ${ddBadge}
+                </div>
+                <button onclick="event.stopPropagation();openPlanningCardEdit(${post.id})" title="편집" style="background:var(--white);border:1px solid var(--gray-200);color:var(--gray-600,#6B7280);font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px;cursor:pointer;white-space:nowrap" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.color='var(--gray-600)'">✏️ 편집</button>
             </div>
-            ${preview ? `<div style="font-size:15px;color:var(--gray-900);line-height:1.55;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(preview)}${post.content.length > 100 ? '...' : ''}</div>` : `<div style="font-size:14px;color:var(--gray-400);font-style:italic">내용 없음</div>`}
+            ${preview ? `<div style="font-size:18px;font-weight:800;color:var(--gray-900);line-height:1.5;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;letter-spacing:-0.01em">${planningEsc(preview)}${post.content.length > 100 ? '...' : ''}</div>` : `<div style="font-size:14px;color:var(--gray-400);font-style:italic">내용 없음</div>`}
             ${vendorTag}
             ${assigneeRow}
             ${thumbHtml}
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed var(--gray-200);font-size:13px;color:var(--gray-500);flex-wrap:wrap;gap:6px">
-                <span><span style="color:var(--gray-500);font-weight:700">작성자:</span> <strong style="color:var(--gray-900);font-weight:800;font-size:14px">${planningEsc(post.author)}</strong></span>
-                <span style="font-size:12px">${planningFmtDate(post.createdAt)}</span>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed var(--gray-200);font-size:11px;color:var(--gray-500);flex-wrap:wrap;gap:6px">
+                <span><span style="color:var(--gray-500);font-weight:600">작성자</span> <strong style="color:var(--gray-700,#4B5563);font-weight:600">${planningEsc(post.author)}</strong></span>
+                <span>${planningFmtDate(post.createdAt)}</span>
             </div>
         </div>`;
     };
@@ -8423,6 +8426,102 @@ function openPlanningPostEditor() {
     planningPendingImages = [];
     refreshPlanningImagePreview();
     setTimeout(() => { const el = document.getElementById('planningPostContent'); if (el) el.focus(); }, 60);
+}
+
+function openPlanningCardEdit(postId) {
+    const proj = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!proj) return;
+    const post = (proj.posts || []).find(x => x.id === postId);
+    if (!post) return;
+    const body = document.getElementById('modalBody');
+    if (!body) return;
+    const catOpts = PLANNING_CATEGORIES.map(c => `<option value="${c.key}" ${c.key === post.category ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('');
+    planningPendingAssignees = Array.isArray(post.assignees) ? post.assignees.slice() : [];
+    planningPendingImages = (Array.isArray(post.images) ? post.images : []).map(url => ({ file: null, url }));
+    body.innerHTML = `
+        <div class="form-section-title">✏️ <span style="color:var(--blue)">${planningEsc(proj.name)}</span>의 카드 편집</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div class="form-group" style="margin:0"><label class="form-label">카테고리</label>
+                <select id="planningPostCategory" class="form-select">${catOpts}</select>
+            </div>
+            <div class="form-group" style="margin:0"><label class="form-label">작성자</label>
+                <input id="planningPostAuthor" class="form-input" value="${planningEsc(post.author || '')}">
+            </div>
+        </div>
+        <div class="form-group"><label class="form-label">내용</label>
+            <textarea id="planningPostContent" class="form-input" rows="4" style="font-family:inherit">${planningEsc(post.content || '')}</textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="form-group"><label class="form-label">🏭 거래처</label>
+                <input id="planningPostVendor" class="form-input" value="${planningEsc(post.vendor || '')}">
+            </div>
+            <div class="form-group"><label class="form-label">⏰ 마감일</label>
+                <input id="planningPostDeadline" class="form-input" type="date" value="${planningEsc(post.deadline || '')}">
+            </div>
+        </div>
+        <div class="form-group"><label class="form-label">👥 담당자</label>
+            <div id="planningAssigneeChips" style="display:flex;flex-wrap:wrap;gap:6px">${renderPlanningAssigneeChips()}</div>
+        </div>
+        <div class="form-group"><label class="form-label">📷 이미지</label>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <label style="padding:8px 12px;background:var(--gray-100);color:var(--gray-900);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                    이미지 파일 선택
+                    <input type="file" accept="image/*" multiple onchange="handlePlanningImageFiles(event)" style="display:none">
+                </label>
+                <input id="planningPostImageUrl" placeholder="또는 이미지 URL" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px">
+                <button type="button" onclick="addPlanningImageUrl()" style="padding:8px 12px;background:var(--gray-100);color:var(--gray-900);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">URL 추가</button>
+            </div>
+            <div id="planningImagePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
+        </div>
+        <button class="form-submit" style="background:var(--blue);margin-top:6px" onclick="submitPlanningCardEdit(${postId})">저장</button>
+    `;
+    document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
+    refreshPlanningImagePreview();
+    setTimeout(() => { const el = document.getElementById('planningPostContent'); if (el) el.focus(); }, 60);
+}
+
+async function submitPlanningCardEdit(postId) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!p) return;
+    const post = (p.posts || []).find(x => x.id === postId);
+    if (!post) return;
+    const content = (document.getElementById('planningPostContent').value || '').trim();
+    if (!content && !planningPendingImages.length) { showToast('내용 또는 이미지를 입력하세요'); return; }
+    const author = (document.getElementById('planningPostAuthor').value || '').trim() || post.author;
+    const category = document.getElementById('planningPostCategory').value;
+    const vendor = (document.getElementById('planningPostVendor').value || '').trim();
+    const deadline = document.getElementById('planningPostDeadline').value || '';
+    let imageUrls;
+    try {
+        imageUrls = await resolvePlanningPendingImages();
+    } catch (err) {
+        showToast('이미지 업로드 실패: ' + err.message);
+        return;
+    }
+    const patch = {
+        author, category, content, vendor,
+        deadline: deadline || null,
+        assignees: planningPendingAssignees.slice(),
+        images: imageUrls
+    };
+    try {
+        const { error } = await sb.from('planning_posts').update(patch).eq('id', postId);
+        if (error) throw error;
+        Object.assign(post, {
+            author, category, content, vendor,
+            deadline: deadline || '',
+            assignees: patch.assignees,
+            images: imageUrls
+        });
+        planningPendingImages = [];
+        planningPendingAssignees = [];
+        closeModal();
+        await renderPlanning({ skipLoad: true });
+        showToast('수정되었습니다');
+    } catch (err) {
+        console.error(err);
+        showToast('수정 실패: ' + err.message);
+    }
 }
 
 async function submitPlanningCard() {
