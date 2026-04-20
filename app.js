@@ -114,6 +114,7 @@ async function showApp() {
     await loadDeliveriesFromDb();
     await loadClientsFromDb();
     subscribeDailyTasks();
+    subscribeAllRealtime();
     renderAll();
     // URL 해시 → 탭 전환 (새로고침 시 탭 유지, 문서생성기에서 이동해온 경우 등)
     const hash = location.hash.replace('#', '');
@@ -4034,6 +4035,97 @@ async function loadDailyTasksFromDb() {
 }
 
 let dailyTasksChannel = null;
+// ===== 전체 테이블 실시간 구독 =====
+let _domesticRealtimeChannel = null;
+let _tempRealtimeChannel = null;
+let _deliveriesRealtimeChannel = null;
+let _clientsRealtimeChannel = null;
+let _planningRealtimeChannel = null;
+let _planningRefreshTimer = null;
+
+function scheduleRerender(fn, delay = 200) {
+    // 단순 debounce — 여러 이벤트가 연달아 와도 한 번만 실행
+    let t = scheduleRerender._timers || (scheduleRerender._timers = new Map());
+    const prev = t.get(fn);
+    if (prev) clearTimeout(prev);
+    t.set(fn, setTimeout(() => { t.delete(fn); fn(); }, delay));
+}
+
+function subscribeDomesticProjectsRealtime() {
+    if (_domesticRealtimeChannel) { sb.removeChannel(_domesticRealtimeChannel); _domesticRealtimeChannel = null; }
+    _domesticRealtimeChannel = sb.channel('projects_domestic_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'projects_domestic' }, () => {
+            scheduleRerender(async () => {
+                await loadDomesticProjectsFromDb();
+                try { renderProjects(); } catch (_) {}
+                try { renderHome(); } catch (_) {}
+            });
+        })
+        .subscribe();
+}
+
+function subscribeTempProjectsRealtime() {
+    if (_tempRealtimeChannel) { sb.removeChannel(_tempRealtimeChannel); _tempRealtimeChannel = null; }
+    _tempRealtimeChannel = sb.channel('projects_temp_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'projects_temp' }, () => {
+            scheduleRerender(async () => {
+                try { await loadTempProjects(); } catch (_) {}
+            });
+        })
+        .subscribe();
+}
+
+function subscribeDeliveriesRealtime() {
+    if (_deliveriesRealtimeChannel) { sb.removeChannel(_deliveriesRealtimeChannel); _deliveriesRealtimeChannel = null; }
+    _deliveriesRealtimeChannel = sb.channel('deliveries_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'deliveries' }, () => {
+            scheduleRerender(async () => {
+                await loadDeliveriesFromDb();
+                try { renderDeliveries(); } catch (_) {}
+                try { renderHome(); } catch (_) {}
+            });
+        })
+        .subscribe();
+}
+
+function subscribeClientsRealtime() {
+    if (_clientsRealtimeChannel) { sb.removeChannel(_clientsRealtimeChannel); _clientsRealtimeChannel = null; }
+    _clientsRealtimeChannel = sb.channel('clients_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => {
+            scheduleRerender(async () => {
+                await loadClientsFromDb();
+                try { renderClients(); } catch (_) {}
+            });
+        })
+        .subscribe();
+}
+
+function subscribePlanningRealtime() {
+    if (_planningRealtimeChannel) { sb.removeChannel(_planningRealtimeChannel); _planningRealtimeChannel = null; }
+    const onAnyChange = () => {
+        scheduleRerender(async () => {
+            await loadPlanningProjects();
+            const tab = document.getElementById('tab-planning');
+            if (tab && tab.classList.contains('active')) {
+                try { await renderPlanning({ skipLoad: true }); } catch (_) {}
+            }
+            try { renderPlanningHomeSection(); } catch (_) {}
+        });
+    };
+    _planningRealtimeChannel = sb.channel('planning_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'planning_projects' }, onAnyChange)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'planning_posts' }, onAnyChange)
+        .subscribe();
+}
+
+function subscribeAllRealtime() {
+    try { subscribeDomesticProjectsRealtime(); } catch (e) { console.warn('domestic realtime fail', e); }
+    try { subscribeTempProjectsRealtime(); } catch (e) { console.warn('temp realtime fail', e); }
+    try { subscribeDeliveriesRealtime(); } catch (e) { console.warn('deliveries realtime fail', e); }
+    try { subscribeClientsRealtime(); } catch (e) { console.warn('clients realtime fail', e); }
+    try { subscribePlanningRealtime(); } catch (e) { console.warn('planning realtime fail', e); }
+}
+
 function subscribeDailyTasks() {
     if (dailyTasksChannel) {
         sb.removeChannel(dailyTasksChannel);
