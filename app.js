@@ -7761,18 +7761,104 @@ function planningLastDayOfYear(y) {
 }
 let planningProjects = [];
 let currentPlanningProjectId = null;
+let planningLoaded = false;
 
-function loadPlanningProjects() {
+function planningProjectFromDb(r) {
+    return {
+        id: r.id, name: r.name, description: r.description || '',
+        status: r.status || '진행 중',
+        period: r.period || 'month',
+        access: r.access || 'company',
+        targetMonth: r.target_month || '',
+        targetYear: r.target_year || '',
+        deadline: r.deadline || '',
+        createdBy: r.created_by || '',
+        ownerLogin: r.owner_login || '',
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+        posts: []
+    };
+}
+function planningProjectToDb(p) {
+    return {
+        name: p.name,
+        description: p.description || '',
+        status: p.status || '진행 중',
+        period: p.period || 'month',
+        access: p.access || 'company',
+        target_month: p.targetMonth || '',
+        target_year: p.targetYear || '',
+        deadline: p.deadline || null,
+        created_by: p.createdBy || '',
+        owner_login: p.ownerLogin || ''
+    };
+}
+function planningPostFromDb(r) {
+    return {
+        id: r.id,
+        projectId: r.project_id,
+        parentId: r.parent_id,
+        author: r.author || '',
+        category: r.category || 'propose',
+        content: r.content || '',
+        vendor: r.vendor || '',
+        deadline: r.deadline || '',
+        assignees: Array.isArray(r.assignees) ? r.assignees : [],
+        images: Array.isArray(r.images) ? r.images : [],
+        taskStatus: r.task_status || 'todo',
+        createdAt: r.created_at
+    };
+}
+function planningPostToDb(post, projectId) {
+    return {
+        project_id: projectId,
+        parent_id: post.parentId || null,
+        author: post.author || '',
+        category: post.category || 'propose',
+        content: post.content || '',
+        vendor: post.vendor || '',
+        deadline: post.deadline || null,
+        assignees: post.assignees || [],
+        images: post.images || [],
+        task_status: post.taskStatus || 'todo'
+    };
+}
+
+async function loadPlanningProjects() {
     try {
-        const raw = localStorage.getItem(PLANNING_STORAGE_KEY);
-        planningProjects = raw ? JSON.parse(raw) : [];
-    } catch (e) {
-        console.error('planning load fail', e);
-        planningProjects = [];
+        const [projRes, postRes] = await Promise.all([
+            sb.from('planning_projects').select('*').order('created_at', { ascending: false }),
+            sb.from('planning_posts').select('*').order('created_at', { ascending: true })
+        ]);
+        if (projRes.error) throw projRes.error;
+        if (postRes.error) throw postRes.error;
+        const postsByProject = {};
+        for (const row of (postRes.data || [])) {
+            const post = planningPostFromDb(row);
+            (postsByProject[post.projectId] = postsByProject[post.projectId] || []).push(post);
+        }
+        planningProjects = (projRes.data || []).map(row => {
+            const proj = planningProjectFromDb(row);
+            proj.posts = postsByProject[proj.id] || [];
+            return proj;
+        });
+        planningLoaded = true;
+    } catch (err) {
+        console.error('planning load fail', err);
+        showToast('프로젝트 로드 실패: ' + err.message);
     }
 }
-function savePlanningProjects() {
-    localStorage.setItem(PLANNING_STORAGE_KEY, JSON.stringify(planningProjects));
+
+async function uploadPlanningImage(file) {
+    const extRaw = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const ext = extRaw || 'jpg';
+    const path = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+    const { error } = await sb.storage.from('planning-images').upload(path, file, {
+        cacheControl: '3600', upsert: false, contentType: file.type || undefined
+    });
+    if (error) throw error;
+    const { data } = sb.storage.from('planning-images').getPublicUrl(path);
+    return data.publicUrl;
 }
 function planningCategoryMeta(key) {
     return PLANNING_CATEGORIES.find(c => c.key === key) || PLANNING_CATEGORIES[PLANNING_CATEGORIES.length - 1];
@@ -7809,10 +7895,16 @@ function planningFmtDate(iso) {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-function renderPlanning() {
-    loadPlanningProjects();
+async function renderPlanning(opts) {
+    const skipLoad = opts && opts.skipLoad;
     const root = document.getElementById('planningRoot');
     if (!root) return;
+    if (!skipLoad) {
+        if (!planningLoaded) {
+            root.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-500)">불러오는 중...</div>`;
+        }
+        await loadPlanningProjects();
+    }
     if (currentPlanningProjectId == null) {
         root.innerHTML = renderPlanningList();
     } else {
@@ -7935,7 +8027,7 @@ function planningSectionDragLeave(ev) {
     if (ev.currentTarget.contains(ev.relatedTarget)) return;
     ev.currentTarget.style.background = '';
 }
-function planningSectionDrop(ev, newPeriod) {
+async function planningSectionDrop(ev, newPeriod) {
     ev.preventDefault();
     ev.currentTarget.style.background = '';
     const id = planningProjectDragId;
@@ -7943,12 +8035,17 @@ function planningSectionDrop(ev, newPeriod) {
     const p = planningProjects.find(x => x.id === id);
     if (!p) return;
     if ((p.period || 'month') === newPeriod) return;
-    p.period = newPeriod;
-    p.updatedAt = new Date().toISOString();
-    savePlanningProjects();
-    renderPlanning();
-    const meta = PLANNING_PERIODS.find(pp => pp.key === newPeriod);
-    showToast(`"${p.name}" → ${meta ? meta.label : newPeriod}`);
+    try {
+        const { error } = await sb.from('planning_projects').update({ period: newPeriod, updated_at: new Date().toISOString() }).eq('id', id);
+        if (error) throw error;
+        p.period = newPeriod; p.updatedAt = new Date().toISOString();
+        await renderPlanning();
+        const meta = PLANNING_PERIODS.find(pp => pp.key === newPeriod);
+        showToast(`"${p.name}" → ${meta ? meta.label : newPeriod}`);
+    } catch (err) {
+        console.error(err);
+        showToast('이동 실패: ' + err.message);
+    }
 }
 
 
@@ -8059,7 +8156,7 @@ function planningPostDragLeave(ev) {
     if (ev.currentTarget.contains(ev.relatedTarget)) return;
     ev.currentTarget.style.background = '';
 }
-function planningPostDrop(ev, newStatus) {
+async function planningPostDrop(ev, newStatus) {
     ev.preventDefault();
     ev.currentTarget.style.background = '';
     const id = planningPostDragId || parseInt(ev.dataTransfer.getData('text/plain'), 10);
@@ -8069,12 +8166,17 @@ function planningPostDrop(ev, newStatus) {
     const post = (p.posts || []).find(x => x.id === id);
     if (!post) return;
     if ((post.taskStatus || 'todo') === newStatus) return;
-    post.taskStatus = newStatus;
-    p.updatedAt = new Date().toISOString();
-    savePlanningProjects();
-    renderPlanning();
-    const label = (PLANNING_TASK_STATUSES.find(s => s.key === newStatus) || {}).label || newStatus;
-    showToast(`→ ${label}`);
+    try {
+        const { error } = await sb.from('planning_posts').update({ task_status: newStatus }).eq('id', id);
+        if (error) throw error;
+        post.taskStatus = newStatus;
+        await renderPlanning({ skipLoad: true });
+        const label = (PLANNING_TASK_STATUSES.find(s => s.key === newStatus) || {}).label || newStatus;
+        showToast(`→ ${label}`);
+    } catch (err) {
+        console.error(err);
+        showToast('이동 실패: ' + err.message);
+    }
 }
 
 function openNewPlanningPostForColumn(taskStatus) {
@@ -8166,17 +8268,23 @@ function openPlanningPostDetail(postId) {
     refreshPlanningImagePreview();
 }
 
-function setPlanningPostTaskStatus(postId, newStatus) {
+async function setPlanningPostTaskStatus(postId, newStatus) {
     const p = planningProjects.find(x => x.id === currentPlanningProjectId);
     if (!p) return;
     const post = (p.posts || []).find(x => x.id === postId);
     if (!post) return;
-    post.taskStatus = newStatus;
-    p.updatedAt = new Date().toISOString();
-    savePlanningProjects();
-    openPlanningPostDetail(postId);
-    const label = (PLANNING_TASK_STATUSES.find(s => s.key === newStatus) || {}).label || newStatus;
-    showToast(`→ ${label}`);
+    try {
+        const { error } = await sb.from('planning_posts').update({ task_status: newStatus }).eq('id', postId);
+        if (error) throw error;
+        post.taskStatus = newStatus;
+        openPlanningPostDetail(postId);
+        await renderPlanning({ skipLoad: true });
+        const label = (PLANNING_TASK_STATUSES.find(s => s.key === newStatus) || {}).label || newStatus;
+        showToast(`→ ${label}`);
+    } catch (err) {
+        console.error(err);
+        showToast('상태 저장 실패: ' + err.message);
+    }
 }
 
 let planningPostEditorMode = null;
@@ -8256,36 +8364,38 @@ async function submitPlanningCard() {
     const vendor = (document.getElementById('planningPostVendor').value || '').trim();
     const deadline = document.getElementById('planningPostDeadline').value || '';
     const mode = planningPostEditorMode || { taskStatus: 'todo', parentId: null };
-    const post = {
-        id: Date.now(),
-        author, category, content, vendor, deadline,
-        assignees: planningPendingAssignees.slice(),
-        images: planningPendingImages.slice(),
-        taskStatus: mode.taskStatus || 'todo',
-        parentId: mode.parentId || null,
-        createdAt: new Date().toISOString()
-    };
-    p.posts = p.posts || [];
-    p.posts.push(post);
-    p.updatedAt = post.createdAt;
+    let imageUrls;
     try {
-        savePlanningProjects();
+        imageUrls = await resolvePlanningPendingImages();
     } catch (err) {
-        showToast('저장 실패(용량 초과일 수 있음): ' + err.message);
-        p.posts.pop();
+        showToast('이미지 업로드 실패: ' + err.message);
         return;
     }
-    // 담당자 일일계획표에 자동 등록 (작성일·마감일)
+    const newPost = {
+        author, category, content, vendor, deadline,
+        assignees: planningPendingAssignees.slice(),
+        images: imageUrls,
+        taskStatus: mode.taskStatus || 'todo',
+        parentId: mode.parentId || null
+    };
     try {
-        await syncPlanningCardToDaily(p, post);
+        const { data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single();
+        if (error) throw error;
+        const inserted = planningPostFromDb(data);
+        p.posts = p.posts || [];
+        p.posts.push(inserted);
+        // 담당자 일일계획표에 자동 등록 (작성일·마감일)
+        try { await syncPlanningCardToDaily(p, inserted); }
+        catch (e) { console.error('일일계획표 동기화 실패', e); }
+        planningPendingImages = [];
+        planningPendingAssignees = [];
+        planningPostEditorMode = null;
+        closeModal();
+        await renderPlanning({ skipLoad: true });
     } catch (err) {
-        console.error('일일계획표 동기화 실패', err);
+        console.error(err);
+        showToast('카드 저장 실패: ' + err.message);
     }
-    planningPendingImages = [];
-    planningPendingAssignees = [];
-    planningPostEditorMode = null;
-    closeModal();
-    renderPlanning();
 }
 
 async function syncPlanningCardToDaily(project, post) {
@@ -8318,33 +8428,39 @@ async function syncPlanningCardToDaily(project, post) {
     if (insertedIds.length) showToast(`일일계획표에 ${insertedIds.length}건 자동 등록`);
 }
 
-function submitPlanningReply(parentPostId) {
+async function submitPlanningReply(parentPostId) {
     const p = planningProjects.find(x => x.id === currentPlanningProjectId);
     if (!p) return;
     const content = (document.getElementById('planningPostContent').value || '').trim();
     if (!content && !planningPendingImages.length) { showToast('내용 또는 이미지를 입력하세요'); return; }
     const author = (document.getElementById('planningPostAuthor').value || '').trim() || (currentUser ? currentUser.name : '익명');
     const category = document.getElementById('planningPostCategory').value;
-    const post = {
-        id: Date.now(),
-        author, category, content,
-        images: planningPendingImages.slice(),
-        parentId: parentPostId,
-        createdAt: new Date().toISOString()
-    };
-    p.posts = p.posts || [];
-    p.posts.push(post);
-    p.updatedAt = post.createdAt;
+    let imageUrls;
     try {
-        savePlanningProjects();
+        imageUrls = await resolvePlanningPendingImages();
     } catch (err) {
-        showToast('저장 실패(용량 초과): ' + err.message);
-        p.posts.pop();
+        showToast('이미지 업로드 실패: ' + err.message);
         return;
     }
-    planningPendingImages = [];
-    openPlanningPostDetail(parentPostId);
-    renderPlanning();
+    const newPost = {
+        author, category, content,
+        images: imageUrls,
+        parentId: parentPostId,
+        taskStatus: 'todo'
+    };
+    try {
+        const { data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single();
+        if (error) throw error;
+        const inserted = planningPostFromDb(data);
+        p.posts = p.posts || [];
+        p.posts.push(inserted);
+        planningPendingImages = [];
+        openPlanningPostDetail(parentPostId);
+        await renderPlanning({ skipLoad: true });
+    } catch (err) {
+        console.error(err);
+        showToast('답글 저장 실패: ' + err.message);
+    }
 }
 
 function openPlanningProject(id) {
@@ -8491,7 +8607,7 @@ function openEditPlanningModal(id) {
     `;
     document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
 }
-function savePlanningProject() {
+async function savePlanningProject() {
     const name = (document.getElementById('newPlanningName').value || '').trim();
     if (!name) { showToast('프로젝트 이름을 입력하세요'); return; }
     const desc = (document.getElementById('newPlanningDesc').value || '').trim();
@@ -8506,75 +8622,100 @@ function savePlanningProject() {
         if (period === 'month' && targetMonth) deadline = planningLastDayOfMonth(targetMonth);
         else if (period === 'year' && targetYear) deadline = planningLastDayOfYear(targetYear);
     }
-    const nowIso = new Date().toISOString();
-    const proj = {
-        id: Date.now(),
+    const payload = planningProjectToDb({
         name, description: desc, status, period, deadline,
         access, targetMonth, targetYear,
         createdBy: currentUser ? currentUser.name : '익명',
-        ownerLogin: planningCurrentOwner(),
-        createdAt: nowIso, updatedAt: nowIso,
-        posts: []
-    };
-    planningProjects.push(proj);
-    savePlanningProjects();
-    closeModal();
-    currentPlanningProjectId = proj.id;
-    renderPlanning();
-    showToast('프로젝트를 만들었습니다');
+        ownerLogin: planningCurrentOwner()
+    });
+    try {
+        const { data, error } = await sb.from('planning_projects').insert(payload).select().single();
+        if (error) throw error;
+        closeModal();
+        currentPlanningProjectId = data.id;
+        await renderPlanning();
+        showToast('프로젝트를 만들었습니다');
+    } catch (err) {
+        console.error(err);
+        showToast('저장 실패: ' + err.message);
+    }
 }
-function savePlanningProjectEdit(id) {
+async function savePlanningProjectEdit(id) {
     const p = planningProjects.find(x => x.id === id);
     if (!p) return;
     const name = (document.getElementById('editPlanningName').value || '').trim();
     if (!name) { showToast('이름을 입력하세요'); return; }
-    p.name = name;
-    p.description = (document.getElementById('editPlanningDesc').value || '').trim();
-    p.status = document.getElementById('editPlanningStatus').value;
-    p.period = document.getElementById('editPlanningPeriod').value;
+    const description = (document.getElementById('editPlanningDesc').value || '').trim();
+    const status = document.getElementById('editPlanningStatus').value;
+    const period = document.getElementById('editPlanningPeriod').value;
     const accessEl = document.querySelector('input[name="editPlanningAccess"]:checked');
-    p.access = accessEl ? accessEl.value : (p.access || 'company');
-    p.targetMonth = p.period === 'month' ? (document.getElementById('editPlanningTargetMonth').value || '') : '';
-    p.targetYear = p.period === 'year' ? (document.getElementById('editPlanningTargetYear').value || '') : '';
+    const access = accessEl ? accessEl.value : (p.access || 'company');
+    const targetMonth = period === 'month' ? (document.getElementById('editPlanningTargetMonth').value || '') : '';
+    const targetYear = period === 'year' ? (document.getElementById('editPlanningTargetYear').value || '') : '';
     let deadline = document.getElementById('editPlanningDeadline').value || '';
     if (!deadline) {
-        if (p.period === 'month' && p.targetMonth) deadline = planningLastDayOfMonth(p.targetMonth);
-        else if (p.period === 'year' && p.targetYear) deadline = planningLastDayOfYear(p.targetYear);
+        if (period === 'month' && targetMonth) deadline = planningLastDayOfMonth(targetMonth);
+        else if (period === 'year' && targetYear) deadline = planningLastDayOfYear(targetYear);
     }
-    p.deadline = deadline;
-    p.updatedAt = new Date().toISOString();
-    savePlanningProjects();
-    closeModal();
-    renderPlanning();
-    showToast('수정되었습니다');
+    const patch = {
+        name, description, status, period, access,
+        target_month: targetMonth, target_year: targetYear,
+        deadline: deadline || null,
+        updated_at: new Date().toISOString()
+    };
+    try {
+        const { error } = await sb.from('planning_projects').update(patch).eq('id', id);
+        if (error) throw error;
+        closeModal();
+        await renderPlanning();
+        showToast('수정되었습니다');
+    } catch (err) {
+        console.error(err);
+        showToast('수정 실패: ' + err.message);
+    }
 }
-function deletePlanningProject(id) {
+async function deletePlanningProject(id) {
     if (!confirm('이 프로젝트를 삭제할까요? 모든 게시물이 함께 사라집니다.')) return;
-    planningProjects = planningProjects.filter(x => x.id !== id);
-    savePlanningProjects();
-    currentPlanningProjectId = null;
-    renderPlanning();
-    showToast('삭제되었습니다');
+    try {
+        const { error } = await sb.from('planning_projects').delete().eq('id', id);
+        if (error) throw error;
+        currentPlanningProjectId = null;
+        await renderPlanning();
+        showToast('삭제되었습니다');
+    } catch (err) {
+        console.error(err);
+        showToast('삭제 실패: ' + err.message);
+    }
 }
-function updatePlanningStatus(id, newStatus) {
-    const p = planningProjects.find(x => x.id === id);
-    if (!p) return;
-    p.status = newStatus;
-    p.updatedAt = new Date().toISOString();
-    savePlanningProjects();
-    showToast(`상태: ${newStatus}`);
+async function updatePlanningStatus(id, newStatus) {
+    try {
+        const { error } = await sb.from('planning_projects').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id);
+        if (error) throw error;
+        const p = planningProjects.find(x => x.id === id);
+        if (p) { p.status = newStatus; p.updatedAt = new Date().toISOString(); }
+        showToast(`상태: ${newStatus}`);
+    } catch (err) {
+        console.error(err);
+        showToast('상태 저장 실패: ' + err.message);
+    }
 }
+// planningPendingImages: [{file: File|null, url: string (preview or final URL)}]
 let planningPendingImages = [];
 function refreshPlanningImagePreview() {
     const box = document.getElementById('planningImagePreview');
     if (!box) return;
-    box.innerHTML = planningPendingImages.map((src, i) => `
+    box.innerHTML = planningPendingImages.map((item, i) => `
         <div style="position:relative;display:inline-block">
-            <img src="${planningEsc(src)}" style="width:80px;height:80px;object-fit:cover;border:1px solid var(--gray-200);border-radius:8px">
+            <img src="${planningEsc(item.url)}" style="width:80px;height:80px;object-fit:cover;border:1px solid var(--gray-200);border-radius:8px">
+            ${item.file ? `<span style="position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,0.6);color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px">업로드 대기</span>` : ''}
             <button type="button" onclick="removePlanningPendingImage(${i})" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--red);color:white;border:none;font-size:12px;font-weight:700;cursor:pointer;line-height:1">×</button>
         </div>`).join('');
 }
 function removePlanningPendingImage(idx) {
+    const item = planningPendingImages[idx];
+    if (item && item.file && item.url && item.url.startsWith('blob:')) {
+        try { URL.revokeObjectURL(item.url); } catch (_) {}
+    }
     planningPendingImages.splice(idx, 1);
     refreshPlanningImagePreview();
 }
@@ -8582,13 +8723,9 @@ function handlePlanningImageFiles(ev) {
     const files = Array.from(ev.target.files || []);
     files.forEach(file => {
         if (!file.type.startsWith('image/')) return;
-        const reader = new FileReader();
-        reader.onload = e => {
-            planningPendingImages.push(e.target.result);
-            refreshPlanningImagePreview();
-        };
-        reader.readAsDataURL(file);
+        planningPendingImages.push({ file, url: URL.createObjectURL(file) });
     });
+    refreshPlanningImagePreview();
     ev.target.value = '';
 }
 function addPlanningImageUrl() {
@@ -8596,26 +8733,46 @@ function addPlanningImageUrl() {
     if (!el) return;
     const url = (el.value || '').trim();
     if (!url) return;
-    planningPendingImages.push(url);
+    planningPendingImages.push({ file: null, url });
     el.value = '';
     refreshPlanningImagePreview();
+}
+async function resolvePlanningPendingImages() {
+    const out = [];
+    for (const item of planningPendingImages) {
+        if (item.file) {
+            const publicUrl = await uploadPlanningImage(item.file);
+            out.push(publicUrl);
+            if (item.url && item.url.startsWith('blob:')) {
+                try { URL.revokeObjectURL(item.url); } catch (_) {}
+            }
+        } else if (item.url) {
+            out.push(item.url);
+        }
+    }
+    return out;
 }
 function openPlanningImage(src) {
     const win = window.open('', '_blank');
     if (win) win.document.write(`<title>이미지</title><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${src}" style="max-width:100%;max-height:100vh"></body>`);
 }
-function deletePlanningPost(postId) {
+async function deletePlanningPost(postId) {
     if (!confirm('이 카드를 삭제할까요? (답글도 함께 삭제)')) return;
     const p = planningProjects.find(x => x.id === currentPlanningProjectId);
     if (!p) return;
     const target = (p.posts || []).find(x => x.id === postId);
     const isReply = target && target.parentId;
-    p.posts = (p.posts || []).filter(x => x.id !== postId && x.parentId !== postId);
-    p.updatedAt = new Date().toISOString();
-    savePlanningProjects();
-    const modalOpen = document.getElementById('modalOverlay').classList.contains('show');
-    if (isReply && modalOpen) {
-        openPlanningPostDetail(target.parentId);
+    try {
+        // 자식 먼저 삭제 후 본인 삭제
+        await sb.from('planning_posts').delete().eq('parent_id', postId);
+        const { error } = await sb.from('planning_posts').delete().eq('id', postId);
+        if (error) throw error;
+        p.posts = (p.posts || []).filter(x => x.id !== postId && x.parentId !== postId);
+        const modalOpen = document.getElementById('modalOverlay').classList.contains('show');
+        if (isReply && modalOpen) openPlanningPostDetail(target.parentId);
+        await renderPlanning({ skipLoad: true });
+    } catch (err) {
+        console.error(err);
+        showToast('삭제 실패: ' + err.message);
     }
-    renderPlanning();
 }
