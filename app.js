@@ -116,7 +116,11 @@ async function showApp() {
     renderAll();
     // URL 해시 → 탭 전환 (새로고침 시 탭 유지, 문서생성기에서 이동해온 경우 등)
     const hash = location.hash.replace('#', '');
-    if (hash && document.getElementById('tab-' + hash)) {
+    if (hash.startsWith('planning/p-')) {
+        const pid = parseInt(hash.slice('planning/p-'.length), 10);
+        if (!isNaN(pid)) currentPlanningProjectId = pid;
+        switchTab('planning', true);
+    } else if (hash && document.getElementById('tab-' + hash)) {
         switchTab(hash, true); // fromHistory=true → pushState 안 함
     } else {
         // 초기 home 상태도 history에 기록해두어 뒤로가기가 자연스럽게 동작
@@ -430,8 +434,9 @@ function switchTab(tabId, fromHistory = false) {
         try { renderMarketdb(); } catch (e) { console.error('renderMarketdb failed', e); }
     }
 
-    // 프로젝트(계획/협업) 탭 열릴 때 렌더
+    // 프로젝트(계획/협업) 탭 열릴 때 렌더 (사이드바에서 클릭 시 목록으로 리셋)
     if (tabId === 'planning') {
+        if (!fromHistory) currentPlanningProjectId = null;
         try { renderPlanning(); } catch (e) { console.error('renderPlanning failed', e); }
     }
 }
@@ -452,7 +457,23 @@ window.addEventListener('popstate', () => {
         return;
     }
 
-    const hash = (location.hash || '').replace('#', '') || 'home';
+    // 프로젝트(계획) 하위 경로: #planning/p-123 ↔ #planning
+    const rawHash = (location.hash || '').replace('#', '');
+    if (rawHash.startsWith('planning/p-')) {
+        const id = parseInt(rawHash.slice('planning/p-'.length), 10);
+        if (!isNaN(id)) {
+            currentPlanningProjectId = id;
+            switchTab('planning', true);
+            return;
+        }
+    }
+    if (rawHash === 'planning' && currentPlanningProjectId != null) {
+        currentPlanningProjectId = null;
+        switchTab('planning', true);
+        return;
+    }
+
+    const hash = rawHash || 'home';
     if (document.getElementById('tab-' + hash)) {
         switchTab(hash, true);
     }
@@ -8140,7 +8161,7 @@ function openPlanningPostDetail(postId) {
             </div>
         </div>
     `;
-    document.getElementById('modalOverlay').classList.add('show');
+    document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
     planningPendingImages = [];
     refreshPlanningImagePreview();
 }
@@ -8219,7 +8240,7 @@ function openPlanningPostEditor() {
         </div>
         <button class="form-submit" style="background:var(--blue);margin-top:6px" onclick="submitPlanningCard()">저장</button>
     `;
-    document.getElementById('modalOverlay').classList.add('show');
+    document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
     planningPendingImages = [];
     refreshPlanningImagePreview();
     setTimeout(() => { const el = document.getElementById('planningPostContent'); if (el) el.focus(); }, 60);
@@ -8329,11 +8350,19 @@ function submitPlanningReply(parentPostId) {
 function openPlanningProject(id) {
     currentPlanningProjectId = id;
     planningPendingImages = [];
+    const newHash = `#planning/p-${id}`;
+    if (location.hash !== newHash) {
+        history.pushState({ tab: 'planning', planningProjectId: id }, '', newHash);
+    }
     renderPlanning();
 }
 function closePlanningProject() {
     currentPlanningProjectId = null;
     planningPendingImages = [];
+    const newHash = '#planning';
+    if (location.hash !== newHash) {
+        history.pushState({ tab: 'planning' }, '', newHash);
+    }
     renderPlanning();
 }
 
@@ -8384,7 +8413,7 @@ function openNewPlanningModal(defaultPeriod) {
         </div>
         <button class="form-submit" style="background:var(--blue)" onclick="savePlanningProject()">저장</button>
     `;
-    document.getElementById('modalOverlay').classList.add('show');
+    document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
     setTimeout(() => {
         const el = document.getElementById('newPlanningName'); if (el) el.focus();
         const chosen = document.querySelector('.planning-access-option input[checked]') || document.querySelector('.planning-access-option input');
@@ -8460,7 +8489,7 @@ function openEditPlanningModal(id) {
         </div>
         <button class="form-submit" style="background:var(--blue)" onclick="savePlanningProjectEdit(${id})">저장</button>
     `;
-    document.getElementById('modalOverlay').classList.add('show');
+    document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
 }
 function savePlanningProject() {
     const name = (document.getElementById('newPlanningName').value || '').trim();
