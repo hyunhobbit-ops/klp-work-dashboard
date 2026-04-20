@@ -1998,7 +1998,7 @@ function renderDeliveries() {
             <td class="td-check"><input type="checkbox" class="delivery-check" data-id="${d.id}" ${d._checked ? 'checked' : ''}></td>
             <td class="cell-editable" data-id="${d.id}" data-field="date" data-type="date">${fmtDisplay(d.date)}${isToday ? ' <span class="today-badge">오늘</span>' : ''}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="type" data-type="select" data-options="일반,중고,번개,당근,GS반택,ETSY"><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
-            <td class="cell-editable" data-id="${d.id}" data-field="sender" data-type="select" data-options="케이엘피코리아,김관택,이현주,김현호,유지은,구정두,기타">${d.sender}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="sender" data-type="select" data-options="케이엘피코리아,김관택,이현주,김현호,유지은,구정두,황선영,(이현주),기타">${d.sender}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="recipient"><strong>${d.recipient}</strong></td>
             <td class="cell-editable" data-id="${d.id}" data-field="phone">${d.phone || '-'}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="product">${d.product}</td>
@@ -2097,7 +2097,7 @@ function openEditDelivery(id) {
             </div>
             <div class="form-group"><label class="form-label">발송인</label>
                 ${(() => {
-                    const senders = ['케이엘피코리아','김관택','이현주','김현호','유지은','구정두'];
+                    const senders = ['케이엘피코리아','김관택','이현주','김현호','유지은','구정두','황선영','(이현주)'];
                     const isCustom = d.sender && !senders.includes(d.sender);
                     const opts = senders.map(s => `<option value="${s}" ${d.sender === s ? 'selected' : ''}>${s}</option>`).join('');
                     return `<select class="form-select" id="editDelSender">
@@ -3541,6 +3541,8 @@ function openModal(type) {
                         <option value="김현호">김현호</option>
                         <option value="유지은">유지은</option>
                         <option value="구정두">구정두</option>
+                        <option value="황선영">황선영</option>
+                        <option value="(이현주)">(이현주)</option>
                         <option value="__custom">기타 (직접입력)</option>
                     </select>
                     <input type="text" class="form-input" id="newDelSenderCustom" placeholder="발송인을 입력하세요" style="display:none;margin-top:6px">
