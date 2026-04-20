@@ -7716,7 +7716,7 @@ const PLANNING_CATEGORIES_ACCESS = [
     { key: 'company',  label: '회사', icon: '🏢', bg: '#DBEAFE', fg: '#1D4ED8', note: '모두 공유' },
     { key: 'family',   label: '가족', icon: '🏠', bg: '#FCE7F3', fg: '#BE185D', note: '모두 공유' }
 ];
-const PLANNING_ASSIGNEES = ['이현주', '김현호', '유지은', '구정두', '김관택', '대표님', '황선영'];
+const PLANNING_ASSIGNEES = ['이현주', '김현호', '유지은', '구정두', '대표님'];
 
 function planningCurrentOwner() {
     return currentUser ? (currentUser.loginName || String(currentUser.id || currentUser.name)) : '';
