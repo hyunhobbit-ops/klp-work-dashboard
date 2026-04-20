@@ -65,10 +65,14 @@
                 <!-- 업무 그룹 -->
                 <div class="nav-group">
                     <div class="nav-group-label">업무</div>
+                    <button class="nav-item" data-tab="planning">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+                        <span>프로젝트</span>
+                    </button>
                     <div class="nav-sub-group">
                         <div class="nav-sub-label">
                             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                            <span>프로젝트</span>
+                            <span>매입매출</span>
                         </div>
                         <button class="nav-item nav-sub-item" data-tab="projects-temp">
                             <span>임시</span>
@@ -349,7 +353,16 @@
                 </div>
             </main>
 
-            <!-- ===== Projects ===== -->
+            <!-- ===== 프로젝트 (계획/협업) ===== -->
+            <main class="content" id="tab-planning">
+                <div style="padding:40px 24px;text-align:center;color:var(--gray-500)">
+                    <div style="font-size:48px;margin-bottom:12px">🧩</div>
+                    <div style="font-size:18px;font-weight:800;color:var(--gray-900);margin-bottom:8px">프로젝트 협업 공간</div>
+                    <div style="font-size:14px">시안 준비 중입니다 — 다음 단계에서 로컬로 시안을 확인하실 수 있어요.</div>
+                </div>
+            </main>
+
+            <!-- ===== Projects (매입매출) ===== -->
             <!-- ===== 임시 프로젝트 ===== -->
             <main class="content" id="tab-projects-temp">
                 <div class="table-wrap">
