@@ -7711,7 +7711,27 @@ const PLANNING_PERIODS = [
     { key: 'month', label: '월간 프로젝트', icon: '🗓️', sub: '한 달 단위로 관리하는 프로젝트' },
     { key: 'year',  label: '연간 프로젝트', icon: '📅', sub: '연간 단위로 관리하는 장기 프로젝트' }
 ];
+const PLANNING_CATEGORIES_ACCESS = [
+    { key: 'personal', label: '개인', icon: '🔒', bg: '#FEF3C7', fg: '#B45309', note: '본인만 볼 수 있음' },
+    { key: 'company',  label: '회사', icon: '🏢', bg: '#DBEAFE', fg: '#1D4ED8', note: '모두 공유' },
+    { key: 'family',   label: '가족', icon: '🏠', bg: '#FCE7F3', fg: '#BE185D', note: '모두 공유' }
+];
 const PLANNING_ASSIGNEES = ['이현주', '김현호', '유지은', '구정두', '김관택', '대표님', '황선영'];
+
+function planningCurrentOwner() {
+    return currentUser ? (currentUser.loginName || String(currentUser.id || currentUser.name)) : '';
+}
+function planningLastDayOfMonth(ym) {
+    if (!ym) return '';
+    const [y, m] = ym.split('-').map(Number);
+    if (!y || !m) return '';
+    const d = new Date(y, m, 0);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function planningLastDayOfYear(y) {
+    if (!y) return '';
+    return `${y}-12-31`;
+}
 let planningProjects = [];
 let currentPlanningProjectId = null;
 
@@ -7775,6 +7795,11 @@ function renderPlanning() {
     }
 }
 
+function planningCanSeeProject(p) {
+    if ((p.access || 'company') !== 'personal') return true;
+    const me = planningCurrentOwner();
+    return !!me && p.ownerLogin === me;
+}
 function renderPlanningList() {
     const renderProjectCard = p => {
         const postCount = (p.posts || []).length;
@@ -7787,11 +7812,14 @@ function renderPlanningList() {
         const progressPct = posts.length ? Math.round((doneCount / posts.length) * 100) : 0;
         const dd = planningDDay(p.deadline);
         const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap">${dd.label}</span>` : '';
+        const access = PLANNING_CATEGORIES_ACCESS.find(c => c.key === (p.access || 'company')) || PLANNING_CATEGORIES_ACCESS[1];
+        const accessBadge = `<span title="${access.note}" style="background:${access.bg};color:${access.fg};font-size:10px;font-weight:800;padding:3px 7px;border-radius:6px;white-space:nowrap">${access.icon} ${access.label}</span>`;
         return `
-        <div onclick="openPlanningProject(${p.id})" style="background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:18px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:10px" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 12px rgba(0,0,0,0.06)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
+        <div draggable="true" ondragstart="planningProjectDragStart(event,${p.id})" ondragend="planningProjectDragEnd(event)" onclick="openPlanningProject(${p.id})" style="background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:18px;cursor:grab;transition:all .15s;display:flex;flex-direction:column;gap:10px;user-select:none" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 12px rgba(0,0,0,0.06)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
                 <div style="font-size:16px;font-weight:800;color:var(--gray-900);line-height:1.3">${planningEsc(p.name)}</div>
                 <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
+                    ${accessBadge}
                     ${ddBadge}
                     <span style="background:${statusBg};color:${statusColor};font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap">${p.status}</span>
                 </div>
@@ -7810,8 +7838,16 @@ function renderPlanningList() {
         </div>`;
     };
 
+    const quickAddCard = (periodKey) => `
+        <div onclick="openPlanningQuickAdd('${periodKey}')" style="background:transparent;border:2px dashed var(--gray-300,#D1D5DB);border-radius:12px;padding:18px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:120px;color:var(--gray-500);transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)';this.style.background='var(--blue-light)'" onmouseout="this.style.borderColor='var(--gray-300)';this.style.color='var(--gray-500)';this.style.background='transparent'">
+            <div style="font-size:28px;font-weight:700;line-height:1">+</div>
+            <div style="font-size:12px;font-weight:700">빠른 추가</div>
+        </div>`;
+
+    const visibleProjects = planningProjects.filter(planningCanSeeProject);
+
     const sections = PLANNING_PERIODS.map(period => {
-        const items = planningProjects
+        const items = visibleProjects
             .filter(p => (p.period || 'month') === period.key)
             .sort((a, b) => {
                 const da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
@@ -7820,20 +7856,21 @@ function renderPlanningList() {
                 return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
             });
         const cards = items.map(renderProjectCard).join('');
-        const emptyCard = !items.length ? `<div style="grid-column:1/-1;background:var(--gray-50);border:2px dashed var(--gray-200);border-radius:10px;padding:28px 16px;text-align:center;color:var(--gray-500);font-size:13px">아직 ${period.label}가 없습니다</div>` : '';
         return `
         <section style="margin-bottom:28px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-                <div style="display:flex;align-items:center;gap:10px">
-                    <span style="font-size:22px">${period.icon}</span>
-                    <div>
-                        <div style="font-size:16px;font-weight:800;color:var(--gray-900)">${period.label} <span style="font-size:12px;color:var(--gray-500);font-weight:700;margin-left:6px">${items.length}개</span></div>
-                        <div style="font-size:11px;color:var(--gray-500)">${period.sub}</div>
+            <div ondragover="planningSectionDragOver(event)" ondragleave="planningSectionDragLeave(event)" ondrop="planningSectionDrop(event,'${period.key}')" style="border-radius:12px;padding:4px;transition:background .15s">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span style="font-size:22px">${period.icon}</span>
+                        <div>
+                            <div style="font-size:16px;font-weight:800;color:var(--gray-900)">${period.label} <span style="font-size:12px;color:var(--gray-500);font-weight:700;margin-left:6px">${items.length}개</span></div>
+                            <div style="font-size:11px;color:var(--gray-500)">${period.sub}</div>
+                        </div>
                     </div>
+                    <button onclick="openNewPlanningModal('${period.key}')" style="padding:7px 14px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">+ 새 ${period.label}</button>
                 </div>
-                <button onclick="openNewPlanningModal('${period.key}')" style="padding:7px 14px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">+ 새 ${period.label}</button>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">${cards}${quickAddCard(period.key)}</div>
             </div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">${cards}${emptyCard}</div>
         </section>`;
     }).join('');
 
@@ -7842,11 +7879,103 @@ function renderPlanningList() {
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
                 <div>
                     <div style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">프로젝트 협업 공간</div>
-                    <div style="font-size:13px;color:var(--gray-500)">주간 · 월간 · 연간 단위로 프로젝트를 관리하고, 클릭하면 칸반보드가 열립니다 <span style="color:var(--yellow);font-weight:700">(로컬 시안 · localStorage 저장)</span></div>
+                    <div style="font-size:13px;color:var(--gray-500)">카드를 다른 섹션으로 드래그하면 기간 구분이 바뀝니다 <span style="color:var(--yellow);font-weight:700">(로컬 시안 · localStorage 저장)</span></div>
                 </div>
             </div>
             ${sections}
         </div>`;
+}
+
+let planningProjectDragId = null;
+function planningProjectDragStart(ev, id) {
+    planningProjectDragId = id;
+    ev.dataTransfer.effectAllowed = 'move';
+    try { ev.dataTransfer.setData('text/plain', 'proj:' + id); } catch (_) {}
+    ev.currentTarget.style.opacity = '0.5';
+    ev.stopPropagation();
+}
+function planningProjectDragEnd(ev) {
+    ev.currentTarget.style.opacity = '';
+    planningProjectDragId = null;
+}
+function planningSectionDragOver(ev) {
+    if (!planningProjectDragId) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    ev.currentTarget.style.background = 'var(--blue-light)';
+}
+function planningSectionDragLeave(ev) {
+    if (ev.currentTarget.contains(ev.relatedTarget)) return;
+    ev.currentTarget.style.background = '';
+}
+function planningSectionDrop(ev, newPeriod) {
+    ev.preventDefault();
+    ev.currentTarget.style.background = '';
+    const id = planningProjectDragId;
+    if (!id) return;
+    const p = planningProjects.find(x => x.id === id);
+    if (!p) return;
+    if ((p.period || 'month') === newPeriod) return;
+    p.period = newPeriod;
+    p.updatedAt = new Date().toISOString();
+    savePlanningProjects();
+    renderPlanning();
+    const meta = PLANNING_PERIODS.find(pp => pp.key === newPeriod);
+    showToast(`"${p.name}" → ${meta ? meta.label : newPeriod}`);
+}
+
+function openPlanningQuickAdd(periodKey) {
+    const body = document.getElementById('modalBody');
+    if (!body) return;
+    const pm = PLANNING_PERIODS.find(p => p.key === periodKey) || PLANNING_PERIODS[1];
+    body.innerHTML = `
+        <div class="form-section-title">⚡ 빠른 추가 <span style="font-size:12px;color:var(--gray-500);font-weight:700;margin-left:6px">${pm.icon} ${pm.label}</span></div>
+        <div class="form-group"><label class="form-label">프로젝트 이름 *</label>
+            <input id="quickPlanningName" class="form-input" placeholder="프로젝트 이름만 빠르게 입력..." onkeydown="if(event.key==='Enter'){savePlanningQuickAdd('${periodKey}')}">
+        </div>
+        <div class="form-group"><label class="form-label">공개 범위</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+                ${PLANNING_CATEGORIES_ACCESS.map((c, i) => `<label style="flex:1;min-width:80px;padding:8px;border:1.5px solid ${i===1?c.fg:'var(--gray-200)'};background:${i===1?c.bg:'var(--white)'};border-radius:8px;cursor:pointer;text-align:center" onclick="document.querySelectorAll('.planning-quick-access').forEach(el=>{el.style.borderColor='var(--gray-200)';el.style.background='var(--white)'});this.style.borderColor='${c.fg}';this.style.background='${c.bg}'" class="planning-quick-access">
+                    <input type="radio" name="quickPlanningAccess" value="${c.key}" ${i===1?'checked':''} style="display:none">
+                    <div style="font-size:13px;font-weight:800;color:${c.fg}">${c.icon} ${c.label}</div>
+                </label>`).join('')}
+            </div>
+        </div>
+        <button class="form-submit" style="background:var(--blue)" onclick="savePlanningQuickAdd('${periodKey}')">추가</button>
+    `;
+    document.getElementById('modalOverlay').classList.add('show');
+    setTimeout(() => { const el = document.getElementById('quickPlanningName'); if (el) el.focus(); }, 50);
+}
+function savePlanningQuickAdd(periodKey) {
+    const name = (document.getElementById('quickPlanningName').value || '').trim();
+    if (!name) { showToast('이름을 입력하세요'); return; }
+    const accessEl = document.querySelector('input[name="quickPlanningAccess"]:checked');
+    const access = accessEl ? accessEl.value : 'company';
+    const now = new Date();
+    let deadline = '';
+    let targetMonth = '';
+    let targetYear = '';
+    if (periodKey === 'month') {
+        targetMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+        deadline = planningLastDayOfMonth(targetMonth);
+    } else if (periodKey === 'year') {
+        targetYear = String(now.getFullYear());
+        deadline = planningLastDayOfYear(targetYear);
+    }
+    const nowIso = now.toISOString();
+    planningProjects.push({
+        id: Date.now(),
+        name, description: '', status: '진행 중',
+        period: periodKey, deadline, access, targetMonth, targetYear,
+        createdBy: currentUser ? currentUser.name : '익명',
+        ownerLogin: planningCurrentOwner(),
+        createdAt: nowIso, updatedAt: nowIso,
+        posts: []
+    });
+    savePlanningProjects();
+    closeModal();
+    renderPlanning();
+    showToast('추가되었습니다');
 }
 
 const PLANNING_TASK_STATUSES = [
@@ -7894,7 +8023,7 @@ function renderPlanningDetail(p) {
     const columns = PLANNING_TASK_STATUSES.map(col => {
         const items = parents.filter(x => (x.taskStatus || 'todo') === col.key);
         const cardsHtml = items.map(renderCard).join('');
-        const emptyCol = !items.length ? `<div style="color:var(--gray-400);font-size:12px;text-align:center;padding:24px 0;border:1px dashed var(--gray-200);border-radius:8px">비어 있음</div>` : '';
+        const addBtn = `<button onclick="openNewPlanningPostForColumn('${col.key}')" style="width:100%;padding:12px;background:transparent;border:2px dashed var(--gray-300,#D1D5DB);border-radius:8px;color:var(--gray-500);font-size:13px;font-weight:700;cursor:pointer;transition:all .12s" onmouseover="this.style.borderColor='${col.bar}';this.style.color='${col.text}';this.style.background='${col.bg}'" onmouseout="this.style.borderColor='var(--gray-300)';this.style.color='var(--gray-500)';this.style.background='transparent'">+ 할 일 추가</button>`;
         return `
         <div class="planning-post-col" ondragover="planningPostDragOver(event)" ondragleave="planningPostDragLeave(event)" ondrop="planningPostDrop(event,'${col.key}')" style="flex:1;min-width:270px;background:var(--gray-50);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;transition:background .15s">
             <div style="display:flex;justify-content:space-between;align-items:center">
@@ -7905,7 +8034,7 @@ function renderPlanningDetail(p) {
                 </div>
                 <button onclick="openNewPlanningPostForColumn('${col.key}')" title="이 컬럼에 새 카드" style="background:none;border:none;color:var(--gray-500);font-size:18px;line-height:1;cursor:pointer;padding:0 4px">+</button>
             </div>
-            <div style="display:flex;flex-direction:column;gap:8px;min-height:80px">${cardsHtml}${emptyCol}</div>
+            <div style="display:flex;flex-direction:column;gap:8px;min-height:80px">${cardsHtml}${addBtn}</div>
         </div>`;
     }).join('');
 
@@ -8221,25 +8350,73 @@ function openNewPlanningModal(defaultPeriod) {
     const body = document.getElementById('modalBody');
     if (!body) return;
     const pd = defaultPeriod || 'month';
+    const accessChips = PLANNING_CATEGORIES_ACCESS.map((c, i) => `<label style="flex:1;min-width:100px;padding:10px;border:1.5px solid var(--gray-200);border-radius:8px;cursor:pointer;display:flex;flex-direction:column;gap:2px;align-items:center;text-align:center" onclick="document.querySelectorAll('.planning-access-option').forEach(el=>{el.style.borderColor='var(--gray-200)';el.style.background='var(--white)'});this.style.borderColor='${c.fg}';this.style.background='${c.bg}'" class="planning-access-option">
+        <input type="radio" name="newPlanningAccess" value="${c.key}" ${i===1?'checked':''} style="display:none">
+        <span style="font-size:18px">${c.icon}</span>
+        <span style="font-size:13px;font-weight:800;color:${c.fg}">${c.label}</span>
+        <span style="font-size:10px;color:var(--gray-500)">${c.note}</span>
+    </label>`).join('');
+    const now = new Date();
+    const curYM = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const curY = String(now.getFullYear());
+    const yearOpts = [];
+    for (let y = now.getFullYear() - 1; y <= now.getFullYear() + 5; y++) {
+        yearOpts.push(`<option value="${y}" ${y === now.getFullYear() ? 'selected' : ''}>${y}년</option>`);
+    }
     body.innerHTML = `
         <div class="form-section-title">+ 새 프로젝트</div>
         <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="newPlanningName" class="form-input" placeholder="예: 원데이강의 준비, 시계 부품 구입"></div>
+        <div class="form-group"><label class="form-label">공개 범위 *</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">${accessChips}</div>
+        </div>
         <div class="form-group"><label class="form-label">설명 (선택)</label><textarea id="newPlanningDesc" class="form-input" rows="3" placeholder="이 프로젝트의 목표, 배경을 적어주세요"></textarea></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">기간 구분</label>
-                <select id="newPlanningPeriod" class="form-select">${PLANNING_PERIODS.map(pp => `<option value="${pp.key}" ${pp.key === pd ? 'selected' : ''}>${pp.icon} ${pp.label}</option>`).join('')}</select>
-            </div>
-            <div class="form-group"><label class="form-label">마감일</label>
-                <input id="newPlanningDeadline" class="form-input" type="date">
+                <select id="newPlanningPeriod" class="form-select" onchange="togglePlanningPeriodInputs()">${PLANNING_PERIODS.map(pp => `<option value="${pp.key}" ${pp.key === pd ? 'selected' : ''}>${pp.icon} ${pp.label}</option>`).join('')}</select>
             </div>
             <div class="form-group"><label class="form-label">상태</label>
                 <select id="newPlanningStatus" class="form-select">${PLANNING_STATUSES.map(s => `<option value="${s}">${s}</option>`).join('')}</select>
             </div>
         </div>
+        <div id="newPlanningMonthWrap" class="form-group" style="display:${pd==='month'?'block':'none'}">
+            <label class="form-label">🗓️ 마감 월</label>
+            <input id="newPlanningTargetMonth" class="form-input" type="month" value="${curYM}">
+            <div style="font-size:11px;color:var(--gray-500);margin-top:4px">마감일을 비워두면 이 월의 말일로 자동 설정</div>
+        </div>
+        <div id="newPlanningYearWrap" class="form-group" style="display:${pd==='year'?'block':'none'}">
+            <label class="form-label">📅 마감 연도</label>
+            <select id="newPlanningTargetYear" class="form-select">${yearOpts}</select>
+            <div style="font-size:11px;color:var(--gray-500);margin-top:4px">마감일을 비워두면 해당 연도의 12월 31일로 자동 설정</div>
+        </div>
+        <div class="form-group"><label class="form-label">마감일 (선택)</label>
+            <input id="newPlanningDeadline" class="form-input" type="date">
+        </div>
         <button class="form-submit" style="background:var(--blue)" onclick="savePlanningProject()">저장</button>
     `;
     document.getElementById('modalOverlay').classList.add('show');
-    setTimeout(() => { const el = document.getElementById('newPlanningName'); if (el) el.focus(); }, 50);
+    setTimeout(() => {
+        const el = document.getElementById('newPlanningName'); if (el) el.focus();
+        const chosen = document.querySelector('.planning-access-option input[checked]') || document.querySelector('.planning-access-option input');
+        if (chosen) {
+            const lbl = chosen.closest('.planning-access-option');
+            const c = PLANNING_CATEGORIES_ACCESS.find(x => x.key === chosen.value);
+            if (lbl && c) { lbl.style.borderColor = c.fg; lbl.style.background = c.bg; }
+        }
+    }, 50);
+}
+function togglePlanningPeriodInputs() {
+    const period = document.getElementById('newPlanningPeriod').value;
+    const mw = document.getElementById('newPlanningMonthWrap');
+    const yw = document.getElementById('newPlanningYearWrap');
+    if (mw) mw.style.display = period === 'month' ? 'block' : 'none';
+    if (yw) yw.style.display = period === 'year' ? 'block' : 'none';
+}
+function toggleEditPlanningPeriodInputs() {
+    const period = document.getElementById('editPlanningPeriod').value;
+    const mw = document.getElementById('editPlanningMonthWrap');
+    const yw = document.getElementById('editPlanningYearWrap');
+    if (mw) mw.style.display = period === 'month' ? 'block' : 'none';
+    if (yw) yw.style.display = period === 'year' ? 'block' : 'none';
 }
 function openEditPlanningModal(id) {
     const p = planningProjects.find(x => x.id === id);
@@ -8247,20 +8424,48 @@ function openEditPlanningModal(id) {
     const body = document.getElementById('modalBody');
     if (!body) return;
     const pd = p.period || 'month';
+    const curAccess = p.access || 'company';
+    const accessChips = PLANNING_CATEGORIES_ACCESS.map(c => {
+        const active = c.key === curAccess;
+        return `<label style="flex:1;min-width:100px;padding:10px;border:1.5px solid ${active ? c.fg : 'var(--gray-200)'};background:${active ? c.bg : 'var(--white)'};border-radius:8px;cursor:pointer;display:flex;flex-direction:column;gap:2px;align-items:center;text-align:center" onclick="document.querySelectorAll('.planning-edit-access').forEach(el=>{el.style.borderColor='var(--gray-200)';el.style.background='var(--white)'});this.style.borderColor='${c.fg}';this.style.background='${c.bg}'" class="planning-edit-access">
+            <input type="radio" name="editPlanningAccess" value="${c.key}" ${active ? 'checked' : ''} style="display:none">
+            <span style="font-size:18px">${c.icon}</span>
+            <span style="font-size:13px;font-weight:800;color:${c.fg}">${c.label}</span>
+            <span style="font-size:10px;color:var(--gray-500)">${c.note}</span>
+        </label>`;
+    }).join('');
+    const now = new Date();
+    const yearOpts = [];
+    for (let y = now.getFullYear() - 2; y <= now.getFullYear() + 5; y++) {
+        yearOpts.push(`<option value="${y}" ${String(y) === String(p.targetYear || now.getFullYear()) ? 'selected' : ''}>${y}년</option>`);
+    }
     body.innerHTML = `
         <div class="form-section-title">✏️ 프로젝트 편집</div>
         <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="editPlanningName" class="form-input" value="${planningEsc(p.name)}"></div>
+        <div class="form-group"><label class="form-label">공개 범위 *</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">${accessChips}</div>
+        </div>
         <div class="form-group"><label class="form-label">설명</label><textarea id="editPlanningDesc" class="form-input" rows="3">${planningEsc(p.description || '')}</textarea></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">기간 구분</label>
-                <select id="editPlanningPeriod" class="form-select">${PLANNING_PERIODS.map(pp => `<option value="${pp.key}" ${pp.key === pd ? 'selected' : ''}>${pp.icon} ${pp.label}</option>`).join('')}</select>
-            </div>
-            <div class="form-group"><label class="form-label">마감일</label>
-                <input id="editPlanningDeadline" class="form-input" type="date" value="${planningEsc(p.deadline || '')}">
+                <select id="editPlanningPeriod" class="form-select" onchange="toggleEditPlanningPeriodInputs()">${PLANNING_PERIODS.map(pp => `<option value="${pp.key}" ${pp.key === pd ? 'selected' : ''}>${pp.icon} ${pp.label}</option>`).join('')}</select>
             </div>
             <div class="form-group"><label class="form-label">상태</label>
                 <select id="editPlanningStatus" class="form-select">${PLANNING_STATUSES.map(s => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
             </div>
+        </div>
+        <div id="editPlanningMonthWrap" class="form-group" style="display:${pd==='month'?'block':'none'}">
+            <label class="form-label">🗓️ 마감 월</label>
+            <input id="editPlanningTargetMonth" class="form-input" type="month" value="${planningEsc(p.targetMonth || '')}">
+            <div style="font-size:11px;color:var(--gray-500);margin-top:4px">마감일을 비워두면 이 월의 말일로 자동 설정</div>
+        </div>
+        <div id="editPlanningYearWrap" class="form-group" style="display:${pd==='year'?'block':'none'}">
+            <label class="form-label">📅 마감 연도</label>
+            <select id="editPlanningTargetYear" class="form-select">${yearOpts}</select>
+            <div style="font-size:11px;color:var(--gray-500);margin-top:4px">마감일을 비워두면 해당 연도의 12월 31일로 자동 설정</div>
+        </div>
+        <div class="form-group"><label class="form-label">마감일 (선택)</label>
+            <input id="editPlanningDeadline" class="form-input" type="date" value="${planningEsc(p.deadline || '')}">
         </div>
         <button class="form-submit" style="background:var(--blue)" onclick="savePlanningProjectEdit(${id})">저장</button>
     `;
@@ -8272,12 +8477,22 @@ function savePlanningProject() {
     const desc = (document.getElementById('newPlanningDesc').value || '').trim();
     const status = document.getElementById('newPlanningStatus').value;
     const period = document.getElementById('newPlanningPeriod').value;
-    const deadline = document.getElementById('newPlanningDeadline').value || '';
+    let deadline = document.getElementById('newPlanningDeadline').value || '';
+    const accessEl = document.querySelector('input[name="newPlanningAccess"]:checked');
+    const access = accessEl ? accessEl.value : 'company';
+    const targetMonth = period === 'month' ? (document.getElementById('newPlanningTargetMonth').value || '') : '';
+    const targetYear = period === 'year' ? (document.getElementById('newPlanningTargetYear').value || '') : '';
+    if (!deadline) {
+        if (period === 'month' && targetMonth) deadline = planningLastDayOfMonth(targetMonth);
+        else if (period === 'year' && targetYear) deadline = planningLastDayOfYear(targetYear);
+    }
     const nowIso = new Date().toISOString();
     const proj = {
         id: Date.now(),
         name, description: desc, status, period, deadline,
+        access, targetMonth, targetYear,
         createdBy: currentUser ? currentUser.name : '익명',
+        ownerLogin: planningCurrentOwner(),
         createdAt: nowIso, updatedAt: nowIso,
         posts: []
     };
@@ -8297,7 +8512,16 @@ function savePlanningProjectEdit(id) {
     p.description = (document.getElementById('editPlanningDesc').value || '').trim();
     p.status = document.getElementById('editPlanningStatus').value;
     p.period = document.getElementById('editPlanningPeriod').value;
-    p.deadline = document.getElementById('editPlanningDeadline').value || '';
+    const accessEl = document.querySelector('input[name="editPlanningAccess"]:checked');
+    p.access = accessEl ? accessEl.value : (p.access || 'company');
+    p.targetMonth = p.period === 'month' ? (document.getElementById('editPlanningTargetMonth').value || '') : '';
+    p.targetYear = p.period === 'year' ? (document.getElementById('editPlanningTargetYear').value || '') : '';
+    let deadline = document.getElementById('editPlanningDeadline').value || '';
+    if (!deadline) {
+        if (p.period === 'month' && p.targetMonth) deadline = planningLastDayOfMonth(p.targetMonth);
+        else if (p.period === 'year' && p.targetYear) deadline = planningLastDayOfYear(p.targetYear);
+    }
+    p.deadline = deadline;
     p.updatedAt = new Date().toISOString();
     savePlanningProjects();
     closeModal();
