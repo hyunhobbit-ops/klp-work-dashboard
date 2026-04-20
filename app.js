@@ -7942,27 +7942,27 @@ function renderPlanningDetail(p) {
     const renderCard = (post) => {
         const meta = planningCategoryMeta(post.category);
         const imgs = Array.isArray(post.images) ? post.images : (post.image ? [post.image] : []);
-        const thumbHtml = imgs.length ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px">${imgs.slice(0,3).map(src => `<img src="${planningEsc(src)}" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid var(--gray-200)">`).join('')}${imgs.length > 3 ? `<div style="width:46px;height:46px;background:var(--gray-100);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--gray-500)">+${imgs.length-3}</div>` : ''}</div>` : '';
+        const thumbHtml = imgs.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${imgs.slice(0,3).map(src => `<img src="${planningEsc(src)}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--gray-200)">`).join('')}${imgs.length > 3 ? `<div style="width:60px;height:60px;background:var(--gray-100);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--gray-500)">+${imgs.length-3}</div>` : ''}</div>` : '';
         const replyCount = (byParent[post.id] || []).length;
-        const preview = String(post.content || '').slice(0, 80);
+        const preview = String(post.content || '').slice(0, 100);
         const dd = planningDDay(post.deadline);
-        const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px">${dd.label}</span>` : '';
-        const vendorTag = post.vendor ? `<span style="color:var(--orange);font-size:11px;font-weight:700">🏭 ${planningEsc(post.vendor)}</span>` : '';
+        const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px">${dd.label}</span>` : '';
+        const vendorTag = post.vendor ? `<div style="color:var(--orange);font-size:14px;font-weight:700;margin-top:8px">🏭 ${planningEsc(post.vendor)}</div>` : '';
         const assignees = Array.isArray(post.assignees) ? post.assignees : [];
-        const assigneeHtml = assignees.length ? `<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:6px">${assignees.map(n => `<span style="background:var(--gray-100);color:var(--gray-700,#374151);font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">${planningEsc(n)}</span>`).join('')}</div>` : '';
+        const assigneeHtml = assignees.length ? `<div style="margin-top:10px;font-size:15px;line-height:1.5;color:var(--gray-900)"><span style="color:var(--gray-500);font-weight:700">담당자:</span> <strong style="font-weight:800">${assignees.map(planningEsc).join(', ')}</strong></div>` : '';
         return `
-        <div draggable="true" ondragstart="planningPostDragStart(event,${post.id})" ondragend="planningPostDragEnd(event)" onclick="openPlanningPostDetail(${post.id})" style="background:var(--white);border:1px solid var(--gray-200);border-left:3px solid ${meta.fg};border-radius:10px;padding:10px 12px;cursor:grab;transition:all .12s;user-select:none" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.08)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
-                <span style="background:${meta.bg};color:${meta.fg};font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px">${meta.icon} ${meta.label}</span>
+        <div draggable="true" ondragstart="planningPostDragStart(event,${post.id})" ondragend="planningPostDragEnd(event)" onclick="openPlanningPostDetail(${post.id})" style="background:var(--white);border:1px solid var(--gray-200);border-left:4px solid ${meta.fg};border-radius:12px;padding:14px 16px;cursor:grab;transition:all .12s;user-select:none" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 10px rgba(0,0,0,0.08)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                <span style="background:${meta.bg};color:${meta.fg};font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px">${meta.icon} ${meta.label}</span>
                 ${ddBadge}
             </div>
-            ${preview ? `<div style="font-size:13px;color:var(--gray-900);line-height:1.45;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(preview)}${post.content.length > 80 ? '...' : ''}</div>` : `<div style="font-size:12px;color:var(--gray-400);font-style:italic">내용 없음</div>`}
-            ${vendorTag ? `<div style="margin-top:6px">${vendorTag}</div>` : ''}
+            ${preview ? `<div style="font-size:15px;color:var(--gray-900);line-height:1.55;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(preview)}${post.content.length > 100 ? '...' : ''}</div>` : `<div style="font-size:14px;color:var(--gray-400);font-style:italic">내용 없음</div>`}
+            ${vendorTag}
             ${assigneeHtml}
             ${thumbHtml}
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px dashed var(--gray-200);font-size:11px;color:var(--gray-500)">
-                <span><strong style="color:var(--gray-900);font-weight:700">${planningEsc(post.author)}</strong></span>
-                <span>${replyCount > 0 ? `↩ ${replyCount} · ` : ''}${planningFmtDate(post.createdAt)}</span>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed var(--gray-200);font-size:13px;color:var(--gray-500);flex-wrap:wrap;gap:6px">
+                <span><span style="color:var(--gray-500);font-weight:700">작성자:</span> <strong style="color:var(--gray-900);font-weight:800;font-size:14px">${planningEsc(post.author)}</strong></span>
+                <span style="font-size:12px">${replyCount > 0 ? `↩ ${replyCount} · ` : ''}${planningFmtDate(post.createdAt)}</span>
             </div>
         </div>`;
     };
