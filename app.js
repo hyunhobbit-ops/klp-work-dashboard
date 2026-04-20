@@ -628,6 +628,25 @@ function renderHome() {
     document.getElementById('todayTasks').textContent = myTodayItems.length;
     document.getElementById('completionRate').textContent = rate + '%';
 
+    // 이번 달 매입매출 집계 — 마감일 또는 시작일이 이번 달이면 포함
+    const inMonth = (p) => {
+        const key = p.deadline || p.startDate;
+        return typeof key === 'string' && key.startsWith(monthPrefix);
+    };
+    const monthProjects = projects.filter(inMonth);
+    const monthRevenue = monthProjects.reduce((s, p) => s + (p.revenue || 0), 0);
+    const monthPurchase = monthProjects.reduce((s, p) => s + (p.supplierRevenue || 0), 0);
+    const monthMargin = monthRevenue - monthPurchase;
+    const marginEl = document.getElementById('monthMargin');
+    const revEl = document.getElementById('monthRevenue');
+    const purEl = document.getElementById('monthPurchase');
+    if (revEl) revEl.textContent = monthRevenue.toLocaleString() + '원';
+    if (purEl) purEl.textContent = monthPurchase.toLocaleString() + '원';
+    if (marginEl) {
+        marginEl.textContent = monthMargin.toLocaleString() + '원';
+        marginEl.style.color = monthMargin < 0 ? 'var(--red)' : '';
+    }
+
     // Quick menu counts
     const qP = document.getElementById('qProjects'); if (qP) qP.textContent = `${activeCount}건 진행`;
     const qD = document.getElementById('qDaily'); if (qD) qD.textContent = `오늘 ${myTodayItems.length}건`;
@@ -796,7 +815,7 @@ function renderHome() {
             ${ddayHtml}
         </div>`;
     });
-    document.getElementById('dashProjects').innerHTML = projHtml || empty('진행 중 프로젝트 없음');
+    document.getElementById('dashProjects').innerHTML = projHtml || empty('진행 중 매입매출 없음');
 }
 
 // =====================================
@@ -7998,7 +8017,7 @@ function renderPlanningList() {
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
                 <div>
                     <div style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">프로젝트 협업 공간</div>
-                    <div style="font-size:13px;color:var(--gray-500)">카드를 다른 섹션으로 드래그하면 기간 구분이 바뀝니다 <span style="color:var(--yellow);font-weight:700">(로컬 시안 · localStorage 저장)</span></div>
+                    <div style="font-size:13px;color:var(--gray-500)">카드를 다른 섹션으로 드래그하면 기간 구분이 바뀝니다</div>
                 </div>
             </div>
             ${sections}
