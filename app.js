@@ -8314,6 +8314,7 @@ function planningProjectFromDb(r) {
         deadline: r.deadline || '',
         location: r.location || '',
         cost: r.cost != null ? Number(r.cost) : null,
+        fundingMeta: (r.funding_meta && typeof r.funding_meta === 'object') ? r.funding_meta : null,
         createdBy: r.created_by || '',
         ownerLogin: r.owner_login || '',
         createdAt: r.created_at,
@@ -8333,6 +8334,7 @@ function planningProjectToDb(p) {
         deadline: p.deadline || null,
         location: p.location || '',
         cost: (p.cost == null || p.cost === '') ? null : Number(p.cost),
+        funding_meta: (p.fundingMeta && typeof p.fundingMeta === 'object') ? p.fundingMeta : null,
         created_by: p.createdBy || '',
         owner_login: p.ownerLogin || ''
     };
@@ -8579,6 +8581,17 @@ function renderPlanningList() {
             </div>
             ${p.deadline ? `<div style="font-size:12px;color:var(--gray-500)">⏰ 마감 ${planningEsc(p.deadline)}</div>` : ''}
             ${p.description ? `<div style="font-size:13px;color:var(--gray-500);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(p.description)}</div>` : ''}
+            ${(p.access === 'funding' && p.fundingMeta) ? (() => {
+                const m = p.fundingMeta;
+                const sym = m.currency === 'USD' ? '$' : '₩';
+                const amt = m.targetAmount != null ? Number(m.targetAmount).toLocaleString() : '';
+                const qty = m.targetQty != null ? Number(m.targetQty).toLocaleString() : '';
+                return `<div style="display:flex;gap:6px;flex-wrap:wrap;font-size:11px">
+                    ${m.platform ? `<span style="background:#EDE9FE;color:#6D28D9;padding:2px 8px;border-radius:5px;font-weight:700">💸 ${planningEsc(m.platform)}</span>` : ''}
+                    ${amt ? `<span style="background:#D1FAE5;color:#047857;padding:2px 8px;border-radius:5px;font-weight:700">🎯 ${sym}${amt}</span>` : ''}
+                    ${qty ? `<span style="background:#DBEAFE;color:#1D4ED8;padding:2px 8px;border-radius:5px;font-weight:700">📦 ${qty}개</span>` : ''}
+                </div>`;
+            })() : ''}
             ${posts.length ? `
             <div style="padding-top:4px">
                 <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray-500);margin-bottom:4px"><span>완료 ${doneCount}/${posts.length}</span><span>${progressPct}%</span></div>
@@ -8598,6 +8611,47 @@ function renderPlanningList() {
         </div>`;
 
     const visibleProjects = planningProjects.filter(planningCanSeeProject);
+
+    const modeLabel = currentPlanningMode === 'company' ? '🏢 회사 프로젝트'
+                    : currentPlanningMode === 'funding' ? '💸 펀딩 프로젝트'
+                    : '🧑 개인 프로젝트';
+    const modeSub = currentPlanningMode === 'company' ? '회사/가족 공유 프로젝트 — 김관택·김현호·이현주만 열람 가능'
+                  : currentPlanningMode === 'funding' ? '펀딩 프로젝트 — 김관택·김현호·이현주만 열람 가능'
+                  : '본인이 작성한 개인 프로젝트만 표시됩니다';
+
+    // 펀딩 모드: 진행/완료 2섹션, 기간 구분 없음
+    if (currentPlanningMode === 'funding') {
+        const fundSections = [
+            { key: 'active', label: '진행 중', icon: '🚀', filter: p => p.status !== '완료' },
+            { key: 'done',   label: '완료',   icon: '✅', filter: p => p.status === '완료' }
+        ].map(sec => {
+            const items = visibleProjects.filter(sec.filter).sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
+            const cards = items.map(renderProjectCard).join('');
+            return `
+            <section style="margin-bottom:28px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span style="font-size:22px">${sec.icon}</span>
+                        <div>
+                            <div style="font-size:16px;font-weight:800;color:var(--gray-900)">${sec.label} <span style="font-size:12px;color:var(--gray-500);font-weight:700;margin-left:6px">${items.length}개</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px">${cards || '<div style="padding:16px;color:var(--gray-400);font-size:13px">프로젝트가 없습니다</div>'}</div>
+            </section>`;
+        }).join('');
+        return `
+            <div style="padding:20px 24px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+                    <div>
+                        <div style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">${modeLabel}</div>
+                        <div style="font-size:13px;color:var(--gray-500)">${modeSub}</div>
+                    </div>
+                    <button onclick="openNewPlanningModal()" style="padding:9px 18px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">+ 새 프로젝트</button>
+                </div>
+                ${fundSections}
+            </div>`;
+    }
 
     const sections = PLANNING_PERIODS.map(period => {
         const items = visibleProjects
@@ -8627,12 +8681,6 @@ function renderPlanningList() {
         </section>`;
     }).join('');
 
-    const modeLabel = currentPlanningMode === 'company' ? '🏢 회사 프로젝트'
-                    : currentPlanningMode === 'funding' ? '💸 펀딩 프로젝트'
-                    : '🧑 개인 프로젝트';
-    const modeSub = currentPlanningMode === 'company' ? '회사/가족 공유 프로젝트 — 김관택·김현호·이현주만 열람 가능'
-                  : currentPlanningMode === 'funding' ? '펀딩 프로젝트 — 김관택·김현호·이현주만 열람 가능'
-                  : '본인이 작성한 개인 프로젝트만 표시됩니다';
     return `
         <div style="padding:20px 24px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
@@ -8754,7 +8802,8 @@ function renderPlanningDetail(p) {
         </div>`;
     }).join('');
 
-    const statusOpts = PLANNING_STATUSES.map(s => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('');
+    const statusList = (p.access === 'funding') ? ['진행 중', '완료'] : PLANNING_STATUSES;
+    const statusOpts = statusList.map(s => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('');
 
     return `
         <div style="padding:20px 24px">
@@ -8768,6 +8817,23 @@ function renderPlanningDetail(p) {
                             ${p.location ? `<span style="background:var(--blue-light,#DBEAFE);color:#1D4ED8;padding:3px 10px;border-radius:6px;font-weight:700">📍 ${planningEsc(p.location)}</span>` : ''}
                             ${p.cost != null ? `<span style="background:var(--green-light,#D1FAE5);color:#047857;padding:3px 10px;border-radius:6px;font-weight:700">💰 ${Number(p.cost).toLocaleString()}원</span>` : ''}
                         </div>` : ''}
+                        ${(p.access === 'funding' && p.fundingMeta) ? (() => {
+                            const m = p.fundingMeta;
+                            const sym = m.currency === 'USD' ? '$' : '₩';
+                            const amt = m.targetAmount != null ? Number(m.targetAmount).toLocaleString() : '';
+                            const qty = m.targetQty != null ? Number(m.targetQty).toLocaleString() : '';
+                            const unit = (m.targetAmount && m.targetQty) ? (m.currency === 'USD' ? (m.targetAmount / m.targetQty).toFixed(2) : Math.round(m.targetAmount / m.targetQty).toLocaleString()) : '';
+                            const period = (m.startDate || m.endDate) ? `${planningEsc(m.startDate || '')} ~ ${planningEsc(m.endDate || '')}` : '';
+                            return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:12px">
+                                ${m.client ? `<span style="background:#F3F4F6;color:#374151;padding:3px 10px;border-radius:6px;font-weight:700">🏢 진행사: ${planningEsc(m.client)}</span>` : ''}
+                                ${m.manufacturer ? `<span style="background:#F3F4F6;color:#374151;padding:3px 10px;border-radius:6px;font-weight:700">🏭 제조사: ${planningEsc(m.manufacturer)}</span>` : ''}
+                                ${m.platform ? `<span style="background:#EDE9FE;color:#6D28D9;padding:3px 10px;border-radius:6px;font-weight:700">💸 ${planningEsc(m.platform)}</span>` : ''}
+                                ${amt ? `<span style="background:#D1FAE5;color:#047857;padding:3px 10px;border-radius:6px;font-weight:700">🎯 목표 ${sym}${amt}</span>` : ''}
+                                ${qty ? `<span style="background:#DBEAFE;color:#1D4ED8;padding:3px 10px;border-radius:6px;font-weight:700">📦 ${qty}개</span>` : ''}
+                                ${unit ? `<span style="background:#FEF3C7;color:#92400E;padding:3px 10px;border-radius:6px;font-weight:700">💵 단가 ${sym}${unit}</span>` : ''}
+                                ${period ? `<span style="background:#FFE4E6;color:#BE123C;padding:3px 10px;border-radius:6px;font-weight:700">📅 ${period}</span>` : ''}
+                            </div>`;
+                        })() : ''}
                         <div style="font-size:11px;color:var(--gray-500);margin-top:8px">만든 사람: ${planningEsc(p.createdBy)} · ${planningFmtDate(p.createdAt)}</div>
                     </div>
                     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -9228,6 +9294,10 @@ function closePlanningProject() {
 function openNewPlanningModal(defaultPeriod) {
     const body = document.getElementById('modalBody');
     if (!body) return;
+    // 펀딩 모드는 전용 폼
+    if (currentPlanningMode === 'funding') {
+        return openFundingPlanningModal(null);
+    }
     const pd = defaultPeriod || 'month';
     const now = new Date();
     const curYM = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
@@ -9309,11 +9379,213 @@ function toggleEditPlanningPeriodInputs() {
     if (mw) mw.style.display = period === 'month' ? 'block' : 'none';
     if (yw) yw.style.display = period === 'year' ? 'block' : 'none';
 }
+// =====================================
+// 펀딩 프로젝트 전용 모달 (신규/편집 공용, p=null이면 신규)
+// =====================================
+const FUNDING_PLATFORMS = ['와디즈', '텀블벅', '킥스타터'];
+const FUNDING_STATUSES = ['진행 중', '완료'];
+
+function openFundingPlanningModal(p) {
+    const body = document.getElementById('modalBody');
+    const title = document.getElementById('modalTitle');
+    if (!body) return;
+    const isEdit = !!p;
+    const m = (p && p.fundingMeta) ? p.fundingMeta : {};
+    const esc = s => planningEsc(String(s == null ? '' : s));
+
+    const platformRaw = m.platform || '';
+    const platformIsStd = FUNDING_PLATFORMS.includes(platformRaw);
+    const platformSelected = platformRaw ? (platformIsStd ? platformRaw : '기타') : '와디즈';
+    const platformCustom = (!platformIsStd && platformRaw) ? platformRaw : '';
+    const currency = m.currency === 'USD' ? 'USD' : 'KRW';
+    const clientsList = (typeof clients !== 'undefined' ? clients : []).map(c => `<option value="${esc(c.companyName || '')}">`).join('');
+
+    if (title) title.textContent = isEdit ? '💸 펀딩 프로젝트 편집' : '💸 새 펀딩 프로젝트';
+    body.innerHTML = `
+        <div class="form-section-title">💸 ${isEdit ? '펀딩 프로젝트 편집' : '새 펀딩 프로젝트'}</div>
+
+        <div class="form-group">
+            <label class="form-label">프로젝트 이름 <span style="color:var(--red)">*</span></label>
+            <input id="fundPlanName" class="form-input" placeholder="예: KLP 스마트 워치 펀딩" value="${esc(p ? p.name : '')}">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">설명</label>
+            <textarea id="fundPlanDesc" class="form-input" rows="6" placeholder="펀딩 개요, 목표, 배경 등" style="min-height:140px;resize:vertical">${esc(p ? p.description : '')}</textarea>
+        </div>
+
+        <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-group">
+                <label class="form-label">진행사</label>
+                <input id="fundPlanClient" class="form-input" list="fundPlanClientList" value="${esc(m.client || '케이엘피코리아(주)')}" placeholder="진행사 (고객사 DB)">
+                <datalist id="fundPlanClientList">${clientsList}</datalist>
+            </div>
+            <div class="form-group">
+                <label class="form-label">제조사</label>
+                <input id="fundPlanManufacturer" class="form-input" value="${esc(m.manufacturer || '')}" placeholder="제조사 (해외거래처 DB — 연결 예정)">
+            </div>
+        </div>
+
+        <div class="form-row" style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+            <div class="form-group">
+                <label class="form-label">목표 금액</label>
+                <input id="fundPlanTargetAmount" class="form-input" inputmode="numeric" placeholder="0" value="${m.targetAmount != null ? Number(m.targetAmount).toLocaleString() : ''}" oninput="fmtPlanningCostInput(this);fundPlanRecalcUnit()">
+            </div>
+            <div class="form-group">
+                <label class="form-label">통화</label>
+                <select id="fundPlanCurrency" class="form-select" onchange="fundPlanRecalcUnit()">
+                    <option value="KRW" ${currency === 'KRW' ? 'selected' : ''}>원화 (KRW)</option>
+                    <option value="USD" ${currency === 'USD' ? 'selected' : ''}>달러 (USD)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-group">
+                <label class="form-label">목표 수량</label>
+                <input id="fundPlanTargetQty" class="form-input" inputmode="numeric" placeholder="0" value="${m.targetQty != null ? Number(m.targetQty).toLocaleString() : ''}" oninput="fmtPlanningCostInput(this);fundPlanRecalcUnit()">
+            </div>
+            <div class="form-group">
+                <label class="form-label">예상 단가 (자동)</label>
+                <div id="fundPlanUnitPrice" class="form-input" style="background:var(--gray-50);color:var(--gray-700);font-weight:700">-</div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">발행처</label>
+            <select id="fundPlanPlatform" class="form-select" onchange="fundPlanTogglePlatformCustom()">
+                ${FUNDING_PLATFORMS.concat(['기타']).map(k => `<option ${platformSelected === k ? 'selected' : ''}>${k}</option>`).join('')}
+            </select>
+            <input id="fundPlanPlatformCustom" class="form-input" placeholder="발행처 직접 입력" value="${esc(platformCustom)}" style="margin-top:6px;display:${platformSelected === '기타' ? '' : 'none'}">
+        </div>
+
+        <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="form-group">
+                <label class="form-label">진행 시작일</label>
+                <input id="fundPlanStartDate" class="form-input" type="date" value="${esc(m.startDate || '')}">
+            </div>
+            <div class="form-group">
+                <label class="form-label">진행 종료일</label>
+                <input id="fundPlanEndDate" class="form-input" type="date" value="${esc(m.endDate || '')}">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">상태</label>
+            <select id="fundPlanStatus" class="form-select">
+                ${FUNDING_STATUSES.map(s => `<option ${(p ? p.status : '진행 중') === s ? 'selected' : ''}>${s}</option>`).join('')}
+            </select>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:16px">
+            ${isEdit ? `<button class="btn-export" onclick="deletePlanningProject(${p.id})" style="color:var(--red);border-color:var(--red)">삭제</button>` : ''}
+            <button class="form-submit" style="flex:1;background:var(--blue)" onclick="saveFundingPlanningProject(${isEdit ? p.id : 'null'})">${isEdit ? '수정 저장' : '저장'}</button>
+        </div>
+    `;
+    document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
+    openModalHistory();
+    setTimeout(() => { try { fundPlanRecalcUnit(); } catch (e) {} const el = document.getElementById('fundPlanName'); if (el && !isEdit) el.focus(); }, 30);
+}
+
+function fundPlanTogglePlatformCustom() {
+    const sel = document.getElementById('fundPlanPlatform');
+    const inp = document.getElementById('fundPlanPlatformCustom');
+    if (!sel || !inp) return;
+    if (sel.value === '기타') { inp.style.display = ''; setTimeout(() => inp.focus(), 30); }
+    else { inp.style.display = 'none'; inp.value = ''; }
+}
+
+function fundPlanRecalcUnit() {
+    const amtStr = (document.getElementById('fundPlanTargetAmount') || {}).value || '';
+    const qtyStr = (document.getElementById('fundPlanTargetQty') || {}).value || '';
+    const cur = (document.getElementById('fundPlanCurrency') || {}).value || 'KRW';
+    const amt = Number(amtStr.replace(/[^0-9.]/g, '')) || 0;
+    const qty = Number(qtyStr.replace(/[^0-9.]/g, '')) || 0;
+    const disp = document.getElementById('fundPlanUnitPrice');
+    if (!disp) return;
+    if (!amt || !qty) { disp.textContent = '-'; return; }
+    const unit = amt / qty;
+    const symbol = cur === 'USD' ? '$' : '₩';
+    const rounded = cur === 'USD' ? unit.toFixed(2) : Math.round(unit).toLocaleString();
+    disp.textContent = `${symbol} ${rounded}`;
+}
+
+async function saveFundingPlanningProject(id) {
+    const v = (idd, def = '') => { const el = document.getElementById(idd); return el ? (el.value || def) : def; };
+    const name = (v('fundPlanName') || '').trim();
+    if (!name) { showToast('프로젝트 이름을 입력하세요'); return; }
+    const description = (v('fundPlanDesc') || '').trim();
+    const status = v('fundPlanStatus', '진행 중');
+    const client = (v('fundPlanClient') || '').trim();
+    const manufacturer = (v('fundPlanManufacturer') || '').trim();
+    const targetAmountStr = v('fundPlanTargetAmount', '');
+    const targetQtyStr = v('fundPlanTargetQty', '');
+    const targetAmount = targetAmountStr ? Number(targetAmountStr.replace(/[^0-9.]/g, '')) : null;
+    const targetQty = targetQtyStr ? Number(targetQtyStr.replace(/[^0-9.]/g, '')) : null;
+    const currency = v('fundPlanCurrency', 'KRW');
+    const platformSel = v('fundPlanPlatform', '와디즈');
+    const platformCustom = (v('fundPlanPlatformCustom') || '').trim();
+    const platform = platformSel === '기타' ? (platformCustom || '기타') : platformSel;
+    const startDate = v('fundPlanStartDate', '') || null;
+    const endDate = v('fundPlanEndDate', '') || null;
+
+    const fundingMeta = {
+        client, manufacturer,
+        targetAmount: targetAmount == null ? null : targetAmount,
+        targetQty: targetQty == null ? null : targetQty,
+        currency, platform,
+        startDate: startDate || '',
+        endDate: endDate || ''
+    };
+
+    const deadline = endDate || null;
+
+    try {
+        if (id) {
+            const patch = {
+                name, description, status,
+                access: 'funding',
+                funding_meta: fundingMeta,
+                deadline,
+                updated_at: new Date().toISOString()
+            };
+            const { error } = await sb.from('planning_projects').update(patch).eq('id', id);
+            if (error) throw error;
+            closeModal();
+            await renderPlanning();
+            showToast('수정되었습니다');
+        } else {
+            const payload = planningProjectToDb({
+                name, description, status,
+                period: 'month',
+                access: 'funding',
+                deadline,
+                fundingMeta,
+                createdBy: currentUser ? currentUser.name : '익명',
+                ownerLogin: planningCurrentOwner()
+            });
+            const { data, error } = await sb.from('planning_projects').insert(payload).select().single();
+            if (error) throw error;
+            closeModal();
+            currentPlanningProjectId = data.id;
+            await renderPlanning();
+            showToast('펀딩 프로젝트가 만들어졌습니다');
+        }
+    } catch (err) {
+        console.error(err);
+        showToast('저장 실패: ' + err.message);
+    }
+}
+
 function openEditPlanningModal(id) {
     const p = planningProjects.find(x => x.id === id);
     if (!p) return;
     const body = document.getElementById('modalBody');
     if (!body) return;
+    // 펀딩 프로젝트는 전용 폼 (access=funding 또는 현재 모드=funding)
+    if ((p.access || '') === 'funding' || currentPlanningMode === 'funding') {
+        return openFundingPlanningModal(p);
+    }
     const pd = p.period || 'month';
     const now = new Date();
     const yearOpts = [];

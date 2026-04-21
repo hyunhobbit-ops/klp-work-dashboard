@@ -1,0 +1,16 @@
+-- =============================================================
+-- 펀딩 프로젝트 확장 필드 (planning_projects 테이블)
+-- Supabase SQL Editor에서 실행 필요
+-- =============================================================
+-- funding_meta 구조 (JSONB):
+-- {
+--   "client": "진행사 이름",
+--   "manufacturer": "제조사 이름",
+--   "targetAmount": 10000000,
+--   "currency": "KRW" | "USD",
+--   "targetQty": 1000,
+--   "platform": "와디즈" | "텀블벅" | "킥스타터" | "기타 직접 입력 텍스트",
+--   "startDate": "YYYY-MM-DD",
+--   "endDate": "YYYY-MM-DD"
+-- }
+alter table public.planning_projects add column if not exists funding_meta jsonb;
