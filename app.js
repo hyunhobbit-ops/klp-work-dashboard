@@ -338,6 +338,12 @@ function setupShortcuts() {
                 openModal('project-overseas');
                 return;
             }
+            const quotesTab = document.getElementById('tab-quotes');
+            if (quotesTab && quotesTab.classList.contains('active')) {
+                e.preventDefault();
+                openQuoteModal();
+                return;
+            }
         }
         if (e.key === 'Escape') {
             const overlay = document.getElementById('modalOverlay');
@@ -9113,7 +9119,48 @@ let _previewingQuote = null;
 let currentQuoteYear = 'all';
 let currentQuoteMonth = 'all';
 
+function defaultQuoteItem() {
+    return {
+        productName: '',
+        quantity: 0,
+        unit: '개',
+        unitPrice: 0,
+        unitPriceVat: 'VAT 별도',
+        color: '-',
+        printColorSize: '시안 확인',
+        printMethod: '없음',
+        printFee: 0,
+        printFeeVat: 'VAT 별도',
+        printFeeApply: '1개당',
+        packaging: '개별박스',
+        packagingFee: 0,
+        packagingFeeVat: 'VAT 별도',
+        packagingFeeApply: '1개당'
+    };
+}
+
 function quoteFromDb(r) {
+    let items = Array.isArray(r.items) && r.items.length ? r.items.map(it => Object.assign(defaultQuoteItem(), it)) : null;
+    if (!items) {
+        // 레거시: flat 컬럼으로부터 단일 품목 배열 복원
+        items = [{
+            productName: r.product_name || '',
+            quantity: Number(r.quantity) || 0,
+            unit: r.unit || '개',
+            unitPrice: Number(r.unit_price) || 0,
+            unitPriceVat: r.unit_price_vat || 'VAT 별도',
+            color: r.color || '-',
+            printColorSize: r.print_color_size || '시안 확인',
+            printMethod: r.print_method || '없음',
+            printFee: Number(r.print_fee) || 0,
+            printFeeVat: r.print_fee_vat || 'VAT 별도',
+            printFeeApply: r.print_fee_apply || '1개당',
+            packaging: r.packaging || '개별박스',
+            packagingFee: Number(r.packaging_fee) || 0,
+            packagingFeeVat: r.packaging_fee_vat || 'VAT 별도',
+            packagingFeeApply: r.packaging_fee_apply || '1개당'
+        }];
+    }
     return {
         id: r.id,
         docNumber: r.doc_number || '',
@@ -9122,21 +9169,7 @@ function quoteFromDb(r) {
         companyName: r.company_name || '',
         contactPerson: r.contact_person || '',
         manager: r.manager || '',
-        productName: r.product_name || '',
-        quantity: Number(r.quantity) || 0,
-        unit: r.unit || '개',
-        unitPrice: Number(r.unit_price) || 0,
-        unitPriceVat: r.unit_price_vat || 'VAT 별도',
-        color: r.color || '-',
-        printColorSize: r.print_color_size || '시안 확인',
-        printMethod: r.print_method || '없음',
-        printFee: Number(r.print_fee) || 0,
-        printFeeVat: r.print_fee_vat || 'VAT 별도',
-        printFeeApply: r.print_fee_apply || '1개당',
-        packaging: r.packaging || '개별박스',
-        packagingFee: Number(r.packaging_fee) || 0,
-        packagingFeeVat: r.packaging_fee_vat || 'VAT 별도',
-        packagingFeeApply: r.packaging_fee_apply || '1개당',
+        items: items,
         shippingType: r.shipping_type || '',
         shippingCost: Number(r.shipping_cost) || 0,
         shippingVat: r.shipping_vat || 'VAT 별도',
@@ -9151,6 +9184,8 @@ function quoteFromDb(r) {
 }
 
 function quoteToDb(q) {
+    const items = Array.isArray(q.items) && q.items.length ? q.items : [defaultQuoteItem()];
+    const first = items[0];
     return {
         doc_number: q.docNumber || null,
         doc_date: q.date,
@@ -9158,21 +9193,23 @@ function quoteToDb(q) {
         company_name: q.companyName,
         contact_person: q.contactPerson || '',
         manager: q.manager || '',
-        product_name: q.productName,
-        quantity: Number(q.quantity) || 0,
-        unit: q.unit || '개',
-        unit_price: Number(q.unitPrice) || 0,
-        unit_price_vat: q.unitPriceVat || 'VAT 별도',
-        color: q.color || '-',
-        print_color_size: q.printColorSize || '시안 확인',
-        print_method: q.printMethod || '없음',
-        print_fee: Number(q.printFee) || 0,
-        print_fee_vat: q.printFeeVat || 'VAT 별도',
-        print_fee_apply: q.printFeeApply || '1개당',
-        packaging: q.packaging || '개별박스',
-        packaging_fee: Number(q.packagingFee) || 0,
-        packaging_fee_vat: q.packagingFeeVat || 'VAT 별도',
-        packaging_fee_apply: q.packagingFeeApply || '1개당',
+        // items JSONB (정식 저장소) + 첫 품목은 flat 컬럼에도 저장(NOT NULL 컬럼 + 레거시 조회 호환)
+        items: items,
+        product_name: first.productName || '',
+        quantity: Number(first.quantity) || 0,
+        unit: first.unit || '개',
+        unit_price: Number(first.unitPrice) || 0,
+        unit_price_vat: first.unitPriceVat || 'VAT 별도',
+        color: first.color || '-',
+        print_color_size: first.printColorSize || '시안 확인',
+        print_method: first.printMethod || '없음',
+        print_fee: Number(first.printFee) || 0,
+        print_fee_vat: first.printFeeVat || 'VAT 별도',
+        print_fee_apply: first.printFeeApply || '1개당',
+        packaging: first.packaging || '개별박스',
+        packaging_fee: Number(first.packagingFee) || 0,
+        packaging_fee_vat: first.packagingFeeVat || 'VAT 별도',
+        packaging_fee_apply: first.packagingFeeApply || '1개당',
         shipping_type: q.shippingType || '',
         shipping_cost: Number(q.shippingCost) || 0,
         shipping_vat: q.shippingVat || 'VAT 별도',
@@ -9215,31 +9252,35 @@ async function dbDeleteQuote(id) {
     return true;
 }
 
-// 견적 계산
+// 견적 계산 — 다중 품목 지원
+// 반환: { items: [{prodT, prodV, prT, prV, pkT, pkV, hasPr, hasPk}, ...],
+//          shT, shV, hasSh, sup, vat, grand }
 function calcQuoteFromFields(q) {
-    const qty = Number(q.quantity) || 0;
-    const up = Number(q.unitPrice) || 0;
-    const prodT = up * qty;
-    const prodV = q.unitPriceVat === 'VAT 별도' ? Math.round(prodT * 0.1) : 0;
-
-    const pf = Number(q.printFee) || 0;
-    const hasPr = q.printMethod && q.printMethod !== '없음' && pf > 0;
-    const prT = hasPr ? (q.printFeeApply === '1개당' ? pf * qty : pf) : 0;
-    const prV = (q.printFeeVat === 'VAT 별도') ? Math.round(prT * 0.1) : 0;
-
-    const pkf = Number(q.packagingFee) || 0;
-    const hasPk = pkf > 0;
-    const pkT = hasPk ? (q.packagingFeeApply === '1개당' ? pkf * qty : pkf) : 0;
-    const pkV = (q.packagingFeeVat === 'VAT 별도') ? Math.round(pkT * 0.1) : 0;
-
-    const shf = Number(q.shippingCost) || 0;
-    const hasSh = shf > 0;
-    const shV = (hasSh && q.shippingVat === 'VAT 별도') ? Math.round(shf * 0.1) : 0;
-
-    const sup = prodT + prT + pkT + shf;
-    const vat = prodV + prV + pkV + shV;
-    const grand = sup + vat;
-    return { prodT, prT, pkT, shT: shf, sup, vat, grand, hasPr, hasPk, hasSh };
+    const items = Array.isArray(q.items) ? q.items : [];
+    let sup = 0, vat = 0;
+    const perItem = items.map(it => {
+        const qty = Number(it.quantity) || 0;
+        const up = Number(it.unitPrice) || 0;
+        const prodT = up * qty;
+        const prodV = it.unitPriceVat === 'VAT 별도' ? Math.round(prodT * 0.1) : 0;
+        const pf = Number(it.printFee) || 0;
+        const hasPr = it.printMethod && it.printMethod !== '없음' && pf > 0;
+        const prT = hasPr ? (it.printFeeApply === '1개당' ? pf * qty : pf) : 0;
+        const prV = (it.printFeeVat === 'VAT 별도') ? Math.round(prT * 0.1) : 0;
+        const pkf = Number(it.packagingFee) || 0;
+        const hasPk = pkf > 0;
+        const pkT = hasPk ? (it.packagingFeeApply === '1개당' ? pkf * qty : pkf) : 0;
+        const pkV = (it.packagingFeeVat === 'VAT 별도') ? Math.round(pkT * 0.1) : 0;
+        sup += prodT + prT + pkT;
+        vat += prodV + prV + pkV;
+        return { prodT, prodV, prT, prV, pkT, pkV, hasPr, hasPk };
+    });
+    const shT = Number(q.shippingCost) || 0;
+    const hasSh = shT > 0;
+    const shV = (hasSh && q.shippingVat === 'VAT 별도') ? Math.round(shT * 0.1) : 0;
+    sup += shT;
+    vat += shV;
+    return { items: perItem, shT, shV, hasSh, sup, vat, grand: sup + vat };
 }
 
 // ===== 리스트 뷰 =====
@@ -9277,7 +9318,9 @@ function renderQuotes() {
             if (parts[1] !== currentQuoteMonth) return false;
         }
         if (search) {
-            const hay = `${q.companyName} ${q.contactPerson} ${q.productName} ${q.docNumber} ${q.manager}`.toLowerCase();
+            const items = Array.isArray(q.items) ? q.items : [];
+            const productNames = items.map(it => it.productName || '').join(' ');
+            const hay = `${q.companyName} ${q.contactPerson} ${productNames} ${q.docNumber} ${q.manager}`.toLowerCase();
             if (!hay.includes(search)) return false;
         }
         return true;
@@ -9294,13 +9337,23 @@ function renderQuotes() {
     let cardHtml = '';
     filtered.forEach(q => {
         const est = calcQuoteFromFields(q);
+        const items = Array.isArray(q.items) ? q.items : [];
+        const first = items[0] || { productName: '', quantity: 0, unit: '' };
+        const productDisplay = items.length > 1
+            ? `${escHtml(first.productName)} <span style="color:var(--gray-400);font-size:12px">외 ${items.length - 1}건</span>`
+            : escHtml(first.productName);
+        const totalQty = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+        const qtyDisplay = items.length > 1
+            ? `${totalQty.toLocaleString()} <span style="color:var(--gray-400);font-size:12px">(${items.length}종)</span>`
+            : `${(first.quantity || 0).toLocaleString()} ${escHtml(first.unit || '')}`;
+
         tableHtml += `<tr>
             <td>${fmtDisplayDate(q.date)}</td>
             <td>${q.docNumber || '-'}</td>
             <td style="font-weight:700">${escHtml(q.companyName)}</td>
             <td>${escHtml(q.contactPerson)}</td>
-            <td>${escHtml(q.productName)}</td>
-            <td style="text-align:right">${(q.quantity || 0).toLocaleString()} ${escHtml(q.unit || '')}</td>
+            <td>${productDisplay}</td>
+            <td style="text-align:right">${qtyDisplay}</td>
             <td style="text-align:right;font-weight:700;color:#0B4F8F">${est.grand.toLocaleString()}원</td>
             <td>${escHtml(q.manager || '-')}</td>
             <td style="white-space:nowrap">
@@ -9320,9 +9373,9 @@ function renderQuotes() {
                 </div>
             </div>
             <div class="resp-card-meta">
-                <div class="resp-card-row"><strong>${escHtml(q.productName)}</strong></div>
+                <div class="resp-card-row"><strong>${productDisplay}</strong></div>
                 <div class="resp-card-row">${fmtDisplayDate(q.date)} · ${escHtml(q.docNumber || '-')}</div>
-                <div class="resp-card-row">${(q.quantity || 0).toLocaleString()}${escHtml(q.unit || '')} · <span style="color:#0B4F8F;font-weight:800">${est.grand.toLocaleString()}원</span></div>
+                <div class="resp-card-row">${qtyDisplay} · <span style="color:#0B4F8F;font-weight:800">${est.grand.toLocaleString()}원</span></div>
                 <div class="resp-card-row">담당자: ${escHtml(q.contactPerson)} · 본사: ${escHtml(q.manager || '-')}</div>
                 <div style="display:flex;gap:6px;margin-top:6px">
                     <button class="edit-btn" onclick="cloneQuote(${q.id})">복제</button>
@@ -9342,7 +9395,135 @@ function escHtml(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ===== 견적서 입력 모달 (국내 프로젝트 스타일 재사용) =====
+// ===== 견적서 입력 모달 (국내 프로젝트 스타일 재사용, 다중 품목 지원) =====
+function quoteItemCardHtml(idx, it) {
+    const sel = (cur, val) => cur === val ? 'selected' : '';
+    const removeBtn = idx > 0
+        ? `<button type="button" onclick="removeQuoteItem(${idx})" style="padding:4px 10px;border:1px solid var(--red);background:transparent;color:var(--red);border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit">− 품목 삭제</button>`
+        : '';
+    return `<div class="quote-item-card" data-item-idx="${idx}" style="background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:16px 20px;margin-bottom:12px;color:var(--gray-900)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div class="form-section-title" style="margin:0;padding:0;border:none">📦 품목 ${idx + 1}</div>
+            ${removeBtn}
+        </div>
+        <div class="form-group"><label class="form-label">품명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input qi-productName" placeholder="시계 상패" value="${escHtml(it.productName || '')}"></div>
+        <div class="form-row" style="grid-template-columns:2fr 1fr">
+            <div class="form-group"><label class="form-label">수량 <span style="color:var(--red)">*</span></label><input type="number" min="0" class="form-input qi-quantity" placeholder="0" value="${it.quantity || ''}" oninput="recalcQuoteEst()"></div>
+            <div class="form-group"><label class="form-label">단위</label>
+                <select class="form-select qi-unit">
+                    ${['개','세트','장','박스','EA'].map(u => `<option ${sel(it.unit || '개', u)}>${u}</option>`).join('')}
+                </select>
+            </div>
+        </div>
+        <div class="form-row" style="grid-template-columns:2fr 1fr">
+            <div class="form-group"><label class="form-label" style="color:var(--blue);font-weight:800">단가 <span style="color:var(--red)">*</span></label><input type="number" min="0" class="form-input qi-unitPrice" placeholder="0" value="${it.unitPrice || ''}" oninput="recalcQuoteEst()"></div>
+            <div class="form-group"><label class="form-label">VAT</label>
+                <select class="form-select qi-unitPriceVat" onchange="recalcQuoteEst()">
+                    <option ${sel(it.unitPriceVat || 'VAT 별도', 'VAT 별도')}>VAT 별도</option>
+                    <option ${sel(it.unitPriceVat, 'VAT 포함')}>VAT 포함</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">색상</label><input type="text" class="form-input qi-color" value="${escHtml(it.color || '-')}"></div>
+            <div class="form-group"><label class="form-label">인쇄 색상/사이즈</label><input type="text" class="form-input qi-printColorSize" value="${escHtml(it.printColorSize || '시안 확인')}"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">인쇄 방법</label>
+                <select class="form-select qi-printMethod" onchange="recalcQuoteEst()">
+                    ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u => `<option ${sel(it.printMethod || '없음', u)}>${u}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group"></div>
+        </div>
+        <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+            <div class="form-group"><label class="form-label">인쇄비</label><input type="number" min="0" class="form-input qi-printFee" placeholder="0" value="${it.printFee || ''}" oninput="recalcQuoteEst()"></div>
+            <div class="form-group"><label class="form-label">VAT</label>
+                <select class="form-select qi-printFeeVat" onchange="recalcQuoteEst()">
+                    <option ${sel(it.printFeeVat || 'VAT 별도', 'VAT 별도')}>VAT 별도</option>
+                    <option ${sel(it.printFeeVat, 'VAT 포함')}>VAT 포함</option>
+                </select>
+            </div>
+            <div class="form-group"><label class="form-label">적용</label>
+                <select class="form-select qi-printFeeApply" onchange="recalcQuoteEst()">
+                    <option ${sel(it.printFeeApply || '1개당', '1개당')}>1개당</option>
+                    <option ${sel(it.printFeeApply, '일괄')}>일괄</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">포장</label>
+                <select class="form-select qi-packaging">
+                    ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u => `<option ${sel(it.packaging || '개별박스', u)}>${u}</option>`).join('')}
+                </select>
+            </div>
+            <div class="form-group"></div>
+        </div>
+        <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+            <div class="form-group"><label class="form-label">포장비</label><input type="number" min="0" class="form-input qi-packagingFee" placeholder="0" value="${it.packagingFee || ''}" oninput="recalcQuoteEst()"></div>
+            <div class="form-group"><label class="form-label">VAT</label>
+                <select class="form-select qi-packagingFeeVat" onchange="recalcQuoteEst()">
+                    <option ${sel(it.packagingFeeVat || 'VAT 별도', 'VAT 별도')}>VAT 별도</option>
+                    <option ${sel(it.packagingFeeVat, 'VAT 포함')}>VAT 포함</option>
+                </select>
+            </div>
+            <div class="form-group"><label class="form-label">적용</label>
+                <select class="form-select qi-packagingFeeApply" onchange="recalcQuoteEst()">
+                    <option ${sel(it.packagingFeeApply || '1개당', '1개당')}>1개당</option>
+                    <option ${sel(it.packagingFeeApply, '일괄')}>일괄</option>
+                </select>
+            </div>
+        </div>
+    </div>`;
+}
+
+function addQuoteItem() {
+    const list = document.getElementById('quoteItemsList');
+    if (!list) return;
+    const idx = list.querySelectorAll('.quote-item-card').length;
+    list.insertAdjacentHTML('beforeend', quoteItemCardHtml(idx, defaultQuoteItem()));
+    recalcQuoteEst();
+    const newCard = list.querySelector(`.quote-item-card[data-item-idx="${idx}"]`);
+    if (newCard) newCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function removeQuoteItem(idx) {
+    const list = document.getElementById('quoteItemsList');
+    if (!list) return;
+    const cards = list.querySelectorAll('.quote-item-card');
+    if (cards.length <= 1) { showToast('최소 1개 이상의 품목이 필요합니다'); return; }
+    // 현재 상태 읽어서 삭제 후 다시 렌더 (인덱스 재정렬)
+    const items = readQuoteItems();
+    items.splice(idx, 1);
+    list.innerHTML = items.map((it, i) => quoteItemCardHtml(i, it)).join('');
+    recalcQuoteEst();
+}
+
+function readQuoteItems() {
+    const list = document.getElementById('quoteItemsList');
+    if (!list) return [];
+    return Array.from(list.querySelectorAll('.quote-item-card')).map(card => {
+        const get = cls => (card.querySelector('.' + cls) || {}).value || '';
+        return {
+            productName: get('qi-productName').trim(),
+            quantity: Number(get('qi-quantity')) || 0,
+            unit: get('qi-unit'),
+            unitPrice: Number(get('qi-unitPrice')) || 0,
+            unitPriceVat: get('qi-unitPriceVat'),
+            color: get('qi-color') || '-',
+            printColorSize: get('qi-printColorSize') || '시안 확인',
+            printMethod: get('qi-printMethod'),
+            printFee: Number(get('qi-printFee')) || 0,
+            printFeeVat: get('qi-printFeeVat'),
+            printFeeApply: get('qi-printFeeApply'),
+            packaging: get('qi-packaging'),
+            packagingFee: Number(get('qi-packagingFee')) || 0,
+            packagingFeeVat: get('qi-packagingFeeVat'),
+            packagingFeeApply: get('qi-packagingFeeApply')
+        };
+    });
+}
+
 function openQuoteModal(id) {
     const title = document.getElementById('modalTitle');
     const body = document.getElementById('modalBody');
@@ -9355,6 +9536,7 @@ function openQuoteModal(id) {
     const sel = (cur, val) => cur === val ? 'selected' : '';
     const mgrDefault = q ? (q.manager || loginManagerDisplay()) : loginManagerDisplay();
     const secCard = inner => `<div style="background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900)">${inner}</div>`;
+    const items = (q && Array.isArray(q.items) && q.items.length) ? q.items : [defaultQuoteItem()];
 
     title.textContent = isEdit ? `견적서 편집 — ${q.companyName}` : '새 견적서';
 
@@ -9380,81 +9562,11 @@ function openQuoteModal(id) {
             </div>
         `)}
 
-        ${secCard(`
-            <div class="form-section-title">📦 제품 정보</div>
-            <div class="form-group"><label class="form-label">품명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="qProductName" placeholder="시계 상패" value="${escHtml(v('productName'))}"></div>
-            <div class="form-row" style="grid-template-columns:2fr 1fr">
-                <div class="form-group"><label class="form-label">수량 <span style="color:var(--red)">*</span></label><input type="number" min="0" class="form-input" id="qQuantity" placeholder="0" value="${v('quantity') || ''}" oninput="recalcQuoteEst()"></div>
-                <div class="form-group"><label class="form-label">단위</label>
-                    <select class="form-select" id="qUnit">
-                        ${['개','세트','장','박스','EA'].map(u => `<option ${sel(v('unit','개'), u)}>${u}</option>`).join('')}
-                    </select>
-                </div>
-            </div>
-            <div class="form-row" style="grid-template-columns:2fr 1fr">
-                <div class="form-group"><label class="form-label" style="color:var(--blue);font-weight:800">단가 <span style="color:var(--red)">*</span></label><input type="number" min="0" class="form-input" id="qUnitPrice" placeholder="0" value="${v('unitPrice') || ''}" oninput="recalcQuoteEst()"></div>
-                <div class="form-group"><label class="form-label">VAT</label>
-                    <select class="form-select" id="qUnitPriceVat" onchange="recalcQuoteEst()">
-                        <option ${sel(v('unitPriceVat','VAT 별도'), 'VAT 별도')}>VAT 별도</option>
-                        <option ${sel(v('unitPriceVat'), 'VAT 포함')}>VAT 포함</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group"><label class="form-label">색상</label><input type="text" class="form-input" id="qColor" value="${escHtml(v('color','-'))}"></div>
-                <div class="form-group"><label class="form-label">인쇄 색상/사이즈</label><input type="text" class="form-input" id="qPrintColorSize" value="${escHtml(v('printColorSize','시안 확인'))}"></div>
-            </div>
-        `)}
+        <div id="quoteItemsList">
+            ${items.map((it, i) => quoteItemCardHtml(i, it)).join('')}
+        </div>
 
-        ${secCard(`
-            <div class="form-section-title">🖨️ 인쇄 / 포장</div>
-            <div class="form-row">
-                <div class="form-group"><label class="form-label">인쇄 방법</label>
-                    <select class="form-select" id="qPrintMethod" onchange="recalcQuoteEst()">
-                        ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u => `<option ${sel(v('printMethod','없음'), u)}>${u}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="form-group"></div>
-            </div>
-            <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                <div class="form-group"><label class="form-label">인쇄비</label><input type="number" min="0" class="form-input" id="qPrintFee" placeholder="0" value="${v('printFee') || ''}" oninput="recalcQuoteEst()"></div>
-                <div class="form-group"><label class="form-label">VAT</label>
-                    <select class="form-select" id="qPrintFeeVat" onchange="recalcQuoteEst()">
-                        <option ${sel(v('printFeeVat','VAT 별도'), 'VAT 별도')}>VAT 별도</option>
-                        <option ${sel(v('printFeeVat'), 'VAT 포함')}>VAT 포함</option>
-                    </select>
-                </div>
-                <div class="form-group"><label class="form-label">적용</label>
-                    <select class="form-select" id="qPrintFeeApply" onchange="recalcQuoteEst()">
-                        <option ${sel(v('printFeeApply','1개당'), '1개당')}>1개당</option>
-                        <option ${sel(v('printFeeApply'), '일괄')}>일괄</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group"><label class="form-label">포장</label>
-                    <select class="form-select" id="qPackaging">
-                        ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u => `<option ${sel(v('packaging','개별박스'), u)}>${u}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="form-group"></div>
-            </div>
-            <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                <div class="form-group"><label class="form-label">포장비</label><input type="number" min="0" class="form-input" id="qPackagingFee" placeholder="0" value="${v('packagingFee') || ''}" oninput="recalcQuoteEst()"></div>
-                <div class="form-group"><label class="form-label">VAT</label>
-                    <select class="form-select" id="qPackagingFeeVat" onchange="recalcQuoteEst()">
-                        <option ${sel(v('packagingFeeVat','VAT 별도'), 'VAT 별도')}>VAT 별도</option>
-                        <option ${sel(v('packagingFeeVat'), 'VAT 포함')}>VAT 포함</option>
-                    </select>
-                </div>
-                <div class="form-group"><label class="form-label">적용</label>
-                    <select class="form-select" id="qPackagingFeeApply" onchange="recalcQuoteEst()">
-                        <option ${sel(v('packagingFeeApply','1개당'), '1개당')}>1개당</option>
-                        <option ${sel(v('packagingFeeApply'), '일괄')}>일괄</option>
-                    </select>
-                </div>
-            </div>
-        `)}
+        <button type="button" onclick="addQuoteItem()" style="width:100%;padding:12px;border:2px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:16px">+ 품목 추가</button>
 
         ${secCard(`
             <div class="form-section-title">🚚 배송</div>
@@ -9520,21 +9632,7 @@ function readQuoteForm() {
         companyName: v('qCompanyName').trim(),
         contactPerson: v('qContactPerson').trim(),
         manager: v('qManager'),
-        productName: v('qProductName').trim(),
-        quantity: Number(v('qQuantity')) || 0,
-        unit: v('qUnit'),
-        unitPrice: Number(v('qUnitPrice')) || 0,
-        unitPriceVat: v('qUnitPriceVat'),
-        color: v('qColor') || '-',
-        printColorSize: v('qPrintColorSize') || '시안 확인',
-        printMethod: v('qPrintMethod'),
-        printFee: Number(v('qPrintFee')) || 0,
-        printFeeVat: v('qPrintFeeVat'),
-        printFeeApply: v('qPrintFeeApply'),
-        packaging: v('qPackaging'),
-        packagingFee: Number(v('qPackagingFee')) || 0,
-        packagingFeeVat: v('qPackagingFeeVat'),
-        packagingFeeApply: v('qPackagingFeeApply'),
+        items: readQuoteItems(),
         shippingType: v('qShippingType'),
         shippingCost: Number(v('qShippingCost')) || 0,
         shippingVat: v('qShippingVat'),
@@ -9553,13 +9651,20 @@ function recalcQuoteEst() {
     const body = document.getElementById('qEstBody');
     const wrap = document.getElementById('qEstPreview');
     if (!body || !wrap) return;
-    if (!q.quantity || !q.unitPrice) { wrap.style.display = 'none'; return; }
+    const hasAnyValue = (q.items || []).some(it => (Number(it.quantity) > 0) && (Number(it.unitPrice) > 0));
+    if (!hasAnyValue) { wrap.style.display = 'none'; return; }
     wrap.style.display = '';
     const row = (label, val) => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px"><span style="color:var(--gray-600)">${label}</span><span style="font-weight:700;color:var(--gray-900)">${val.toLocaleString()}원</span></div>`;
+    const itemLines = (q.items || []).map((it, i) => {
+        const e = est.items[i] || {};
+        const name = (it.productName || '').trim() || `품목 ${i + 1}`;
+        const parts = [row(`${escHtml(name)} 공급가`, e.prodT || 0)];
+        if (e.hasPr) parts.push(row(`　└ 인쇄비`, e.prT || 0));
+        if (e.hasPk) parts.push(row(`　└ 포장비`, e.pkT || 0));
+        return parts.join('');
+    }).join('');
     body.innerHTML = `
-        ${row('제품 공급가', est.prodT)}
-        ${est.hasPr ? row('인쇄비 공급가', est.prT) : ''}
-        ${est.hasPk ? row('포장비 공급가', est.pkT) : ''}
+        ${itemLines}
         ${est.hasSh ? row('배송비', est.shT) : ''}
         <div style="border-top:1px solid var(--border);margin:8px 0;padding-top:8px">
             ${row('공급가 합계', est.sup)}
@@ -9609,9 +9714,15 @@ async function saveQuoteAndPreview() {
     const q = readQuoteForm();
     if (!q.date) { showToast('발행일을 입력해주세요'); document.getElementById('qDate').focus(); return; }
     if (!q.companyName) { showToast('업체명을 입력해주세요'); document.getElementById('qCompanyName').focus(); return; }
-    if (!q.productName) { showToast('품명을 입력해주세요'); document.getElementById('qProductName').focus(); return; }
-    if (!q.quantity) { showToast('수량을 입력해주세요'); document.getElementById('qQuantity').focus(); return; }
-    if (!q.unitPrice) { showToast('단가를 입력해주세요'); document.getElementById('qUnitPrice').focus(); return; }
+    if (!Array.isArray(q.items) || !q.items.length) { showToast('품목이 없습니다'); return; }
+    for (let i = 0; i < q.items.length; i++) {
+        const it = q.items[i];
+        const card = document.querySelector(`.quote-item-card[data-item-idx="${i}"]`);
+        const focusField = cls => { const el = card && card.querySelector('.' + cls); if (el) el.focus(); };
+        if (!it.productName) { showToast(`품목 ${i + 1}: 품명을 입력해주세요`); focusField('qi-productName'); return; }
+        if (!it.quantity) { showToast(`품목 ${i + 1}: 수량을 입력해주세요`); focusField('qi-quantity'); return; }
+        if (!it.unitPrice) { showToast(`품목 ${i + 1}: 단가를 입력해주세요`); focusField('qi-unitPrice'); return; }
+    }
 
     let saved;
     if (_editingQuoteId) {
@@ -9649,6 +9760,7 @@ async function cloneQuote(id) {
     if (!src) return;
     const copy = { ...src };
     delete copy.id;
+    copy.items = (src.items || []).map(it => ({ ...it })); // 깊은 복사
     copy.date = getTodayStr();
     copy.validUntil = addDays(copy.date, 7);
     copy.docNumber = nextQuoteDocNumber(copy.date);
@@ -9716,19 +9828,53 @@ function numToKoreanAmountQuote(n) {
 function renderQuotePreviewDoc(q) {
     const e = calcQuoteFromFields(q);
     const sup = e.sup, vat = e.vat, grand = e.grand;
-    const vatLabel = q.unitPriceVat === 'VAT 포함' ? '부가세 포함가' : '부가세 별도가';
+    const items = Array.isArray(q.items) ? q.items : [];
+    const firstItem = items[0] || {};
+    const vatLabel = firstItem.unitPriceVat === 'VAT 포함' ? '부가세 포함가' : '부가세 별도가';
     const koreanAmt = numToKoreanAmountQuote(grand);
-    const qty = Number(q.quantity) || 0;
-    const up = Number(q.unitPrice) || 0;
     const fmtN = n => (Number(n) || 0).toLocaleString();
     const fmtDate = d => d ? d.replace(/-/g, '.') : '';
     const esc = escHtml;
 
     const headCell = 'background:#f5f7fa;color:#4a5568;padding:8px 6px;font-weight:700;font-size:10px;letter-spacing:.5px;border-bottom:1px solid #d5dae3';
     const itemCell = 'padding:10px 6px;border-bottom:1px solid #eef0f5;text-align:right;color:#0B4F8F;font-weight:700';
+    const subCell = 'padding:6px 6px;border-bottom:1px solid #eef0f5;text-align:right;color:#4a5568;font-size:10px';
     const logo = typeof LOGO_DARK !== 'undefined' ? LOGO_DARK : '';
     const stamp = typeof STAMP !== 'undefined' ? STAMP : '';
     const noteText = q.note ? q.note : '• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.\n• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.';
+
+    // 품목별 행 생성
+    const itemRowsHtml = items.map((it, i) => {
+        const ei = e.items[i] || {};
+        const qty = Number(it.quantity) || 0;
+        const up = Number(it.unitPrice) || 0;
+        let rows = `<tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #eef0f5;font-weight:700;color:#1a1d29;font-size:11px">${esc(it.productName || '')}${it.unitPriceVat === 'VAT 포함' ? ' <span style="font-size:9px;color:#888">(VAT포함)</span>' : ''}</td>
+            <td style="${itemCell}">${qty}</td>
+            <td style="${itemCell}">${fmtN(up)}</td>
+            <td style="${itemCell}">${fmtN(ei.prodT || 0)}</td>
+            <td style="${itemCell}">${fmtN(ei.prodV || 0)}</td>
+        </tr>`;
+        if (ei.hasPr) {
+            rows += `<tr>
+                <td style="padding:6px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10px">　└ 인쇄비 (${esc(it.printMethod || '')}) <span style="font-size:9px;color:#888">${esc(it.printFeeApply)} / ${esc(it.printFeeVat)}</span></td>
+                <td style="${subCell}">${it.printFeeApply === '1개당' ? qty : 1}</td>
+                <td style="${subCell}">${fmtN(Number(it.printFee) || 0)}</td>
+                <td style="${subCell}">${fmtN(ei.prT || 0)}</td>
+                <td style="${subCell}">${fmtN(ei.prV || 0)}</td>
+            </tr>`;
+        }
+        if (ei.hasPk) {
+            rows += `<tr>
+                <td style="padding:6px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10px">　└ 포장비 (${esc(it.packaging || '')}) <span style="font-size:9px;color:#888">${esc(it.packagingFeeApply)} / ${esc(it.packagingFeeVat)}</span></td>
+                <td style="${subCell}">${it.packagingFeeApply === '1개당' ? qty : 1}</td>
+                <td style="${subCell}">${fmtN(Number(it.packagingFee) || 0)}</td>
+                <td style="${subCell}">${fmtN(ei.pkT || 0)}</td>
+                <td style="${subCell}">${fmtN(ei.pkV || 0)}</td>
+            </tr>`;
+        }
+        return rows;
+    }).join('');
 
     document.getElementById('quotePreviewDocEl').innerHTML =
     `<div id="quotePreviewDocInner" style="width:794px;height:1123px;overflow:hidden;background:#fff;font-family:'Noto Sans KR',sans-serif;color:#1a1d29;position:relative;padding:30px 44px 22px;box-sizing:border-box;display:flex;flex-direction:column">
@@ -9791,33 +9937,13 @@ function renderQuotePreviewDoc(q) {
                     <th style="${headCell};width:96px">부 가 세</th>
                 </tr></thead>
                 <tbody>
-                    <tr>
-                        <td style="padding:10px 12px;border-bottom:1px solid #eef0f5;font-weight:700;color:#1a1d29;font-size:11px">${esc(q.productName || '')}</td>
-                        <td style="${itemCell}">${qty}</td>
-                        <td style="${itemCell}">${fmtN(up)}</td>
-                        <td style="${itemCell}">${fmtN(e.prodT)}</td>
-                        <td style="${itemCell}">${fmtN((q.unitPriceVat === 'VAT 별도') ? Math.round((e.prodT) * 0.1) : 0)}</td>
-                    </tr>
-                    ${e.hasPr ? `<tr>
-                        <td style="padding:8px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10.5px">인쇄비 (${esc(q.printMethod || '')}) <span style="font-size:9px;color:#888">${esc(q.printFeeApply)} / ${esc(q.printFeeVat)}</span></td>
-                        <td style="${itemCell}">${q.printFeeApply === '1개당' ? qty : 1}</td>
-                        <td style="${itemCell}">${fmtN(Number(q.printFee) || 0)}</td>
-                        <td style="${itemCell}">${fmtN(e.prT)}</td>
-                        <td style="${itemCell}">${fmtN((q.printFeeVat === 'VAT 별도') ? Math.round((e.prT) * 0.1) : 0)}</td>
-                    </tr>` : ''}
-                    ${e.hasPk ? `<tr>
-                        <td style="padding:8px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10.5px">포장비 (${esc(q.packaging || '')}) <span style="font-size:9px;color:#888">${esc(q.packagingFeeApply)} / ${esc(q.packagingFeeVat)}</span></td>
-                        <td style="${itemCell}">${q.packagingFeeApply === '1개당' ? qty : 1}</td>
-                        <td style="${itemCell}">${fmtN(Number(q.packagingFee) || 0)}</td>
-                        <td style="${itemCell}">${fmtN(e.pkT)}</td>
-                        <td style="${itemCell}">${fmtN((q.packagingFeeVat === 'VAT 별도') ? Math.round((e.pkT) * 0.1) : 0)}</td>
-                    </tr>` : ''}
+                    ${itemRowsHtml}
                     ${e.hasSh ? `<tr>
                         <td style="padding:8px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10.5px">배송비 (${esc(q.shippingType || '')}) <span style="font-size:9px;color:#888">/ ${esc(q.shippingVat)}</span></td>
                         <td style="${itemCell}">1</td>
                         <td style="${itemCell}">${fmtN(q.shippingCost || 0)}</td>
                         <td style="${itemCell}">${fmtN(e.shT)}</td>
-                        <td style="${itemCell}">${fmtN((q.shippingVat === 'VAT 별도') ? Math.round((e.shT) * 0.1) : 0)}</td>
+                        <td style="${itemCell}">${fmtN(e.shV || 0)}</td>
                     </tr>` : ''}
                     <tr><td colspan="5" style="background:#f5f7fa;text-align:center;font-weight:700;color:#4a5568;font-size:10.5px;padding:6px">- 이 하 여 백 -</td></tr>
                 </tbody>
@@ -9851,7 +9977,9 @@ async function dlQuotePreview(type) {
         const canvas = await html2canvas(el, { scale: 3, useCORS: true, backgroundColor: '#fff', logging: false, width: 794, height: 1123, windowWidth: 794, windowHeight: 1123 });
         const q = _previewingQuote;
         const dateP = (q.date || '').replace(/-/g, '').substring(2);
-        const fname = dateP + '_케이엘피코리아_' + (q.companyName || '업체') + '_' + (q.productName || '품명') + '_견적서';
+        const firstItem = (q.items && q.items[0]) || {};
+        const productLabel = firstItem.productName ? (firstItem.productName + (q.items.length > 1 ? ` 외 ${q.items.length - 1}건` : '')) : '품명';
+        const fname = dateP + '_케이엘피코리아_' + (q.companyName || '업체') + '_' + productLabel + '_견적서';
         if (type === 'jpg') {
             const a = document.createElement('a');
             a.download = fname + '.jpg';

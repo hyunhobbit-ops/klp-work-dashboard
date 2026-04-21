@@ -42,10 +42,19 @@ create table if not exists public.quotes (
 
     note text,
 
+    -- 다중 품목 배열 (각 요소는 {productName, quantity, unit, unitPrice, unitPriceVat,
+    --   color, printColorSize, printMethod, printFee, printFeeVat, printFeeApply,
+    --   packaging, packagingFee, packagingFeeVat, packagingFeeApply})
+    -- 레거시 단일 품목 데이터는 위 flat 컬럼들을 그대로 사용 (items가 NULL이면 flat 컬럼에서 역변환)
+    items jsonb,
+
     author text,
     created_at timestamptz default now(),
     updated_at timestamptz default now()
 );
+
+-- 기존 테이블에 items 컬럼 추가 (이미 생성된 경우)
+alter table public.quotes add column if not exists items jsonb;
 
 create index if not exists quotes_doc_date_idx on public.quotes (doc_date desc);
 create index if not exists quotes_company_name_idx on public.quotes (company_name);
