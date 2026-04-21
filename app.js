@@ -9032,14 +9032,14 @@ function openNewPlanningModal(defaultPeriod) {
         yearOpts.push(`<option value="${y}" ${y === now.getFullYear() ? 'selected' : ''}>${y}년</option>`);
     }
     const extrasBlock = currentPlanningMode === 'personal' ? `
-        <div class="form-group" id="newPlanningLocationSec" style="display:none;background:var(--bg-secondary,#f9fafb);border:1px solid var(--gray-200);border-radius:8px;padding:12px">
+        <div class="form-group" id="newPlanningLocationSec" style="display:none;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
                 <label class="form-label" style="margin:0">📍 장소</label>
                 <button type="button" onclick="togglePlanningExtraSection('newPlanningLocationSec','newPlanningLocationAdd',false)" style="padding:2px 10px;border:1px solid var(--gray-300);background:transparent;color:var(--gray-600);border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
             </div>
             <input id="newPlanningLocation" class="form-input" placeholder="장소를 입력해주세요">
         </div>
-        <div class="form-group" id="newPlanningCostSec" style="display:none;background:var(--bg-secondary,#f9fafb);border:1px solid var(--gray-200);border-radius:8px;padding:12px">
+        <div class="form-group" id="newPlanningCostSec" style="display:none;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
                 <label class="form-label" style="margin:0">💰 비용</label>
                 <button type="button" onclick="togglePlanningExtraSection('newPlanningCostSec','newPlanningCostAdd',false)" style="padding:2px 10px;border:1px solid var(--gray-300);background:transparent;color:var(--gray-600);border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
@@ -9120,14 +9120,14 @@ function openEditPlanningModal(id) {
     const hasCost = p.cost != null && p.cost !== '';
     const costFormatted = hasCost ? Number(p.cost).toLocaleString() : '';
     const editExtrasBlock = isPersonal ? `
-        <div class="form-group" id="editPlanningLocationSec" style="display:${hasLocation ? '' : 'none'};background:var(--bg-secondary,#f9fafb);border:1px solid var(--gray-200);border-radius:8px;padding:12px">
+        <div class="form-group" id="editPlanningLocationSec" style="display:${hasLocation ? '' : 'none'};background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
                 <label class="form-label" style="margin:0">📍 장소</label>
                 <button type="button" onclick="togglePlanningExtraSection('editPlanningLocationSec','editPlanningLocationAdd',false)" style="padding:2px 10px;border:1px solid var(--gray-300);background:transparent;color:var(--gray-600);border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
             </div>
             <input id="editPlanningLocation" class="form-input" placeholder="장소를 입력해주세요" value="${planningEsc(p.location || '')}">
         </div>
-        <div class="form-group" id="editPlanningCostSec" style="display:${hasCost ? '' : 'none'};background:var(--bg-secondary,#f9fafb);border:1px solid var(--gray-200);border-radius:8px;padding:12px">
+        <div class="form-group" id="editPlanningCostSec" style="display:${hasCost ? '' : 'none'};background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:12px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
                 <label class="form-label" style="margin:0">💰 비용</label>
                 <button type="button" onclick="togglePlanningExtraSection('editPlanningCostSec','editPlanningCostAdd',false)" style="padding:2px 10px;border:1px solid var(--gray-300);background:transparent;color:var(--gray-600);border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
