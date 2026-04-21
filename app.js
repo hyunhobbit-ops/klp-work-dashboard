@@ -8586,10 +8586,10 @@ function renderPlanningList() {
                 const sym = m.currency === 'USD' ? '$' : '₩';
                 const amt = m.targetAmount != null ? Number(m.targetAmount).toLocaleString() : '';
                 const qty = m.targetQty != null ? Number(m.targetQty).toLocaleString() : '';
-                return `<div style="display:flex;gap:6px;flex-wrap:wrap;font-size:11px">
-                    ${m.platform ? `<span style="background:#EDE9FE;color:#6D28D9;padding:2px 8px;border-radius:5px;font-weight:700">💸 ${planningEsc(m.platform)}</span>` : ''}
-                    ${amt ? `<span style="background:#D1FAE5;color:#047857;padding:2px 8px;border-radius:5px;font-weight:700">🎯 ${sym}${amt}</span>` : ''}
-                    ${qty ? `<span style="background:#DBEAFE;color:#1D4ED8;padding:2px 8px;border-radius:5px;font-weight:700">📦 ${qty}개</span>` : ''}
+                return `<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:13px">
+                    ${m.platform ? `<span style="background:#EDE9FE;color:#6D28D9;padding:4px 10px;border-radius:6px;font-weight:700">💸 발행처 : ${planningEsc(m.platform)}</span>` : ''}
+                    ${amt ? `<span style="background:#D1FAE5;color:#047857;padding:4px 10px;border-radius:6px;font-weight:700">🎯 목표금액 : ${sym}${amt}</span>` : ''}
+                    ${qty ? `<span style="background:#DBEAFE;color:#1D4ED8;padding:4px 10px;border-radius:6px;font-weight:700">📦 목표수량 : ${qty}개</span>` : ''}
                 </div>`;
             })() : ''}
             ${posts.length ? `
@@ -8824,14 +8824,14 @@ function renderPlanningDetail(p) {
                             const qty = m.targetQty != null ? Number(m.targetQty).toLocaleString() : '';
                             const unit = (m.targetAmount && m.targetQty) ? (m.currency === 'USD' ? (m.targetAmount / m.targetQty).toFixed(2) : Math.round(m.targetAmount / m.targetQty).toLocaleString()) : '';
                             const period = (m.startDate || m.endDate) ? `${planningEsc(m.startDate || '')} ~ ${planningEsc(m.endDate || '')}` : '';
-                            return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:12px">
-                                ${m.client ? `<span style="background:#F3F4F6;color:#374151;padding:3px 10px;border-radius:6px;font-weight:700">🏢 진행사: ${planningEsc(m.client)}</span>` : ''}
-                                ${m.manufacturer ? `<span style="background:#F3F4F6;color:#374151;padding:3px 10px;border-radius:6px;font-weight:700">🏭 제조사: ${planningEsc(m.manufacturer)}</span>` : ''}
-                                ${m.platform ? `<span style="background:#EDE9FE;color:#6D28D9;padding:3px 10px;border-radius:6px;font-weight:700">💸 ${planningEsc(m.platform)}</span>` : ''}
-                                ${amt ? `<span style="background:#D1FAE5;color:#047857;padding:3px 10px;border-radius:6px;font-weight:700">🎯 목표 ${sym}${amt}</span>` : ''}
-                                ${qty ? `<span style="background:#DBEAFE;color:#1D4ED8;padding:3px 10px;border-radius:6px;font-weight:700">📦 ${qty}개</span>` : ''}
-                                ${unit ? `<span style="background:#FEF3C7;color:#92400E;padding:3px 10px;border-radius:6px;font-weight:700">💵 단가 ${sym}${unit}</span>` : ''}
-                                ${period ? `<span style="background:#FFE4E6;color:#BE123C;padding:3px 10px;border-radius:6px;font-weight:700">📅 ${period}</span>` : ''}
+                            return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:14px">
+                                ${m.client ? `<span style="background:#F3F4F6;color:#374151;padding:5px 12px;border-radius:7px;font-weight:700">🏢 진행사 : ${planningEsc(m.client)}</span>` : ''}
+                                ${m.manufacturer ? `<span style="background:#F3F4F6;color:#374151;padding:5px 12px;border-radius:7px;font-weight:700">🏭 제조사 : ${planningEsc(m.manufacturer)}</span>` : ''}
+                                ${m.platform ? `<span style="background:#EDE9FE;color:#6D28D9;padding:5px 12px;border-radius:7px;font-weight:700">💸 발행처 : ${planningEsc(m.platform)}</span>` : ''}
+                                ${amt ? `<span style="background:#D1FAE5;color:#047857;padding:5px 12px;border-radius:7px;font-weight:700">🎯 목표금액 : ${sym}${amt}</span>` : ''}
+                                ${qty ? `<span style="background:#DBEAFE;color:#1D4ED8;padding:5px 12px;border-radius:7px;font-weight:700">📦 목표수량 : ${qty}개</span>` : ''}
+                                ${unit ? `<span style="background:#FEF3C7;color:#92400E;padding:5px 12px;border-radius:7px;font-weight:700">💵 예상단가 : ${sym}${unit}</span>` : ''}
+                                ${period ? `<span style="background:#FFE4E6;color:#BE123C;padding:5px 12px;border-radius:7px;font-weight:700">📅 기간 : ${period}</span>` : ''}
                             </div>`;
                         })() : ''}
                         <div style="font-size:11px;color:var(--gray-500);margin-top:8px">만든 사람: ${planningEsc(p.createdBy)} · ${planningFmtDate(p.createdAt)}</div>
