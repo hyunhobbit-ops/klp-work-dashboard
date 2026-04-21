@@ -2484,7 +2484,7 @@ async function showProjectDetail(id) {
                     ${row('색상', p.color)}
                 </div>
                 <div>
-                    ${row('인쇄 색상/사이즈', p.printColorSize)}
+                    ${row('인쇄 색상 및 사이즈', p.printColorSize)}
                     ${row('인쇄 방법', p.printMethod)}
                     ${row('포장', p.packaging)}
                     ${p.shippingType ? row('배송', `${p.shippingType}${p.shippingType === '택배' && p.shippingBoxes ? ` (${p.shippingBoxes}박스)` : ''}`) : ''}
@@ -2871,8 +2871,8 @@ function openEditProject(id) {
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label class="form-label">색상</label><input type="text" class="form-input" id="editProjectColor" value="${(p.color || '-').replace(/"/g, '&quot;')}"></div>
-                <div class="form-group"><label class="form-label">인쇄 색상/사이즈</label><input type="text" class="form-input" id="editProjectPrintColorSize" value="${(p.printColorSize || '').replace(/"/g, '&quot;')}"></div>
+                <div class="form-group"><label class="form-label">제품 색상</label><input type="text" class="form-input" id="editProjectColor" value="${(p.color || '-').replace(/"/g, '&quot;')}"></div>
+                <div class="form-group"><label class="form-label">인쇄 색상 및 사이즈</label><input type="text" class="form-input" id="editProjectPrintColorSize" value="${(p.printColorSize || '').replace(/"/g, '&quot;')}"></div>
             </div>
         `)}
 
@@ -3466,8 +3466,8 @@ function openModal(type) {
                         </div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label class="form-label">색상</label><input type="text" class="form-input" id="newProjectColor" value="${v('color') || '-'}"></div>
-                        <div class="form-group"><label class="form-label">인쇄 색상/사이즈</label><input type="text" class="form-input" id="newProjectPrintColorSize" value="${v('printColorSize') || '시안 확인'}"></div>
+                        <div class="form-group"><label class="form-label">제품 색상</label><input type="text" class="form-input" id="newProjectColor" value="${v('color') || '-'}"></div>
+                        <div class="form-group"><label class="form-label">인쇄 색상 및 사이즈</label><input type="text" class="form-input" id="newProjectPrintColorSize" value="${v('printColorSize') || '시안 확인'}"></div>
                     </div>
                 `)}
 
