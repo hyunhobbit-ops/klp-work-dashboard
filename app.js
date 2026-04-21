@@ -1211,10 +1211,10 @@ function renderDaily() {
         return title; // 개인 이름은 그대로
     }
 
-    // 미완료(어제 이전까지) 컬럼 — 개인 탭에서만 노출
+    // 미완료(어제 이전까지) 컬럼 — 개인 탭에서만 노출 (본인 + 전체 공통 업무 포함)
     function renderOverdueColumn(person) {
         const overdue = dailyTasks.filter(t =>
-            t.assignee === person &&
+            (t.assignee === person || t.assignee === '전체') &&
             t.date && t.date < todayStr &&
             !t.done &&
             !t.isDeadlineCopy
