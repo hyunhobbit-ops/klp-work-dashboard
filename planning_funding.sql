@@ -18,7 +18,14 @@
 alter table public.planning_projects
     add column if not exists funding_meta jsonb;
 
--- 2) access 컬럼이 'funding' 값을 허용하는지 보장
+-- 2) 개인 프로젝트 확장 필드 (장소/비용) — 펀딩 저장 시에도 payload에 포함됨
+alter table public.planning_projects
+    add column if not exists location text;
+
+alter table public.planning_projects
+    add column if not exists cost numeric;
+
+-- 3) access 컬럼이 'funding' 값을 허용하는지 보장
 --    기존에 CHECK 제약이 있어 ('company','personal')만 허용되면 펀딩 저장이 실패하므로
 --    해당 제약을 찾아 제거하고, 새 값 집합으로 다시 설정
 do $$
@@ -40,7 +47,10 @@ begin
     end loop;
 end$$;
 
--- 3) access 값 검증 제약을 funding 포함해서 재설정
+-- 4) access 값 검증 제약을 funding 포함해서 재설정
 alter table public.planning_projects
     add constraint planning_projects_access_check
     check (access in ('company', 'personal', 'funding'));
+
+-- 5) Supabase PostgREST 스키마 캐시 강제 갱신
+notify pgrst, 'reload schema';
