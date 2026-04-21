@@ -8993,7 +8993,7 @@ function openNewPlanningModal(defaultPeriod) {
     body.innerHTML = `
         <div class="form-section-title">+ 새 프로젝트</div>
         <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="newPlanningName" class="form-input" placeholder="예: 원데이강의 준비, 시계 부품 구입"></div>
-        <div class="form-group"><label class="form-label">설명 (선택)</label><textarea id="newPlanningDesc" class="form-input" rows="3" placeholder="이 프로젝트의 목표, 배경을 적어주세요"></textarea></div>
+        <div class="form-group"><label class="form-label">설명 (선택)</label><textarea id="newPlanningDesc" class="form-input" rows="8" placeholder="이 프로젝트의 목표, 배경을 적어주세요" style="min-height:180px;resize:vertical"></textarea></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">기간 구분</label>
                 <select id="newPlanningPeriod" class="form-select" onchange="togglePlanningPeriodInputs()">${PLANNING_PERIODS.map(pp => `<option value="${pp.key}" ${pp.key === pd ? 'selected' : ''}>${pp.icon} ${pp.label}</option>`).join('')}</select>
@@ -9056,7 +9056,7 @@ function openEditPlanningModal(id) {
     body.innerHTML = `
         <div class="form-section-title">✏️ 프로젝트 편집</div>
         <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="editPlanningName" class="form-input" value="${planningEsc(p.name)}"></div>
-        <div class="form-group"><label class="form-label">설명</label><textarea id="editPlanningDesc" class="form-input" rows="3">${planningEsc(p.description || '')}</textarea></div>
+        <div class="form-group"><label class="form-label">설명</label><textarea id="editPlanningDesc" class="form-input" rows="8" style="min-height:180px;resize:vertical">${planningEsc(p.description || '')}</textarea></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">기간 구분</label>
                 <select id="editPlanningPeriod" class="form-select" onchange="toggleEditPlanningPeriodInputs()">${PLANNING_PERIODS.map(pp => `<option value="${pp.key}" ${pp.key === pd ? 'selected' : ''}>${pp.icon} ${pp.label}</option>`).join('')}</select>
