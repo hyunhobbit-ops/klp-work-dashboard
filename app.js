@@ -1211,10 +1211,10 @@ function renderDaily() {
         return title; // 개인 이름은 그대로
     }
 
-    // 미완료(어제 이전까지) 컬럼 — 개인 탭에서만 노출 (본인 + 전체 공통 업무 포함)
+    // 미완료(어제 이전까지) 컬럼 — 개인 탭에서만 노출 (전체 공통 업무는 전체 컬럼에 계속 남김)
     function renderOverdueColumn(person) {
         const overdue = dailyTasks.filter(t =>
-            (t.assignee === person || t.assignee === '전체') &&
+            t.assignee === person &&
             t.date && t.date < todayStr &&
             !t.done &&
             !t.isDeadlineCopy
@@ -1228,13 +1228,12 @@ function renderDaily() {
             const tagLabel = (t.priority||'').includes('긴급') ? '긴급' : (t.priority||'').includes('낮음') ? '낮음' : '보통';
             const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
             const clientStr = t.client ? `<span class="daily-client">📌 ${t.client}</span>` : '';
-            const commonPrefix = t.assignee === '전체' ? `<span class="overdue-common-badge">[전체]</span> ` : '';
             const dObj = new Date(t.date + 'T00:00:00');
             const days = Math.max(1, Math.round((today0 - dObj) / MS));
             itemsHtml += `<div class="daily-item overdue-item" onclick="openEditTask(${t.id})" style="cursor:pointer">
                 <div class="daily-checkbox" onclick="event.stopPropagation();toggleTask(${t.id})">${checkSvg}</div>
                 <div class="daily-info">
-                    <div class="daily-title">${commonPrefix}${t.task}</div>
+                    <div class="daily-title">${t.task}</div>
                     <div class="daily-meta">
                         <span class="daily-tag ${tagClass}">${tagLabel}</span>
                         ${labelStr}
@@ -1313,7 +1312,11 @@ function renderDaily() {
     const renderCommonCols = (includeCeo) => {
         let h = '';
         if (showCommonColumn) {
-            const commonTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '전체');
+            // 전체(공통) 업무는 당일 + 과거 미체크까지 계속 노출 (미완료 컬럼으로 이동시키지 않음)
+            const commonTasks = dailyTasks.filter(t =>
+                t.assignee === '전체' &&
+                (t.date === todayStr || (t.date && t.date < todayStr && !t.done))
+            );
             h += renderColumn('전체 (공통)', commonTasks, '전체');
         }
         if (showExecColumn) {
