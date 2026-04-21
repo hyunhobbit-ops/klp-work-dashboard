@@ -125,7 +125,7 @@ async function showApp() {
         const pid = parseInt(hash.slice('planning/p-'.length), 10);
         if (!isNaN(pid)) currentPlanningProjectId = pid;
         switchTab(`planning-${currentPlanningMode}`, true);
-    } else if (hash === 'planning-company' || hash === 'planning-personal' || hash === 'planning') {
+    } else if (hash === 'planning-company' || hash === 'planning-funding' || hash === 'planning-personal' || hash === 'planning') {
         const target = hash === 'planning' ? `planning-${currentPlanningMode}` : hash;
         switchTab(target, true);
     } else if (hash && document.getElementById('tab-' + hash)) {
@@ -255,6 +255,7 @@ const pageTitles = {
     quotes: '견적서 만들기',
     planning: '프로젝트',
     'planning-company': '회사 프로젝트',
+    'planning-funding': '펀딩 프로젝트',
     'planning-personal': '개인 프로젝트'
 };
 
@@ -590,8 +591,9 @@ function setupTabs() {
 }
 
 function switchTab(tabId, fromHistory = false) {
-    // 프로젝트 서브메뉴(회사/개인) 분기 — 실제 DOM 탭은 'planning' 하나를 공유
+    // 프로젝트 서브메뉴(회사/펀딩/개인) 분기 — 실제 DOM 탭은 'planning' 하나를 공유
     const planningSubMode = tabId === 'planning-company' ? 'company'
+                          : tabId === 'planning-funding' ? 'funding'
                           : tabId === 'planning-personal' ? 'personal' : null;
     const actualTabId = planningSubMode ? 'planning' : tabId;
 
@@ -662,7 +664,7 @@ function switchTab(tabId, fromHistory = false) {
     }
 
     // 프로젝트(계획/협업) 탭 열릴 때 렌더 (사이드바에서 클릭 시 목록으로 리셋)
-    if (tabId === 'planning' || tabId === 'planning-company' || tabId === 'planning-personal') {
+    if (tabId === 'planning' || tabId === 'planning-company' || tabId === 'planning-funding' || tabId === 'planning-personal') {
         if (!fromHistory) currentPlanningProjectId = null;
         try { renderPlanning(); } catch (e) { console.error('renderPlanning failed', e); }
     }
@@ -699,7 +701,7 @@ window.addEventListener('popstate', () => {
             return;
         }
     }
-    if ((rawHash === 'planning' || rawHash === 'planning-company' || rawHash === 'planning-personal') && currentPlanningProjectId != null) {
+    if ((rawHash === 'planning' || rawHash === 'planning-company' || rawHash === 'planning-funding' || rawHash === 'planning-personal') && currentPlanningProjectId != null) {
         currentPlanningProjectId = null;
         const target = rawHash === 'planning' ? `planning-${currentPlanningMode}` : rawHash;
         switchTab(target, true);
@@ -707,7 +709,7 @@ window.addEventListener('popstate', () => {
     }
 
     const hash = rawHash || 'home';
-    if (hash === 'planning-company' || hash === 'planning-personal') {
+    if (hash === 'planning-company' || hash === 'planning-funding' || hash === 'planning-personal') {
         switchTab(hash, true);
         return;
     }
@@ -8212,6 +8214,7 @@ const PLANNING_PERIODS = [
 const PLANNING_CATEGORIES_ACCESS = [
     { key: 'personal', label: '개인', icon: '🔒', bg: '#FEF3C7', fg: '#B45309', note: '본인만 볼 수 있음' },
     { key: 'company',  label: '회사', icon: '🏢', bg: '#DBEAFE', fg: '#1D4ED8', note: '모두 공유' },
+    { key: 'funding',  label: '펀딩', icon: '💸', bg: '#EDE9FE', fg: '#6D28D9', note: '관리자 3인 공유' },
     { key: 'family',   label: '가족', icon: '🏠', bg: '#FCE7F3', fg: '#BE185D', note: '모두 공유' }
 ];
 const PLANNING_ASSIGNEES = ['이현주', '김현호', '유지은', '구정두', '대표님'];
@@ -8222,20 +8225,23 @@ function planningIsAdmin() {
     const login = currentUser.loginName || currentUser.name;
     return PLANNING_ALLOWED.includes(login);
 }
-// mode: 'company' = 회사 프로젝트 메뉴 (관리자만), 'personal' = 개인 프로젝트 메뉴 (모두)
+// mode: 'company'/'funding' = 관리자 3인만, 'personal' = 모두
 function planningCanAccessMode(mode) {
     if (!currentUser) return false;
     if (mode === 'company') return planningIsAdmin();
+    if (mode === 'funding') return planningIsAdmin();
     if (mode === 'personal') return true;
     return planningIsAdmin();
 }
-// 하위호환: 둘 중 하나라도 접근 가능한지
+// 하위호환: 셋 중 하나라도 접근 가능한지
 function planningCanAccess() {
-    return planningCanAccessMode('personal') || planningCanAccessMode('company');
+    return planningCanAccessMode('personal') || planningCanAccessMode('company') || planningCanAccessMode('funding');
 }
 function applyPlanningPermission() {
     const navCo = document.getElementById('navPlanningCompany');
     if (navCo) navCo.style.display = planningCanAccessMode('company') ? '' : 'none';
+    const navFu = document.getElementById('navPlanningFunding');
+    if (navFu) navFu.style.display = planningCanAccessMode('funding') ? '' : 'none';
     const navPe = document.getElementById('navPlanningPersonal');
     if (navPe) navPe.style.display = planningCanAccessMode('personal') ? '' : 'none';
     const group = document.getElementById('navPlanningGroup');
@@ -8439,9 +8445,11 @@ async function renderPlanningHomeSection() {
             const dd = planningDDay(post.deadline);
             const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:11px;font-weight:800;padding:2px 7px;border-radius:5px">${dd.label}</span>` : '';
             const preview = String(post.content || '').slice(0, 60);
-            // 회사/가족 프로젝트는 회사 메뉴, 개인 프로젝트는 개인 메뉴
+            // 회사/가족 → 회사 메뉴, 펀딩 → 펀딩 메뉴, 개인 → 개인 메뉴
             const projAcc = proj.access || 'company';
-            const projMode = projAcc === 'personal' ? 'personal' : 'company';
+            const projMode = projAcc === 'personal' ? 'personal'
+                           : projAcc === 'funding' ? 'funding'
+                           : 'company';
             return `<div onclick="switchTab('planning-${projMode}');setTimeout(()=>openPlanningProject(${proj.id}),60)" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--gray-100);cursor:pointer;transition:background .1s" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background='transparent'">
                 <span style="background:${s[0]};color:${s[1]};font-size:11px;font-weight:800;padding:3px 8px;border-radius:5px;white-space:nowrap">${s[2]}</span>
                 <div style="flex:1;min-width:0">
@@ -8526,6 +8534,7 @@ function planningUserCanSeeProject(p) {
     const acc = p.access || 'company';
     if (acc === 'company') return planningIsAdmin();
     if (acc === 'family') return planningIsAdmin();
+    if (acc === 'funding') return planningIsAdmin();
     if (acc === 'personal') {
         const me = planningCurrentOwner();
         return !!me && p.ownerLogin === me;
@@ -8538,6 +8547,8 @@ function planningCanSeeProject(p) {
     const acc = p.access || 'company';
     // 회사 메뉴 = 회사 + 가족 (관리자 3인 공유)
     if (currentPlanningMode === 'company') return acc === 'company' || acc === 'family';
+    // 펀딩 메뉴 = 펀딩 (관리자 3인 공유)
+    if (currentPlanningMode === 'funding') return acc === 'funding';
     // 개인 메뉴 = 본인의 개인 프로젝트만
     if (currentPlanningMode === 'personal') return acc === 'personal';
     return false;
@@ -8616,10 +8627,12 @@ function renderPlanningList() {
         </section>`;
     }).join('');
 
-    const modeLabel = currentPlanningMode === 'company' ? '🏢 회사 프로젝트' : '🧑 개인 프로젝트';
-    const modeSub = currentPlanningMode === 'company'
-        ? '회사/가족 공유 프로젝트 — 김관택·김현호·이현주만 열람 가능'
-        : '본인이 작성한 개인 프로젝트만 표시됩니다';
+    const modeLabel = currentPlanningMode === 'company' ? '🏢 회사 프로젝트'
+                    : currentPlanningMode === 'funding' ? '💸 펀딩 프로젝트'
+                    : '🧑 개인 프로젝트';
+    const modeSub = currentPlanningMode === 'company' ? '회사/가족 공유 프로젝트 — 김관택·김현호·이현주만 열람 가능'
+                  : currentPlanningMode === 'funding' ? '펀딩 프로젝트 — 김관택·김현호·이현주만 열람 가능'
+                  : '본인이 작성한 개인 프로젝트만 표시됩니다';
     return `
         <div style="padding:20px 24px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
@@ -9368,8 +9381,10 @@ async function savePlanningProject() {
     const status = document.getElementById('newPlanningStatus').value;
     const period = document.getElementById('newPlanningPeriod').value;
     let deadline = document.getElementById('newPlanningDeadline').value || '';
-    // 공개 범위는 현재 메뉴에 따라 자동 설정 (회사 메뉴 → company, 개인 메뉴 → personal)
-    const access = currentPlanningMode === 'company' ? 'company' : 'personal';
+    // 공개 범위는 현재 메뉴에 따라 자동 설정 (회사 → company, 펀딩 → funding, 개인 → personal)
+    const access = currentPlanningMode === 'company' ? 'company'
+                 : currentPlanningMode === 'funding' ? 'funding'
+                 : 'personal';
     const locEl = document.getElementById('newPlanningLocation');
     const costEl = document.getElementById('newPlanningCost');
     const location = locEl && locEl.offsetParent !== null ? (locEl.value || '').trim() : '';
