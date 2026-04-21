@@ -135,11 +135,10 @@
                 <!-- 편의성 그룹 -->
                 <div class="nav-group">
                     <div class="nav-group-label">편의성</div>
-                    <a class="nav-item nav-external" href="doc-generator.html#new-quote" target="_blank" rel="noopener">
+                    <button class="nav-item" data-tab="quotes">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1L14 8M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1L10 16m11-4a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span>견적서 만들기</span>
-                        <svg class="external-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
-                    </a>
+                    </button>
                     <a class="nav-item nav-external" href="doc-generator.html" target="_blank" rel="noopener">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                         <span>문서생성기</span>
@@ -1165,6 +1164,307 @@
                     <div id="marketPagination" style="display:flex;justify-content:center;gap:6px;padding:16px;flex-wrap:wrap"></div>
                 </div>
             </main>
+
+            <!-- ===== 견적서 만들기 ===== -->
+            <main class="content" id="tab-quotes">
+                <!-- LIST VIEW -->
+                <div id="quotesListView">
+                    <div class="content-toolbar">
+                        <div class="toolbar-left">
+                            <div class="search-bar">
+                                <svg width="16" height="16" fill="none" stroke="#999" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                                <input type="text" id="quoteSearch" placeholder="업체, 담당자, 품명, 문서번호 검색" oninput="renderQuotes()">
+                            </div>
+                            <div id="quoteDateFilter" style="display:flex;gap:8px;align-items:center"></div>
+                        </div>
+                        <div class="toolbar-buttons">
+                            <button class="btn-primary" onclick="openNewQuoteForm()">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                                새 견적서 만들기
+                            </button>
+                        </div>
+                    </div>
+                    <div class="page-section">
+                        <div class="quote-stats" id="quoteStats" style="padding:8px 16px;color:var(--text-secondary);font-size:14px"></div>
+                        <div class="table-wrap">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>발행일</th>
+                                        <th>문서번호</th>
+                                        <th>업체명</th>
+                                        <th>담당자</th>
+                                        <th>품명</th>
+                                        <th style="text-align:right">수량</th>
+                                        <th style="text-align:right">합계</th>
+                                        <th>담당</th>
+                                        <th>관리</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="quotesTableBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="card-grid" id="quotesCardGrid"></div>
+                    </div>
+                </div>
+
+                <!-- FORM VIEW -->
+                <div id="quotesFormView" style="display:none">
+                    <div class="content-toolbar">
+                        <div class="toolbar-left">
+                            <button class="btn-export" onclick="closeQuoteForm()">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 12H5m0 0l7 7m-7-7l7-7"/></svg>
+                                목록으로
+                            </button>
+                            <h2 id="quoteFormTitle" style="margin:0 0 0 12px;font-size:18px;font-weight:700;color:var(--text-primary)">새 견적서 작성</h2>
+                        </div>
+                    </div>
+                    <div class="page-section">
+                        <div class="form-card" id="quoteFormCard">
+                            <div class="form-section">
+                                <div class="form-section-title">📋 문서 정보</div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>발행일 <span style="color:var(--red)">*</span></label>
+                                        <input type="date" id="qDate">
+                                    </div>
+                                    <div class="form-field">
+                                        <label>유효기간</label>
+                                        <input type="date" id="qValidUntil">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>업체명 <span style="color:var(--red)">*</span></label>
+                                        <input id="qCompanyName" list="quoteClientsList" autocomplete="off" placeholder="거래처명">
+                                        <datalist id="quoteClientsList"></datalist>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>담당자</label>
+                                        <input id="qContactPerson" placeholder="담당자님">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>본사 담당자</label>
+                                        <select id="qManager">
+                                            <option>이현주 실장</option>
+                                            <option selected>김현호 팀장</option>
+                                            <option>유지은 대리</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <div class="form-section-title">📦 제품 정보</div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>품명 <span style="color:var(--red)">*</span></label>
+                                        <input id="qProductName" placeholder="시계 상패">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>수량 <span style="color:var(--red)">*</span></label>
+                                        <input id="qQuantity" type="number" min="0" placeholder="0" oninput="recalcQuoteEst()">
+                                    </div>
+                                    <div class="form-field" style="max-width:140px">
+                                        <label>단위</label>
+                                        <select id="qUnit">
+                                            <option>개</option>
+                                            <option>세트</option>
+                                            <option>장</option>
+                                            <option>박스</option>
+                                            <option>EA</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>단가 <span style="color:var(--red)">*</span></label>
+                                        <input id="qUnitPrice" type="number" min="0" placeholder="0" oninput="recalcQuoteEst()">
+                                    </div>
+                                    <div class="form-field" style="max-width:160px">
+                                        <label>VAT</label>
+                                        <select id="qUnitPriceVat" onchange="recalcQuoteEst()">
+                                            <option>VAT 별도</option>
+                                            <option>VAT 포함</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>색상</label>
+                                        <input id="qColor" value="-">
+                                    </div>
+                                    <div class="form-field">
+                                        <label>인쇄 색상 및 사이즈</label>
+                                        <input id="qPrintColorSize" value="시안 확인">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <div class="form-section-title">🖨️ 인쇄</div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>인쇄 방법</label>
+                                        <select id="qPrintMethod" onchange="recalcQuoteEst()">
+                                            <option>없음</option>
+                                            <option>실크인쇄</option>
+                                            <option>레이저각인</option>
+                                            <option>UV인쇄</option>
+                                            <option>패드인쇄</option>
+                                            <option>열전사</option>
+                                            <option>기타</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>인쇄비</label>
+                                        <input id="qPrintFee" type="number" min="0" placeholder="0" oninput="recalcQuoteEst()">
+                                    </div>
+                                    <div class="form-field" style="max-width:160px">
+                                        <label>VAT</label>
+                                        <select id="qPrintFeeVat" onchange="recalcQuoteEst()">
+                                            <option>VAT 별도</option>
+                                            <option>VAT 포함</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-field" style="max-width:160px">
+                                        <label>적용 방식</label>
+                                        <select id="qPrintFeeApply" onchange="recalcQuoteEst()">
+                                            <option>1개당</option>
+                                            <option>일괄</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <div class="form-section-title">📦 포장</div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>포장</label>
+                                        <select id="qPackaging">
+                                            <option>개별박스</option>
+                                            <option>선물포장</option>
+                                            <option>선물포장+라벨부착</option>
+                                            <option>에어캡포장</option>
+                                            <option>기타</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>포장비</label>
+                                        <input id="qPackagingFee" type="number" min="0" placeholder="0" oninput="recalcQuoteEst()">
+                                    </div>
+                                    <div class="form-field" style="max-width:160px">
+                                        <label>VAT</label>
+                                        <select id="qPackagingFeeVat" onchange="recalcQuoteEst()">
+                                            <option>VAT 별도</option>
+                                            <option>VAT 포함</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-field" style="max-width:160px">
+                                        <label>적용 방식</label>
+                                        <select id="qPackagingFeeApply" onchange="recalcQuoteEst()">
+                                            <option>1개당</option>
+                                            <option>일괄</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <div class="form-section-title">🚚 배송</div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>배송 방법</label>
+                                        <select id="qShippingType" onchange="recalcQuoteEst()">
+                                            <option value="">없음</option>
+                                            <option>택배</option>
+                                            <option>퀵</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>배송비</label>
+                                        <input id="qShippingCost" type="number" min="0" placeholder="0" oninput="recalcQuoteEst()">
+                                    </div>
+                                    <div class="form-field" style="max-width:160px">
+                                        <label>VAT</label>
+                                        <select id="qShippingVat" onchange="recalcQuoteEst()">
+                                            <option>VAT 별도</option>
+                                            <option>VAT 포함</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <div class="form-section-title">🚚 납기 및 수령 (선택)</div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>납기일</label>
+                                        <input type="date" id="qDeliveryDate">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>수령인</label>
+                                        <input id="qRecipient" placeholder="수령인 이름">
+                                    </div>
+                                    <div class="form-field">
+                                        <label>핸드폰번호</label>
+                                        <input id="qPhone" placeholder="010-0000-0000">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <label>주소</label>
+                                        <input id="qAddress" placeholder="배송지 주소">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <div class="form-section-title">💬 비고</div>
+                                <div class="form-row">
+                                    <div class="form-field">
+                                        <textarea id="qNote" rows="3" placeholder="• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.&#10;• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다." style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;resize:vertical"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-section" id="qEstPreview" style="display:none">
+                                <div class="form-section-title">💰 최종 견적 금액</div>
+                                <div id="qEstBody" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:16px"></div>
+                            </div>
+
+                            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap">
+                                <button class="btn-export" onclick="closeQuoteForm()">취소</button>
+                                <button class="btn-primary" style="background:linear-gradient(135deg,#16A34A,#15803D)" onclick="saveQuoteAndPreview()">💰 견적서 만들기</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- ===== 견적서 미리보기 오버레이 ===== -->
+    <div id="quotePreviewOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;overflow-y:auto;backdrop-filter:blur(4px)">
+        <div style="max-width:860px;margin:24px auto;padding:16px">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+                <div style="font-size:16px;font-weight:900;color:#fff;margin-right:auto">💰 견적서 미리보기</div>
+                <button id="btnQuotePreviewJpg" onclick="dlQuotePreview('jpg')" style="padding:8px 16px;border-radius:10px;border:none;background:#1B64DA;color:#fff;font-weight:700;cursor:pointer;font-family:inherit">📷 JPG</button>
+                <button id="btnQuotePreviewPdf" onclick="dlQuotePreview('pdf')" style="padding:8px 16px;border-radius:10px;border:none;background:#16A34A;color:#fff;font-weight:700;cursor:pointer;font-family:inherit">📄 PDF</button>
+                <button onclick="closeQuotePreview()" style="padding:8px 16px;border-radius:10px;border:none;background:var(--gray-200);color:var(--gray-700);font-weight:700;cursor:pointer;font-family:inherit">닫기</button>
+            </div>
+            <div style="padding:20px;background:#f0f0f0;border-radius:12px"><div id="quotePreviewDocEl" style="margin:0 auto"></div></div>
         </div>
     </div>
 
