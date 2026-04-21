@@ -2138,17 +2138,6 @@ body {
 .form-submit { width: 100%; padding: 13px; border: none; border-radius: var(--radius-xs); background: var(--blue); color: white; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 8px; transition: all var(--transition); }
 .form-submit:hover { background: var(--blue-dark); }
 
-/* 견적서 만들기 전용 폼 카드 */
-.form-card { background: var(--white); border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 24px; max-width: 960px; margin: 0 auto; }
-.form-card .form-section { margin-bottom: 8px; }
-.form-card .form-field { display: flex; flex-direction: column; }
-.form-card .form-field label { font-size: 13px; font-weight: 600; color: var(--gray-700); margin-bottom: 6px; }
-.form-card .form-field input, .form-card .form-field select, .form-card .form-field textarea { padding: 10px 12px; border: 1px solid var(--gray-200); border-radius: 8px; font-size: 14px; font-family: inherit; color: var(--gray-900); background: var(--gray-50); outline: none; }
-.form-card .form-field input:focus, .form-card .form-field select:focus, .form-card .form-field textarea:focus { border-color: var(--blue); background: var(--white); }
-[data-theme="dark"] .form-card { background: var(--bg-primary); border-color: var(--border); }
-[data-theme="dark"] .form-card .form-field input, [data-theme="dark"] .form-card .form-field select, [data-theme="dark"] .form-card .form-field textarea { background: var(--bg-secondary); color: var(--text-primary); border-color: var(--border); }
-@media (max-width: 768px) { .form-card { padding: 16px; } .form-card .form-row { grid-template-columns: 1fr; } }
-
 /* ============================
    EMPTY & TOAST
    ============================ */
