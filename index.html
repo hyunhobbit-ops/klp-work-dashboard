@@ -147,9 +147,58 @@
                     </a>
                 </div>
 
-                <!-- 리틀리 바로가기 그룹 -->
+                <!-- URL 바로가기 그룹 -->
                 <div class="nav-group">
-                    <div class="nav-group-label">리틀리 바로가기</div>
+                    <div class="nav-group-label">URL 바로가기</div>
+
+                    <!-- 홈페이지 -->
+                    <a class="nav-item nav-external" href="https://klpkorea.co.kr/" target="_blank" rel="noopener" onclick="copyLittlyLink('https://klpkorea.co.kr/','홈페이지')">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                        <span>홈페이지</span>
+                        <svg class="external-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+                    </a>
+
+                    <!-- 마케팅채널 -->
+                    <div class="nav-sub-group">
+                        <div class="nav-sub-label">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+                            <span>마케팅채널</span>
+                        </div>
+                        <a class="nav-item nav-sub-item nav-external" href="http://pf.kakao.com/_xmGyUM" target="_blank" rel="noopener" onclick="copyLittlyLink('http://pf.kakao.com/_xmGyUM','카카오톡 플러스친구')">
+                            <span>카카오톡 플러스친구</span>
+                            <svg class="external-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+                        </a>
+                        <a class="nav-item nav-sub-item nav-external" href="https://www.youtube.com/@KLPKOREA" target="_blank" rel="noopener" onclick="copyLittlyLink('https://www.youtube.com/@KLPKOREA','유튜브')">
+                            <span>유튜브</span>
+                            <svg class="external-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+                        </a>
+                        <a class="nav-item nav-sub-item nav-external" href="https://x.com/KLPKOREA" target="_blank" rel="noopener" onclick="copyLittlyLink('https://x.com/KLPKOREA','X(트위터)')">
+                            <span>X(트위터)</span>
+                            <svg class="external-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+                        </a>
+                    </div>
+
+                    <!-- 쇼핑몰 -->
+                    <div class="nav-sub-group">
+                        <div class="nav-sub-label">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
+                            <span>쇼핑몰</span>
+                        </div>
+                        <a class="nav-item nav-sub-item nav-external" href="https://showroom.co.kr/" target="_blank" rel="noopener" onclick="copyLittlyLink('https://showroom.co.kr/','쇼룸')">
+                            <span>쇼룸</span>
+                            <svg class="external-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+                        </a>
+                        <a class="nav-item nav-sub-item nav-external" href="https://agift.kr/" target="_blank" rel="noopener" onclick="copyLittlyLink('https://agift.kr/','에이기프트')">
+                            <span>에이기프트</span>
+                            <svg class="external-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+                        </a>
+                        <a class="nav-item nav-sub-item nav-external" href="https://goodzduck.com/" target="_blank" rel="noopener" onclick="copyLittlyLink('https://goodzduck.com/','굿즈덕')">
+                            <span>굿즈덕</span>
+                            <svg class="external-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+                        </a>
+                    </div>
+
+                    <!-- 리틀리 (제일 아래) -->
                     <div class="nav-sub-group">
                         <div class="nav-sub-label">
                             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
