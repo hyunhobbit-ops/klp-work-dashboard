@@ -9440,7 +9440,8 @@ function quoteItemCardHtml(idx, it) {
     const pk = resolveQuoteOption(it.packaging || '개별박스', QUOTE_PACKAGING_OPTIONS);
 
     // 어느 섹션을 펼친 채로 시작할지 (값이 있으면 자동 펼침)
-    const showPrintPack = (it.printMethod && it.printMethod !== '없음') || Number(it.printFee) > 0 || Number(it.packagingFee) > 0;
+    const showPrint = (it.printMethod && it.printMethod !== '없음') || Number(it.printFee) > 0;
+    const showPack = Number(it.packagingFee) > 0;
     const showMold = Number(it.moldFee) > 0;
     const showSample = Number(it.sampleFee) > 0;
 
@@ -9470,9 +9471,9 @@ function quoteItemCardHtml(idx, it) {
             <div class="form-group"><label class="form-label">VAT</label>${_qVatSelect('qi-unitPriceVat', it.unitPriceVat || 'VAT 별도')}</div>
         </div>
 
-        <!-- 인쇄 / 포장 (토글) -->
-        <div class="qi-section qi-section-printPack" style="display:${showPrintPack ? '' : 'none'};border-top:1px dashed var(--gray-200);margin-top:12px;padding-top:8px">
-            ${sectionHeader('🖨️', '인쇄 / 포장', 'printPack')}
+        <!-- 인쇄 (토글) -->
+        <div class="qi-section qi-section-print" style="display:${showPrint ? '' : 'none'};border-top:1px dashed var(--gray-200);margin-top:12px;padding-top:8px">
+            ${sectionHeader('🖨️', '인쇄', 'print')}
             <div class="form-row">
                 <div class="form-group"><label class="form-label">인쇄 방법</label>
                     <select class="form-select qi-printMethod" onchange="onQuoteOtherSelectChange(this,'qi-printMethodCustom');recalcQuoteEst()">
@@ -9487,6 +9488,11 @@ function quoteItemCardHtml(idx, it) {
                 <div class="form-group"><label class="form-label">VAT</label>${_qVatSelect('qi-printFeeVat', it.printFeeVat)}</div>
                 <div class="form-group"><label class="form-label">적용</label>${_qApplySelect('qi-printFeeApply', it.printFeeApply, '1개당')}</div>
             </div>
+        </div>
+
+        <!-- 포장 (토글) -->
+        <div class="qi-section qi-section-pack" style="display:${showPack ? '' : 'none'};border-top:1px dashed var(--gray-200);margin-top:12px;padding-top:8px">
+            ${sectionHeader('📦', '포장', 'pack')}
             <div class="form-row">
                 <div class="form-group"><label class="form-label">포장</label>
                     <select class="form-select qi-packaging" onchange="onQuoteOtherSelectChange(this,'qi-packagingCustom')">
@@ -9525,7 +9531,8 @@ function quoteItemCardHtml(idx, it) {
 
         <!-- 추가 버튼 (이미 추가된 섹션은 숨김) -->
         <div class="qi-add-buttons" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-100)">
-            <button type="button" class="qi-add-printPack" onclick="toggleQuoteItemSection(${idx},'printPack',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:${showPrintPack ? 'none' : ''}">+ 인쇄/포장 추가</button>
+            <button type="button" class="qi-add-print" onclick="toggleQuoteItemSection(${idx},'print',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:${showPrint ? 'none' : ''}">+ 인쇄 추가</button>
+            <button type="button" class="qi-add-pack" onclick="toggleQuoteItemSection(${idx},'pack',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:${showPack ? 'none' : ''}">+ 포장 추가</button>
             <button type="button" class="qi-add-mold" onclick="toggleQuoteItemSection(${idx},'mold',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:${showMold ? 'none' : ''}">+ 금형비 추가</button>
             <button type="button" class="qi-add-sample" onclick="toggleQuoteItemSection(${idx},'sample',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:${showSample ? 'none' : ''}">+ 샘플비 추가</button>
         </div>
