@@ -2032,8 +2032,8 @@ function renderDeliveries() {
         </select>`;
 
         const trackingCell = `<div class="inline-tracking">
-            <input type="text" class="inline-input" id="track-${d.id}" value="${d.tracking}" placeholder="운송장번호">
-            <button class="inline-save-btn" onclick="saveTracking(${d.id})">저장</button>
+            <input type="text" class="inline-input" id="track-${d.id}" value="${d.tracking}" placeholder="운송장번호" onchange="autoSaveTracking(${d.id})">
+            <button class="inline-save-btn" onclick="copyTrackingFromInput(${d.id})" title="운송장번호 복사">복사</button>
         </div>`;
 
         tableHtml += `<tr class="${todayCls.trim()}">
@@ -2263,6 +2263,31 @@ async function saveTracking(id) {
     d.tracking = input.value.trim();
     await dbUpdateDelivery(id, { tracking: d.tracking });
     showToast('운송장번호가 저장되었습니다');
+}
+
+// 인라인 입력: 값이 바뀌면 자동 저장 (포커스 아웃 또는 Enter 시 onchange 발생)
+async function autoSaveTracking(id) {
+    const d = deliveries.find(x => x.id === id);
+    if (!d) return;
+    const input = document.getElementById(`track-${id}`);
+    if (!input) return;
+    const next = input.value.trim();
+    if (next === (d.tracking || '')) return;
+    d.tracking = next;
+    await dbUpdateDelivery(id, { tracking: next });
+    showToast(next ? '운송장번호가 저장되었습니다' : '운송장번호가 삭제되었습니다');
+}
+
+// 인라인 입력 옆 복사 버튼: 입력창의 현재 값을 클립보드에 복사
+function copyTrackingFromInput(id) {
+    const input = document.getElementById(`track-${id}`);
+    if (!input) return;
+    const num = input.value.trim();
+    if (!num) {
+        showToast('복사할 운송장번호가 없습니다');
+        return;
+    }
+    copyTracking(num);
 }
 
 async function saveDetailTracking(id) {
