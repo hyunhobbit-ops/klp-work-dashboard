@@ -326,6 +326,21 @@ body {
     font-weight: 500 !important;
 }
 
+/* URL 바로가기 — 토글 가능한 하위 메뉴 */
+#urlShortcutsGroup .nav-sub-label { cursor: pointer; user-select: none; transition: color var(--transition); }
+#urlShortcutsGroup .nav-sub-label:hover { color: var(--gray-700); }
+#urlShortcutsGroup .nav-caret { margin-left: auto; transition: transform 0.15s; color: var(--gray-400); }
+#urlShortcutsGroup .nav-sub-group.collapsed > .nav-sub-label .nav-caret { transform: rotate(-90deg); }
+#urlShortcutsGroup .nav-sub-group.collapsed > .nav-sub-item,
+#urlShortcutsGroup .nav-sub-group.collapsed > .url-sub-items { display: none; }
+#urlShortcutsGroup .url-sub-items { display: flex; flex-direction: column; }
+#urlShortcutsGroup .url-user-row { display: flex; align-items: center; gap: 2px; }
+#urlShortcutsGroup .url-user-row > .nav-sub-item { flex: 1; min-width: 0; }
+#urlShortcutsGroup .url-edit-btn { background: transparent; border: none; color: var(--gray-400); cursor: pointer; padding: 4px 6px; font-size: 12px; border-radius: 4px; margin-right: 8px; }
+#urlShortcutsGroup .url-edit-btn:hover { background: var(--gray-100); color: var(--gray-700); }
+#urlShortcutsGroup .url-add-main-btn { border: none; background: transparent; color: var(--gray-400); cursor: pointer; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; }
+#urlShortcutsGroup .url-add-main-btn:hover { background: var(--gray-100); color: var(--gray-700); }
+
 /* External link nav items */
 .nav-external {
     position: relative;

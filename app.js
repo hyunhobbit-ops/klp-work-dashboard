@@ -116,6 +116,9 @@ async function showApp() {
     subscribeDailyTasks();
     subscribeAllRealtime();
     renderAll();
+    // 사이드바 URL 바로가기: 카테고리 열림 상태 적용 + 사용자 추가 URL 로드
+    try { applyUrlCategoryOpenState(); } catch (e) {}
+    loadUrlShortcuts().catch(e => console.warn(e));
     // URL 해시 → 탭 전환 (새로고침 시 탭 유지, 문서생성기에서 이동해온 경우 등)
     const hash = location.hash.replace('#', '');
     if (hash.startsWith('planning/p-')) {
@@ -305,6 +308,195 @@ function copyLittlyLink(url, name) {
         } catch (e) {
             showToast('복사 실패');
         }
+    }
+}
+
+// =====================================
+// 사이드바 URL 바로가기 (카테고리 토글 + 사용자 추가 URL)
+// =====================================
+const URL_OPEN_STATE_KEY = 'klp_url_open_cats';
+let urlShortcuts = [];
+
+function getOpenUrlCats() {
+    try { return new Set(JSON.parse(localStorage.getItem(URL_OPEN_STATE_KEY) || '[]')); }
+    catch (e) { return new Set(); }
+}
+function saveOpenUrlCats(set) {
+    try { localStorage.setItem(URL_OPEN_STATE_KEY, JSON.stringify([...set])); } catch (e) {}
+}
+function applyUrlCategoryOpenState() {
+    const opens = getOpenUrlCats();
+    document.querySelectorAll('#urlShortcutsGroup .nav-sub-group[data-url-category]').forEach(g => {
+        const cat = g.dataset.urlCategory;
+        if (opens.has(cat)) g.classList.remove('collapsed');
+        else g.classList.add('collapsed');
+    });
+}
+function toggleUrlCategoryGroup(labelEl) {
+    const grp = labelEl.closest('.nav-sub-group');
+    if (!grp) return;
+    grp.classList.toggle('collapsed');
+    const cat = grp.dataset.urlCategory;
+    if (!cat) return;
+    const opens = getOpenUrlCats();
+    if (grp.classList.contains('collapsed')) opens.delete(cat);
+    else opens.add(cat);
+    saveOpenUrlCats(opens);
+}
+
+async function loadUrlShortcuts() {
+    try {
+        const { data, error } = await sb.from('url_shortcuts').select('*').order('sort_order', { ascending: true }).order('id', { ascending: true });
+        if (error) throw error;
+        urlShortcuts = data || [];
+        renderUrlShortcuts();
+    } catch (err) {
+        console.warn('URL 바로가기 로드 실패 (테이블 없음?):', err.message);
+    }
+}
+
+function urlShortcutItemHtml(s) {
+    const url = (s.url || '').replace(/"/g, '&quot;');
+    const title = escHtml(s.title || '');
+    return `<div class="url-user-row">
+        <a class="nav-item nav-sub-item nav-external" href="${url}" target="_blank" rel="noopener" onclick="copyLittlyLink('${url.replace(/'/g, '\\\'')}','${(s.title || '').replace(/'/g, '\\\'')}')">
+            <span>${title}</span>
+            <svg class="external-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
+        </a>
+        <button class="url-edit-btn" onclick="event.stopPropagation();openUrlShortcutModal(${s.id})" title="편집">✏️</button>
+    </div>`;
+}
+
+function renderUrlShortcuts() {
+    const group = document.getElementById('urlShortcutsGroup');
+    if (!group) return;
+
+    // 1. 기존 하드코딩 카테고리들에 있는 사용자 추가 항목(.url-user-row) 모두 제거
+    group.querySelectorAll('.nav-sub-group[data-url-category] .url-user-row').forEach(el => el.remove());
+
+    // 2. 커스텀 카테고리 컨테이너 비우기
+    const customRoot = document.getElementById('customUrlCategories');
+    if (customRoot) customRoot.innerHTML = '';
+
+    // 3. 카테고리별로 그룹핑
+    const groupsByCat = {};
+    urlShortcuts.forEach(s => {
+        const c = (s.category || '기타').trim() || '기타';
+        if (!groupsByCat[c]) groupsByCat[c] = [];
+        groupsByCat[c].push(s);
+    });
+
+    // 4. 각 카테고리 렌더
+    Object.entries(groupsByCat).forEach(([cat, items]) => {
+        const existing = group.querySelector(`.nav-sub-group[data-url-category="${CSS.escape(cat)}"]`);
+        if (existing) {
+            // 기존 하드코딩 카테고리에 항목 추가
+            const html = items.map(urlShortcutItemHtml).join('');
+            existing.insertAdjacentHTML('beforeend', html);
+        } else if (customRoot) {
+            // 새 카테고리 생성
+            const itemsHtml = items.map(urlShortcutItemHtml).join('');
+            const catEsc = escHtml(cat);
+            const catAttr = cat.replace(/"/g, '&quot;');
+            customRoot.insertAdjacentHTML('beforeend', `
+                <div class="nav-sub-group collapsed" data-url-category="${catAttr}">
+                    <div class="nav-sub-label" onclick="toggleUrlCategoryGroup(this)">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                        <span>${catEsc}</span>
+                        <svg class="nav-caret" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 9l-7 7-7-7"/></svg>
+                    </div>
+                    ${itemsHtml}
+                </div>`);
+        }
+    });
+
+    // 5. 열림 상태 복원
+    applyUrlCategoryOpenState();
+}
+
+function openUrlShortcutModal(id) {
+    const isEdit = id != null;
+    const s = isEdit ? urlShortcuts.find(x => x.id === id) : null;
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    if (!body) return;
+    title.textContent = isEdit ? 'URL 편집' : '새 URL 추가';
+
+    // 카테고리 자동완성: 기존 하드코딩 + 사용자 추가
+    const hardcodedCats = ['마케팅채널', '쇼핑몰', '리틀리'];
+    const userCats = [...new Set(urlShortcuts.map(x => x.category).filter(Boolean))];
+    const allCats = [...new Set([...hardcodedCats, ...userCats])];
+
+    body.innerHTML = `
+        <div class="form-section-title">🔗 ${isEdit ? 'URL 편집' : 'URL 추가'}</div>
+        <div class="form-group">
+            <label class="form-label">제목 <span style="color:var(--red)">*</span></label>
+            <input id="urlShortcutTitle" class="form-input" placeholder="표시될 이름" value="${escHtml(s ? s.title || '' : '')}">
+        </div>
+        <div class="form-group">
+            <label class="form-label">URL <span style="color:var(--red)">*</span></label>
+            <input id="urlShortcutUrl" class="form-input" placeholder="https://..." value="${escHtml(s ? s.url || '' : '')}">
+        </div>
+        <div class="form-group">
+            <label class="form-label">카테고리 <span style="color:var(--red)">*</span></label>
+            <input id="urlShortcutCategory" class="form-input" list="urlCatDatalist" placeholder="예: 마케팅채널, 쇼핑몰 — 또는 새 카테고리 입력" value="${escHtml(s ? s.category || '' : '')}">
+            <datalist id="urlCatDatalist">${allCats.map(c => `<option value="${escHtml(c)}">`).join('')}</datalist>
+            <div style="font-size:11px;color:var(--gray-500);margin-top:4px">기존 카테고리를 선택하거나 새 카테고리 이름을 입력하세요.</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+            ${isEdit ? `<button class="btn-export" onclick="deleteUrlShortcut(${id})" style="color:var(--red);border-color:var(--red)">삭제</button>` : ''}
+            <button class="form-submit" onclick="saveUrlShortcut(${isEdit ? id : 'null'})" style="flex:1">${isEdit ? '수정 저장' : '추가'}</button>
+        </div>
+    `;
+    document.getElementById('modalOverlay').classList.add('show');
+    openModalHistory();
+}
+
+async function saveUrlShortcut(id) {
+    const title = (document.getElementById('urlShortcutTitle').value || '').trim();
+    const url = (document.getElementById('urlShortcutUrl').value || '').trim();
+    const category = (document.getElementById('urlShortcutCategory').value || '').trim();
+    if (!title) { showToast('제목을 입력하세요'); return; }
+    if (!url) { showToast('URL을 입력하세요'); return; }
+    if (!category) { showToast('카테고리를 입력하세요'); return; }
+    const payload = { title, url, category };
+    try {
+        if (id) {
+            const { data, error } = await sb.from('url_shortcuts').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+            if (error) throw error;
+            const idx = urlShortcuts.findIndex(x => x.id === id);
+            if (idx >= 0) urlShortcuts[idx] = data;
+            showToast('URL이 수정되었습니다');
+        } else {
+            const { data, error } = await sb.from('url_shortcuts').insert(payload).select().single();
+            if (error) throw error;
+            urlShortcuts.push(data);
+            // 추가한 카테고리는 열린 상태로
+            const opens = getOpenUrlCats();
+            opens.add(category);
+            saveOpenUrlCats(opens);
+            showToast('URL이 추가되었습니다');
+        }
+        closeModal();
+        renderUrlShortcuts();
+    } catch (err) {
+        console.error(err);
+        showToast('저장 실패: ' + err.message);
+    }
+}
+
+async function deleteUrlShortcut(id) {
+    if (!confirm('이 URL을 삭제할까요?')) return;
+    try {
+        const { error } = await sb.from('url_shortcuts').delete().eq('id', id);
+        if (error) throw error;
+        urlShortcuts = urlShortcuts.filter(x => x.id !== id);
+        closeModal();
+        renderUrlShortcuts();
+        showToast('삭제되었습니다');
+    } catch (err) {
+        console.error(err);
+        showToast('삭제 실패: ' + err.message);
     }
 }
 
