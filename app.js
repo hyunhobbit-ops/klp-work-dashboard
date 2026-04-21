@@ -8211,7 +8211,9 @@ async function renderPlanningHomeSection() {
             const dd = planningDDay(post.deadline);
             const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:11px;font-weight:800;padding:2px 7px;border-radius:5px">${dd.label}</span>` : '';
             const preview = String(post.content || '').slice(0, 60);
-            const projMode = (proj.access || 'company') === 'company' ? 'company' : 'personal';
+            // 회사/가족 프로젝트는 회사 메뉴, 개인 프로젝트는 개인 메뉴
+            const projAcc = proj.access || 'company';
+            const projMode = projAcc === 'personal' ? 'personal' : 'company';
             return `<div onclick="switchTab('planning-${projMode}');setTimeout(()=>openPlanningProject(${proj.id}),60)" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--gray-100);cursor:pointer;transition:background .1s" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background='transparent'">
                 <span style="background:${s[0]};color:${s[1]};font-size:11px;font-weight:800;padding:3px 8px;border-radius:5px;white-space:nowrap">${s[2]}</span>
                 <div style="flex:1;min-width:0">
@@ -8306,8 +8308,10 @@ function planningUserCanSeeProject(p) {
 function planningCanSeeProject(p) {
     if (!planningUserCanSeeProject(p)) return false;
     const acc = p.access || 'company';
-    if (currentPlanningMode === 'company') return acc === 'company';
-    if (currentPlanningMode === 'personal') return acc === 'personal' || acc === 'family';
+    // 회사 메뉴 = 회사 + 가족 (관리자 3인 공유)
+    if (currentPlanningMode === 'company') return acc === 'company' || acc === 'family';
+    // 개인 메뉴 = 본인의 개인 프로젝트만
+    if (currentPlanningMode === 'personal') return acc === 'personal';
     return false;
 }
 function renderPlanningList() {
@@ -8386,10 +8390,8 @@ function renderPlanningList() {
 
     const modeLabel = currentPlanningMode === 'company' ? '🏢 회사 프로젝트' : '🧑 개인 프로젝트';
     const modeSub = currentPlanningMode === 'company'
-        ? '회사 공유 프로젝트 — 김관택·김현호·이현주만 열람 가능'
-        : (planningIsAdmin()
-            ? '개인 전용 + 가족 프로젝트 (가족 프로젝트는 관리자 3인만 공유)'
-            : '본인의 개인 프로젝트만 표시됩니다');
+        ? '회사/가족 공유 프로젝트 — 김관택·김현호·이현주만 열람 가능'
+        : '본인이 작성한 개인 프로젝트만 표시됩니다';
     return `
         <div style="padding:20px 24px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
@@ -8983,9 +8985,10 @@ function openNewPlanningModal(defaultPeriod) {
     if (!body) return;
     const pd = defaultPeriod || 'month';
     // 현재 메뉴(모드)에 따라 선택 가능한 공개 범위 제한
+    // 회사 메뉴: 회사 / 가족 (관리자 3인 공유) | 개인 메뉴: 개인 (본인만)
     const allowedKeys = currentPlanningMode === 'company'
-        ? ['company']
-        : (planningIsAdmin() ? ['personal', 'family'] : ['personal']);
+        ? (planningIsAdmin() ? ['company', 'family'] : ['company'])
+        : ['personal'];
     const defaultAccess = allowedKeys[0];
     const accessOptions = PLANNING_CATEGORIES_ACCESS.filter(c => allowedKeys.includes(c.key));
     const accessChips = accessOptions.map(c => {
@@ -9066,10 +9069,11 @@ function openEditPlanningModal(id) {
     if (!body) return;
     const pd = p.period || 'month';
     const curAccess = p.access || 'company';
-    // 현재 모드에서 이동 가능한 공개 범위로 제한 (회사 메뉴 → 회사, 개인 메뉴 → 개인/(관리자에 한해)가족)
+    // 현재 모드에서 이동 가능한 공개 범위로 제한
+    // 회사 메뉴: 회사 / (관리자에 한해) 가족 | 개인 메뉴: 개인
     const allowedEditKeys = currentPlanningMode === 'company'
-        ? ['company']
-        : (planningIsAdmin() ? ['personal', 'family'] : ['personal']);
+        ? (planningIsAdmin() ? ['company', 'family'] : ['company'])
+        : ['personal'];
     // 현재 값이 허용 범위 밖(예: 기존 데이터 충돌)이라도 유지되도록 포함
     if (!allowedEditKeys.includes(curAccess)) allowedEditKeys.unshift(curAccess);
     const accessChips = PLANNING_CATEGORIES_ACCESS.filter(c => allowedEditKeys.includes(c.key)).map(c => {
@@ -9130,8 +9134,8 @@ async function savePlanningProject() {
     const rawAccess = accessEl ? accessEl.value : modeDefault;
     // 현재 모드에서 허용된 값만 통과 (서버측 제한은 없지만 UI 강제)
     const allowed = currentPlanningMode === 'company'
-        ? ['company']
-        : (planningIsAdmin() ? ['personal', 'family'] : ['personal']);
+        ? (planningIsAdmin() ? ['company', 'family'] : ['company'])
+        : ['personal'];
     const access = allowed.includes(rawAccess) ? rawAccess : modeDefault;
     const targetMonth = period === 'month' ? (document.getElementById('newPlanningTargetMonth').value || '') : '';
     const targetYear = period === 'year' ? (document.getElementById('newPlanningTargetYear').value || '') : '';
