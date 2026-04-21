@@ -8047,6 +8047,8 @@ function applyPlanningPermission() {
     if (navCo) navCo.style.display = planningCanAccessMode('company') ? '' : 'none';
     const navPe = document.getElementById('navPlanningPersonal');
     if (navPe) navPe.style.display = planningCanAccessMode('personal') ? '' : 'none';
+    const group = document.getElementById('navPlanningGroup');
+    if (group) group.style.display = planningCanAccess() ? '' : 'none';
     const homeSec = document.getElementById('homePlanningSection');
     if (homeSec) homeSec.style.display = planningCanAccess() ? '' : 'none';
 }
