@@ -8055,6 +8055,39 @@ function applyPlanningPermission() {
 function planningCurrentOwner() {
     return currentUser ? (currentUser.loginName || String(currentUser.id || currentUser.name)) : '';
 }
+
+// 비용 입력 콤마 자동 포맷 (커서 위치 보정)
+function fmtPlanningCostInput(el) {
+    if (!el) return;
+    const before = el.value;
+    const cursorEnd = el.selectionStart;
+    const digitsBeforeCursor = before.substring(0, cursorEnd).replace(/[^0-9]/g, '').length;
+    const digits = before.replace(/[^0-9]/g, '');
+    const formatted = digits ? Number(digits).toLocaleString() : '';
+    el.value = formatted;
+    // 커서 위치: 숫자 N개만큼 뒤의 위치 찾기
+    let pos = 0, count = 0;
+    while (pos < formatted.length && count < digitsBeforeCursor) {
+        if (/[0-9]/.test(formatted[pos])) count++;
+        pos++;
+    }
+    try { el.setSelectionRange(pos, pos); } catch (e) {}
+}
+
+// 개인 프로젝트 모달의 장소/비용 섹션 토글
+function togglePlanningExtraSection(secId, btnId, show) {
+    const sec = document.getElementById(secId);
+    const btn = document.getElementById(btnId);
+    if (!sec) return;
+    sec.style.display = show ? '' : 'none';
+    if (btn) btn.style.display = show ? 'none' : '';
+    if (!show) {
+        sec.querySelectorAll('input').forEach(el => { el.value = ''; });
+    } else {
+        const inp = sec.querySelector('input');
+        if (inp) setTimeout(() => inp.focus(), 30);
+    }
+}
 function planningLastDayOfMonth(ym) {
     if (!ym) return '';
     const [y, m] = ym.split('-').map(Number);
@@ -8081,6 +8114,8 @@ function planningProjectFromDb(r) {
         targetMonth: r.target_month || '',
         targetYear: r.target_year || '',
         deadline: r.deadline || '',
+        location: r.location || '',
+        cost: r.cost != null ? Number(r.cost) : null,
         createdBy: r.created_by || '',
         ownerLogin: r.owner_login || '',
         createdAt: r.created_at,
@@ -8098,6 +8133,8 @@ function planningProjectToDb(p) {
         target_month: p.targetMonth || '',
         target_year: p.targetYear || '',
         deadline: p.deadline || null,
+        location: p.location || '',
+        cost: (p.cost == null || p.cost === '') ? null : Number(p.cost),
         created_by: p.createdBy || '',
         owner_login: p.ownerLogin || ''
     };
@@ -8522,6 +8559,10 @@ function renderPlanningDetail(p) {
                     <div style="flex:1;min-width:0">
                         <div style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">${planningEsc(p.name)}</div>
                         ${p.description ? `<div style="font-size:13px;color:var(--gray-500);line-height:1.5;white-space:pre-wrap">${planningEsc(p.description)}</div>` : ''}
+                        ${(p.location || p.cost != null) ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:12px">
+                            ${p.location ? `<span style="background:var(--blue-light,#DBEAFE);color:#1D4ED8;padding:3px 10px;border-radius:6px;font-weight:700">📍 ${planningEsc(p.location)}</span>` : ''}
+                            ${p.cost != null ? `<span style="background:var(--green-light,#D1FAE5);color:#047857;padding:3px 10px;border-radius:6px;font-weight:700">💰 ${Number(p.cost).toLocaleString()}원</span>` : ''}
+                        </div>` : ''}
                         <div style="font-size:11px;color:var(--gray-500);margin-top:8px">만든 사람: ${planningEsc(p.createdBy)} · ${planningFmtDate(p.createdAt)}</div>
                     </div>
                     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -8990,10 +9031,31 @@ function openNewPlanningModal(defaultPeriod) {
     for (let y = now.getFullYear() - 1; y <= now.getFullYear() + 5; y++) {
         yearOpts.push(`<option value="${y}" ${y === now.getFullYear() ? 'selected' : ''}>${y}년</option>`);
     }
+    const extrasBlock = currentPlanningMode === 'personal' ? `
+        <div class="form-group" id="newPlanningLocationSec" style="display:none;background:var(--bg-secondary,#f9fafb);border:1px solid var(--gray-200);border-radius:8px;padding:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <label class="form-label" style="margin:0">📍 장소</label>
+                <button type="button" onclick="togglePlanningExtraSection('newPlanningLocationSec','newPlanningLocationAdd',false)" style="padding:2px 10px;border:1px solid var(--gray-300);background:transparent;color:var(--gray-600);border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
+            </div>
+            <input id="newPlanningLocation" class="form-input" placeholder="장소를 입력해주세요">
+        </div>
+        <div class="form-group" id="newPlanningCostSec" style="display:none;background:var(--bg-secondary,#f9fafb);border:1px solid var(--gray-200);border-radius:8px;padding:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <label class="form-label" style="margin:0">💰 비용</label>
+                <button type="button" onclick="togglePlanningExtraSection('newPlanningCostSec','newPlanningCostAdd',false)" style="padding:2px 10px;border:1px solid var(--gray-300);background:transparent;color:var(--gray-600);border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
+            </div>
+            <input id="newPlanningCost" class="form-input" inputmode="numeric" placeholder="0" oninput="fmtPlanningCostInput(this)">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button type="button" id="newPlanningLocationAdd" onclick="togglePlanningExtraSection('newPlanningLocationSec','newPlanningLocationAdd',true)" style="flex:1;padding:8px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ 장소 추가</button>
+            <button type="button" id="newPlanningCostAdd" onclick="togglePlanningExtraSection('newPlanningCostSec','newPlanningCostAdd',true)" style="flex:1;padding:8px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ 비용 추가</button>
+        </div>
+    ` : '';
     body.innerHTML = `
         <div class="form-section-title">+ 새 프로젝트</div>
         <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="newPlanningName" class="form-input" placeholder="예: 원데이강의 준비, 시계 부품 구입"></div>
         <div class="form-group"><label class="form-label">설명 (선택)</label><textarea id="newPlanningDesc" class="form-input" rows="8" placeholder="이 프로젝트의 목표, 배경을 적어주세요" style="min-height:180px;resize:vertical"></textarea></div>
+        ${extrasBlock}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">기간 구분</label>
                 <select id="newPlanningPeriod" class="form-select" onchange="togglePlanningPeriodInputs()">${PLANNING_PERIODS.map(pp => `<option value="${pp.key}" ${pp.key === pd ? 'selected' : ''}>${pp.icon} ${pp.label}</option>`).join('')}</select>
@@ -9053,10 +9115,35 @@ function openEditPlanningModal(id) {
     for (let y = now.getFullYear() - 2; y <= now.getFullYear() + 5; y++) {
         yearOpts.push(`<option value="${y}" ${String(y) === String(p.targetYear || now.getFullYear()) ? 'selected' : ''}>${y}년</option>`);
     }
+    const isPersonal = (p.access || 'company') === 'personal';
+    const hasLocation = !!(p.location && p.location.trim());
+    const hasCost = p.cost != null && p.cost !== '';
+    const costFormatted = hasCost ? Number(p.cost).toLocaleString() : '';
+    const editExtrasBlock = isPersonal ? `
+        <div class="form-group" id="editPlanningLocationSec" style="display:${hasLocation ? '' : 'none'};background:var(--bg-secondary,#f9fafb);border:1px solid var(--gray-200);border-radius:8px;padding:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <label class="form-label" style="margin:0">📍 장소</label>
+                <button type="button" onclick="togglePlanningExtraSection('editPlanningLocationSec','editPlanningLocationAdd',false)" style="padding:2px 10px;border:1px solid var(--gray-300);background:transparent;color:var(--gray-600);border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
+            </div>
+            <input id="editPlanningLocation" class="form-input" placeholder="장소를 입력해주세요" value="${planningEsc(p.location || '')}">
+        </div>
+        <div class="form-group" id="editPlanningCostSec" style="display:${hasCost ? '' : 'none'};background:var(--bg-secondary,#f9fafb);border:1px solid var(--gray-200);border-radius:8px;padding:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <label class="form-label" style="margin:0">💰 비용</label>
+                <button type="button" onclick="togglePlanningExtraSection('editPlanningCostSec','editPlanningCostAdd',false)" style="padding:2px 10px;border:1px solid var(--gray-300);background:transparent;color:var(--gray-600);border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
+            </div>
+            <input id="editPlanningCost" class="form-input" inputmode="numeric" placeholder="0" value="${costFormatted}" oninput="fmtPlanningCostInput(this)">
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button type="button" id="editPlanningLocationAdd" onclick="togglePlanningExtraSection('editPlanningLocationSec','editPlanningLocationAdd',true)" style="flex:1;padding:8px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:${hasLocation ? 'none' : ''}">+ 장소 추가</button>
+            <button type="button" id="editPlanningCostAdd" onclick="togglePlanningExtraSection('editPlanningCostSec','editPlanningCostAdd',true)" style="flex:1;padding:8px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:${hasCost ? 'none' : ''}">+ 비용 추가</button>
+        </div>
+    ` : '';
     body.innerHTML = `
         <div class="form-section-title">✏️ 프로젝트 편집</div>
         <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="editPlanningName" class="form-input" value="${planningEsc(p.name)}"></div>
         <div class="form-group"><label class="form-label">설명</label><textarea id="editPlanningDesc" class="form-input" rows="8" style="min-height:180px;resize:vertical">${planningEsc(p.description || '')}</textarea></div>
+        ${editExtrasBlock}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">기간 구분</label>
                 <select id="editPlanningPeriod" class="form-select" onchange="toggleEditPlanningPeriodInputs()">${PLANNING_PERIODS.map(pp => `<option value="${pp.key}" ${pp.key === pd ? 'selected' : ''}>${pp.icon} ${pp.label}</option>`).join('')}</select>
@@ -9091,6 +9178,11 @@ async function savePlanningProject() {
     let deadline = document.getElementById('newPlanningDeadline').value || '';
     // 공개 범위는 현재 메뉴에 따라 자동 설정 (회사 메뉴 → company, 개인 메뉴 → personal)
     const access = currentPlanningMode === 'company' ? 'company' : 'personal';
+    const locEl = document.getElementById('newPlanningLocation');
+    const costEl = document.getElementById('newPlanningCost');
+    const location = locEl && locEl.offsetParent !== null ? (locEl.value || '').trim() : '';
+    const costStr = costEl && costEl.offsetParent !== null ? (costEl.value || '') : '';
+    const cost = costStr ? Number(costStr.replace(/[^0-9]/g, '')) : null;
     const targetMonth = period === 'month' ? (document.getElementById('newPlanningTargetMonth').value || '') : '';
     const targetYear = period === 'year' ? (document.getElementById('newPlanningTargetYear').value || '') : '';
     if (!deadline) {
@@ -9099,7 +9191,7 @@ async function savePlanningProject() {
     }
     const payload = planningProjectToDb({
         name, description: desc, status, period, deadline,
-        access, targetMonth, targetYear,
+        access, targetMonth, targetYear, location, cost,
         createdBy: currentUser ? currentUser.name : '익명',
         ownerLogin: planningCurrentOwner()
     });
@@ -9125,6 +9217,11 @@ async function savePlanningProjectEdit(id) {
     const period = document.getElementById('editPlanningPeriod').value;
     // 공개 범위는 기존 값 유지 (UI에서 제거됨)
     const access = p.access || 'company';
+    const editLocEl = document.getElementById('editPlanningLocation');
+    const editCostEl = document.getElementById('editPlanningCost');
+    const location = editLocEl && editLocEl.offsetParent !== null ? (editLocEl.value || '').trim() : '';
+    const editCostStr = editCostEl && editCostEl.offsetParent !== null ? (editCostEl.value || '') : '';
+    const cost = editCostStr ? Number(editCostStr.replace(/[^0-9]/g, '')) : null;
     const targetMonth = period === 'month' ? (document.getElementById('editPlanningTargetMonth').value || '') : '';
     const targetYear = period === 'year' ? (document.getElementById('editPlanningTargetYear').value || '') : '';
     let deadline = document.getElementById('editPlanningDeadline').value || '';
@@ -9136,6 +9233,8 @@ async function savePlanningProjectEdit(id) {
         name, description, status, period, access,
         target_month: targetMonth, target_year: targetYear,
         deadline: deadline || null,
+        location: location || '',
+        cost: cost == null ? null : cost,
         updated_at: new Date().toISOString()
     };
     try {
