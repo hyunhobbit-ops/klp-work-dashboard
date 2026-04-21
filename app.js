@@ -8637,7 +8637,7 @@ function renderPlanningList() {
                         </div>
                     </div>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px">${cards || '<div style="padding:16px;color:var(--gray-400);font-size:13px">프로젝트가 없습니다</div>'}</div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px">${cards}${sec.key === 'active' ? quickAddCard('funding') : (cards ? '' : '<div style="padding:16px;color:var(--gray-400);font-size:13px">프로젝트가 없습니다</div>')}</div>
             </section>`;
         }).join('');
         return `
