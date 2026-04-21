@@ -1017,6 +1017,25 @@ function toggleCustomInput(selectId, inputId) {
     if (sel.value !== '기타') inp.value = '';
 }
 
+// 국내 프로젝트 모달의 인쇄/포장 섹션 토글 (show=true 펼침, false 접기+값 초기화)
+function toggleProjSection(secId, btnId, show, recalcFnName) {
+    const sec = document.getElementById(secId);
+    const btn = document.getElementById(btnId);
+    if (!sec) return;
+    sec.style.display = show ? '' : 'none';
+    if (btn) btn.style.display = show ? 'none' : '';
+    if (!show) {
+        sec.querySelectorAll('input').forEach(el => {
+            if (el.type === 'text' || el.type === 'number' || !el.type) el.value = '';
+            if (el.id && el.id.endsWith('Custom')) el.style.display = 'none';
+        });
+        sec.querySelectorAll('select').forEach(el => { el.selectedIndex = 0; });
+        if (recalcFnName && typeof window[recalcFnName] === 'function') {
+            try { window[recalcFnName](); } catch (e) {}
+        }
+    }
+}
+
 function toggleShippingFields(prefix) {
     const typeEl = document.getElementById(prefix + 'ProjectShippingType') || document.getElementById(prefix + 'ShippingType');
     if (!typeEl) return;
@@ -2857,62 +2876,88 @@ function openEditProject(id) {
             </div>
         `)}
 
+        ${(() => {
+            const eHasPrint = (p.printMethod && p.printMethod !== '없음') || Number(p.printFee || p.printCost) > 0;
+            const eHasPack = Number(p.packagingFee || p.packCost) > 0 || (p.packaging && p.packaging !== '개별박스');
+            return secCard(`
+            <div class="form-section-title">🖨️ 인쇄 · 포장 <span style="font-size:12px;font-weight:600;color:var(--blue);margin-left:6px">(매출 기준)</span></div>
+
+            <div id="editPrintSec" style="display:${eHasPrint ? '' : 'none'};border-top:1px dashed var(--gray-200);margin-top:8px;padding-top:8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <div style="font-size:12px;font-weight:800;color:var(--gray-700);letter-spacing:.5px">🖨️ 인쇄</div>
+                    <button type="button" onclick="toggleProjSection('editPrintSec','editPrintAdd',false,'calcEditProjectRevenue')" style="padding:2px 10px;border:1px solid var(--gray-300);background:transparent;color:var(--gray-600);border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">인쇄 방법</label>
+                        <select class="form-select" id="editProjectPrintMethod" onchange="toggleCustomInput('editProjectPrintMethod','editProjectPrintMethodCustom')">
+                            ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u=>{
+                                const isCustom = !['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].includes(p.printMethod);
+                                const selected = p.printMethod===u || (u==='기타' && isCustom);
+                                return `<option ${selected?'selected':''}>${u}</option>`;
+                            }).join('')}
+                        </select>
+                        <input type="text" class="form-input" id="editProjectPrintMethodCustom" placeholder="인쇄 방법 직접 입력" value="${!['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타',''].includes(p.printMethod) ? p.printMethod : ''}" style="margin-top:6px;display:${!['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타',''].includes(p.printMethod) || p.printMethod==='기타' ? 'block' : 'none'}">
+                    </div>
+                </div>
+                <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                    <div class="form-group"><label class="form-label">인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectPrintFee" value="${(p.printFee || p.printCost) ? Number(p.printFee || p.printCost).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcEditProjectRevenue()"></div>
+                    <div class="form-group"><label class="form-label">VAT</label>
+                        <select class="form-select" id="editProjectPrintFeeVat" onchange="calcEditProjectRevenue()">
+                            <option ${printFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
+                            <option ${printFeeVat==='VAT 포함'?'selected':''}>VAT 포함</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">적용 방식</label>
+                        <select class="form-select" id="editProjectPrintFeeApply" onchange="calcEditProjectRevenue()">
+                            <option ${printFeeApply==='1개당'?'selected':''}>1개당</option>
+                            <option ${printFeeApply==='일괄'?'selected':''}>일괄</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div id="editPackSec" style="display:${eHasPack ? '' : 'none'};border-top:1px dashed var(--gray-200);margin-top:8px;padding-top:8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <div style="font-size:12px;font-weight:800;color:var(--gray-700);letter-spacing:.5px">📦 포장</div>
+                    <button type="button" onclick="toggleProjSection('editPackSec','editPackAdd',false,'calcEditProjectRevenue')" style="padding:2px 10px;border:1px solid var(--gray-300);background:transparent;color:var(--gray-600);border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label class="form-label">포장</label>
+                        <select class="form-select" id="editProjectPackaging" onchange="toggleCustomInput('editProjectPackaging','editProjectPackagingCustom')">
+                            ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u=>{
+                                const isCustom = !['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타',''].includes(p.packaging);
+                                const selected = p.packaging===u || (u==='기타' && isCustom);
+                                return `<option ${selected?'selected':''}>${u}</option>`;
+                            }).join('')}
+                        </select>
+                        <input type="text" class="form-input" id="editProjectPackagingCustom" placeholder="포장 방법 직접 입력" value="${!['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타',''].includes(p.packaging) ? p.packaging : ''}" style="margin-top:6px;display:${!['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타',''].includes(p.packaging) || p.packaging==='기타' ? 'block' : 'none'}">
+                    </div>
+                </div>
+                <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                    <div class="form-group"><label class="form-label">포장비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectPackFee" value="${(p.packagingFee || p.packCost) ? Number(p.packagingFee || p.packCost).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcEditProjectRevenue()"></div>
+                    <div class="form-group"><label class="form-label">VAT</label>
+                        <select class="form-select" id="editProjectPackFeeVat" onchange="calcEditProjectRevenue()">
+                            <option ${packagingFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
+                            <option ${packagingFeeVat==='VAT 포함'?'selected':''}>VAT 포함</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">적용 방식</label>
+                        <select class="form-select" id="editProjectPackFeeApply" onchange="calcEditProjectRevenue()">
+                            <option ${packagingFeeApply==='1개당'?'selected':''}>1개당</option>
+                            <option ${packagingFeeApply==='일괄'?'selected':''}>일괄</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:8px;border-top:1px solid var(--gray-100)">
+                <button type="button" id="editPrintAdd" onclick="toggleProjSection('editPrintSec','editPrintAdd',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:${eHasPrint ? 'none' : ''}">+ 인쇄 추가</button>
+                <button type="button" id="editPackAdd" onclick="toggleProjSection('editPackSec','editPackAdd',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:${eHasPack ? 'none' : ''}">+ 포장 추가</button>
+            </div>
+            `)
+        })()}
+
         ${secCard(`
-            <div class="form-section-title">🖨️ 인쇄 / 포장 <span style="font-size:12px;font-weight:600;color:var(--blue);margin-left:6px">(매출 기준)</span></div>
-            <div class="form-row">
-                <div class="form-group"><label class="form-label">인쇄 방법</label>
-                    <select class="form-select" id="editProjectPrintMethod" onchange="toggleCustomInput('editProjectPrintMethod','editProjectPrintMethodCustom')">
-                        ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u=>{
-                            const isCustom = !['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].includes(p.printMethod);
-                            const selected = p.printMethod===u || (u==='기타' && isCustom);
-                            return `<option ${selected?'selected':''}>${u}</option>`;
-                        }).join('')}
-                    </select>
-                    <input type="text" class="form-input" id="editProjectPrintMethodCustom" placeholder="인쇄 방법 직접 입력" value="${!['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타',''].includes(p.printMethod) ? p.printMethod : ''}" style="margin-top:6px;display:${!['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타',''].includes(p.printMethod) || p.printMethod==='기타' ? 'block' : 'none'}">
-                </div>
-            </div>
-            <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                <div class="form-group"><label class="form-label">인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectPrintFee" value="${(p.printFee || p.printCost) ? Number(p.printFee || p.printCost).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcEditProjectRevenue()"></div>
-                <div class="form-group"><label class="form-label">VAT</label>
-                    <select class="form-select" id="editProjectPrintFeeVat" onchange="calcEditProjectRevenue()">
-                        <option ${printFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
-                        <option ${printFeeVat==='VAT 포함'?'selected':''}>VAT 포함</option>
-                    </select>
-                </div>
-                <div class="form-group"><label class="form-label">적용 방식</label>
-                    <select class="form-select" id="editProjectPrintFeeApply" onchange="calcEditProjectRevenue()">
-                        <option ${printFeeApply==='1개당'?'selected':''}>1개당</option>
-                        <option ${printFeeApply==='일괄'?'selected':''}>일괄</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group"><label class="form-label">포장</label>
-                    <select class="form-select" id="editProjectPackaging" onchange="toggleCustomInput('editProjectPackaging','editProjectPackagingCustom')">
-                        ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u=>{
-                            const isCustom = !['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타',''].includes(p.packaging);
-                            const selected = p.packaging===u || (u==='기타' && isCustom);
-                            return `<option ${selected?'selected':''}>${u}</option>`;
-                        }).join('')}
-                    </select>
-                    <input type="text" class="form-input" id="editProjectPackagingCustom" placeholder="포장 방법 직접 입력" value="${!['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타',''].includes(p.packaging) ? p.packaging : ''}" style="margin-top:6px;display:${!['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타',''].includes(p.packaging) || p.packaging==='기타' ? 'block' : 'none'}">
-                </div>
-            </div>
-            <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                <div class="form-group"><label class="form-label">포장비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectPackFee" value="${(p.packagingFee || p.packCost) ? Number(p.packagingFee || p.packCost).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcEditProjectRevenue()"></div>
-                <div class="form-group"><label class="form-label">VAT</label>
-                    <select class="form-select" id="editProjectPackFeeVat" onchange="calcEditProjectRevenue()">
-                        <option ${packagingFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
-                        <option ${packagingFeeVat==='VAT 포함'?'selected':''}>VAT 포함</option>
-                    </select>
-                </div>
-                <div class="form-group"><label class="form-label">적용 방식</label>
-                    <select class="form-select" id="editProjectPackFeeApply" onchange="calcEditProjectRevenue()">
-                        <option ${packagingFeeApply==='1개당'?'selected':''}>1개당</option>
-                        <option ${packagingFeeApply==='일괄'?'selected':''}>일괄</option>
-                    </select>
-                </div>
-            </div>
             <div class="form-section-title">🚚 배송비</div>
             <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
                 <div class="form-group"><label class="form-label">배송 방법</label>
@@ -2965,35 +3010,51 @@ function openEditProject(id) {
                     </select>
                 </div>
             </div>
-            <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                <div class="form-group"><label class="form-label">매입 인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectSupPrintFee" value="${p.supplierPrintFee ? Number(p.supplierPrintFee).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcEditSupplierTotal()"></div>
-                <div class="form-group"><label class="form-label">VAT</label>
-                    <select class="form-select" id="editProjectSupPrintFeeVat" onchange="calcEditSupplierTotal()">
-                        <option ${supPrintFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
-                        <option ${supPrintFeeVat==='VAT 포함'?'selected':''}>VAT 포함</option>
-                    </select>
+            <div id="editSupPrintSec" style="display:${Number(p.supplierPrintFee) > 0 ? '' : 'none'};border-top:1px dashed #FFE0CC;margin-top:8px;padding-top:8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <div style="font-size:12px;font-weight:800;color:var(--klp-orange,#E67E22);letter-spacing:.5px">🖨️ 매입 인쇄비</div>
+                    <button type="button" onclick="toggleProjSection('editSupPrintSec','editSupPrintAdd',false,'calcEditSupplierTotal')" style="padding:2px 10px;border:1px solid #FFD4A6;background:transparent;color:#B56500;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
                 </div>
-                <div class="form-group"><label class="form-label">적용 방식</label>
-                    <select class="form-select" id="editProjectSupPrintFeeApply" onchange="calcEditSupplierTotal()">
-                        <option ${supPrintFeeApply==='1개당'?'selected':''}>1개당</option>
-                        <option ${supPrintFeeApply==='일괄'?'selected':''}>일괄</option>
-                    </select>
+                <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                    <div class="form-group"><label class="form-label">매입 인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectSupPrintFee" value="${p.supplierPrintFee ? Number(p.supplierPrintFee).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcEditSupplierTotal()"></div>
+                    <div class="form-group"><label class="form-label">VAT</label>
+                        <select class="form-select" id="editProjectSupPrintFeeVat" onchange="calcEditSupplierTotal()">
+                            <option ${supPrintFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
+                            <option ${supPrintFeeVat==='VAT 포함'?'selected':''}>VAT 포함</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">적용 방식</label>
+                        <select class="form-select" id="editProjectSupPrintFeeApply" onchange="calcEditSupplierTotal()">
+                            <option ${supPrintFeeApply==='1개당'?'selected':''}>1개당</option>
+                            <option ${supPrintFeeApply==='일괄'?'selected':''}>일괄</option>
+                        </select>
+                    </div>
                 </div>
             </div>
-            <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                <div class="form-group"><label class="form-label">매입 포장비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectSupPackFee" value="${p.supplierPackagingFee ? Number(p.supplierPackagingFee).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcEditSupplierTotal()"></div>
-                <div class="form-group"><label class="form-label">VAT</label>
-                    <select class="form-select" id="editProjectSupPackFeeVat" onchange="calcEditSupplierTotal()">
-                        <option ${supPackFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
-                        <option ${supPackFeeVat==='VAT 포함'?'selected':''}>VAT 포함</option>
-                    </select>
+            <div id="editSupPackSec" style="display:${Number(p.supplierPackagingFee) > 0 ? '' : 'none'};border-top:1px dashed #FFE0CC;margin-top:8px;padding-top:8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <div style="font-size:12px;font-weight:800;color:var(--klp-orange,#E67E22);letter-spacing:.5px">📦 매입 포장비</div>
+                    <button type="button" onclick="toggleProjSection('editSupPackSec','editSupPackAdd',false,'calcEditSupplierTotal')" style="padding:2px 10px;border:1px solid #FFD4A6;background:transparent;color:#B56500;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
                 </div>
-                <div class="form-group"><label class="form-label">적용 방식</label>
-                    <select class="form-select" id="editProjectSupPackFeeApply" onchange="calcEditSupplierTotal()">
-                        <option ${supPackFeeApply==='1개당'?'selected':''}>1개당</option>
-                        <option ${supPackFeeApply==='일괄'?'selected':''}>일괄</option>
-                    </select>
+                <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                    <div class="form-group"><label class="form-label">매입 포장비</label><input type="text" inputmode="numeric" class="form-input" id="editProjectSupPackFee" value="${p.supplierPackagingFee ? Number(p.supplierPackagingFee).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcEditSupplierTotal()"></div>
+                    <div class="form-group"><label class="form-label">VAT</label>
+                        <select class="form-select" id="editProjectSupPackFeeVat" onchange="calcEditSupplierTotal()">
+                            <option ${supPackFeeVat==='VAT 별도'?'selected':''}>VAT 별도</option>
+                            <option ${supPackFeeVat==='VAT 포함'?'selected':''}>VAT 포함</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">적용 방식</label>
+                        <select class="form-select" id="editProjectSupPackFeeApply" onchange="calcEditSupplierTotal()">
+                            <option ${supPackFeeApply==='1개당'?'selected':''}>1개당</option>
+                            <option ${supPackFeeApply==='일괄'?'selected':''}>일괄</option>
+                        </select>
+                    </div>
                 </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:8px;border-top:1px solid #FFE0CC">
+                <button type="button" id="editSupPrintAdd" onclick="toggleProjSection('editSupPrintSec','editSupPrintAdd',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed #FFD4A6;background:transparent;color:#B56500;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:${Number(p.supplierPrintFee) > 0 ? 'none' : ''}">+ 매입 인쇄 추가</button>
+                <button type="button" id="editSupPackAdd" onclick="toggleProjSection('editSupPackSec','editSupPackAdd',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed #FFD4A6;background:transparent;color:#B56500;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:${Number(p.supplierPackagingFee) > 0 ? 'none' : ''}">+ 매입 포장 추가</button>
             </div>
             <div style="font-size:13px;font-weight:800;color:var(--klp-orange,#E67E22);margin:14px 0 8px;padding-bottom:6px;border-bottom:1px solid #FFE0CC">🚚 매입 배송비</div>
             <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
@@ -3410,50 +3471,76 @@ function openModal(type) {
                     </div>
                 `)}
 
+                ${(() => {
+                    const hasPrint = (v('printMethod') && v('printMethod') !== '없음') || Number(v('printFee')) > 0;
+                    const hasPack = Number(v('packagingFee')) > 0 || (v('packaging') && v('packaging') !== '개별박스');
+                    return secCard(`
+                    <div class="form-section-title">🖨️ 인쇄 · 포장 <span style="font-size:12px;font-weight:600;color:var(--blue);margin-left:6px">(매출 기준)</span></div>
+
+                    <div id="newPrintSec" style="display:${hasPrint ? '' : 'none'};border-top:1px dashed var(--gray-200);margin-top:8px;padding-top:8px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                            <div style="font-size:12px;font-weight:800;color:var(--gray-700);letter-spacing:.5px">🖨️ 인쇄</div>
+                            <button type="button" onclick="toggleProjSection('newPrintSec','newPrintAdd',false,'calcProjectRevenue')" style="padding:2px 10px;border:1px solid var(--gray-300);background:transparent;color:var(--gray-600);border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">인쇄 방법</label>
+                                <select class="form-select" id="newProjectPrintMethod" onchange="toggleCustomInput('newProjectPrintMethod','newProjectPrintMethodCustom')">
+                                    ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u=>{
+                                        const isCustom = v('printMethod') && !['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].includes(v('printMethod'));
+                                        const selected = v('printMethod')===u || (u==='기타' && isCustom);
+                                        return `<option ${selected?'selected':''}>${u}</option>`;
+                                    }).join('')}
+                                </select>
+                                <input type="text" class="form-input" id="newProjectPrintMethodCustom" placeholder="인쇄 방법 직접 입력" value="${!['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타',''].includes(v('printMethod')) ? v('printMethod') : ''}" style="margin-top:6px;display:none">
+                            </div>
+                        </div>
+                        <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                            <div class="form-group"><label class="form-label">인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectPrintFee" placeholder="0" value="${v('printFee') ? Number(v('printFee')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcProjectRevenue()"></div>
+                            <div class="form-group"><label class="form-label">VAT</label>
+                                <select class="form-select" id="newProjectPrintFeeVat" onchange="calcProjectRevenue()"><option>VAT 별도</option><option>VAT 포함</option></select>
+                            </div>
+                            <div class="form-group"><label class="form-label">적용 방식</label>
+                                <select class="form-select" id="newProjectPrintFeeApply" onchange="calcProjectRevenue()"><option>1개당</option><option>일괄</option></select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="newPackSec" style="display:${hasPack ? '' : 'none'};border-top:1px dashed var(--gray-200);margin-top:8px;padding-top:8px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                            <div style="font-size:12px;font-weight:800;color:var(--gray-700);letter-spacing:.5px">📦 포장</div>
+                            <button type="button" onclick="toggleProjSection('newPackSec','newPackAdd',false,'calcProjectRevenue')" style="padding:2px 10px;border:1px solid var(--gray-300);background:transparent;color:var(--gray-600);border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label class="form-label">포장</label>
+                                <select class="form-select" id="newProjectPackaging" onchange="toggleCustomInput('newProjectPackaging','newProjectPackagingCustom')">
+                                    ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u=>{
+                                        const isCustom = v('packaging') && !['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].includes(v('packaging'));
+                                        const selected = v('packaging')===u || (u==='기타' && isCustom);
+                                        return `<option ${selected?'selected':''}>${u}</option>`;
+                                    }).join('')}
+                                </select>
+                                <input type="text" class="form-input" id="newProjectPackagingCustom" placeholder="포장 방법 직접 입력" value="${!['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타',''].includes(v('packaging')) ? v('packaging') : ''}" style="margin-top:6px;display:none">
+                            </div>
+                        </div>
+                        <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                            <div class="form-group"><label class="form-label">포장비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectPackFee" placeholder="0" value="${v('packagingFee') ? Number(v('packagingFee')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcProjectRevenue()"></div>
+                            <div class="form-group"><label class="form-label">VAT</label>
+                                <select class="form-select" id="newProjectPackFeeVat" onchange="calcProjectRevenue()"><option>VAT 별도</option><option>VAT 포함</option></select>
+                            </div>
+                            <div class="form-group"><label class="form-label">적용 방식</label>
+                                <select class="form-select" id="newProjectPackFeeApply" onchange="calcProjectRevenue()"><option>1개당</option><option>일괄</option></select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:8px;border-top:1px solid var(--gray-100)">
+                        <button type="button" id="newPrintAdd" onclick="toggleProjSection('newPrintSec','newPrintAdd',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:${hasPrint ? 'none' : ''}">+ 인쇄 추가</button>
+                        <button type="button" id="newPackAdd" onclick="toggleProjSection('newPackSec','newPackAdd',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:${hasPack ? 'none' : ''}">+ 포장 추가</button>
+                    </div>
+                    `)
+                })()}
+
                 ${secCard(`
-                    <div class="form-section-title">🖨️ 인쇄 / 포장 <span style="font-size:12px;font-weight:600;color:var(--blue);margin-left:6px">(매출 기준)</span></div>
-                    <div class="form-row">
-                        <div class="form-group"><label class="form-label">인쇄 방법</label>
-                            <select class="form-select" id="newProjectPrintMethod" onchange="toggleCustomInput('newProjectPrintMethod','newProjectPrintMethodCustom')">
-                                ${['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].map(u=>{
-                                    const isCustom = v('printMethod') && !['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타'].includes(v('printMethod'));
-                                    const selected = v('printMethod')===u || (u==='기타' && isCustom);
-                                    return `<option ${selected?'selected':''}>${u}</option>`;
-                                }).join('')}
-                            </select>
-                            <input type="text" class="form-input" id="newProjectPrintMethodCustom" placeholder="인쇄 방법 직접 입력" value="${!['없음','실크인쇄','레이저각인','UV인쇄','패드인쇄','열전사','기타',''].includes(v('printMethod')) ? v('printMethod') : ''}" style="margin-top:6px;display:none">
-                        </div>
-                    </div>
-                    <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                        <div class="form-group"><label class="form-label">인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectPrintFee" placeholder="0" value="${v('printFee') ? Number(v('printFee')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcProjectRevenue()"></div>
-                        <div class="form-group"><label class="form-label">VAT</label>
-                            <select class="form-select" id="newProjectPrintFeeVat" onchange="calcProjectRevenue()"><option>VAT 별도</option><option>VAT 포함</option></select>
-                        </div>
-                        <div class="form-group"><label class="form-label">적용 방식</label>
-                            <select class="form-select" id="newProjectPrintFeeApply" onchange="calcProjectRevenue()"><option>1개당</option><option>일괄</option></select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group"><label class="form-label">포장</label>
-                            <select class="form-select" id="newProjectPackaging" onchange="toggleCustomInput('newProjectPackaging','newProjectPackagingCustom')">
-                                ${['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].map(u=>{
-                                    const isCustom = v('packaging') && !['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타'].includes(v('packaging'));
-                                    const selected = v('packaging')===u || (u==='기타' && isCustom);
-                                    return `<option ${selected?'selected':''}>${u}</option>`;
-                                }).join('')}
-                            </select>
-                            <input type="text" class="form-input" id="newProjectPackagingCustom" placeholder="포장 방법 직접 입력" value="${!['개별박스','선물포장','선물포장+라벨부착','에어캡포장','기타',''].includes(v('packaging')) ? v('packaging') : ''}" style="margin-top:6px;display:none">
-                        </div>
-                    </div>
-                    <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                        <div class="form-group"><label class="form-label">포장비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectPackFee" placeholder="0" value="${v('packagingFee') ? Number(v('packagingFee')).toLocaleString() : ''}" oninput="fmtProjectNumberInput(this);calcProjectRevenue()"></div>
-                        <div class="form-group"><label class="form-label">VAT</label>
-                            <select class="form-select" id="newProjectPackFeeVat" onchange="calcProjectRevenue()"><option>VAT 별도</option><option>VAT 포함</option></select>
-                        </div>
-                        <div class="form-group"><label class="form-label">적용 방식</label>
-                            <select class="form-select" id="newProjectPackFeeApply" onchange="calcProjectRevenue()"><option>1개당</option><option>일괄</option></select>
-                        </div>
-                    </div>
                     <div class="form-section-title">🚚 배송비</div>
                     <div class="form-row" style="grid-template-columns:1fr 1fr 1fr">
                         <div class="form-group"><label class="form-label">배송 방법</label>
@@ -3507,23 +3594,39 @@ function openModal(type) {
                             </select>
                         </div>
                     </div>
-                    <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                        <div class="form-group"><label class="form-label">매입 인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectSupPrintFee" placeholder="0" oninput="fmtProjectNumberInput(this);calcSupplierTotal()"></div>
-                        <div class="form-group"><label class="form-label">VAT</label>
-                            <select class="form-select" id="newProjectSupPrintFeeVat" onchange="calcSupplierTotal()"><option>VAT 별도</option><option>VAT 포함</option></select>
+                    <div id="newSupPrintSec" style="display:none;border-top:1px dashed #FFE0CC;margin-top:8px;padding-top:8px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                            <div style="font-size:12px;font-weight:800;color:var(--klp-orange,#E67E22);letter-spacing:.5px">🖨️ 매입 인쇄비</div>
+                            <button type="button" onclick="toggleProjSection('newSupPrintSec','newSupPrintAdd',false,'calcSupplierTotal')" style="padding:2px 10px;border:1px solid #FFD4A6;background:transparent;color:#B56500;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
                         </div>
-                        <div class="form-group"><label class="form-label">적용 방식</label>
-                            <select class="form-select" id="newProjectSupPrintFeeApply" onchange="calcSupplierTotal()"><option>1개당</option><option>일괄</option></select>
+                        <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                            <div class="form-group"><label class="form-label">매입 인쇄비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectSupPrintFee" placeholder="0" oninput="fmtProjectNumberInput(this);calcSupplierTotal()"></div>
+                            <div class="form-group"><label class="form-label">VAT</label>
+                                <select class="form-select" id="newProjectSupPrintFeeVat" onchange="calcSupplierTotal()"><option>VAT 별도</option><option>VAT 포함</option></select>
+                            </div>
+                            <div class="form-group"><label class="form-label">적용 방식</label>
+                                <select class="form-select" id="newProjectSupPrintFeeApply" onchange="calcSupplierTotal()"><option>1개당</option><option>일괄</option></select>
+                            </div>
                         </div>
                     </div>
-                    <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
-                        <div class="form-group"><label class="form-label">매입 포장비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectSupPackFee" placeholder="0" oninput="fmtProjectNumberInput(this);calcSupplierTotal()"></div>
-                        <div class="form-group"><label class="form-label">VAT</label>
-                            <select class="form-select" id="newProjectSupPackFeeVat" onchange="calcSupplierTotal()"><option>VAT 별도</option><option>VAT 포함</option></select>
+                    <div id="newSupPackSec" style="display:none;border-top:1px dashed #FFE0CC;margin-top:8px;padding-top:8px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                            <div style="font-size:12px;font-weight:800;color:var(--klp-orange,#E67E22);letter-spacing:.5px">📦 매입 포장비</div>
+                            <button type="button" onclick="toggleProjSection('newSupPackSec','newSupPackAdd',false,'calcSupplierTotal')" style="padding:2px 10px;border:1px solid #FFD4A6;background:transparent;color:#B56500;border-radius:6px;font-size:11px;cursor:pointer;font-family:inherit">× 제거</button>
                         </div>
-                        <div class="form-group"><label class="form-label">적용 방식</label>
-                            <select class="form-select" id="newProjectSupPackFeeApply" onchange="calcSupplierTotal()"><option>1개당</option><option>일괄</option></select>
+                        <div class="form-row" style="grid-template-columns:2fr 1fr 1fr">
+                            <div class="form-group"><label class="form-label">매입 포장비</label><input type="text" inputmode="numeric" class="form-input" id="newProjectSupPackFee" placeholder="0" oninput="fmtProjectNumberInput(this);calcSupplierTotal()"></div>
+                            <div class="form-group"><label class="form-label">VAT</label>
+                                <select class="form-select" id="newProjectSupPackFeeVat" onchange="calcSupplierTotal()"><option>VAT 별도</option><option>VAT 포함</option></select>
+                            </div>
+                            <div class="form-group"><label class="form-label">적용 방식</label>
+                                <select class="form-select" id="newProjectSupPackFeeApply" onchange="calcSupplierTotal()"><option>1개당</option><option>일괄</option></select>
+                            </div>
                         </div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:8px;border-top:1px solid #FFE0CC">
+                        <button type="button" id="newSupPrintAdd" onclick="toggleProjSection('newSupPrintSec','newSupPrintAdd',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed #FFD4A6;background:transparent;color:#B56500;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ 매입 인쇄 추가</button>
+                        <button type="button" id="newSupPackAdd" onclick="toggleProjSection('newSupPackSec','newSupPackAdd',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed #FFD4A6;background:transparent;color:#B56500;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ 매입 포장 추가</button>
                     </div>
                     <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid #FFE0CC">
                         <label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">💰 매입액 (자동계산)</label>
