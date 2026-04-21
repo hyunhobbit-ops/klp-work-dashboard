@@ -243,6 +243,7 @@ const pageTitles = {
     proposals: '제안서 관리',
     docs: '회사 문서',
     manual: '회사 매뉴얼',
+    'ceo-vision': '경영목표',
     clients: '고객사 리스트',
     marketdb: '중고마켓DB'
 };
