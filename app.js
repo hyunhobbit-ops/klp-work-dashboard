@@ -8983,22 +8983,6 @@ function openNewPlanningModal(defaultPeriod) {
     const body = document.getElementById('modalBody');
     if (!body) return;
     const pd = defaultPeriod || 'month';
-    // 현재 메뉴(모드)에 따라 선택 가능한 공개 범위 제한
-    // 회사 메뉴: 회사 / 가족 (관리자 3인 공유) | 개인 메뉴: 개인 (본인만)
-    const allowedKeys = currentPlanningMode === 'company'
-        ? (planningIsAdmin() ? ['company', 'family'] : ['company'])
-        : ['personal'];
-    const defaultAccess = allowedKeys[0];
-    const accessOptions = PLANNING_CATEGORIES_ACCESS.filter(c => allowedKeys.includes(c.key));
-    const accessChips = accessOptions.map(c => {
-        const checked = c.key === defaultAccess;
-        return `<label style="flex:1;min-width:100px;padding:10px;border:1.5px solid ${checked ? c.fg : 'var(--gray-200)'};background:${checked ? c.bg : 'var(--white)'};border-radius:8px;cursor:pointer;display:flex;flex-direction:column;gap:2px;align-items:center;text-align:center" onclick="document.querySelectorAll('.planning-access-option').forEach(el=>{el.style.borderColor='var(--gray-200)';el.style.background='var(--white)'});this.style.borderColor='${c.fg}';this.style.background='${c.bg}'" class="planning-access-option">
-        <input type="radio" name="newPlanningAccess" value="${c.key}" ${checked ? 'checked' : ''} style="display:none">
-        <span style="font-size:18px">${c.icon}</span>
-        <span style="font-size:13px;font-weight:800;color:${c.fg}">${c.label}</span>
-        <span style="font-size:10px;color:var(--gray-500)">${c.note}</span>
-    </label>`;
-    }).join('');
     const now = new Date();
     const curYM = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     const curY = String(now.getFullYear());
@@ -9009,9 +8993,6 @@ function openNewPlanningModal(defaultPeriod) {
     body.innerHTML = `
         <div class="form-section-title">+ 새 프로젝트</div>
         <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="newPlanningName" class="form-input" placeholder="예: 원데이강의 준비, 시계 부품 구입"></div>
-        <div class="form-group"><label class="form-label">공개 범위 *</label>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">${accessChips}</div>
-        </div>
         <div class="form-group"><label class="form-label">설명 (선택)</label><textarea id="newPlanningDesc" class="form-input" rows="3" placeholder="이 프로젝트의 목표, 배경을 적어주세요"></textarea></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">기간 구분</label>
@@ -9067,23 +9048,6 @@ function openEditPlanningModal(id) {
     const body = document.getElementById('modalBody');
     if (!body) return;
     const pd = p.period || 'month';
-    const curAccess = p.access || 'company';
-    // 현재 모드에서 이동 가능한 공개 범위로 제한
-    // 회사 메뉴: 회사 / (관리자에 한해) 가족 | 개인 메뉴: 개인
-    const allowedEditKeys = currentPlanningMode === 'company'
-        ? (planningIsAdmin() ? ['company', 'family'] : ['company'])
-        : ['personal'];
-    // 현재 값이 허용 범위 밖(예: 기존 데이터 충돌)이라도 유지되도록 포함
-    if (!allowedEditKeys.includes(curAccess)) allowedEditKeys.unshift(curAccess);
-    const accessChips = PLANNING_CATEGORIES_ACCESS.filter(c => allowedEditKeys.includes(c.key)).map(c => {
-        const active = c.key === curAccess;
-        return `<label style="flex:1;min-width:100px;padding:10px;border:1.5px solid ${active ? c.fg : 'var(--gray-200)'};background:${active ? c.bg : 'var(--white)'};border-radius:8px;cursor:pointer;display:flex;flex-direction:column;gap:2px;align-items:center;text-align:center" onclick="document.querySelectorAll('.planning-edit-access').forEach(el=>{el.style.borderColor='var(--gray-200)';el.style.background='var(--white)'});this.style.borderColor='${c.fg}';this.style.background='${c.bg}'" class="planning-edit-access">
-            <input type="radio" name="editPlanningAccess" value="${c.key}" ${active ? 'checked' : ''} style="display:none">
-            <span style="font-size:18px">${c.icon}</span>
-            <span style="font-size:13px;font-weight:800;color:${c.fg}">${c.label}</span>
-            <span style="font-size:10px;color:var(--gray-500)">${c.note}</span>
-        </label>`;
-    }).join('');
     const now = new Date();
     const yearOpts = [];
     for (let y = now.getFullYear() - 2; y <= now.getFullYear() + 5; y++) {
@@ -9092,9 +9056,6 @@ function openEditPlanningModal(id) {
     body.innerHTML = `
         <div class="form-section-title">✏️ 프로젝트 편집</div>
         <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="editPlanningName" class="form-input" value="${planningEsc(p.name)}"></div>
-        <div class="form-group"><label class="form-label">공개 범위 *</label>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">${accessChips}</div>
-        </div>
         <div class="form-group"><label class="form-label">설명</label><textarea id="editPlanningDesc" class="form-input" rows="3">${planningEsc(p.description || '')}</textarea></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">기간 구분</label>
@@ -9128,14 +9089,8 @@ async function savePlanningProject() {
     const status = document.getElementById('newPlanningStatus').value;
     const period = document.getElementById('newPlanningPeriod').value;
     let deadline = document.getElementById('newPlanningDeadline').value || '';
-    const accessEl = document.querySelector('input[name="newPlanningAccess"]:checked');
-    const modeDefault = currentPlanningMode === 'company' ? 'company' : 'personal';
-    const rawAccess = accessEl ? accessEl.value : modeDefault;
-    // 현재 모드에서 허용된 값만 통과 (서버측 제한은 없지만 UI 강제)
-    const allowed = currentPlanningMode === 'company'
-        ? (planningIsAdmin() ? ['company', 'family'] : ['company'])
-        : ['personal'];
-    const access = allowed.includes(rawAccess) ? rawAccess : modeDefault;
+    // 공개 범위는 현재 메뉴에 따라 자동 설정 (회사 메뉴 → company, 개인 메뉴 → personal)
+    const access = currentPlanningMode === 'company' ? 'company' : 'personal';
     const targetMonth = period === 'month' ? (document.getElementById('newPlanningTargetMonth').value || '') : '';
     const targetYear = period === 'year' ? (document.getElementById('newPlanningTargetYear').value || '') : '';
     if (!deadline) {
@@ -9168,8 +9123,8 @@ async function savePlanningProjectEdit(id) {
     const description = (document.getElementById('editPlanningDesc').value || '').trim();
     const status = document.getElementById('editPlanningStatus').value;
     const period = document.getElementById('editPlanningPeriod').value;
-    const accessEl = document.querySelector('input[name="editPlanningAccess"]:checked');
-    const access = accessEl ? accessEl.value : (p.access || 'company');
+    // 공개 범위는 기존 값 유지 (UI에서 제거됨)
+    const access = p.access || 'company';
     const targetMonth = period === 'month' ? (document.getElementById('editPlanningTargetMonth').value || '') : '';
     const targetYear = period === 'year' ? (document.getElementById('editPlanningTargetYear').value || '') : '';
     let deadline = document.getElementById('editPlanningDeadline').value || '';
