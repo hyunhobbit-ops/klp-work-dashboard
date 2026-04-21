@@ -1228,12 +1228,13 @@ function renderDaily() {
             const tagLabel = (t.priority||'').includes('긴급') ? '긴급' : (t.priority||'').includes('낮음') ? '낮음' : '보통';
             const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
             const clientStr = t.client ? `<span class="daily-client">📌 ${t.client}</span>` : '';
+            const commonPrefix = t.assignee === '전체' ? `<span class="overdue-common-badge">[전체]</span> ` : '';
             const dObj = new Date(t.date + 'T00:00:00');
             const days = Math.max(1, Math.round((today0 - dObj) / MS));
             itemsHtml += `<div class="daily-item overdue-item" onclick="openEditTask(${t.id})" style="cursor:pointer">
                 <div class="daily-checkbox" onclick="event.stopPropagation();toggleTask(${t.id})">${checkSvg}</div>
                 <div class="daily-info">
-                    <div class="daily-title">${t.task}</div>
+                    <div class="daily-title">${commonPrefix}${t.task}</div>
                     <div class="daily-meta">
                         <span class="daily-tag ${tagClass}">${tagLabel}</span>
                         ${labelStr}

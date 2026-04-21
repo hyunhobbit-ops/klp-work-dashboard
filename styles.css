@@ -2462,6 +2462,11 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
   background: #fee2e2; color: #991b1b; border-radius: 10px;
 }
 .overdue-days { font-size: 11px; color: #dc2626; font-weight: 700; }
+.overdue-common-badge {
+  display: inline-block; padding: 1px 6px; margin-right: 4px;
+  font-size: 11px; font-weight: 800; color: #fff;
+  background: #3b82f6; border-radius: 6px; vertical-align: middle;
+}
 
 [data-theme="dark"] .daily-column.overdue-column { background: #3a1d1f; border-color: #7f1d1d; }
 [data-theme="dark"] .daily-column.overdue-column .daily-col-header { background: linear-gradient(135deg, #7f1d1d, #5f1515); }
@@ -2469,4 +2474,5 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 [data-theme="dark"] .daily-item.overdue-item { background: var(--white); }
 [data-theme="dark"] .overdue-date-badge { background: #5f1515; color: #fca5a5; }
 [data-theme="dark"] .overdue-days { color: #fca5a5; }
+[data-theme="dark"] .overdue-common-badge { background: #1d4ed8; color: #dbeafe; }
 
