@@ -7904,13 +7904,12 @@ function renderTempQuoteDoc(g) {
       </div>
       <div style="flex:1;border:1px solid #d5dae3;border-radius:8px;overflow:hidden;background:#fff">
         <div style="background:linear-gradient(135deg,#2B3856,#0B4F8F);color:#fff;padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:2px">공급자 · FROM</div>
-        <div style="padding:10px 10px 8px;background:#fff;border-bottom:1px solid #eef0f5;text-align:center;position:relative">
+        <div style="padding:10px 10px 8px;background:#fff;border-bottom:1px solid #eef0f5;text-align:center">
           <img src="${typeof LOGO_DARK !== 'undefined' ? LOGO_DARK : ''}" style="height:24px">
-          <img src="${typeof STAMP !== 'undefined' ? STAMP : ''}" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:46px;height:46px;object-fit:contain;pointer-events:none;mix-blend-mode:multiply">
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:10.5px">
           ${_qRowTemp('사업자번호', '114-81-93170')}
-          ${_qRowTemp('대표자', '김관택')}
+          ${_qRowTemp('대표자', `<span style="position:relative;display:inline-block">김관택<img src="${typeof STAMP !== 'undefined' ? STAMP : ''}" style="position:absolute;left:40px;top:-8px;width:46px;height:46px;object-fit:contain;pointer-events:none;mix-blend-mode:multiply;z-index:2"></span>`)}
           ${_qRowTemp('주 소', '<span style="font-size:9.5px;line-height:1.4">서울 구로구 디지털로32길 30,<br>코오롱빌란트1차 901호</span>')}
           ${_qRowTemp('업태/종목', '<span style="font-size:9.5px">제조·도매 / 시계 판촉물</span>')}
           ${_qRowTemp('담 당 자', esc(manager))}
@@ -10216,13 +10215,12 @@ function renderQuotePreviewDoc(q) {
             </div>
             <div style="flex:1;border:1px solid #d5dae3;border-radius:8px;overflow:hidden;background:#fff">
                 <div style="background:linear-gradient(135deg,#2B3856,#0B4F8F);color:#fff;padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:2px">공급자 · FROM</div>
-                <div style="padding:10px 10px 8px;background:#fff;border-bottom:1px solid #eef0f5;text-align:center;position:relative">
+                <div style="padding:10px 10px 8px;background:#fff;border-bottom:1px solid #eef0f5;text-align:center">
                     <img src="${logo}" style="height:24px">
-                    <img src="${stamp}" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);width:46px;height:46px;object-fit:contain;pointer-events:none;mix-blend-mode:multiply">
                 </div>
                 <table style="width:100%;border-collapse:collapse;font-size:10.5px">
                     ${_qRowQuote('사업자번호', '114-81-93170')}
-                    ${_qRowQuote('대표자', '김관택')}
+                    ${_qRowQuote('대표자', `<span style="position:relative;display:inline-block">김관택<img src="${stamp}" style="position:absolute;left:40px;top:-8px;width:46px;height:46px;object-fit:contain;pointer-events:none;mix-blend-mode:multiply;z-index:2"></span>`)}
                     ${_qRowQuote('주 소', '<span style="font-size:9.5px;line-height:1.4">서울 구로구 디지털로32길 30,<br>코오롱빌란트1차 901호</span>')}
                     ${_qRowQuote('업태/종목', '<span style="font-size:9.5px">제조·도매 / 시계 판촉물</span>')}
                     ${_qRowQuote('담 당 자', esc(q.manager || ''))}
