@@ -8586,7 +8586,7 @@ function renderPlanningList() {
                 const sym = m.currency === 'USD' ? '$' : '₩';
                 const amt = m.targetAmount != null ? Number(m.targetAmount).toLocaleString() : '';
                 const qty = m.targetQty != null ? Number(m.targetQty).toLocaleString() : '';
-                return `<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:13px">
+                return `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;font-size:13px">
                     ${m.platform ? `<span style="background:#EDE9FE;color:#6D28D9;padding:4px 10px;border-radius:6px;font-weight:700">💸 발행처 : ${planningEsc(m.platform)}</span>` : ''}
                     ${amt ? `<span style="background:#D1FAE5;color:#047857;padding:4px 10px;border-radius:6px;font-weight:700">🎯 목표금액 : ${sym}${amt}</span>` : ''}
                     ${qty ? `<span style="background:#DBEAFE;color:#1D4ED8;padding:4px 10px;border-radius:6px;font-weight:700">📦 목표수량 : ${qty}개</span>` : ''}
