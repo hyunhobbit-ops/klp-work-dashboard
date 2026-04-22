@@ -1,3 +1,7 @@
 .vercel
 node_modules/
 .claude/settings.local.json
+
+# 원본 거래처 엑셀 (민감 데이터) — 로컬 임포트용
+ESA001M.xlsx
+*.xlsx
