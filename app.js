@@ -5470,32 +5470,48 @@ function renderClientsOverseas() {
         return '-';
     };
 
-    // 품목 셀: 제작 이력이 있으면 최신(발주일 내림차순) 항목 + N건 배지, 없으면 items 텍스트
-    const productSummary = (c) => {
-        const hist = Array.isArray(c.productionHistory) ? c.productionHistory.filter(h => h && (h.item || h.qty || h.unit_price_usd)) : [];
-        if (hist.length === 0) return esc(c.items) || '-';
+    // 제작 이력 — 최신(발주일 내림차순) 1건을 품목/품목 내역 두 셀로 분리
+    const latestProduction = (c) => {
+        const hist = Array.isArray(c.productionHistory) ? c.productionHistory.filter(h => h && (h.item || h.qty || h.unit_price_usd || h.order_date)) : [];
+        if (hist.length === 0) return null;
         const sorted = [...hist].sort((a, b) => (b.order_date || '').localeCompare(a.order_date || ''));
-        const latest = sorted[0];
-        const more = hist.length > 1 ? `<span style="font-size:11px;color:var(--gray-500);margin-left:6px">+${hist.length - 1}건</span>` : '';
+        return { latest: sorted[0], total: hist.length };
+    };
+
+    const productName = (c) => {
+        const p = latestProduction(c);
+        if (!p) return esc(c.items) || '-';
+        const more = p.total > 1 ? `<span style="font-size:11px;color:var(--gray-500);margin-left:6px">+${p.total - 1}건</span>` : '';
+        return `<strong>${esc(p.latest.item || c.items || '-')}</strong>${more}`;
+    };
+
+    const productDetail = (c) => {
+        const p = latestProduction(c);
+        if (!p) return '-';
+        const { latest } = p;
         const qty = latest.qty ? `${Number(latest.qty).toLocaleString()}개` : '';
         const price = latest.unit_price_usd ? `$${Number(latest.unit_price_usd).toFixed(2)}` : '';
-        const detail = [qty, price].filter(Boolean).join(' · ');
-        const detailHtml = detail ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">${detail}${latest.order_date ? ' · ' + esc(latest.order_date) : ''}</div>` : '';
-        return `<strong>${esc(latest.item || c.items || '-')}</strong>${more}${detailHtml}`;
+        const date = latest.order_date ? `📅 ${esc(latest.order_date)}` : '';
+        const numbers = [qty, price].filter(Boolean).join(' · ');
+        const lines = [];
+        if (numbers) lines.push(`<div style="font-weight:700">${numbers}</div>`);
+        if (date) lines.push(`<div style="font-size:11px;color:var(--gray-500);margin-top:2px">${date}</div>`);
+        return lines.length ? lines.join('') : '-';
     };
 
     tbody.innerHTML = filtered.map(c => `
         <tr onclick="openEditClientOverseas(${c.id})" style="cursor:pointer">
             <td>${typeBadge(c.bizType)}</td>
             <td><strong>${esc(c.companyName)}</strong></td>
-            <td>${productSummary(c)}</td>
+            <td>${productName(c)}</td>
             <td>${esc(c.phone) || '-'}</td>
             <td>${esc(c.email) || '-'}</td>
             <td>${esc(c.location) || '-'}</td>
             <td>${esc(c.contactName) || '-'}</td>
+            <td>${productDetail(c)}</td>
             <td><button class="edit-btn" onclick="event.stopPropagation();openEditClientOverseas(${c.id})">편집</button></td>
         </tr>
-    `).join('') || `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-tertiary)">해외 거래처가 없습니다</td></tr>`;
+    `).join('') || `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-tertiary)">해외 거래처가 없습니다</td></tr>`;
 }
 
 function openClientOverseasModal(existing) {
