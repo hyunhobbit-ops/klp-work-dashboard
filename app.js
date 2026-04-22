@@ -114,6 +114,7 @@ async function showApp() {
     await loadDeliveriesFromDb();
     await loadClientsFromDb();
     await loadClientsOverseasFromDb();
+    await loadMarketingCampaignsFromDb();
     subscribeDailyTasks();
     subscribeAllRealtime();
     renderAll();
@@ -226,6 +227,12 @@ const CLIENTS_PER_PAGE = 50;
 // 해외 거래처 (자료실)
 let clientsOverseas = [];
 let clientOverseasSearch = '';
+
+// 마케팅 (업무)
+let marketingCampaigns = [];
+let marketingSearch = '';
+const MARKETING_DISTRIBUTORS = ['김관택', '이현주', '김현호'];     // 로그인 이름 기준
+const MARKETING_CHANNEL_OPTIONS = ['카카오톡', '유튜브', 'X', '인스타', '블로그', '페이스북', '기타'];
 const expandedProjectIds = new Set();
 
 // ===== State =====
@@ -250,6 +257,7 @@ const pageTitles = {
     'projects-overseas': '매입매출 — 해외',
     daily: '일일계획표',
     delivery: '택배 관리',
+    marketing: '마케팅',
     'product-db': '상품 DB',
     proposals: '제안서 관리',
     docs: '회사 문서',
@@ -809,6 +817,13 @@ function setupSearch() {
             renderClientsOverseas();
         });
     }
+    const marketingSearchEl = document.getElementById('marketingSearch');
+    if (marketingSearchEl) {
+        marketingSearchEl.addEventListener('input', e => {
+            marketingSearch = e.target.value;
+            renderMarketing();
+        });
+    }
     const productSearchEl = document.getElementById('productSearch');
     if (productSearchEl) {
         productSearchEl.addEventListener('input', e => {
@@ -833,6 +848,7 @@ function renderAll() {
     renderDeliveries();
     renderClients();
     renderClientsOverseas();
+    renderMarketing();
     renderProductDB();
     renderProposals();
 }
@@ -5397,6 +5413,255 @@ async function deleteClientOverseas(id) {
     closeModal();
     renderClientsOverseas();
     showToast('해외 거래처가 삭제되었습니다');
+}
+
+// =====================================
+// 마케팅 (업무 > 마케팅) — 캠페인 카드 + 배포 체크
+// =====================================
+function marketingLoginName() {
+    if (!currentUser) return null;
+    return currentUser.loginName || currentUser.name;
+}
+function marketingDisplayName(loginName) {
+    return DISPLAY_NAME_MAP[loginName] || loginName;
+}
+
+function marketingFromDb(r) {
+    return {
+        id: r.id,
+        title: r.title || '',
+        content: r.content || '',
+        channels: Array.isArray(r.channels) ? r.channels : [],
+        deadline: r.deadline || '',
+        memo: r.memo || '',
+        distributions: (r.distributions && typeof r.distributions === 'object') ? r.distributions : {},
+        createdBy: r.created_by || '',
+        createdAt: r.created_at || ''
+    };
+}
+function marketingToDb(c) {
+    return {
+        title: c.title,
+        content: c.content || '',
+        channels: Array.isArray(c.channels) ? c.channels : [],
+        deadline: c.deadline || null,
+        memo: c.memo || '',
+        distributions: c.distributions || {},
+        created_by: c.createdBy || ''
+    };
+}
+
+async function loadMarketingCampaignsFromDb() {
+    try {
+        const { data, error } = await sb.from('marketing_campaigns')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        marketingCampaigns.length = 0;
+        (data || []).forEach(r => marketingCampaigns.push(marketingFromDb(r)));
+    } catch (err) {
+        console.error('마케팅 로드 실패:', err.message);
+        if (!/relation .* does not exist/i.test(err.message || '')) {
+            showToast('마케팅 로드 실패: ' + err.message);
+        }
+    }
+}
+
+function filterMarketing() {
+    if (!marketingSearch) return marketingCampaigns;
+    const q = marketingSearch.toLowerCase();
+    return marketingCampaigns.filter(c =>
+        (c.title || '').toLowerCase().includes(q) ||
+        (c.content || '').toLowerCase().includes(q) ||
+        (c.channels || []).some(ch => ch.toLowerCase().includes(q))
+    );
+}
+
+function renderMarketing() {
+    const grid = document.getElementById('marketingGrid');
+    if (!grid) return;
+    const list = filterMarketing();
+    const stats = document.getElementById('marketingStats');
+    if (stats) stats.textContent = `총 ${list.length.toLocaleString()}개 캠페인`;
+
+    const esc = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    const me = marketingLoginName();
+
+    if (list.length === 0) {
+        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-tertiary)">등록된 마케팅 캠페인이 없습니다</div>`;
+        return;
+    }
+
+    grid.innerHTML = list.map(c => {
+        const chips = (c.channels || []).map(ch => `<span class="marketing-chip">${esc(ch)}</span>`).join('');
+        const rows = MARKETING_DISTRIBUTORS.map(login => {
+            const d = c.distributions[login] || {};
+            const checked = !!d.done;
+            const isMe = login === me;
+            const doneAt = d.done_at ? new Date(d.done_at).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }) : '';
+            const display = marketingDisplayName(login);
+            return `<label class="marketing-distrib-row ${isMe ? 'is-me' : ''} ${checked ? 'checked' : ''}">
+                <input type="checkbox" ${checked ? 'checked' : ''} ${isMe ? '' : 'disabled'}
+                    onchange="toggleMarketingDistribution(${c.id}, '${login}', this.checked)">
+                <span class="marketing-distrib-name">${esc(display)}${isMe ? ' (나)' : ''}</span>
+                ${checked && doneAt ? `<span class="marketing-distrib-done">${doneAt} 배포</span>` : ''}
+            </label>`;
+        }).join('');
+
+        const contentId = `mktContent_${c.id}`;
+        const deadlineHtml = c.deadline
+            ? `<div class="marketing-deadline">📅 마감: ${esc(c.deadline)}</div>`
+            : '';
+
+        return `<div class="marketing-card">
+            <div class="marketing-card-header">
+                <div class="marketing-card-title">${esc(c.title)}</div>
+                <button class="marketing-card-edit" onclick="openMarketingModal(${c.id})">✏️ 편집</button>
+            </div>
+            ${chips ? `<div class="marketing-channels">${chips}</div>` : ''}
+            ${c.content ? `<div class="marketing-content" id="${contentId}">${esc(c.content)}</div>
+                <button class="marketing-content-toggle" onclick="toggleMarketingContent('${contentId}', this)">전체 보기</button>` : ''}
+            ${deadlineHtml}
+            <div class="marketing-distrib">${rows}</div>
+        </div>`;
+    }).join('');
+}
+
+function toggleMarketingContent(id, btn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const open = el.classList.toggle('expanded');
+    btn.textContent = open ? '접기' : '전체 보기';
+}
+
+async function toggleMarketingDistribution(campaignId, loginName, checked) {
+    const me = marketingLoginName();
+    if (loginName !== me) {
+        showToast('본인 칸만 체크할 수 있습니다');
+        renderMarketing();
+        return;
+    }
+    const c = marketingCampaigns.find(x => x.id === campaignId);
+    if (!c) return;
+    const newDist = { ...c.distributions };
+    if (checked) {
+        newDist[loginName] = { done: true, done_at: new Date().toISOString() };
+    } else {
+        delete newDist[loginName];
+    }
+    // optimistic 업데이트
+    c.distributions = newDist;
+    renderMarketing();
+    const { error } = await sb.from('marketing_campaigns')
+        .update({ distributions: newDist })
+        .eq('id', campaignId);
+    if (error) {
+        console.error(error);
+        showToast('배포 체크 실패: ' + error.message);
+        // 재로드로 복구
+        await loadMarketingCampaignsFromDb();
+        renderMarketing();
+    }
+}
+
+function openMarketingModal(id) {
+    const existing = id != null ? marketingCampaigns.find(x => x.id === id) : null;
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    title.textContent = existing ? '마케팅 편집' : '새 마케팅';
+    const c = existing || { title: '', content: '', channels: [], deadline: '', memo: '' };
+    const esc = s => (s || '').toString().replace(/"/g, '&quot;');
+    const chipsHtml = MARKETING_CHANNEL_OPTIONS.map(opt => {
+        const selected = (c.channels || []).includes(opt);
+        return `<span class="chip ${selected ? 'selected' : ''}" data-channel="${esc(opt)}" onclick="toggleMarketingChannelChip(this)">${opt}</span>`;
+    }).join('');
+
+    body.innerHTML = `
+        <div class="form-row" style="grid-template-columns:1fr">
+            <div class="form-group"><label class="form-label">제목 <span style="color:var(--red)">*</span></label>
+                <input type="text" class="form-input" id="mktTitle" value="${esc(c.title)}" placeholder="예) 4월 특가 프로모션">
+            </div>
+        </div>
+        <div class="form-row" style="grid-template-columns:1fr">
+            <div class="form-group"><label class="form-label">마케팅 문구</label>
+                <textarea class="form-input" id="mktContent" rows="5" placeholder="배포할 문구를 여기에 작성하세요">${esc(c.content)}</textarea>
+            </div>
+        </div>
+        <div class="form-row" style="grid-template-columns:1fr">
+            <div class="form-group"><label class="form-label">채널 (복수 선택)</label>
+                <div class="marketing-channel-picker">${chipsHtml}</div>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">마감일 (선택)</label>
+                <input type="date" class="form-input" id="mktDeadline" value="${esc(c.deadline)}">
+            </div>
+            <div class="form-group"><label class="form-label">메모</label>
+                <input type="text" class="form-input" id="mktMemo" value="${esc(c.memo)}" placeholder="추가 안내사항">
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+            ${existing ? `<button class="form-submit" style="flex:1;background:var(--red)" onclick="deleteMarketingCampaign(${c.id})">🗑️ 삭제</button>` : ''}
+            <button class="form-submit" style="flex:2" onclick="${existing ? `saveMarketingCampaign(${c.id})` : 'addMarketingCampaign()'}">💾 ${existing ? '수정 저장' : '추가'}</button>
+        </div>`;
+    document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
+}
+
+function toggleMarketingChannelChip(el) {
+    el.classList.toggle('selected');
+}
+
+function readMarketingForm() {
+    const title = document.getElementById('mktTitle').value.trim();
+    const content = document.getElementById('mktContent').value.trim();
+    const deadline = document.getElementById('mktDeadline').value;
+    const memo = document.getElementById('mktMemo').value.trim();
+    const chips = document.querySelectorAll('.marketing-channel-picker .chip.selected');
+    const channels = Array.from(chips).map(el => el.dataset.channel);
+    return { title, content, channels, deadline, memo };
+}
+
+async function addMarketingCampaign() {
+    const form = readMarketingForm();
+    if (!form.title) { showToast('제목을 입력해주세요'); return; }
+    const payload = marketingToDb({ ...form, distributions: {}, createdBy: marketingLoginName() || '' });
+    const { data, error } = await sb.from('marketing_campaigns').insert(payload).select().single();
+    if (error) { console.error(error); showToast('저장 실패: ' + error.message); return; }
+    marketingCampaigns.unshift(marketingFromDb(data));
+    closeModal();
+    renderMarketing();
+    showToast('마케팅 캠페인이 추가되었습니다');
+}
+
+async function saveMarketingCampaign(id) {
+    const form = readMarketingForm();
+    if (!form.title) { showToast('제목을 입력해주세요'); return; }
+    const c = marketingCampaigns.find(x => x.id === id);
+    if (!c) return;
+    const patch = {
+        title: form.title,
+        content: form.content,
+        channels: form.channels,
+        deadline: form.deadline || null,
+        memo: form.memo
+    };
+    const { error } = await sb.from('marketing_campaigns').update(patch).eq('id', id);
+    if (error) { console.error(error); showToast('수정 실패: ' + error.message); return; }
+    Object.assign(c, form);
+    closeModal();
+    renderMarketing();
+    showToast('수정되었습니다');
+}
+
+async function deleteMarketingCampaign(id) {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    const { error } = await sb.from('marketing_campaigns').delete().eq('id', id);
+    if (error) { console.error(error); showToast('삭제 실패: ' + error.message); return; }
+    const idx = marketingCampaigns.findIndex(x => x.id === id);
+    if (idx !== -1) marketingCampaigns.splice(idx, 1);
+    closeModal();
+    renderMarketing();
+    showToast('삭제되었습니다');
 }
 
 // 엑셀 가져오기 (거래처등록 시트 기준)

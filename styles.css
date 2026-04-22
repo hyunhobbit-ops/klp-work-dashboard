@@ -1500,6 +1500,160 @@ body {
 [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 
 /* ============================
+   Marketing (마케팅 카드)
+   ============================ */
+.marketing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+    padding: 16px;
+}
+.marketing-card {
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    padding: 18px 20px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+.marketing-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+.marketing-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+.marketing-card-title {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--gray-900);
+    line-height: 1.4;
+    word-break: keep-all;
+}
+.marketing-card-edit {
+    border: none;
+    background: transparent;
+    color: var(--gray-400);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+.marketing-card-edit:hover {
+    background: var(--gray-100);
+    color: var(--gray-700);
+}
+.marketing-channels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.marketing-chip {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--blue-light);
+    color: var(--blue);
+}
+.marketing-content {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--gray-700);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 6.4em;
+    overflow: hidden;
+    position: relative;
+}
+.marketing-content.expanded { max-height: none; }
+.marketing-content-toggle {
+    font-size: 12px;
+    color: var(--blue);
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    align-self: flex-start;
+    font-weight: 600;
+}
+.marketing-deadline {
+    font-size: 12px;
+    color: var(--gray-500);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.marketing-distrib {
+    border-top: 1px solid var(--gray-100);
+    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.marketing-distrib-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+.marketing-distrib-row.is-me { background: var(--gray-50); }
+.marketing-distrib-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--blue);
+}
+.marketing-distrib-row input[type="checkbox"]:disabled { cursor: not-allowed; opacity: 0.6; }
+.marketing-distrib-name {
+    flex: 1;
+    font-weight: 600;
+    color: var(--gray-800);
+}
+.marketing-distrib-done {
+    font-size: 11px;
+    color: var(--gray-500);
+}
+.marketing-distrib-row.checked .marketing-distrib-name {
+    color: var(--gray-500);
+    text-decoration: line-through;
+    text-decoration-color: var(--gray-300);
+}
+
+/* 채널 선택 칩 (모달) */
+.marketing-channel-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.marketing-channel-picker .chip {
+    border: 1px solid var(--gray-300);
+    background: var(--white);
+    color: var(--gray-700);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s;
+}
+.marketing-channel-picker .chip:hover { border-color: var(--blue); color: var(--blue); }
+.marketing-channel-picker .chip.selected {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+}
+
+/* ============================
    Placeholder Page (자료실 등)
    ============================ */
 .placeholder-page {
