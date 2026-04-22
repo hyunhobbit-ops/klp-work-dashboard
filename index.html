@@ -1098,6 +1098,12 @@
             <main class="content" id="tab-clients">
                 <div class="content-toolbar">
                     <div class="toolbar-left">
+                        <div class="filter-bar" id="clientCategoryFilterBar">
+                            <button class="filter-chip active" data-cat-filter="all" onclick="setClientCategoryFilter('all')">전체</button>
+                            <button class="filter-chip" data-cat-filter="매출처" onclick="setClientCategoryFilter('매출처')">매출처</button>
+                            <button class="filter-chip" data-cat-filter="매입처" onclick="setClientCategoryFilter('매입처')">매입처</button>
+                            <button class="filter-chip" data-cat-filter="공란" onclick="setClientCategoryFilter('공란')">공란</button>
+                        </div>
                         <div class="search-bar">
                             <svg width="16" height="16" fill="none" stroke="#999" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
                             <input type="text" id="clientSearch" placeholder="회사명, 대표자, 전화, 담당직원, 주소 검색">
@@ -1134,23 +1140,24 @@
                         <input type="text" id="clientBulkGrade" class="form-input" placeholder="등급 값 (체크 시 변경)" style="width:180px;margin:0">
                         <button class="btn-primary" onclick="applyClientBulkEdit()">일괄 적용</button>
                         <button class="btn-export" onclick="clearClientSelection()">선택 해제</button>
+                        <button class="btn-danger" onclick="bulkDeleteClients()" style="padding:8px 14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">🗑️ 선택 삭제</button>
                     </div>
                     <div class="table-wrap">
-                        <table class="data-table" id="clientTable">
+                        <table class="data-table client-table-sortable" id="clientTable">
                             <thead>
                                 <tr>
                                     <th style="width:40px;text-align:center"><input type="checkbox" id="clientSelectAll" onclick="toggleClientSelectAll(this)" style="width:16px;height:16px;cursor:pointer" title="현재 페이지 전체 선택"></th>
-                                    <th style="width:90px">구분</th>
-                                    <th style="max-width:220px">회사명</th>
-                                    <th>대표자</th>
-                                    <th>전화</th>
-                                    <th>핸드폰</th>
-                                    <th>이메일</th>
-                                    <th>주소</th>
-                                    <th>업태</th>
-                                    <th>업종</th>
-                                    <th>담당직원</th>
-                                    <th>등급</th>
+                                    <th class="sortable" data-sort="category" style="width:90px" onclick="setClientSort('category')">구분<span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-sort="companyName" style="max-width:220px" onclick="setClientSort('companyName')">회사명<span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-sort="ceo" onclick="setClientSort('ceo')">대표자<span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-sort="phone" onclick="setClientSort('phone')">전화<span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-sort="mobile" onclick="setClientSort('mobile')">핸드폰<span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-sort="email" onclick="setClientSort('email')">이메일<span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-sort="address" onclick="setClientSort('address')">주소<span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-sort="bizType" onclick="setClientSort('bizType')">업태<span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-sort="bizItem" onclick="setClientSort('bizItem')">업종<span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-sort="staffName" onclick="setClientSort('staffName')">담당직원<span class="sort-arrow"></span></th>
+                                    <th class="sortable" data-sort="grade" onclick="setClientSort('grade')">등급<span class="sort-arrow"></span></th>
                                     <th>편집</th>
                                 </tr>
                             </thead>

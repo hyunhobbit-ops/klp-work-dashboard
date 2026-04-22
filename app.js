@@ -223,6 +223,8 @@ let currentProposalSearch = '';
 let clientSearch = '';
 let clientPage = 1;
 const CLIENTS_PER_PAGE = 50;
+let clientCategoryFilter = 'all';           // 'all' | '매출처' | '매입처' | '공란'
+let clientSort = { field: null, dir: 'asc' }; // 컬럼 헤더 클릭 정렬
 
 // 해외 거래처 (자료실)
 let clientsOverseas = [];
@@ -4839,17 +4841,102 @@ async function dbDeleteClient(id) {
 }
 
 function filterClients() {
-    if (!clientSearch) return clients;
-    const q = clientSearch.toLowerCase();
-    return clients.filter(c =>
-        (c.companyName || '').toLowerCase().includes(q) ||
-        (c.ceo || '').toLowerCase().includes(q) ||
-        (c.phone || '').toLowerCase().includes(q) ||
-        (c.mobile || '').toLowerCase().includes(q) ||
-        (c.staffName || '').toLowerCase().includes(q) ||
-        (c.address || '').toLowerCase().includes(q) ||
-        (c.email || '').toLowerCase().includes(q)
-    );
+    let list = clients;
+
+    // 1) 카테고리 필터 (매출처/매입처/공란/전체)
+    if (clientCategoryFilter === '매출처' || clientCategoryFilter === '매입처') {
+        list = list.filter(c => (c.category || '') === clientCategoryFilter);
+    } else if (clientCategoryFilter === '공란') {
+        list = list.filter(c => c.category !== '매출처' && c.category !== '매입처');
+    }
+
+    // 2) 검색 필터
+    if (clientSearch) {
+        const q = clientSearch.toLowerCase();
+        list = list.filter(c =>
+            (c.companyName || '').toLowerCase().includes(q) ||
+            (c.ceo || '').toLowerCase().includes(q) ||
+            (c.phone || '').toLowerCase().includes(q) ||
+            (c.mobile || '').toLowerCase().includes(q) ||
+            (c.staffName || '').toLowerCase().includes(q) ||
+            (c.address || '').toLowerCase().includes(q) ||
+            (c.email || '').toLowerCase().includes(q)
+        );
+    }
+
+    // 3) 정렬 (컬럼 헤더 클릭 시)
+    if (clientSort.field) {
+        const f = clientSort.field;
+        const dir = clientSort.dir === 'desc' ? -1 : 1;
+        list = [...list].sort((a, b) => {
+            const av = (a[f] || '').toString();
+            const bv = (b[f] || '').toString();
+            return av.localeCompare(bv, 'ko') * dir;
+        });
+    }
+
+    return list;
+}
+
+function setClientCategoryFilter(cat) {
+    clientCategoryFilter = cat;
+    clientPage = 1;
+    // 칩 active 상태 반영
+    document.querySelectorAll('#clientCategoryFilterBar .filter-chip').forEach(b => {
+        b.classList.toggle('active', b.dataset.catFilter === cat);
+    });
+    renderClients();
+}
+
+function setClientSort(field) {
+    if (clientSort.field === field) {
+        clientSort.dir = clientSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        clientSort.field = field;
+        clientSort.dir = 'asc';
+    }
+    clientPage = 1;
+    renderClients();
+}
+
+function updateClientSortArrows() {
+    document.querySelectorAll('#clientTable thead th.sortable').forEach(th => {
+        const field = th.dataset.sort;
+        const arrow = th.querySelector('.sort-arrow');
+        if (!arrow) return;
+        if (clientSort.field === field) {
+            arrow.textContent = clientSort.dir === 'asc' ? ' ▲' : ' ▼';
+            arrow.classList.add('active');
+        } else {
+            arrow.textContent = ' ⇅';
+            arrow.classList.remove('active');
+        }
+    });
+}
+
+async function bulkDeleteClients() {
+    if (selectedClientIds.size === 0) { showToast('선택된 거래처가 없습니다'); return; }
+    const n = selectedClientIds.size;
+    if (!confirm(`선택된 ${n}개 거래처를 정말 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`)) return;
+
+    const ids = Array.from(selectedClientIds);
+    // 500건씩 배치 삭제
+    const BATCH = 500;
+    let ok = 0, fail = 0;
+    for (let i = 0; i < ids.length; i += BATCH) {
+        const chunk = ids.slice(i, i + BATCH);
+        const { error } = await sb.from('clients').delete().in('id', chunk);
+        if (error) { console.error(error); fail += chunk.length; continue; }
+        ok += chunk.length;
+    }
+    // 로컬 상태 정리
+    const idSet = new Set(ids);
+    for (let i = clients.length - 1; i >= 0; i--) {
+        if (idSet.has(clients[i].id)) clients.splice(i, 1);
+    }
+    selectedClientIds.clear();
+    showToast(`삭제 완료: ${ok}건${fail ? ` / 실패 ${fail}건` : ''}`);
+    renderClients();
 }
 
 const selectedClientIds = new Set();
@@ -5008,6 +5095,9 @@ function renderClients() {
             pag.innerHTML = html;
         }
     }
+
+    // 정렬 화살표 상태 반영
+    updateClientSortArrows();
 }
 
 function gotoClientPage(p) {

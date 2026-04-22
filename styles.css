@@ -1500,6 +1500,26 @@ body {
 [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 
 /* ============================
+   Sortable Table Headers (국내 거래처 DB)
+   ============================ */
+.client-table-sortable th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.1s;
+}
+.client-table-sortable th.sortable:hover { background: var(--gray-100); }
+.client-table-sortable .sort-arrow {
+    margin-left: 4px;
+    font-size: 11px;
+    color: var(--gray-300);
+    display: inline-block;
+}
+.client-table-sortable .sort-arrow.active {
+    color: var(--blue);
+    font-weight: 900;
+}
+
+/* ============================
    Marketing (마케팅 카드)
    ============================ */
 .marketing-grid {
