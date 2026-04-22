@@ -5486,8 +5486,9 @@ function renderClientsOverseas() {
     tbody.innerHTML = filtered.map(c => {
         const p = latestProduction(c);
         const latest = p ? p.latest : null;
-        const more = p && p.total > 1 ? `<span style="font-size:11px;color:var(--gray-500);margin-left:6px">+${p.total - 1}건</span>` : '';
-        const itemCell = latest && latest.item ? `<strong>${esc(latest.item)}</strong>${more}` : (esc(c.items) || '-');
+        const more = p && p.total > 1 ? `<span style="font-size:11px;color:var(--gray-500);margin-left:6px">외 ${p.total - 1}건 발주</span>` : '';
+        const rep = esc(c.items) || '-';  // 대표 생산 품목 = 자유입력 텍스트
+        const itemCell = latest && latest.item ? `<strong>${esc(latest.item)}</strong>${more}` : '-';
         const dateCell = latest && latest.order_date ? esc(latest.order_date) : '-';
         const priceCell = latest && latest.unit_price_usd ? `$${Number(latest.unit_price_usd).toFixed(2)}` : '-';
         const qtyCell = latest && latest.qty ? `${Number(latest.qty).toLocaleString()}` : '-';
@@ -5495,17 +5496,18 @@ function renderClientsOverseas() {
         <tr onclick="openEditClientOverseas(${c.id})" style="cursor:pointer">
             <td>${typeBadge(c.bizType)}</td>
             <td><strong>${esc(c.companyName)}</strong></td>
-            <td>${itemCell}</td>
+            <td>${rep}</td>
             <td>${esc(c.phone) || '-'}</td>
             <td>${esc(c.email) || '-'}</td>
             <td>${esc(c.location) || '-'}</td>
             <td>${esc(c.contactName) || '-'}</td>
-            <td>${dateCell}</td>
+            <td>${itemCell}</td>
             <td style="text-align:right">${priceCell}</td>
             <td style="text-align:right">${qtyCell}</td>
+            <td>${dateCell}</td>
             <td><button class="edit-btn" onclick="event.stopPropagation();openEditClientOverseas(${c.id})">편집</button></td>
         </tr>`;
-    }).join('') || `<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-tertiary)">해외 거래처가 없습니다</td></tr>`;
+    }).join('') || `<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text-tertiary)">해외 거래처가 없습니다</td></tr>`;
 }
 
 function openClientOverseasModal(existing) {
@@ -5527,7 +5529,7 @@ function openClientOverseasModal(existing) {
             </div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label class="form-label">품목</label><input type="text" class="form-input" id="covItems" value="${v('items')}" placeholder="예) 시계, 가죽 파우치"></div>
+            <div class="form-group"><label class="form-label">대표 생산 품목</label><input type="text" class="form-input" id="covItems" value="${v('items')}" placeholder="예) 시계, 가죽 파우치"></div>
             <div class="form-group"><label class="form-label">담당자명</label><input type="text" class="form-input" id="covContactName" value="${v('contactName')}" placeholder="담당자 이름"></div>
         </div>
         <div class="form-row">
