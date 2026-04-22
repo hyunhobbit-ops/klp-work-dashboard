@@ -1053,13 +1053,39 @@
 
             <!-- ===== 해외 거래처 DB ===== -->
             <main class="content" id="tab-clients-overseas">
-                <div class="placeholder-page">
-                    <div class="placeholder-icon">
-                        <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>
+                <div class="content-toolbar">
+                    <div class="toolbar-left">
+                        <div class="search-bar">
+                            <svg width="16" height="16" fill="none" stroke="#999" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                            <input type="text" id="clientOverseasSearch" placeholder="회사명, 품목, 담당자, 위치, 이메일 검색">
+                        </div>
                     </div>
-                    <h3 class="placeholder-title">해외 거래처 DB</h3>
-                    <p class="placeholder-desc">해외 거래처(매입/매출) 정보를 관리합니다.<br>국가, 통화, 결제조건 등 해외 거래용 필드로 추후 구성됩니다.</p>
-                    <span class="placeholder-badge">준비 중</span>
+                    <div class="toolbar-buttons">
+                        <button class="btn-primary" onclick="openModal('client-overseas')" title="F2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                            새 해외 거래처 (F2)
+                        </button>
+                    </div>
+                </div>
+                <div class="page-section">
+                    <div class="client-stats" id="clientOverseasStats" style="padding:8px 16px;color:var(--text-secondary);font-size:14px"></div>
+                    <div class="table-wrap">
+                        <table class="data-table" id="clientOverseasTable">
+                            <thead>
+                                <tr>
+                                    <th style="width:90px">유형</th>
+                                    <th style="max-width:240px">회사명</th>
+                                    <th>품목</th>
+                                    <th>연락처</th>
+                                    <th>이메일</th>
+                                    <th>위치</th>
+                                    <th>담당자</th>
+                                    <th style="width:80px">편집</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientOverseasTableBody"></tbody>
+                        </table>
+                    </div>
                 </div>
             </main>
 

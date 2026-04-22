@@ -113,6 +113,7 @@ async function showApp() {
     await loadDailyTasksFromDb();
     await loadDeliveriesFromDb();
     await loadClientsFromDb();
+    await loadClientsOverseasFromDb();
     subscribeDailyTasks();
     subscribeAllRealtime();
     renderAll();
@@ -221,6 +222,10 @@ let currentProposalSearch = '';
 let clientSearch = '';
 let clientPage = 1;
 const CLIENTS_PER_PAGE = 50;
+
+// 해외 거래처 (자료실)
+let clientsOverseas = [];
+let clientOverseasSearch = '';
 const expandedProjectIds = new Set();
 
 // ===== State =====
@@ -526,6 +531,12 @@ function setupShortcuts() {
                 openModal('client');
                 return;
             }
+            const clientOvTab = document.getElementById('tab-clients-overseas');
+            if (clientOvTab && clientOvTab.classList.contains('active')) {
+                e.preventDefault();
+                openModal('client-overseas');
+                return;
+            }
             const domProjTab = document.getElementById('tab-projects-domestic');
             if (domProjTab && domProjTab.classList.contains('active')) {
                 e.preventDefault();
@@ -791,6 +802,13 @@ function setupSearch() {
             renderClients();
         });
     }
+    const clientOverseasSearchEl = document.getElementById('clientOverseasSearch');
+    if (clientOverseasSearchEl) {
+        clientOverseasSearchEl.addEventListener('input', e => {
+            clientOverseasSearch = e.target.value;
+            renderClientsOverseas();
+        });
+    }
     const productSearchEl = document.getElementById('productSearch');
     if (productSearchEl) {
         productSearchEl.addEventListener('input', e => {
@@ -814,6 +832,7 @@ function renderAll() {
     renderDaily();
     renderDeliveries();
     renderClients();
+    renderClientsOverseas();
     renderProductDB();
     renderProposals();
 }
@@ -3987,6 +4006,9 @@ function openModal(type) {
     } else if (type === 'client') {
         openClientModal(null);
         return;
+    } else if (type === 'client-overseas') {
+        openClientOverseasModal(null);
+        return;
     } else if (type === 'product') {
         openProductDBModal(null);
         return;
@@ -5187,6 +5209,194 @@ async function deleteClient(id) {
     closeModal();
     renderClients();
     showToast('고객사가 삭제되었습니다');
+}
+
+// =====================================
+// Supabase: clients_overseas (해외 거래처 DB — 자료실)
+// =====================================
+function clientOverseasToDb(c) {
+    return {
+        company_name: c.companyName,
+        items: c.items || '',
+        phone: c.phone || '',
+        email: c.email || '',
+        location: c.location || '',
+        biz_type: c.bizType || '',
+        contact_name: c.contactName || ''
+    };
+}
+function clientOverseasFromDb(r) {
+    return {
+        id: r.id,
+        companyName: r.company_name || '',
+        items: r.items || '',
+        phone: r.phone || '',
+        email: r.email || '',
+        location: r.location || '',
+        bizType: r.biz_type || '',
+        contactName: r.contact_name || ''
+    };
+}
+async function loadClientsOverseasFromDb() {
+    try {
+        const { data, error } = await sb.from('clients_overseas')
+            .select('*')
+            .order('company_name', { ascending: true });
+        if (error) throw error;
+        clientsOverseas.length = 0;
+        (data || []).forEach(r => clientsOverseas.push(clientOverseasFromDb(r)));
+    } catch (err) {
+        console.error('해외 거래처 로드 실패:', err.message);
+        // 테이블이 아직 없으면 조용히 무시 (마이그레이션 전)
+        if (!/relation .* does not exist/i.test(err.message || '')) {
+            showToast('해외 거래처 로드 실패: ' + err.message);
+        }
+    }
+}
+async function dbInsertClientOverseas(c) {
+    const { data, error } = await sb.from('clients_overseas').insert(clientOverseasToDb(c)).select().single();
+    if (error) { console.error(error); showToast('DB 저장 실패: ' + error.message); return null; }
+    return clientOverseasFromDb(data);
+}
+async function dbUpdateClientOverseas(id, patch) {
+    const dbPatch = clientOverseasToDb(patch);
+    Object.keys(dbPatch).forEach(k => { if (dbPatch[k] === undefined) delete dbPatch[k]; });
+    const { error } = await sb.from('clients_overseas').update(dbPatch).eq('id', id);
+    if (error) { console.error(error); showToast('DB 수정 실패: ' + error.message); }
+}
+async function dbDeleteClientOverseas(id) {
+    const { error } = await sb.from('clients_overseas').delete().eq('id', id);
+    if (error) { console.error(error); showToast('DB 삭제 실패: ' + error.message); }
+}
+
+function filterClientsOverseas() {
+    if (!clientOverseasSearch) return clientsOverseas;
+    const q = clientOverseasSearch.toLowerCase();
+    return clientsOverseas.filter(c =>
+        (c.companyName || '').toLowerCase().includes(q) ||
+        (c.items || '').toLowerCase().includes(q) ||
+        (c.phone || '').toLowerCase().includes(q) ||
+        (c.email || '').toLowerCase().includes(q) ||
+        (c.location || '').toLowerCase().includes(q) ||
+        (c.contactName || '').toLowerCase().includes(q)
+    );
+}
+
+function renderClientsOverseas() {
+    const tbody = document.getElementById('clientOverseasTableBody');
+    if (!tbody) return;
+    const filtered = filterClientsOverseas();
+    const stats = document.getElementById('clientOverseasStats');
+    if (stats) stats.textContent = `총 ${filtered.length.toLocaleString()}개 해외 거래처`;
+
+    const esc = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    const typeBadge = (t) => {
+        if (t === '공장') return `<span class="badge badge-purple">공장</span>`;
+        if (t === '에이전시') return `<span class="badge badge-blue">에이전시</span>`;
+        return '-';
+    };
+
+    tbody.innerHTML = filtered.map(c => `
+        <tr onclick="openEditClientOverseas(${c.id})" style="cursor:pointer">
+            <td>${typeBadge(c.bizType)}</td>
+            <td><strong>${esc(c.companyName)}</strong></td>
+            <td>${esc(c.items) || '-'}</td>
+            <td>${esc(c.phone) || '-'}</td>
+            <td>${esc(c.email) || '-'}</td>
+            <td>${esc(c.location) || '-'}</td>
+            <td>${esc(c.contactName) || '-'}</td>
+            <td><button class="edit-btn" onclick="event.stopPropagation();openEditClientOverseas(${c.id})">편집</button></td>
+        </tr>
+    `).join('') || `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-tertiary)">해외 거래처가 없습니다</td></tr>`;
+}
+
+function openClientOverseasModal(existing) {
+    const title = document.getElementById('modalTitle');
+    const body = document.getElementById('modalBody');
+    const c = existing || {};
+    title.textContent = existing ? '해외 거래처 수정' : '새 해외 거래처';
+    const v = k => (c[k] || '').toString().replace(/"/g, '&quot;');
+    const bt = c.bizType || '';
+    body.innerHTML = `
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">회사명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="covCompanyName" value="${v('companyName')}" placeholder="회사명"></div>
+            <div class="form-group"><label class="form-label">유형</label>
+                <select class="form-select" id="covBizType">
+                    <option value="" ${!bt ? 'selected' : ''}>선택 안함</option>
+                    <option value="공장" ${bt === '공장' ? 'selected' : ''}>공장</option>
+                    <option value="에이전시" ${bt === '에이전시' ? 'selected' : ''}>에이전시</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">품목</label><input type="text" class="form-input" id="covItems" value="${v('items')}" placeholder="예) 시계, 가죽 파우치"></div>
+            <div class="form-group"><label class="form-label">담당자명</label><input type="text" class="form-input" id="covContactName" value="${v('contactName')}" placeholder="담당자 이름"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">연락처</label><input type="text" class="form-input" id="covPhone" value="${v('phone')}" placeholder="+86 ..."></div>
+            <div class="form-group"><label class="form-label">이메일</label><input type="text" class="form-input" id="covEmail" value="${v('email')}" placeholder="name@company.com"></div>
+        </div>
+        <div class="form-row" style="grid-template-columns:1fr">
+            <div class="form-group"><label class="form-label">위치</label><input type="text" class="form-input" id="covLocation" value="${v('location')}" placeholder="예) 중국 광저우 / 베트남 하노이"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+            ${existing ? `<button class="form-submit" style="flex:1;background:var(--red)" onclick="deleteClientOverseas(${c.id})">🗑️ 삭제</button>` : ''}
+            <button class="form-submit" style="flex:2" onclick="${existing ? `saveEditClientOverseas(${c.id})` : 'addClientOverseas()'}">💾 ${existing ? '수정 저장' : '추가'}</button>
+        </div>`;
+    document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
+}
+
+function readClientOverseasForm() {
+    return {
+        companyName: document.getElementById('covCompanyName').value.trim(),
+        bizType: document.getElementById('covBizType').value.trim(),
+        items: document.getElementById('covItems').value.trim(),
+        contactName: document.getElementById('covContactName').value.trim(),
+        phone: document.getElementById('covPhone').value.trim(),
+        email: document.getElementById('covEmail').value.trim(),
+        location: document.getElementById('covLocation').value.trim()
+    };
+}
+
+async function addClientOverseas() {
+    const form = readClientOverseasForm();
+    if (!form.companyName) { showToast('회사명을 입력해주세요'); return; }
+    const saved = await dbInsertClientOverseas(form);
+    if (!saved) return;
+    clientsOverseas.push(saved);
+    clientsOverseas.sort((a, b) => (a.companyName || '').localeCompare(b.companyName || ''));
+    closeModal();
+    renderClientsOverseas();
+    showToast('해외 거래처가 추가되었습니다');
+}
+
+function openEditClientOverseas(id) {
+    const c = clientsOverseas.find(x => x.id === id);
+    if (!c) return;
+    openClientOverseasModal(c);
+}
+
+async function saveEditClientOverseas(id) {
+    const c = clientsOverseas.find(x => x.id === id);
+    if (!c) return;
+    const form = readClientOverseasForm();
+    if (!form.companyName) { showToast('회사명을 입력해주세요'); return; }
+    Object.assign(c, form);
+    await dbUpdateClientOverseas(id, form);
+    clientsOverseas.sort((a, b) => (a.companyName || '').localeCompare(b.companyName || ''));
+    closeModal();
+    renderClientsOverseas();
+    showToast('해외 거래처가 수정되었습니다');
+}
+
+async function deleteClientOverseas(id) {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    await dbDeleteClientOverseas(id);
+    const idx = clientsOverseas.findIndex(x => x.id === id);
+    if (idx !== -1) clientsOverseas.splice(idx, 1);
+    closeModal();
+    renderClientsOverseas();
+    showToast('해외 거래처가 삭제되었습니다');
 }
 
 // 엑셀 가져오기 (거래처등록 시트 기준)
