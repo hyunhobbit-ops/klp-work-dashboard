@@ -348,6 +348,7 @@ body {
 #urlShortcutsGroup .nav-caret { margin-left: auto; transition: transform 0.15s; color: var(--gray-400); }
 #urlShortcutsGroup .nav-sub-group.collapsed > .nav-sub-label .nav-caret { transform: rotate(-90deg); }
 #urlShortcutsGroup .nav-sub-group.collapsed > .nav-sub-item,
+#urlShortcutsGroup .nav-sub-group.collapsed > .url-user-row,
 #urlShortcutsGroup .nav-sub-group.collapsed > .url-sub-items { display: none; }
 #urlShortcutsGroup .url-sub-items { display: flex; flex-direction: column; }
 #urlShortcutsGroup .url-user-row { display: flex; align-items: center; gap: 2px; }
