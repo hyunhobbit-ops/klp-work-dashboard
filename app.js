@@ -537,10 +537,11 @@ const F2_NEW_ACTIONS = [
     ['tab-product-db',         () => openProductDBModal(null)],
     ['tab-proposals',          () => openProposalEditor(null)],
     ['tab-marketing',          () => openMarketingModal(null)],
-    // 협업 프로젝트 — 목록뷰면 새 프로젝트, 상세뷰면 todo 컬럼에 새 카드
+    // 협업 프로젝트 — 펀딩 모드에서만 F2 활성 (회사/개인은 기간 섹션별 버튼이 있어 F2 제외)
     ['tab-planning',           () => {
+        if (currentPlanningMode !== 'funding') return;
         if (currentPlanningProjectId == null) {
-            openNewPlanningModal();
+            openFundingPlanningModal(null);
         } else {
             openNewPlanningPostForColumn('todo');
         }
@@ -9477,7 +9478,7 @@ function renderPlanningDetail(p) {
                     </div>
                     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                         <select onchange="updatePlanningStatus(${p.id}, this.value)" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:8px;font-weight:700;font-size:12px">${statusOpts}</select>
-                        <button onclick="openNewPlanningPostForColumn('todo')" title="F2" style="padding:6px 12px;background:var(--blue);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ 새 카드 (F2)</button>
+                        <button onclick="openNewPlanningPostForColumn('todo')" ${currentPlanningMode === 'funding' ? 'title="F2"' : ''} style="padding:6px 12px;background:var(--blue);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ 새 카드${currentPlanningMode === 'funding' ? ' (F2)' : ''}</button>
                         <button onclick="openEditPlanningModal(${p.id})" style="padding:6px 10px;background:var(--gray-100);border:none;border-radius:8px;font-size:12px;cursor:pointer">✏️ 편집</button>
                         <button onclick="deletePlanningProject(${p.id})" style="padding:6px 10px;background:var(--red-light,#FEE);color:var(--red);border:none;border-radius:8px;font-size:12px;cursor:pointer">삭제</button>
                     </div>
