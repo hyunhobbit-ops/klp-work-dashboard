@@ -5436,7 +5436,12 @@ async function dbUpdateClientOverseas(id, patch) {
     const dbPatch = clientOverseasToDb(patch);
     Object.keys(dbPatch).forEach(k => { if (dbPatch[k] === undefined) delete dbPatch[k]; });
     const { error } = await sb.from('clients_overseas').update(dbPatch).eq('id', id);
-    if (error) { console.error(error); showToast('DB 수정 실패: ' + error.message); }
+    if (error) {
+        console.error(error);
+        showToast('DB 수정 실패: ' + error.message + (error.hint ? ' — ' + error.hint : ''));
+        return false;
+    }
+    return true;
 }
 async function dbDeleteClientOverseas(id) {
     const { error } = await sb.from('clients_overseas').delete().eq('id', id);
@@ -5470,7 +5475,7 @@ function renderClientsOverseas() {
         return '-';
     };
 
-    // 제작 이력 — 최신(발주일 내림차순) 1건을 품목/품목 내역 두 셀로 분리
+    // 제작 이력 — 최신(발주일 내림차순) 1건을 발주일/품목/단가/수량 4개 셀로 풀어서 표시
     const latestProduction = (c) => {
         const hist = Array.isArray(c.productionHistory) ? c.productionHistory.filter(h => h && (h.item || h.qty || h.unit_price_usd || h.order_date)) : [];
         if (hist.length === 0) return null;
@@ -5478,40 +5483,29 @@ function renderClientsOverseas() {
         return { latest: sorted[0], total: hist.length };
     };
 
-    const productName = (c) => {
+    tbody.innerHTML = filtered.map(c => {
         const p = latestProduction(c);
-        if (!p) return esc(c.items) || '-';
-        const more = p.total > 1 ? `<span style="font-size:11px;color:var(--gray-500);margin-left:6px">+${p.total - 1}건</span>` : '';
-        return `<strong>${esc(p.latest.item || c.items || '-')}</strong>${more}`;
-    };
-
-    const productDetail = (c) => {
-        const p = latestProduction(c);
-        if (!p) return '-';
-        const { latest } = p;
-        const qty = latest.qty ? `${Number(latest.qty).toLocaleString()}개` : '';
-        const price = latest.unit_price_usd ? `$${Number(latest.unit_price_usd).toFixed(2)}` : '';
-        const date = latest.order_date ? `📅 ${esc(latest.order_date)}` : '';
-        const numbers = [qty, price].filter(Boolean).join(' · ');
-        const lines = [];
-        if (numbers) lines.push(`<div style="font-weight:700">${numbers}</div>`);
-        if (date) lines.push(`<div style="font-size:11px;color:var(--gray-500);margin-top:2px">${date}</div>`);
-        return lines.length ? lines.join('') : '-';
-    };
-
-    tbody.innerHTML = filtered.map(c => `
+        const latest = p ? p.latest : null;
+        const more = p && p.total > 1 ? `<span style="font-size:11px;color:var(--gray-500);margin-left:6px">+${p.total - 1}건</span>` : '';
+        const dateCell = latest && latest.order_date ? esc(latest.order_date) : '-';
+        const itemCell = latest && latest.item ? `<strong>${esc(latest.item)}</strong>${more}` : (esc(c.items) || '-');
+        const priceCell = latest && latest.unit_price_usd ? `$${Number(latest.unit_price_usd).toFixed(2)}` : '-';
+        const qtyCell = latest && latest.qty ? `${Number(latest.qty).toLocaleString()}` : '-';
+        return `
         <tr onclick="openEditClientOverseas(${c.id})" style="cursor:pointer">
             <td>${typeBadge(c.bizType)}</td>
             <td><strong>${esc(c.companyName)}</strong></td>
-            <td>${productName(c)}</td>
             <td>${esc(c.phone) || '-'}</td>
             <td>${esc(c.email) || '-'}</td>
             <td>${esc(c.location) || '-'}</td>
             <td>${esc(c.contactName) || '-'}</td>
-            <td>${productDetail(c)}</td>
+            <td>${dateCell}</td>
+            <td>${itemCell}</td>
+            <td style="text-align:right">${priceCell}</td>
+            <td style="text-align:right">${qtyCell}</td>
             <td><button class="edit-btn" onclick="event.stopPropagation();openEditClientOverseas(${c.id})">편집</button></td>
-        </tr>
-    `).join('') || `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-tertiary)">해외 거래처가 없습니다</td></tr>`;
+        </tr>`;
+    }).join('') || `<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-tertiary)">해외 거래처가 없습니다</td></tr>`;
 }
 
 function openClientOverseasModal(existing) {
@@ -5649,8 +5643,9 @@ async function saveEditClientOverseas(id) {
     if (!c) return;
     const form = readClientOverseasForm();
     if (!form.companyName) { showToast('회사명을 입력해주세요'); return; }
+    const ok = await dbUpdateClientOverseas(id, form);
+    if (!ok) return;    // DB 실패 시 로컬 상태도 건드리지 않음 — 화면과 DB 불일치 방지
     Object.assign(c, form);
-    await dbUpdateClientOverseas(id, form);
     clientsOverseas.sort((a, b) => (a.companyName || '').localeCompare(b.companyName || ''));
     closeModal();
     renderClientsOverseas();
