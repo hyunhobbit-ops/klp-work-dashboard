@@ -524,44 +524,32 @@ function applyTheme(theme) {
     localStorage.setItem('klp_theme', theme);
 }
 
+// 현재 active 탭에서 F2 누를 때 실행할 "새로 만들기" 액션 매핑.
+// 새 메뉴 추가 시 여기에 한 줄 넣으면 F2 + 버튼 툴팁 자동 적용됨.
+const F2_NEW_ACTIONS = [
+    ['tab-delivery',           () => openModal('delivery')],
+    ['tab-clients',            () => openModal('client')],
+    ['tab-clients-overseas',   () => openModal('client-overseas')],
+    ['tab-projects-domestic',  () => openModal('project-domestic')],
+    ['tab-projects-overseas',  () => openModal('project-overseas')],
+    ['tab-quotes',             () => openQuoteModal()],
+    ['tab-marketdb',           () => openMarketModal(null, null)],
+    ['tab-product-db',         () => openProductDBModal(null)],
+    ['tab-proposals',          () => openProposalEditor(null)],
+    ['tab-marketing',          () => openMarketingModal(null)]
+];
+
 function setupShortcuts() {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'F2') {
-            const deliveryTab = document.getElementById('tab-delivery');
-            if (deliveryTab && deliveryTab.classList.contains('active')) {
-                e.preventDefault();
-                openModal('delivery');
-                return;
-            }
-            const clientTab = document.getElementById('tab-clients');
-            if (clientTab && clientTab.classList.contains('active')) {
-                e.preventDefault();
-                openModal('client');
-                return;
-            }
-            const clientOvTab = document.getElementById('tab-clients-overseas');
-            if (clientOvTab && clientOvTab.classList.contains('active')) {
-                e.preventDefault();
-                openModal('client-overseas');
-                return;
-            }
-            const domProjTab = document.getElementById('tab-projects-domestic');
-            if (domProjTab && domProjTab.classList.contains('active')) {
-                e.preventDefault();
-                openModal('project-domestic');
-                return;
-            }
-            const ovProjTab = document.getElementById('tab-projects-overseas');
-            if (ovProjTab && ovProjTab.classList.contains('active')) {
-                e.preventDefault();
-                openModal('project-overseas');
-                return;
-            }
-            const quotesTab = document.getElementById('tab-quotes');
-            if (quotesTab && quotesTab.classList.contains('active')) {
-                e.preventDefault();
-                openQuoteModal();
-                return;
+            // 입력 필드에서 F2 누른 경우는 그대로 브라우저 기본 동작 — 만약 우리가 모달 열고 싶으면 아래 로직 수행
+            for (const [tabId, action] of F2_NEW_ACTIONS) {
+                const el = document.getElementById(tabId);
+                if (el && el.classList.contains('active')) {
+                    e.preventDefault();
+                    try { action(); } catch (err) { console.error('F2 action error:', err); }
+                    return;
+                }
             }
         }
         if (e.key === 'Escape') {
