@@ -33,6 +33,10 @@ alter table public.clients_overseas drop constraint if exists clients_overseas_b
 alter table public.clients_overseas add constraint clients_overseas_biz_type_check
     check (biz_type is null or biz_type in ('', '공장', '에이전시'));
 
+-- 제작 이력 (품목/USD 단가/수량 배열)
+-- 예: [{"item":"시계","unit_price_usd":5.5,"qty":1000}, ...]
+alter table public.clients_overseas add column if not exists production_history jsonb default '[]'::jsonb;
+
 -- RLS: 대시보드 전체 공유 정책 (다른 테이블과 동일)
 alter table public.clients_overseas enable row level security;
 

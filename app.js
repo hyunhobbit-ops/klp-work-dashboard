@@ -5394,7 +5394,8 @@ function clientOverseasToDb(c) {
         email: c.email || '',
         location: c.location || '',
         biz_type: c.bizType || '',
-        contact_name: c.contactName || ''
+        contact_name: c.contactName || '',
+        production_history: Array.isArray(c.productionHistory) ? c.productionHistory : []
     };
 }
 function clientOverseasFromDb(r) {
@@ -5406,7 +5407,8 @@ function clientOverseasFromDb(r) {
         email: r.email || '',
         location: r.location || '',
         bizType: r.biz_type || '',
-        contactName: r.contact_name || ''
+        contactName: r.contact_name || '',
+        productionHistory: Array.isArray(r.production_history) ? r.production_history : []
     };
 }
 async function loadClientsOverseasFromDb() {
@@ -5511,11 +5513,71 @@ function openClientOverseasModal(existing) {
         <div class="form-row" style="grid-template-columns:1fr">
             <div class="form-group"><label class="form-label">위치</label><input type="text" class="form-input" id="covLocation" value="${v('location')}" placeholder="예) 중국 광저우 / 베트남 하노이"></div>
         </div>
+        <div class="form-row" style="grid-template-columns:1fr">
+            <div class="form-group">
+                <label class="form-label">📋 제작 이력 (단가는 USD)</label>
+                <div style="display:grid;grid-template-columns:2fr 1fr 1fr 40px;gap:8px;font-size:11px;color:var(--gray-500);font-weight:700;margin-bottom:4px;padding:0 4px">
+                    <div>품목</div>
+                    <div style="text-align:right">단가 ($)</div>
+                    <div style="text-align:right">수량</div>
+                    <div></div>
+                </div>
+                <div id="covProductionList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
+                <button type="button" onclick="addOverseasProductionRow()" style="width:100%;padding:10px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ 품목 추가</button>
+            </div>
+        </div>
         <div style="display:flex;gap:8px;margin-top:12px">
             ${existing ? `<button class="form-submit" style="flex:1;background:var(--red)" onclick="deleteClientOverseas(${c.id})">🗑️ 삭제</button>` : ''}
             <button class="form-submit" style="flex:2" onclick="${existing ? `saveEditClientOverseas(${c.id})` : 'addClientOverseas()'}">💾 ${existing ? '수정 저장' : '추가'}</button>
         </div>`;
+    // 기존 제작 이력 채우기 (없으면 빈 행 1개)
+    const history = Array.isArray(c.productionHistory) ? c.productionHistory : [];
+    if (history.length === 0) {
+        addOverseasProductionRow();
+    } else {
+        history.forEach(h => addOverseasProductionRow(h));
+    }
     document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
+}
+
+function addOverseasProductionRow(data) {
+    const list = document.getElementById('covProductionList');
+    if (!list) return;
+    const d = data || {};
+    const esc = s => (s == null ? '' : s.toString()).replace(/"/g, '&quot;');
+    const row = document.createElement('div');
+    row.className = 'cov-production-row';
+    row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr 40px;gap:8px;align-items:center';
+    row.innerHTML = `
+        <input type="text" class="form-input cov-prod-item" placeholder="품목명" value="${esc(d.item)}" style="margin:0">
+        <div style="position:relative">
+            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gray-500);font-weight:700;font-size:13px;pointer-events:none">$</span>
+            <input type="text" inputmode="decimal" class="form-input cov-prod-price" placeholder="0.00" value="${esc(d.unit_price_usd ?? '')}" style="margin:0;padding-left:22px;text-align:right">
+        </div>
+        <input type="text" inputmode="numeric" class="form-input cov-prod-qty" placeholder="0" value="${esc(d.qty ?? '')}" style="margin:0;text-align:right">
+        <button type="button" onclick="removeOverseasProductionRow(this)" title="삭제" style="background:var(--gray-100);border:none;border-radius:8px;padding:8px 0;cursor:pointer;font-size:14px">🗑</button>
+    `;
+    list.appendChild(row);
+}
+
+function removeOverseasProductionRow(btn) {
+    const row = btn.closest('.cov-production-row');
+    if (row) row.remove();
+}
+
+function readOverseasProductionHistory() {
+    const rows = document.querySelectorAll('#covProductionList .cov-production-row');
+    const result = [];
+    rows.forEach(row => {
+        const item = row.querySelector('.cov-prod-item').value.trim();
+        const priceRaw = (row.querySelector('.cov-prod-price').value || '').replace(/[^0-9.]/g, '');
+        const qtyRaw = (row.querySelector('.cov-prod-qty').value || '').replace(/[^0-9]/g, '');
+        const price = priceRaw ? parseFloat(priceRaw) : 0;
+        const qty = qtyRaw ? parseInt(qtyRaw, 10) : 0;
+        if (!item && !price && !qty) return;    // 전부 빈 행은 저장하지 않음
+        result.push({ item, unit_price_usd: price, qty });
+    });
+    return result;
 }
 
 function readClientOverseasForm() {
@@ -5526,7 +5588,8 @@ function readClientOverseasForm() {
         contactName: document.getElementById('covContactName').value.trim(),
         phone: document.getElementById('covPhone').value.trim(),
         email: document.getElementById('covEmail').value.trim(),
-        location: document.getElementById('covLocation').value.trim()
+        location: document.getElementById('covLocation').value.trim(),
+        productionHistory: readOverseasProductionHistory()
     };
 }
 
