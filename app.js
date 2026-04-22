@@ -5564,7 +5564,8 @@ function openClientOverseasModal(existing) {
     } else {
         history.forEach(h => addOverseasProductionRow(h));
     }
-    document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
+    document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
+    openModalHistory();
 }
 
 function addOverseasProductionRow(data) {
