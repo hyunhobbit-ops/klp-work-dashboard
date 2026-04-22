@@ -669,6 +669,9 @@ function switchTab(tabId, fromHistory = false) {
         }
     }
 
+    // 탭 전환 시 리스트/검색 상태를 초기화 (사용자가 이전에 남긴 필터·선택·페이지 초기화)
+    try { resetTabState(tabId); } catch (e) { console.warn('resetTabState failed:', e); }
+
     // 임시 프로젝트 탭 열릴 때 DB 로드 + 인라인 초기화
     if (tabId === 'projects-temp') {
         loadTempProjects();
@@ -836,6 +839,50 @@ function setupSearch() {
             currentProposalSearch = e.target.value.toLowerCase();
             renderProposals();
         });
+    }
+}
+
+// ===== 탭 초기 상태 리셋 =====
+// 다른 메뉴 갔다 돌아왔을 때 검색·필터·페이지·선택 등을 모두 처음 상태로 되돌림.
+// switchTab 에서 호출됨.
+function resetTabState(tabId) {
+    if (tabId === 'clients') {
+        clientSearch = '';
+        clientPage = 1;
+        clientCategoryFilter = 'all';
+        clientSort = { field: null, dir: 'asc' };
+        if (typeof selectedClientIds !== 'undefined') selectedClientIds.clear();
+        const searchEl = document.getElementById('clientSearch');
+        if (searchEl) searchEl.value = '';
+        document.querySelectorAll('#clientCategoryFilterBar .filter-chip').forEach(b => {
+            b.classList.toggle('active', b.dataset.catFilter === 'all');
+        });
+        try { renderClients(); } catch (e) {}
+    } else if (tabId === 'clients-overseas') {
+        clientOverseasSearch = '';
+        const searchEl = document.getElementById('clientOverseasSearch');
+        if (searchEl) searchEl.value = '';
+        try { renderClientsOverseas(); } catch (e) {}
+    } else if (tabId === 'marketing') {
+        marketingSearch = '';
+        const searchEl = document.getElementById('marketingSearch');
+        if (searchEl) searchEl.value = '';
+        try { renderMarketing(); } catch (e) {}
+    } else if (tabId === 'delivery') {
+        currentDeliverySearch = '';
+        const searchEl = document.getElementById('deliverySearch');
+        if (searchEl) searchEl.value = '';
+        try { renderDeliveries(); } catch (e) {}
+    } else if (tabId === 'product-db') {
+        currentProductSearch = '';
+        const searchEl = document.getElementById('productSearch');
+        if (searchEl) searchEl.value = '';
+        try { renderProductDB(); } catch (e) {}
+    } else if (tabId === 'proposals') {
+        currentProposalSearch = '';
+        const searchEl = document.getElementById('proposalSearch');
+        if (searchEl) searchEl.value = '';
+        try { renderProposals(); } catch (e) {}
     }
 }
 
