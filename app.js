@@ -4804,10 +4804,32 @@ async function dbInsertClient(c) {
     if (error) { console.error(error); showToast('DB 저장 실패: ' + error.message); return null; }
     return clientFromDb(data);
 }
+// 인라인 편집 + 모달 수정 양쪽에서 쓰이므로 patch 의 실제 키만 DB 컬럼으로 매핑.
+// (clientToDb 는 전체 필드를 강제 반환하므로 부분 업데이트에 쓰면 다른 필드가 빈 문자열로 덮여버림)
+const CLIENT_FIELD_MAP = {
+    businessNo: 'business_no',
+    companyName: 'company_name',
+    ceo: 'ceo',
+    phone: 'phone',
+    fax: 'fax',
+    mobile: 'mobile',
+    email: 'email',
+    zipcode: 'zipcode',
+    address: 'address',
+    bizType: 'biz_type',
+    bizItem: 'biz_item',
+    staffName: 'staff_name',
+    staffMobile: 'staff_mobile',
+    staffEmail: 'staff_email',
+    grade: 'grade',
+    category: 'category'
+};
 async function dbUpdateClient(id, patch) {
-    const dbPatch = clientToDb(patch);
-    // patch might be partial — strip undefined
-    Object.keys(dbPatch).forEach(k => { if (dbPatch[k] === undefined) delete dbPatch[k]; });
+    const dbPatch = {};
+    for (const [k, v] of Object.entries(patch)) {
+        if (CLIENT_FIELD_MAP[k] && v !== undefined) dbPatch[CLIENT_FIELD_MAP[k]] = v;
+    }
+    if (Object.keys(dbPatch).length === 0) return;
     const { error } = await sb.from('clients').update(dbPatch).eq('id', id);
     if (error) { console.error(error); showToast('DB 수정 실패: ' + error.message); }
 }
