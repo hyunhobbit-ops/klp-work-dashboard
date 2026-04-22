@@ -5527,7 +5527,10 @@ function renderMarketing() {
             </div>
             ${chips ? `<div class="marketing-channels">${chips}</div>` : ''}
             ${c.content ? `<div class="marketing-content" id="${contentId}">${esc(c.content)}</div>
-                <button class="marketing-content-toggle" onclick="toggleMarketingContent('${contentId}', this)">전체 보기</button>` : ''}
+                <div class="marketing-content-actions">
+                    <button class="marketing-content-toggle" onclick="toggleMarketingContent('${contentId}', this)">전체 보기</button>
+                    <button class="marketing-copy-btn" onclick="copyMarketingContent(${c.id})">📋 문구 복사</button>
+                </div>` : ''}
             ${deadlineHtml}
             <div class="marketing-distrib">${rows}</div>
         </div>`;
@@ -5539,6 +5542,28 @@ function toggleMarketingContent(id, btn) {
     if (!el) return;
     const open = el.classList.toggle('expanded');
     btn.textContent = open ? '접기' : '전체 보기';
+}
+
+function copyMarketingContent(campaignId) {
+    const c = marketingCampaigns.find(x => x.id === campaignId);
+    if (!c || !c.content) { showToast('복사할 문구가 없습니다'); return; }
+    const text = c.content;
+    const done = () => showToast('문구가 복사되었습니다');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => showToast('복사 실패 — 직접 복사해주세요'));
+    } else {
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            done();
+        } catch (e) { showToast('복사 실패'); }
+    }
 }
 
 async function toggleMarketingDistribution(campaignId, loginName, checked) {
@@ -5609,7 +5634,7 @@ function openMarketingModal(id) {
         </div>
         <div class="form-row" style="grid-template-columns:1fr">
             <div class="form-group"><label class="form-label">마케팅 문구</label>
-                <textarea class="form-input" id="mktContent" rows="5" placeholder="배포할 문구를 여기에 작성하세요">${esc(c.content)}</textarea>
+                <textarea class="form-input" id="mktContent" rows="14" style="min-height:280px;font-family:inherit;line-height:1.6;resize:vertical" placeholder="배포할 문구를 여기에 작성하세요&#10;&#10;여러 줄 작성이 가능합니다.">${esc(c.content)}</textarea>
             </div>
         </div>
         <div class="form-row" style="grid-template-columns:1fr">
