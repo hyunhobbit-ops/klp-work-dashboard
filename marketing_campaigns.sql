@@ -8,11 +8,15 @@ create table if not exists public.marketing_campaigns (
     channels text[] default array[]::text[],
     deadline date,
     memo text,
+    image_url text,                             -- base64 data URL (추후 Supabase Storage로 이관 예정)
     distributions jsonb default '{}'::jsonb,   -- { "김관택": { "done": true, "done_at": "2026-04-22T..." }, ... }
     created_by text,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
+
+-- 기존 테이블이 이미 있으면 image_url 추가
+alter table public.marketing_campaigns add column if not exists image_url text;
 
 -- updated_at 자동 갱신
 create or replace function public.set_updated_at()

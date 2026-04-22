@@ -5434,6 +5434,7 @@ function marketingFromDb(r) {
         channels: Array.isArray(r.channels) ? r.channels : [],
         deadline: r.deadline || '',
         memo: r.memo || '',
+        imageUrl: r.image_url || '',
         distributions: (r.distributions && typeof r.distributions === 'object') ? r.distributions : {},
         createdBy: r.created_by || '',
         createdAt: r.created_at || ''
@@ -5446,6 +5447,7 @@ function marketingToDb(c) {
         channels: Array.isArray(c.channels) ? c.channels : [],
         deadline: c.deadline || null,
         memo: c.memo || '',
+        image_url: c.imageUrl || null,
         distributions: c.distributions || {},
         created_by: c.createdBy || ''
     };
@@ -5513,7 +5515,12 @@ function renderMarketing() {
             ? `<div class="marketing-deadline">📅 마감: ${esc(c.deadline)}</div>`
             : '';
 
+        const imageHtml = c.imageUrl
+            ? `<div class="marketing-card-image"><img src="${esc(c.imageUrl)}" alt="${esc(c.title)}" onclick="openMarketingImage('${esc(c.imageUrl)}')"></div>`
+            : '';
+
         return `<div class="marketing-card">
+            ${imageHtml}
             <div class="marketing-card-header">
                 <div class="marketing-card-title">${esc(c.title)}</div>
                 <button class="marketing-card-edit" onclick="openMarketingModal(${c.id})">✏️ 편집</button>
@@ -5569,17 +5576,35 @@ function openMarketingModal(id) {
     const title = document.getElementById('modalTitle');
     const body = document.getElementById('modalBody');
     title.textContent = existing ? '마케팅 편집' : '새 마케팅';
-    const c = existing || { title: '', content: '', channels: [], deadline: '', memo: '' };
+    const c = existing || { title: '', content: '', channels: [], deadline: '', memo: '', imageUrl: '' };
     const esc = s => (s || '').toString().replace(/"/g, '&quot;');
     const chipsHtml = MARKETING_CHANNEL_OPTIONS.map(opt => {
         const selected = (c.channels || []).includes(opt);
         return `<span class="chip ${selected ? 'selected' : ''}" data-channel="${esc(opt)}" onclick="toggleMarketingChannelChip(this)">${opt}</span>`;
     }).join('');
 
+    const previewHtml = c.imageUrl
+        ? `<img src="${esc(c.imageUrl)}" style="max-width:100%;max-height:240px;border-radius:10px;border:1px solid var(--gray-200);object-fit:contain;background:var(--gray-50)">`
+        : `<div style="width:100%;height:120px;border:2px dashed var(--gray-300);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:13px">이미지 없음</div>`;
+
     body.innerHTML = `
         <div class="form-row" style="grid-template-columns:1fr">
             <div class="form-group"><label class="form-label">제목 <span style="color:var(--red)">*</span></label>
                 <input type="text" class="form-input" id="mktTitle" value="${esc(c.title)}" placeholder="예) 4월 특가 프로모션">
+            </div>
+        </div>
+        <div class="form-row" style="grid-template-columns:1fr">
+            <div class="form-group"><label class="form-label">이미지 (선택, 최대 4MB)</label>
+                <input type="hidden" id="mktImage" value="${esc(c.imageUrl)}">
+                <div id="mktImagePreview" style="margin-bottom:8px">${previewHtml}</div>
+                <div style="display:flex;gap:6px">
+                    <input type="file" id="mktImageFile" accept="image/*" style="display:none" onchange="handleMarketingImageUpload(event)">
+                    <button type="button" class="btn-export" onclick="document.getElementById('mktImageFile').click()">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 19V5m0 0l-6 6m6-6l6 6M4 20h16"/></svg>
+                        이미지 업로드
+                    </button>
+                    <button type="button" class="btn-export" onclick="clearMarketingImage()">삭제</button>
+                </div>
             </div>
         </div>
         <div class="form-row" style="grid-template-columns:1fr">
@@ -5607,6 +5632,37 @@ function openMarketingModal(id) {
     document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
 }
 
+function handleMarketingImageUpload(ev) {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { showToast('이미지 파일만 업로드 가능합니다'); return; }
+    if (file.size > 4 * 1024 * 1024) { showToast('4MB 이하 파일만 업로드 가능합니다'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const dataUrl = e.target.result;
+        const hidden = document.getElementById('mktImage');
+        if (hidden) hidden.value = dataUrl;
+        const preview = document.getElementById('mktImagePreview');
+        if (preview) preview.innerHTML = `<img src="${dataUrl}" style="max-width:100%;max-height:240px;border-radius:10px;border:1px solid var(--gray-200);object-fit:contain;background:var(--gray-50)">`;
+    };
+    reader.onerror = () => showToast('이미지 읽기 실패');
+    reader.readAsDataURL(file);
+}
+
+function clearMarketingImage() {
+    const hidden = document.getElementById('mktImage');
+    if (hidden) hidden.value = '';
+    const preview = document.getElementById('mktImagePreview');
+    if (preview) preview.innerHTML = `<div style="width:100%;height:120px;border:2px dashed var(--gray-300);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:13px">이미지 없음</div>`;
+}
+
+function openMarketingImage(dataUrl) {
+    // 전체화면 오버레이로 이미지 확대 보기
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(`<title>마케팅 이미지</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${dataUrl}" style="max-width:100%;max-height:100vh"></body>`);
+}
+
 function toggleMarketingChannelChip(el) {
     el.classList.toggle('selected');
 }
@@ -5616,9 +5672,10 @@ function readMarketingForm() {
     const content = document.getElementById('mktContent').value.trim();
     const deadline = document.getElementById('mktDeadline').value;
     const memo = document.getElementById('mktMemo').value.trim();
+    const imageUrl = (document.getElementById('mktImage').value || '').trim();
     const chips = document.querySelectorAll('.marketing-channel-picker .chip.selected');
     const channels = Array.from(chips).map(el => el.dataset.channel);
-    return { title, content, channels, deadline, memo };
+    return { title, content, channels, deadline, memo, imageUrl };
 }
 
 async function addMarketingCampaign() {
@@ -5643,7 +5700,8 @@ async function saveMarketingCampaign(id) {
         content: form.content,
         channels: form.channels,
         deadline: form.deadline || null,
-        memo: form.memo
+        memo: form.memo,
+        image_url: form.imageUrl || null
     };
     const { error } = await sb.from('marketing_campaigns').update(patch).eq('id', id);
     if (error) { console.error(error); showToast('수정 실패: ' + error.message); return; }
