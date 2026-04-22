@@ -276,11 +276,28 @@ body {
 }
 
 .nav-group-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     font-size: 16px;
     font-weight: 800;
     color: var(--gray-800);
     letter-spacing: -0.2px;
     padding: 14px 14px 8px;
+}
+.nav-group-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--gray-200);
+}
+/* URL 바로가기는 내부에 라인 span + 버튼이 있으므로 pseudo 라인 숨김 */
+#urlShortcutsGroup .nav-group-label::after { display: none; }
+.nav-group-line {
+    flex: 1;
+    height: 1px;
+    background: var(--gray-200);
+    min-width: 12px;
 }
 
 .nav-item {
