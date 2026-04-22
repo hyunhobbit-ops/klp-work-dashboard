@@ -337,7 +337,7 @@ body {
     font-size: 14px; font-weight: 600; color: var(--gray-500);
 }
 .nav-sub-item {
-    padding-left: 46px !important;
+    padding-left: 60px !important;
     font-size: 13px !important;
     font-weight: 500 !important;
 }
