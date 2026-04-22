@@ -1524,6 +1524,7 @@ body {
     box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }
 .marketing-card-image {
+    position: relative;
     margin: -18px -20px 0;
     border-top-left-radius: var(--radius-md);
     border-top-right-radius: var(--radius-md);
@@ -1534,6 +1535,28 @@ body {
     align-items: center;
     justify-content: center;
 }
+.marketing-image-download {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(17, 17, 17, 0.7);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transition: background 0.15s, transform 0.1s;
+    z-index: 2;
+}
+.marketing-image-download:hover { background: rgba(17, 17, 17, 0.9); }
+.marketing-image-download:active { transform: scale(0.97); }
 .marketing-card-image img {
     width: 100%;
     max-height: 220px;

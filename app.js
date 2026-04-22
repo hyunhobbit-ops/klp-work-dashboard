@@ -5516,7 +5516,13 @@ function renderMarketing() {
             : '';
 
         const imageHtml = c.imageUrl
-            ? `<div class="marketing-card-image"><img src="${esc(c.imageUrl)}" alt="${esc(c.title)}" onclick="openMarketingImage('${esc(c.imageUrl)}')"></div>`
+            ? `<div class="marketing-card-image">
+                <button class="marketing-image-download" onclick="event.stopPropagation();downloadMarketingImage(${c.id})" title="이미지 다운로드">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M12 5v14m0 0l-6-6m6 6l6-6M4 21h16"/></svg>
+                    다운로드
+                </button>
+                <img src="${esc(c.imageUrl)}" alt="${esc(c.title)}" onclick="openMarketingImage('${esc(c.imageUrl)}')">
+            </div>`
             : '';
 
         return `<div class="marketing-card">
@@ -5619,17 +5625,22 @@ function openMarketingModal(id) {
             </div>
         </div>
         <div class="form-row" style="grid-template-columns:1fr">
-            <div class="form-group"><label class="form-label">이미지 (선택, 최대 4MB)</label>
+            <div class="form-group"><label class="form-label">이미지 (선택)</label>
                 <input type="hidden" id="mktImage" value="${esc(c.imageUrl)}">
                 <div id="mktImagePreview" style="margin-bottom:8px">${previewHtml}</div>
-                <div style="display:flex;gap:6px">
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
                     <input type="file" id="mktImageFile" accept="image/*" style="display:none" onchange="handleMarketingImageUpload(event)">
                     <button type="button" class="btn-export" onclick="document.getElementById('mktImageFile').click()">
                         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 19V5m0 0l-6 6m6-6l6 6M4 20h16"/></svg>
-                        이미지 업로드
+                        파일 업로드 (최대 4MB)
                     </button>
                     <button type="button" class="btn-export" onclick="clearMarketingImage()">삭제</button>
                 </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <input type="url" id="mktImageUrlInput" class="form-input" placeholder="또는 이미지 URL 붙여넣기 — https://..." value="${(c.imageUrl || '').startsWith('data:') ? '' : esc(c.imageUrl)}" style="flex:1">
+                    <button type="button" class="btn-export" onclick="applyMarketingImageUrl()">URL 적용</button>
+                </div>
+                <div style="font-size:12px;color:var(--gray-500);margin-top:4px">파일 업로드와 URL 중 하나를 사용하세요.</div>
             </div>
         </div>
         <div class="form-row" style="grid-template-columns:1fr">
@@ -5677,8 +5688,31 @@ function handleMarketingImageUpload(ev) {
 function clearMarketingImage() {
     const hidden = document.getElementById('mktImage');
     if (hidden) hidden.value = '';
+    const urlInput = document.getElementById('mktImageUrlInput');
+    if (urlInput) urlInput.value = '';
     const preview = document.getElementById('mktImagePreview');
     if (preview) preview.innerHTML = `<div style="width:100%;height:120px;border:2px dashed var(--gray-300);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:13px">이미지 없음</div>`;
+}
+
+function applyMarketingImageUrl() {
+    const urlInput = document.getElementById('mktImageUrlInput');
+    if (!urlInput) return;
+    const url = (urlInput.value || '').trim();
+    if (!url) { showToast('URL을 입력해주세요'); return; }
+    if (!/^https?:\/\//i.test(url)) { showToast('http:// 또는 https:// 로 시작하는 URL만 사용 가능합니다'); return; }
+
+    const preview = document.getElementById('mktImagePreview');
+    const hidden = document.getElementById('mktImage');
+
+    // 이미지 로드 테스트 후 반영
+    const probe = new Image();
+    probe.onload = () => {
+        if (hidden) hidden.value = url;
+        if (preview) preview.innerHTML = `<img src="${url.replace(/"/g, '&quot;')}" style="max-width:100%;max-height:240px;border-radius:10px;border:1px solid var(--gray-200);object-fit:contain;background:var(--gray-50)">`;
+        showToast('이미지 URL이 적용되었습니다');
+    };
+    probe.onerror = () => showToast('이미지를 불러올 수 없는 URL입니다');
+    probe.src = url;
 }
 
 function openMarketingImage(dataUrl) {
@@ -5686,6 +5720,56 @@ function openMarketingImage(dataUrl) {
     const w = window.open('', '_blank');
     if (!w) return;
     w.document.write(`<title>마케팅 이미지</title><body style="margin:0;background:#111;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${dataUrl}" style="max-width:100%;max-height:100vh"></body>`);
+}
+
+function downloadMarketingImage(campaignId) {
+    const c = marketingCampaigns.find(x => x.id === campaignId);
+    if (!c || !c.imageUrl) { showToast('이미지가 없습니다'); return; }
+    const url = c.imageUrl;
+    const safe = (c.title || 'marketing').replace(/[\\/:*?"<>|]/g, '_').slice(0, 60) || 'marketing';
+
+    // data URL은 즉시 다운로드
+    if (url.startsWith('data:')) {
+        const extMatch = url.match(/^data:image\/([a-z0-9+]+)/i);
+        const ext = extMatch ? extMatch[1].replace('jpeg', 'jpg') : 'png';
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${safe}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showToast('이미지가 다운로드되었습니다');
+        return;
+    }
+
+    // 외부 URL — fetch + blob 으로 다운로드 (CORS 허용된 경우)
+    fetch(url, { mode: 'cors' })
+        .then(res => {
+            if (!res.ok) throw new Error('fetch failed');
+            return res.blob();
+        })
+        .then(blob => {
+            const extMatch = blob.type && blob.type.match(/image\/([a-z0-9+]+)/i);
+            let ext = extMatch ? extMatch[1].replace('jpeg', 'jpg') : null;
+            if (!ext) {
+                const urlExt = url.split('?')[0].match(/\.([a-z0-9]+)$/i);
+                ext = urlExt ? urlExt[1].toLowerCase() : 'png';
+            }
+            const objUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objUrl;
+            a.download = `${safe}.${ext}`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(objUrl), 1500);
+            showToast('이미지가 다운로드되었습니다');
+        })
+        .catch(() => {
+            // CORS로 막힌 경우 — 새 탭에서 열기
+            window.open(url, '_blank', 'noopener');
+            showToast('새 탭에서 열었습니다 — 우클릭 후 "이미지 저장"으로 받아주세요');
+        });
 }
 
 function toggleMarketingChannelChip(el) {
