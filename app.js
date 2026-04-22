@@ -8538,25 +8538,38 @@ function openTempGroupEdit(gi) {
     const TL = 'font-size:11px;font-weight:700;color:#1B64DA;margin-top:4px;min-height:16px';
 
     // 부대비용 섹션 HTML 헬퍼 (compact 2-col layout)
-    const feeSection = (prefix, i, data, qty) => `
+    // hideMethod=true 면 인쇄/포장 '방법' 필드를 생략하고 비용만 렌더 (매출/매입이 방법을 공유하기 위함)
+    const feeSection = (prefix, i, data, qty, hideMethod) => `
         <div style="background:var(--white);border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid var(--gray-200)">
-            <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px">🖨 인쇄</div>
+            <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px">🖨 인쇄${hideMethod ? ' 비용' : ''}</div>
+            ${hideMethod ? `
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:end">
+                <div><label style="${LB}">금액</label><input id="${prefix}_pf_${i}" value="${fmtV(data.pf)}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
+                <div><label style="${LB}">적용</label><select id="${prefix}_pfa_${i}" style="${SS}" onchange="${RC(prefix,i,qty)}"><option${(data.pfa||'1개당')==='1개당'?' selected':''}>1개당</option><option${data.pfa==='일괄'?' selected':''}>일괄</option></select></div>
+                <div><label style="${LB}">VAT</label><select id="${prefix}_pfv_${i}" style="${SS}">${vatOpts(data.pfv)}</select></div>
+            </div>` : `
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end">
                 <div><label style="${LB}">방법</label><select id="${prefix}_pm_${i}" style="${SS}" onchange="toggleTempCustom(this,'${prefix}_pmc_${i}')">${printMethodOpts(data.pm)}</select><input id="${prefix}_pmc_${i}" placeholder="직접 입력" value="${customVal(data.pm, printMethods)}" style="${IS};margin-top:4px;display:${customDisplay(data.pm, printMethods)}"></div>
                 <div><label style="${LB}">금액</label><input id="${prefix}_pf_${i}" value="${fmtV(data.pf)}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
                 <div><label style="${LB}">적용</label><select id="${prefix}_pfa_${i}" style="${SS}" onchange="${RC(prefix,i,qty)}"><option${(data.pfa||'1개당')==='1개당'?' selected':''}>1개당</option><option${data.pfa==='일괄'?' selected':''}>일괄</option></select></div>
                 <div><label style="${LB}">VAT</label><select id="${prefix}_pfv_${i}" style="${SS}">${vatOpts(data.pfv)}</select></div>
-            </div>
+            </div>`}
             <div id="${prefix}_pf_total_${i}" style="${TL}"></div>
         </div>
         <div style="background:var(--white);border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid var(--gray-200)">
-            <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px">📦 포장</div>
+            <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px">📦 포장${hideMethod ? ' 비용' : ''}</div>
+            ${hideMethod ? `
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:end">
+                <div><label style="${LB}">금액</label><input id="${prefix}_pkf_${i}" value="${fmtV(data.pkf)}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
+                <div><label style="${LB}">적용</label><select id="${prefix}_pkfa_${i}" style="${SS}" onchange="${RC(prefix,i,qty)}"><option${(data.pkfa||'일괄')==='1개당'?' selected':''}>1개당</option><option${(data.pkfa||'일괄')==='일괄'?' selected':''}>일괄</option></select></div>
+                <div><label style="${LB}">VAT</label><select id="${prefix}_pkfv_${i}" style="${SS}">${vatOpts(data.pkfv)}</select></div>
+            </div>` : `
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:end">
                 <div><label style="${LB}">방법</label><select id="${prefix}_pkm_${i}" style="${SS}" onchange="toggleTempCustom(this,'${prefix}_pkmc_${i}')">${packMethodOpts(data.pkm)}</select><input id="${prefix}_pkmc_${i}" placeholder="직접 입력" value="${customVal(data.pkm, packMethods)}" style="${IS};margin-top:4px;display:${customDisplay(data.pkm, packMethods)}"></div>
                 <div><label style="${LB}">금액</label><input id="${prefix}_pkf_${i}" value="${fmtV(data.pkf)}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
                 <div><label style="${LB}">적용</label><select id="${prefix}_pkfa_${i}" style="${SS}" onchange="${RC(prefix,i,qty)}"><option${(data.pkfa||'일괄')==='1개당'?' selected':''}>1개당</option><option${(data.pkfa||'일괄')==='일괄'?' selected':''}>일괄</option></select></div>
                 <div><label style="${LB}">VAT</label><select id="${prefix}_pkfv_${i}" style="${SS}">${vatOpts(data.pkfv)}</select></div>
-            </div>
+            </div>`}
             <div id="${prefix}_pkf_total_${i}" style="${TL}"></div>
         </div>
         <div style="background:var(--white);border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid var(--gray-200)">
@@ -8600,7 +8613,7 @@ function openTempGroupEdit(gi) {
                     <div><label style="${LB}">단가</label><input id="tge_sup_${i}" value="${fmtV(p.supplierUnitPrice)}" placeholder="0" oninput="fmtCommaTemp(this)" style="${IS};text-align:right"></div>
                     <div><label style="${LB}">VAT</label><select id="tge_supv_${i}" style="${SS}">${vatOpts(p.supplierUnitPriceVat)}</select></div>
                 </div>
-                ${feeSection('tgs', i, { pm: p.supPrintMethod, pf: p.supPrintFee, pfa: p.supPrintFeeApply, pfv: p.supPrintFeeVat, pkm: p.supPackMethod, pkf: p.supPackagingFee, pkfa: p.supPackagingFeeApply, pkfv: p.supPackagingFeeVat, lf: p.supLabelFee, lfa: p.supLabelFeeApply, lfv: p.supLabelFeeVat, sb: p.supShippingBoxes, sf: p.supShippingFee, sfv: p.supShippingFeeVat }, p.qty || 0)}
+                ${feeSection('tgs', i, { pm: p.supPrintMethod, pf: p.supPrintFee, pfa: p.supPrintFeeApply, pfv: p.supPrintFeeVat, pkm: p.supPackMethod, pkf: p.supPackagingFee, pkfa: p.supPackagingFeeApply, pkfv: p.supPackagingFeeVat, lf: p.supLabelFee, lfa: p.supLabelFeeApply, lfv: p.supLabelFeeVat, sb: p.supShippingBoxes, sf: p.supShippingFee, sfv: p.supShippingFeeVat }, p.qty || 0, true)}
             </div>
         </div>
     </div>`).join('');
@@ -8676,12 +8689,12 @@ async function saveTempGroupEdit(gi) {
         p.shippingFee = getNum(`tge_sf_${i}`);
         p.shippingFeeVat = getVal(`tge_sfv_${i}`);
 
-        // 매입 부대비용
-        p.supPrintMethod = getVal(`tgs_pm_${i}`) === '기타' ? (getVal(`tgs_pmc_${i}`) || '기타') : getVal(`tgs_pm_${i}`);
+        // 매입 부대비용 — 방법은 매출(tge)에서 복사, 비용만 tgs 에서 읽음
+        p.supPrintMethod = p.printMethod;
         p.supPrintFee = getNum(`tgs_pf_${i}`);
         p.supPrintFeeApply = getVal(`tgs_pfa_${i}`);
         p.supPrintFeeVat = getVal(`tgs_pfv_${i}`);
-        p.supPackMethod = getVal(`tgs_pkm_${i}`) === '기타' ? (getVal(`tgs_pkmc_${i}`) || '기타') : getVal(`tgs_pkm_${i}`);
+        p.supPackMethod = p.packMethod;
         p.supPackagingFee = getNum(`tgs_pkf_${i}`);
         p.supPackagingFeeApply = getVal(`tgs_pkfa_${i}`);
         p.supPackagingFeeVat = getVal(`tgs_pkfv_${i}`);
@@ -8829,13 +8842,17 @@ function renderTempQuoteDoc(g) {
         </tr>`;
 
         // 부대비용 행
+        // 인쇄/포장은 "방법"이 유의미하면 0원이어도 견적서에 표시 (인쇄 '없음' / 포장 '기본박스'는 제외)
+        // 라벨/택배는 방법 개념이 없으므로 금액 > 0 인 경우만 표시
         const qty = p.qty || 0;
+        const hasPrintMethod = !!p.printMethod && p.printMethod !== '없음';
+        const hasPackMethod  = !!p.packMethod  && p.packMethod !== '기본박스';
         const fees = [
-            { name: '인쇄비' + (p.printMethod && p.printMethod !== '없음' ? ' (' + p.printMethod + ')' : ''), unitVal: p.printFee || 0, apply: p.printFeeApply || '1개당', vat: p.printFeeVat },
-            { name: '포장비' + (p.packMethod && p.packMethod !== '기본박스' ? ' (' + p.packMethod + ')' : ''), unitVal: p.packagingFee || 0, apply: p.packagingFeeApply || '일괄', vat: p.packagingFeeVat },
-            { name: '라벨비', unitVal: p.labelFee || 0, apply: p.labelFeeApply || '1개당', vat: p.labelFeeVat },
-            { name: '택배비', unitVal: p.shippingFee || 0, apply: '박스', fQtyOverride: p.shippingBoxes || 0, vat: p.shippingFeeVat }
-        ].filter(f => f.unitVal > 0);
+            { name: '인쇄비' + (hasPrintMethod ? ' (' + p.printMethod + ')' : ''), unitVal: p.printFee || 0, apply: p.printFeeApply || '1개당', vat: p.printFeeVat, show: hasPrintMethod || (p.printFee || 0) > 0 },
+            { name: '포장비' + (hasPackMethod ? ' (' + p.packMethod + ')' : ''),    unitVal: p.packagingFee || 0, apply: p.packagingFeeApply || '일괄', vat: p.packagingFeeVat, show: hasPackMethod || (p.packagingFee || 0) > 0 },
+            { name: '라벨비', unitVal: p.labelFee || 0, apply: p.labelFeeApply || '1개당', vat: p.labelFeeVat, show: (p.labelFee || 0) > 0 },
+            { name: '택배비', unitVal: p.shippingFee || 0, apply: '박스', fQtyOverride: p.shippingBoxes || 0, vat: p.shippingFeeVat, show: (p.shippingFee || 0) > 0 }
+        ].filter(f => f.show);
 
         fees.forEach(f => {
             const fQty = f.fQtyOverride !== undefined ? f.fQtyOverride : (f.apply === '1개당' ? qty : 1);
