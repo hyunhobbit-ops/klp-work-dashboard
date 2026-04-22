@@ -232,7 +232,7 @@ let clientOverseasSearch = '';
 let marketingCampaigns = [];
 let marketingSearch = '';
 const MARKETING_DISTRIBUTORS = ['김관택', '이현주', '김현호'];     // 로그인 이름 기준
-const MARKETING_CHANNEL_OPTIONS = ['카카오톡', '유튜브', 'X', '인스타', '블로그', '페이스북', '기타'];
+const MARKETING_CHANNEL_OPTIONS = ['카카오톡', '문자', '이메일', '유튜브', 'X', '인스타', '블로그', '페이스북', '기타'];
 const expandedProjectIds = new Set();
 
 // ===== State =====
