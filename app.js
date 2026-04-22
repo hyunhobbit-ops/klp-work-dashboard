@@ -8626,7 +8626,7 @@ function openTempGroupEdit(gi) {
     ${itemsHtml}
     <div style="background:var(--gray-50);border-radius:14px;padding:16px;margin-bottom:14px">
         <div style="font-weight:700;font-size:14px;margin-bottom:10px;color:var(--gray-900)">견적서 비고</div>
-        <textarea id="tge_quoteNote" rows="4" style="${IS};resize:vertical;min-height:80px;line-height:1.6">${g.quoteNote || '• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.\n• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.'}</textarea>
+        <textarea id="tge_quoteNote" rows="4" onkeydown="handleQuoteNoteKey(event)" onfocus="handleQuoteNoteFocus(event)" style="${IS};resize:vertical;min-height:80px;line-height:1.6">${g.quoteNote || '• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.\n• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.'}</textarea>
     </div>
     <button class="btn-primary" onclick="saveTempGroupEdit(${gi})" style="width:100%;padding:14px;font-size:15px;margin-top:4px">저장</button>`;
 
@@ -8646,6 +8646,26 @@ function openTempGroupEdit(gi) {
         recalcTempFeeRow('tge', i, p.qty || 0);
         recalcTempFeeRow('tgs', i, p.qty || 0);
     });
+}
+
+// 견적서 비고 textarea — Enter 키로 자동 bullet 줄바꿈, 빈 상태 포커스 시 bullet prepend
+function handleQuoteNoteKey(ev) {
+    if (ev.key !== 'Enter' || ev.shiftKey) return;
+    ev.preventDefault();
+    const ta = ev.target;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const insert = '\n• ';
+    ta.value = ta.value.slice(0, start) + insert + ta.value.slice(end);
+    const pos = start + insert.length;
+    ta.selectionStart = ta.selectionEnd = pos;
+}
+function handleQuoteNoteFocus(ev) {
+    const ta = ev.target;
+    if (!ta.value.trim()) {
+        ta.value = '• ';
+        ta.selectionStart = ta.selectionEnd = ta.value.length;
+    }
 }
 
 async function saveTempGroupEdit(gi) {
