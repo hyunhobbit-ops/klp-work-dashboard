@@ -536,7 +536,15 @@ const F2_NEW_ACTIONS = [
     ['tab-marketdb',           () => openMarketModal(null, null)],
     ['tab-product-db',         () => openProductDBModal(null)],
     ['tab-proposals',          () => openProposalEditor(null)],
-    ['tab-marketing',          () => openMarketingModal(null)]
+    ['tab-marketing',          () => openMarketingModal(null)],
+    // 협업 프로젝트 — 목록뷰면 새 프로젝트, 상세뷰면 todo 컬럼에 새 카드
+    ['tab-planning',           () => {
+        if (currentPlanningProjectId == null) {
+            openNewPlanningModal();
+        } else {
+            openNewPlanningPostForColumn('todo');
+        }
+    }]
 ];
 
 function setupShortcuts() {
@@ -9278,7 +9286,7 @@ function renderPlanningList() {
                         <div style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">${modeLabel}</div>
                         <div style="font-size:13px;color:var(--gray-500)">${modeSub}</div>
                     </div>
-                    <button onclick="openNewPlanningModal()" style="padding:9px 18px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">+ 새 프로젝트</button>
+                    <button onclick="openNewPlanningModal()" title="F2" style="padding:9px 18px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">+ 새 프로젝트 (F2)</button>
                 </div>
                 ${fundSections}
             </div>`;
@@ -9469,7 +9477,7 @@ function renderPlanningDetail(p) {
                     </div>
                     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                         <select onchange="updatePlanningStatus(${p.id}, this.value)" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:8px;font-weight:700;font-size:12px">${statusOpts}</select>
-                        <button onclick="openNewPlanningPostForColumn('todo')" style="padding:6px 12px;background:var(--blue);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ 새 카드</button>
+                        <button onclick="openNewPlanningPostForColumn('todo')" title="F2" style="padding:6px 12px;background:var(--blue);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ 새 카드 (F2)</button>
                         <button onclick="openEditPlanningModal(${p.id})" style="padding:6px 10px;background:var(--gray-100);border:none;border-radius:8px;font-size:12px;cursor:pointer">✏️ 편집</button>
                         <button onclick="deletePlanningProject(${p.id})" style="padding:6px 10px;background:var(--red-light,#FEE);color:var(--red);border:none;border-radius:8px;font-size:12px;cursor:pointer">삭제</button>
                     </div>
