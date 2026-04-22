@@ -5487,20 +5487,20 @@ function renderClientsOverseas() {
         const p = latestProduction(c);
         const latest = p ? p.latest : null;
         const more = p && p.total > 1 ? `<span style="font-size:11px;color:var(--gray-500);margin-left:6px">+${p.total - 1}건</span>` : '';
-        const dateCell = latest && latest.order_date ? esc(latest.order_date) : '-';
         const itemCell = latest && latest.item ? `<strong>${esc(latest.item)}</strong>${more}` : (esc(c.items) || '-');
+        const dateCell = latest && latest.order_date ? esc(latest.order_date) : '-';
         const priceCell = latest && latest.unit_price_usd ? `$${Number(latest.unit_price_usd).toFixed(2)}` : '-';
         const qtyCell = latest && latest.qty ? `${Number(latest.qty).toLocaleString()}` : '-';
         return `
         <tr onclick="openEditClientOverseas(${c.id})" style="cursor:pointer">
             <td>${typeBadge(c.bizType)}</td>
             <td><strong>${esc(c.companyName)}</strong></td>
+            <td>${itemCell}</td>
             <td>${esc(c.phone) || '-'}</td>
             <td>${esc(c.email) || '-'}</td>
             <td>${esc(c.location) || '-'}</td>
             <td>${esc(c.contactName) || '-'}</td>
             <td>${dateCell}</td>
-            <td>${itemCell}</td>
             <td style="text-align:right">${priceCell}</td>
             <td style="text-align:right">${qtyCell}</td>
             <td><button class="edit-btn" onclick="event.stopPropagation();openEditClientOverseas(${c.id})">편집</button></td>
