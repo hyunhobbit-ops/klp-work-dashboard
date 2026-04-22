@@ -286,8 +286,56 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSearch();
     setupShortcuts();
     setupMarketdbHandlers();
+    setupNavTooltips();
     checkAuth();
 });
+
+// 사이드바 메뉴 hover 시 오른쪽에 설명 툴팁 표시
+// .sidebar 내 [data-tip] 요소에 대해 delegation 으로 동작 — 동적으로 추가되는 URL 바로가기 등에도 자동 적용
+function setupNavTooltips() {
+    let tipEl = null;
+    let showTimer = null;
+
+    const hide = () => {
+        clearTimeout(showTimer);
+        if (tipEl) tipEl.classList.remove('show');
+    };
+
+    const show = (el) => {
+        const text = el.getAttribute('data-tip');
+        if (!text) return;
+        if (!tipEl) {
+            tipEl = document.createElement('div');
+            tipEl.className = 'nav-tooltip';
+            document.body.appendChild(tipEl);
+        }
+        tipEl.textContent = text;
+        const rect = el.getBoundingClientRect();
+        tipEl.style.left = (rect.right + 12) + 'px';
+        tipEl.style.top = (rect.top + rect.height / 2) + 'px';
+        tipEl.classList.add('show');
+    };
+
+    document.addEventListener('mouseover', (e) => {
+        const el = e.target.closest('.sidebar [data-tip]');
+        if (!el) return;
+        clearTimeout(showTimer);
+        showTimer = setTimeout(() => show(el), 300);
+    });
+    document.addEventListener('mouseout', (e) => {
+        const el = e.target.closest('.sidebar [data-tip]');
+        if (!el) return;
+        // 같은 [data-tip] 내부로 이동하는 경우는 무시
+        if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+        hide();
+    });
+
+    // 사이드바 스크롤 / 탭 전환 / 창 리사이즈 시 툴팁 즉시 제거
+    const sidebarNav = document.querySelector('.sidebar-nav');
+    if (sidebarNav) sidebarNav.addEventListener('scroll', hide);
+    window.addEventListener('resize', hide);
+    window.addEventListener('scroll', hide, true);
+}
 
 // ===== Theme (light / dark) =====
 function setupTheme() {

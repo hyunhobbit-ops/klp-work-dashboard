@@ -1500,6 +1500,30 @@ body {
 [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 
 /* ============================
+   Sidebar Nav Tooltip (hover 시 오른쪽에 말풍선)
+   ============================ */
+.nav-tooltip {
+    position: fixed;
+    background: rgba(17, 17, 17, 0.92);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    max-width: 280px;
+    line-height: 1.5;
+    pointer-events: none;
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    opacity: 0;
+    transition: opacity 0.12s;
+    white-space: normal;
+    word-break: keep-all;
+    transform: translateY(-50%);
+}
+.nav-tooltip.show { opacity: 1; }
+
+/* ============================
    Sortable Table Headers (국내 거래처 DB)
    ============================ */
 .client-table-sortable th.sortable {

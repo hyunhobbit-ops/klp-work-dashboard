@@ -57,7 +57,7 @@
             </div>
             <nav class="sidebar-nav">
                 <!-- Home -->
-                <button class="nav-item active" data-tab="home">
+                <button class="nav-item active" data-tab="home" data-tip="대시보드 홈 — 오늘의 요약과 빠른 이동 카드">
                     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
                     <span>홈</span>
                 </button>
@@ -66,48 +66,48 @@
                 <div class="nav-group">
                     <div class="nav-group-label">업무</div>
                     <div class="nav-sub-group" id="navPlanningGroup">
-                        <div class="nav-sub-label">
+                        <div class="nav-sub-label" data-tip="협업 프로젝트 — 회사·펀딩·개인 구분">
                             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
                             <span>프로젝트</span>
                         </div>
-                        <button class="nav-item nav-sub-item" data-tab="planning-company" id="navPlanningCompany" style="display:none">
+                        <button class="nav-item nav-sub-item" data-tab="planning-company" id="navPlanningCompany" data-tip="회사/가족 공유 프로젝트 (관리자 전용)" style="display:none">
                             <span>회사</span>
                         </button>
-                        <button class="nav-item nav-sub-item" data-tab="planning-funding" id="navPlanningFunding" style="display:none">
+                        <button class="nav-item nav-sub-item" data-tab="planning-funding" id="navPlanningFunding" data-tip="크라우드펀딩 프로젝트 (관리자 전용)" style="display:none">
                             <span>펀딩</span>
                         </button>
-                        <button class="nav-item nav-sub-item" data-tab="planning-personal" id="navPlanningPersonal">
+                        <button class="nav-item nav-sub-item" data-tab="planning-personal" id="navPlanningPersonal" data-tip="본인이 작성한 개인 프로젝트">
                             <span>개인</span>
                         </button>
                     </div>
                     <div class="nav-sub-group">
-                        <div class="nav-sub-label">
+                        <div class="nav-sub-label" data-tip="매입·매출 프로젝트 관리">
                             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                             <span>매입매출</span>
                         </div>
-                        <button class="nav-item nav-sub-item" data-tab="projects-temp">
+                        <button class="nav-item nav-sub-item" data-tab="projects-temp" data-tip="견적 의뢰 — 단가·수량·부대비용 자동 계산 + 견적서 출력">
                             <span>견적 의뢰</span>
                         </button>
-                        <button class="nav-item nav-sub-item" data-tab="projects-domestic">
+                        <button class="nav-item nav-sub-item" data-tab="projects-domestic" data-tip="국내 주문 프로젝트 진행 현황 (매출+매입 통합)">
                             <span>국내</span>
                         </button>
-                        <button class="nav-item nav-sub-item" data-tab="projects-overseas">
+                        <button class="nav-item nav-sub-item" data-tab="projects-overseas" data-tip="해외 주문 프로젝트 진행 현황">
                             <span>해외</span>
                         </button>
                     </div>
-                    <button class="nav-item" data-tab="daily">
+                    <button class="nav-item" data-tab="daily" data-tip="담당자별 일일 업무 — 전체·임원·대표·개인 탭">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span>일일계획표</span>
                     </button>
-                    <button class="nav-item" data-tab="delivery">
+                    <button class="nav-item" data-tab="delivery" data-tip="택배 발송 기록 + 로젠택배 엑셀 일괄 내보내기">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8 8-4-4M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                         <span>택배 관리</span>
                     </button>
-                    <button class="nav-item" data-tab="marketing">
+                    <button class="nav-item" data-tab="marketing" data-tip="마케팅 문구·채널별 배포 체크 (본인 칸만 체크 가능)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
                         <span>마케팅</span>
                     </button>
-                    <button class="nav-item" data-tab="marketdb" id="navMarketdb" style="display:none">
+                    <button class="nav-item" data-tab="marketdb" id="navMarketdb" data-tip="중고 상품 업로드 현황 (관리자 전용)" style="display:none">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"/></svg>
                         <span>중고마켓DB</span>
                     </button>
@@ -116,11 +116,11 @@
                 <!-- 제안서 그룹 -->
                 <div class="nav-group">
                     <div class="nav-group-label">제안서</div>
-                    <button class="nav-item" data-tab="product-db">
+                    <button class="nav-item" data-tab="product-db" data-tip="제안서 작성용 상품 카탈로그 (카테고리별 등록)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"/></svg>
                         <span>상품 DB</span>
                     </button>
-                    <button class="nav-item" data-tab="proposals">
+                    <button class="nav-item" data-tab="proposals" data-tip="거래처별 제안서 작성·발송·이력 관리">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                         <span>제안서 관리</span>
                     </button>
@@ -129,23 +129,23 @@
                 <!-- 자료실 그룹 -->
                 <div class="nav-group">
                     <div class="nav-group-label">자료실</div>
-                    <button class="nav-item" data-tab="docs">
+                    <button class="nav-item" data-tab="docs" data-tip="회사 양식·규정·계약서 (준비 중)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                         <span>회사 문서</span>
                     </button>
-                    <button class="nav-item" data-tab="manual">
+                    <button class="nav-item" data-tab="manual" data-tip="업무 프로세스·신입 온보딩 가이드 (준비 중)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
                         <span>회사 매뉴얼</span>
                     </button>
-                    <button class="nav-item" data-tab="ceo-vision">
+                    <button class="nav-item" data-tab="ceo-vision" data-tip="대표님의 경영 방향·전략">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                         <span>경영목표</span>
                     </button>
-                    <button class="nav-item" data-tab="clients">
+                    <button class="nav-item" data-tab="clients" data-tip="국내 매출·매입처 정보 (필터·정렬·일괄 삭제)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                         <span>국내 거래처 DB</span>
                     </button>
-                    <button class="nav-item" data-tab="clients-overseas">
+                    <button class="nav-item" data-tab="clients-overseas" data-tip="해외 공장·에이전시 정보 + 제작 이력(USD)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>
                         <span>해외 거래처 DB</span>
                     </button>
@@ -154,16 +154,16 @@
                 <!-- 편의성 그룹 -->
                 <div class="nav-group">
                     <div class="nav-group-label">편의성</div>
-                    <button class="nav-item" data-tab="quotes">
+                    <button class="nav-item" data-tab="quotes" data-tip="단독 견적서 빠른 작성 (DC 없이 견적만 발행)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1L14 8M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1L10 16m11-4a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span>견적서 만들기</span>
                     </button>
-                    <a class="nav-item nav-external" href="doc-generator.html" target="_blank" rel="noopener">
+                    <a class="nav-item nav-external" href="doc-generator.html" target="_blank" rel="noopener" data-tip="디자인확인서·작업요청서 생성 페이지 (새 창)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                         <span>문서생성기</span>
                         <svg class="external-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
                     </a>
-                    <a class="nav-item nav-external" href="https://klp-bread-order-system.vercel.app/" target="_blank" rel="noopener">
+                    <a class="nav-item nav-external" href="https://klp-bread-order-system.vercel.app/" target="_blank" rel="noopener" data-tip="온라인 빵 발주 시스템 (새 창)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>
                         <span>온라인 빵 발주서</span>
                         <svg class="external-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
