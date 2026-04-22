@@ -8867,7 +8867,9 @@ function renderTempQuoteDoc(g) {
             }
             totalSup += fSup;
             totalVat += fV;
-            const applyLabel = f.apply === '1개당' ? ' <span style="font-size:9px;color:#888">1개당</span>' : (f.apply === '박스' ? ' <span style="font-size:9px;color:#888">' + fQty + '박스</span>' : '');
+            // 견적서에는 '1개당' / '일괄' 라벨 숨김 — 수량 컬럼으로 충분히 파악 가능
+            // 택배의 '박스' 단위만 유지 (수량 단위가 개와 다르므로 명시 필요)
+            const applyLabel = f.apply === '박스' ? ' <span style="font-size:9px;color:#888">' + fQty + '박스</span>' : '';
             rows += `<tr>
                 <td style="${icSub}">　└ ${f.name}${applyLabel}${f.vat === 'VAT 포함' ? ' <span style="color:#E67E22">(포함)</span>' : ''}</td>
                 <td style="${icSub};text-align:right">${fQty}</td>
