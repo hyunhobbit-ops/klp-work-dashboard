@@ -5470,11 +5470,25 @@ function renderClientsOverseas() {
         return '-';
     };
 
+    // 품목 셀: 제작 이력이 있으면 최신(발주일 내림차순) 항목 + N건 배지, 없으면 items 텍스트
+    const productSummary = (c) => {
+        const hist = Array.isArray(c.productionHistory) ? c.productionHistory.filter(h => h && (h.item || h.qty || h.unit_price_usd)) : [];
+        if (hist.length === 0) return esc(c.items) || '-';
+        const sorted = [...hist].sort((a, b) => (b.order_date || '').localeCompare(a.order_date || ''));
+        const latest = sorted[0];
+        const more = hist.length > 1 ? `<span style="font-size:11px;color:var(--gray-500);margin-left:6px">+${hist.length - 1}건</span>` : '';
+        const qty = latest.qty ? `${Number(latest.qty).toLocaleString()}개` : '';
+        const price = latest.unit_price_usd ? `$${Number(latest.unit_price_usd).toFixed(2)}` : '';
+        const detail = [qty, price].filter(Boolean).join(' · ');
+        const detailHtml = detail ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">${detail}${latest.order_date ? ' · ' + esc(latest.order_date) : ''}</div>` : '';
+        return `<strong>${esc(latest.item || c.items || '-')}</strong>${more}${detailHtml}`;
+    };
+
     tbody.innerHTML = filtered.map(c => `
         <tr onclick="openEditClientOverseas(${c.id})" style="cursor:pointer">
             <td>${typeBadge(c.bizType)}</td>
             <td><strong>${esc(c.companyName)}</strong></td>
-            <td>${esc(c.items) || '-'}</td>
+            <td>${productSummary(c)}</td>
             <td>${esc(c.phone) || '-'}</td>
             <td>${esc(c.email) || '-'}</td>
             <td>${esc(c.location) || '-'}</td>
@@ -5516,7 +5530,8 @@ function openClientOverseasModal(existing) {
         <div class="form-row" style="grid-template-columns:1fr">
             <div class="form-group">
                 <label class="form-label">📋 제작 이력 (단가는 USD)</label>
-                <div style="display:grid;grid-template-columns:2fr 1fr 1fr 40px;gap:8px;font-size:11px;color:var(--gray-500);font-weight:700;margin-bottom:4px;padding:0 4px">
+                <div style="display:grid;grid-template-columns:130px 2fr 1fr 1fr 40px;gap:8px;font-size:11px;color:var(--gray-500);font-weight:700;margin-bottom:4px;padding:0 4px">
+                    <div>발주일</div>
                     <div>품목</div>
                     <div style="text-align:right">단가 ($)</div>
                     <div style="text-align:right">수량</div>
@@ -5547,8 +5562,9 @@ function addOverseasProductionRow(data) {
     const esc = s => (s == null ? '' : s.toString()).replace(/"/g, '&quot;');
     const row = document.createElement('div');
     row.className = 'cov-production-row';
-    row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr 40px;gap:8px;align-items:center';
+    row.style.cssText = 'display:grid;grid-template-columns:130px 2fr 1fr 1fr 40px;gap:8px;align-items:center';
     row.innerHTML = `
+        <input type="date" class="form-input cov-prod-date" value="${esc(d.order_date || '')}" style="margin:0">
         <input type="text" class="form-input cov-prod-item" placeholder="품목명" value="${esc(d.item)}" style="margin:0">
         <div style="position:relative">
             <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gray-500);font-weight:700;font-size:13px;pointer-events:none">$</span>
@@ -5569,13 +5585,14 @@ function readOverseasProductionHistory() {
     const rows = document.querySelectorAll('#covProductionList .cov-production-row');
     const result = [];
     rows.forEach(row => {
+        const orderDate = row.querySelector('.cov-prod-date').value || '';
         const item = row.querySelector('.cov-prod-item').value.trim();
         const priceRaw = (row.querySelector('.cov-prod-price').value || '').replace(/[^0-9.]/g, '');
         const qtyRaw = (row.querySelector('.cov-prod-qty').value || '').replace(/[^0-9]/g, '');
         const price = priceRaw ? parseFloat(priceRaw) : 0;
         const qty = qtyRaw ? parseInt(qtyRaw, 10) : 0;
-        if (!item && !price && !qty) return;    // 전부 빈 행은 저장하지 않음
-        result.push({ item, unit_price_usd: price, qty });
+        if (!orderDate && !item && !price && !qty) return;   // 전부 빈 행은 저장하지 않음
+        result.push({ order_date: orderDate, item, unit_price_usd: price, qty });
     });
     return result;
 }
