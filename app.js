@@ -8734,11 +8734,12 @@ async function saveTempGroupEdit(gi) {
             quote_note: p.quoteNote
         };
 
-        try {
-            await sb.from('projects_temp').update(dbRow).eq('id', p.id);
-        } catch (err) {
-            console.error('저장 실패:', err);
-            showToast('저장 실패: ' + err.message);
+        // Supabase JS 클라이언트는 에러를 throw 하지 않고 { data, error } 로 반환함.
+        // try/catch 가 아니라 error 를 직접 확인해야 함.
+        const { error } = await sb.from('projects_temp').update(dbRow).eq('id', p.id);
+        if (error) {
+            console.error('저장 실패 (id=' + p.id + '):', error);
+            showToast('저장 실패: ' + (error.message || '알 수 없는 오류') + (error.hint ? ' — ' + error.hint : ''));
             return;
         }
     }
