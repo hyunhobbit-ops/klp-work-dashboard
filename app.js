@@ -115,6 +115,8 @@ async function showApp() {
     await loadClientsFromDb();
     await loadClientsOverseasFromDb();
     await loadMarketingCampaignsFromDb();
+    await loadProductsFromDb();
+    await loadProposalsFromDb();
     subscribeDailyTasks();
     subscribeAllRealtime();
     renderAll();
@@ -177,47 +179,15 @@ let dailyTasks = [];
 let deliveries = [];
 let clients = [];
 
-// 상품 DB (제안서 시스템) — 파트 2: 로컬 JS 배열. 추후 Supabase 전환 예정.
-const productsDB = [
-    { id: 1, name: '미니클락 골드', description: '작고 고급스러운 골드 컬러 탁상시계', category: '시계', image: '', unitPrice: 85000, vatIncluded: true, printType: '레이저각인', printFee: 2000, packagingType: '선물포장', packagingFee: 1500, labelAvailable: true, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
-    { id: 2, name: '순금 1돈 감사패 대형', description: '순금 1돈이 박힌 프리미엄 감사패', category: '상패,트로피', image: '', unitPrice: 1800000, vatIncluded: true, printType: '레이저각인', printFee: 5000, packagingType: '전용보관함', packagingFee: 60000, labelAvailable: true, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
-    { id: 3, name: '센트하우스 와인 디퓨저', description: '고급 향수 디퓨저 — 와인병 모양', category: '생활용품', image: '', unitPrice: 88000, vatIncluded: true, printType: '불가', printFee: 0, packagingType: '선물포장', packagingFee: 0, labelAvailable: true, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
-    { id: 4, name: '파카 51 코어 볼펜', description: '파카 51 시리즈 고급 볼펜 (각인 가능)', category: '사무용품', image: '', unitPrice: 121000, vatIncluded: true, printType: '레이저각인', printFee: 3000, packagingType: '선물포장', packagingFee: 0, labelAvailable: false, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
-    { id: 5, name: '대통령 취임 기념시계', description: '대통령 취임 기념 한정판 시계', category: '시계', image: '', unitPrice: 250000, vatIncluded: true, printType: '레이저각인', printFee: 8000, packagingType: '전용케이스', packagingFee: 15000, labelAvailable: true, status: '품절', createdAt: '2026-03-01T00:00:00.000Z' },
-    { id: 6, name: 'UM2 접지형 멀티 충전기', description: '접지형 멀티탭 + USB 충전기', category: '생활용품', image: '', unitPrice: 69000, vatIncluded: true, printType: '레이저각인', printFee: 2000, packagingType: '선물포장', packagingFee: 1500, labelAvailable: true, status: '판매 중', createdAt: '2026-03-01T00:00:00.000Z' },
-];
+// 상품 DB (제안서 시스템) — Supabase `products` 테이블 연동
+// products.sql 참조. loadProductsFromDb() 가 showApp() 진입 시 채움.
+let productsDB = [];
 let currentProductCategory = 'all';
 let currentProductSearch = '';
 
-// 제안서 (제안서 시스템 파트 3) — 로컬 JS 배열. 추후 Supabase 전환 예정.
-const proposals = [
-    {
-        id: 1, title: '순금1돈 감사패 제안', clientName: '지플러스타워', clientContact: '김팀장',
-        clientPhone: '010-1234-5678', clientEmail: 'gplus@example.com',
-        description: '지플러스타워 준공 기념 감사패 제안', validUntil: '2026-04-30',
-        assignee: '김현호', status: '계약 성사',
-        items: [{ productId: 2, quantity: 1, subtotal: 1865000 }],
-        totalAmount: 2400000, sentDate: '2026-04-10',
-        shareLink: '#proposal-preview-1', createdAt: '2026-04-08T09:00:00.000Z'
-    },
-    {
-        id: 2, title: '러쉬 성수 커스텀시계', clientName: '러쉬코리아', clientContact: '박담당',
-        clientPhone: '010-2345-6789', clientEmail: 'lush@example.com',
-        description: '러쉬 성수동 플래그십 오픈 기념 커스텀 시계', validUntil: '2026-05-15',
-        assignee: '이현주', status: '발송 완료',
-        items: [{ productId: 1, quantity: 100, subtotal: 8700000 }],
-        totalAmount: 8500000, sentDate: '2026-04-09',
-        shareLink: '#proposal-preview-2', createdAt: '2026-04-07T09:00:00.000Z'
-    },
-    {
-        id: 3, title: '롯데월드 천관사복 굿즈', clientName: '롯데월드', clientContact: '이매니저',
-        clientPhone: '010-3456-7890', clientEmail: 'lotte@example.com',
-        description: '천관사복 협업 한정판 굿즈 패키지', validUntil: '2026-06-01',
-        assignee: '김현호', status: '작성 중',
-        items: [], totalAmount: 15000000, sentDate: '',
-        shareLink: '', createdAt: '2026-04-11T09:00:00.000Z'
-    },
-];
+// 제안서 (제안서 시스템) — Supabase `proposals` 테이블 연동
+// proposals.sql 참조. loadProposalsFromDb() 가 showApp() 진입 시 채움.
+let proposals = [];
 let currentProposalStatus = 'all';
 let currentProposalSearch = '';
 let clientSearch = '';
@@ -6572,6 +6542,152 @@ function productThumb(p) {
     return `<div style="width:44px;height:44px;border-radius:8px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;color:var(--gray-400)"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>`;
 }
 
+// ===== 상품 DB Supabase 연동 =====
+function productFromDb(r) {
+    return {
+        id: r.id,
+        name: r.name || '',
+        description: r.description || '',
+        category: r.category || '기타',
+        image: r.image || '',
+        unitPrice: r.unit_price || 0,
+        vatIncluded: r.vat_included !== false,
+        printType: r.print_type || '불가',
+        printFee: r.print_fee || 0,
+        printFeeApply: r.print_fee_apply || '1개당',
+        packagingType: r.packaging_type || '',
+        packagingFee: r.packaging_fee || 0,
+        packagingFeeApply: r.packaging_fee_apply || '1개당',
+        labelAvailable: r.label_available !== false,
+        labelFee: r.label_fee || 0,
+        labelFeeApply: r.label_fee_apply || '1개당',
+        status: r.status || '판매 중',
+        createdAt: r.created_at || new Date().toISOString(),
+    };
+}
+function productToDb(p) {
+    return {
+        name: p.name || '',
+        description: p.description || '',
+        category: p.category || '기타',
+        image: p.image || '',
+        unit_price: Number(p.unitPrice) || 0,
+        vat_included: !!p.vatIncluded,
+        print_type: p.printType || '불가',
+        print_fee: Number(p.printFee) || 0,
+        print_fee_apply: p.printFeeApply || '1개당',
+        packaging_type: p.packagingType || '',
+        packaging_fee: Number(p.packagingFee) || 0,
+        packaging_fee_apply: p.packagingFeeApply || '1개당',
+        label_available: !!p.labelAvailable,
+        label_fee: Number(p.labelFee) || 0,
+        label_fee_apply: p.labelFeeApply || '1개당',
+        status: p.status || '판매 중',
+    };
+}
+async function loadProductsFromDb() {
+    try {
+        const { data, error } = await sb.from('products')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        productsDB.length = 0;
+        (data || []).forEach(r => productsDB.push(productFromDb(r)));
+    } catch (err) {
+        console.error('상품 DB 로드 실패:', err.message);
+        if (!/relation .* does not exist/i.test(err.message || '')) {
+            showToast('상품 DB 로드 실패: ' + err.message);
+        }
+    }
+}
+async function dbInsertProduct(p) {
+    const { data, error } = await sb.from('products').insert(productToDb(p)).select().single();
+    if (error) { console.error(error); showToast('상품 저장 실패: ' + error.message); return null; }
+    return productFromDb(data);
+}
+async function dbUpdateProduct(id, patch) {
+    const { data, error } = await sb.from('products').update(productToDb(patch)).eq('id', id).select().single();
+    if (error) { console.error(error); showToast('상품 수정 실패: ' + error.message); return null; }
+    return productFromDb(data);
+}
+async function dbDeleteProduct(id) {
+    const { error } = await sb.from('products').delete().eq('id', id);
+    if (error) { console.error(error); showToast('상품 삭제 실패: ' + error.message); return false; }
+    return true;
+}
+
+// ===== 제안서 Supabase 연동 =====
+function proposalFromDb(r) {
+    return {
+        id: r.id,
+        title: r.title || '',
+        clientName: r.client_name || '',
+        clientContact: r.client_contact || '',
+        clientPhone: r.client_phone || '',
+        clientEmail: r.client_email || '',
+        description: r.description || '',
+        validUntil: r.valid_until || '',
+        assignee: r.assignee || '',
+        assigneePhone: r.assignee_phone || '',
+        assigneeEmail: r.assignee_email || '',
+        status: r.status || '작성 중',
+        items: Array.isArray(r.items) ? r.items : [],
+        totalAmount: r.total_amount || 0,
+        sentDate: r.sent_date || '',
+        shareLink: r.share_link || '',
+        createdAt: r.created_at || new Date().toISOString(),
+    };
+}
+function proposalToDb(p) {
+    return {
+        title: p.title || '',
+        client_name: p.clientName || '',
+        client_contact: p.clientContact || '',
+        client_phone: p.clientPhone || '',
+        client_email: p.clientEmail || '',
+        description: p.description || '',
+        valid_until: p.validUntil || null,           // 빈 문자열 → null (date 컬럼)
+        assignee: p.assignee || '',
+        assignee_phone: p.assigneePhone || '',
+        assignee_email: p.assigneeEmail || '',
+        status: p.status || '작성 중',
+        items: Array.isArray(p.items) ? p.items : [],
+        total_amount: Number(p.totalAmount) || 0,
+        sent_date: p.sentDate || null,
+        share_link: p.shareLink || '',
+    };
+}
+async function loadProposalsFromDb() {
+    try {
+        const { data, error } = await sb.from('proposals')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        proposals.length = 0;
+        (data || []).forEach(r => proposals.push(proposalFromDb(r)));
+    } catch (err) {
+        console.error('제안서 로드 실패:', err.message);
+        if (!/relation .* does not exist/i.test(err.message || '')) {
+            showToast('제안서 로드 실패: ' + err.message);
+        }
+    }
+}
+async function dbInsertProposal(p) {
+    const { data, error } = await sb.from('proposals').insert(proposalToDb(p)).select().single();
+    if (error) { console.error(error); showToast('제안서 저장 실패: ' + error.message); return null; }
+    return proposalFromDb(data);
+}
+async function dbUpdateProposal(id, patch) {
+    const { data, error } = await sb.from('proposals').update(proposalToDb(patch)).eq('id', id).select().single();
+    if (error) { console.error(error); showToast('제안서 수정 실패: ' + error.message); return null; }
+    return proposalFromDb(data);
+}
+async function dbDeleteProposal(id) {
+    const { error } = await sb.from('proposals').delete().eq('id', id);
+    if (error) { console.error(error); showToast('제안서 삭제 실패: ' + error.message); return false; }
+    return true;
+}
+
 function renderProductDB() {
     // 요약 카드
     document.getElementById('pdbTotal').textContent = productsDB.length;
@@ -6767,7 +6883,7 @@ function clearProductImage() {
     if (preview) preview.innerHTML = `<div style="width:200px;height:140px;border:2px dashed var(--gray-300);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--gray-400);font-size:12px">이미지 없음</div>`;
 }
 
-function saveProduct() {
+async function saveProduct() {
     const editId = parseInt(document.getElementById('productEditId').value) || 0;
     const name = document.getElementById('productName').value.trim();
     if (!name) { showToast('상품명을 입력해주세요'); return; }
@@ -6791,19 +6907,25 @@ function saveProduct() {
         status: document.getElementById('productStatus').value,
     };
     if (editId) {
+        const updated = await dbUpdateProduct(editId, data);
+        if (!updated) return;                          // DB 실패 시 모달 유지
         const idx = productsDB.findIndex(p => p.id === editId);
-        if (idx >= 0) productsDB[idx] = { ...productsDB[idx], ...data };
+        if (idx >= 0) productsDB[idx] = updated;
         showToast('상품이 수정되었습니다');
     } else {
-        productsDB.push({ id: Date.now(), ...data, createdAt: new Date().toISOString() });
+        const inserted = await dbInsertProduct(data);
+        if (!inserted) return;
+        productsDB.unshift(inserted);
         showToast('상품이 등록되었습니다');
     }
     closeModal();
     renderProductDB();
 }
 
-function deleteProduct(id) {
+async function deleteProduct(id) {
     if (!confirm('정말 삭제하시겠습니까?')) return;
+    const ok = await dbDeleteProduct(id);
+    if (!ok) return;
     const idx = productsDB.findIndex(p => p.id === id);
     if (idx >= 0) productsDB.splice(idx, 1);
     closeModal();
@@ -7443,7 +7565,7 @@ function renderProposalPreview() {
     `;
 }
 
-function saveProposal() {
+async function saveProposal() {
     if (!editingProposal) return;
     // DOM 값 수집
     const title = document.getElementById('epTitle').value.trim();
@@ -7468,12 +7590,15 @@ function saveProposal() {
     recalcProposalTotal();
 
     if (editingProposal.id) {
+        const updated = await dbUpdateProposal(editingProposal.id, editingProposal);
+        if (!updated) return;
         const idx = proposals.findIndex(p => p.id === editingProposal.id);
-        if (idx >= 0) proposals[idx] = { ...editingProposal };
+        if (idx >= 0) proposals[idx] = updated;
         showToast('제안서가 저장되었습니다');
     } else {
-        editingProposal.id = Date.now();
-        proposals.push({ ...editingProposal });
+        const inserted = await dbInsertProposal(editingProposal);
+        if (!inserted) return;
+        proposals.unshift(inserted);
         showToast('제안서가 등록되었습니다');
     }
     closeProposalEditor();
