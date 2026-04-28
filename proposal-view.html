@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>KLP 제안서</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background: #f3f4f6;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--gray-900);
+            min-height: 100vh;
+        }
+        .pv-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(255,255,255,0.96);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--gray-200);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .pv-brand { font-weight: 800; font-size: 16px; color: var(--gray-900); letter-spacing: -.3px; }
+        .pv-actions { display: flex; gap: 8px; }
+        .pv-actions button {
+            padding: 9px 16px;
+            border: 1px solid var(--gray-200);
+            background: var(--white);
+            border-radius: 8px;
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 13px;
+            color: var(--gray-700);
+            cursor: pointer;
+        }
+        .pv-actions button.primary { background: var(--blue, #3182f6); border-color: var(--blue, #3182f6); color: #fff; }
+        .pv-actions button:disabled { opacity: .6; cursor: wait; }
+        .pv-content { padding: 24px 12px 60px; }
+        .pp-wrap { background: #fff; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.06); overflow: hidden; max-width: 1100px; margin: 0 auto; }
+        .pv-loading, .pv-error { padding: 80px 24px; text-align: center; color: var(--gray-500); font-size: 14px; }
+        .pv-error { color: #dc2626; }
+        @media print {
+            .pv-toolbar { display: none; }
+            body { background: #fff; }
+            .pp-wrap { box-shadow: none; border-radius: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="pv-toolbar">
+        <div class="pv-brand">KLP KOREA · 제안서</div>
+        <div class="pv-actions">
+            <button id="pvPdfBtn" class="primary" onclick="downloadPdf(this)">📄 PDF 다운로드</button>
+        </div>
+    </div>
+    <div class="pv-content">
+        <div id="pvRoot"><div class="pv-loading">제안서를 불러오는 중...</div></div>
+    </div>
+
+<script>
+// ===== Supabase (anon, RLS 전체 공유 정책에 의존) =====
+const SUPABASE_URL = 'https://vtulmuxkriklpiibiues.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ===== 포맷터 =====
+const formatKRW = (n) => {
+    const v = Number(n) || 0;
+    return v ? '₩' + v.toLocaleString() : '-';
+};
+const fmtDisplay = (d) => (d || '').replace(/-/g, '.');
+const feeUnit = (a) => a === '일괄' ? '일괄' : '개당';
+const _optDisplayType = (o) => {
+    if (!o) return '-';
+    if (o.type === '기타' && o.customType) return o.customType;
+    return o.type || '-';
+};
+const _assigneeRoleTitle = (name) => {
+    if (!name) return '';
+    const n = name.trim();
+    if (n === '김관택' || n === '대표님') return '대표';
+    if (n === '김현호') return '팀장';
+    if (n === '이현주') return '실장';
+    if (n === '유지은') return '대리';
+    return '';
+};
+
+// ===== 매퍼 =====
+function proposalFromDb(r) {
+    return {
+        id: r.id,
+        title: r.title || '',
+        clientName: r.client_name || '',
+        clientContact: r.client_contact || '',
+        clientPhone: r.client_phone || '',
+        clientEmail: r.client_email || '',
+        description: r.description || '',
+        validUntil: r.valid_until || '',
+        assignee: r.assignee || '',
+        assigneePhone: r.assignee_phone || '',
+        assigneeEmail: r.assignee_email || '',
+        status: r.status || '작성 중',
+        items: Array.isArray(r.items) ? r.items : [],
+        totalAmount: r.total_amount || 0,
+        sentDate: r.sent_date || '',
+    };
+}
+function productFromDb(r) {
+    return {
+        id: r.id,
+        name: r.name || '',
+        description: r.description || '',
+        category: r.category || '기타',
+        image: r.image || '',
+        unitPrice: r.unit_price || 0,
+        vatIncluded: r.vat_included !== false,
+        prints: Array.isArray(r.prints) ? r.prints : [],
+        packagings: Array.isArray(r.packagings) ? r.packagings : [],
+        labels: Array.isArray(r.labels) ? r.labels : [],
+        bulkPrices: Array.isArray(r.bulk_prices) ? r.bulk_prices : [],
+        status: r.status || '판매 중',
+    };
+}
+
+let _ep = null;     // 로드된 제안서
+let _products = []; // 로드된 상품들
+
+async function load() {
+    const params = new URLSearchParams(location.search);
+    const id = parseInt(params.get('id'), 10);
+    if (!Number.isInteger(id)) {
+        showError('잘못된 제안서 링크입니다 (id 누락).');
+        return;
+    }
+    try {
+        const { data: pRow, error: pErr } = await sb.from('proposals').select('*').eq('id', id).single();
+        if (pErr || !pRow) {
+            showError('제안서를 찾을 수 없습니다. 링크를 다시 확인해주세요.');
+            return;
+        }
+        _ep = proposalFromDb(pRow);
+        const productIds = (_ep.items || []).map(it => it.productId).filter(Boolean);
+        if (productIds.length > 0) {
+            const { data: prods, error: prErr } = await sb.from('products').select('*').in('id', productIds);
+            if (prErr) console.warn('상품 로드 실패:', prErr.message);
+            _products = (prods || []).map(productFromDb);
+        }
+        document.title = (_ep.title || 'KLP 제안서') + ' · KLP KOREA';
+        render();
+    } catch (e) {
+        console.error(e);
+        showError('불러오기 실패: ' + (e.message || ''));
+    }
+}
+
+function showError(msg) {
+    document.getElementById('pvRoot').innerHTML = `<div class="pv-error">${msg}</div>`;
+}
+
+function _collectProducts(ep) {
+    return ep.items.map(it => {
+        const p = _products.find(x => x.id === it.productId);
+        if (!p) return null;
+        return { ...p, _quantity: it.quantity, _subtotal: it.subtotal };
+    }).filter(Boolean);
+}
+
+function render() {
+    if (!_ep) return;
+    const ep = _ep;
+    const all = _collectProducts(ep);
+
+    const validHtml = ep.validUntil
+        ? `유효기간: <span class="pp-valid">${fmtDisplay(ep.validUntil)}까지</span>`
+        : '유효기간 미정';
+
+    const cardsHtml = all.map((p, idx) => {
+        const isBest = idx === 0 && p.status === '판매 중';
+        const vatLabel = p.vatIncluded ? 'VAT 포함' : 'VAT 별도';
+        const badgeHtml = isBest
+            ? `<span class="pp-card-badge best">BEST</span>`
+            : (idx < 3 ? `<span class="pp-card-badge new">NEW</span>` : '');
+
+        const feeText = o => (Number(o.fee) || 0) > 0
+            ? `${feeUnit(o.feeApply)} ₩${Number(o.fee).toLocaleString()}`
+            : '포함';
+        const prints = Array.isArray(p.prints) ? p.prints : [];
+        const packs = Array.isArray(p.packagings) ? p.packagings : [];
+        const labels = Array.isArray(p.labels) ? p.labels : [];
+        const printRow = prints.length === 0 ? '' : prints.map(o =>
+            `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value"><span style="font-weight:600;color:var(--gray-900)">${_optDisplayType(o)}</span> <span style="color:var(--gray-500);font-size:11px">${feeText(o)}</span></span></div>`
+        ).join('');
+        const packRow = packs.length === 0 ? '' : packs.map(o =>
+            `<div class="pp-opt-row"><span class="pp-opt-label">포장</span><span class="pp-opt-value"><span style="font-weight:600;color:var(--gray-900)">${_optDisplayType(o)}</span> <span style="color:var(--gray-500);font-size:11px">${feeText(o)}</span></span></div>`
+        ).join('');
+        const labelRow = labels.length === 0 ? '' : labels.map(o =>
+            `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span style="font-weight:600;color:var(--gray-900)">부착 가능${o.note ? ' · ' + o.note : ''}</span> <span style="color:var(--gray-500);font-size:11px">${feeText(o)}</span></span></div>`
+        ).join('');
+
+        const imgHtml = p.image
+            ? `<img src="${p.image}" alt="${p.name}">`
+            : `<svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
+
+        const bulks = Array.isArray(p.bulkPrices) ? p.bulkPrices.filter(b => (b.minQty || b.maxQty) && b.price) : [];
+        const bulkLabel = (b) => {
+            if (b.minQty && b.maxQty) return `${b.minQty.toLocaleString()}개 ~ ${b.maxQty.toLocaleString()}개`;
+            if (b.minQty) return `${b.minQty.toLocaleString()}개 이상`;
+            if (b.maxQty) return `${b.maxQty.toLocaleString()}개 이하`;
+            return '';
+        };
+        const bulkHtml = bulks.length === 0 ? '' : `
+            <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--gray-200);font-size:11px;color:var(--gray-600)">
+                <div style="font-weight:700;color:var(--gray-700);margin-bottom:4px">수량별 단가</div>
+                ${bulks.map(b => `<div style="display:flex;justify-content:space-between;padding:2px 0"><span>${bulkLabel(b)}</span><span style="font-weight:700;color:var(--gray-900)">₩${(b.price || 0).toLocaleString()}</span></div>`).join('')}
+            </div>`;
+
+        const priceLine = (Number(p.unitPrice) || 0) > 0
+            ? `₩${Number(p.unitPrice).toLocaleString()} <small>(${vatLabel})</small>`
+            : '포함';
+
+        return `<div class="pp-card">
+            <div class="pp-card-img">${imgHtml}${badgeHtml}</div>
+            <div class="pp-card-body">
+                <div class="pp-card-name">${p.name}</div>
+                ${p.description ? `<div class="pp-card-desc">${p.description}</div>` : ''}
+                <div class="pp-card-price">${priceLine}</div>
+                ${bulkHtml}
+                <div class="pp-card-opts">${printRow}${packRow}${labelRow}</div>
+            </div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('pvRoot').innerHTML = `
+        <div class="pp-wrap">
+            <div class="pp-hero">
+                <div class="pp-hero-circle3"></div>
+                <div class="pp-hero-left">
+                    <div class="pp-hero-label">PRODUCT PROPOSAL</div>
+                    <div class="pp-hero-title">${ep.title || '제안서 제목'}</div>
+                    <div class="pp-hero-sub">${ep.clientName || '거래처'}${ep.clientContact ? ' · ' + ep.clientContact + ' 님' : ''}</div>
+                </div>
+                <div class="pp-hero-right">
+                    <div class="pp-hero-brand">KLP KOREA</div>
+                    <div class="pp-hero-slogan">We Make Better Goods</div>
+                </div>
+            </div>
+
+            <div class="pp-info-row">
+                <div class="pp-info-card">
+                    <div class="pp-info-title">제안 안내</div>
+                    <div class="pp-info-desc">${(ep.description || '본 제안서는 아래 상품 구성을 기반으로 작성되었습니다.').replace(/\n/g, '<br>')}</div>
+                    <div style="margin-top:14px;font-size:13px;color:var(--gray-600);font-weight:700">${validHtml}</div>
+                </div>
+                <div class="pp-info-card">
+                    <div class="pp-info-title">담당자 정보</div>
+                    <div class="pp-mgr-row">
+                        <div class="pp-mgr-name">${ep.assignee || 'KLP 담당자'}${_assigneeRoleTitle(ep.assignee) ? ` <span style="font-size:14px;font-weight:600;color:var(--gray-500);margin-left:6px">${_assigneeRoleTitle(ep.assignee)}</span>` : ''}</div>
+                    </div>
+                    <div class="pp-mgr-contact">
+                        <div>📧 ${ep.assigneeEmail || 'klpkorea@agift.kr'}</div>
+                        <div>📱 ${ep.assigneePhone || '02-2103-5757'}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pp-grid">${cardsHtml || `<div style="grid-column:1/-1;text-align:center;color:var(--gray-500);padding:60px 0">상품이 없습니다</div>`}</div>
+
+            <div class="pp-footer">
+                <strong>KLP KOREA</strong> · 서울시 강남구 · 02-2103-5757 · klpkorea@agift.kr · www.klpkorea.com<br>
+                본 제안서는 KLP KOREA의 자산이며, 무단 복제 및 배포를 금합니다.
+            </div>
+        </div>
+    `;
+}
+
+// ===== PDF 다운로드 (A4 멀티페이지, 라이트모드) =====
+async function downloadPdf(btn) {
+    const wrap = document.querySelector('.pp-wrap');
+    if (!wrap) { alert('제안서가 아직 로드되지 않았습니다'); return; }
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'PDF 생성 중...';
+    try {
+        const canvas = await html2canvas(wrap, {
+            scale: 2,
+            backgroundColor: '#ffffff',
+            useCORS: true,
+            logging: false,
+            windowWidth: wrap.scrollWidth,
+            windowHeight: wrap.scrollHeight,
+        });
+        const imgData = canvas.toDataURL('image/jpeg', 0.92);
+        const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pw = pdf.internal.pageSize.getWidth();
+        const ph = pdf.internal.pageSize.getHeight();
+        const imgW = pw;
+        const imgH = (canvas.height * imgW) / canvas.width;
+        if (imgH <= ph) {
+            pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
+        } else {
+            let heightLeft = imgH;
+            let position = 0;
+            pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+            heightLeft -= ph;
+            while (heightLeft > 0) {
+                position -= ph;
+                pdf.addPage();
+                pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+                heightLeft -= ph;
+            }
+        }
+        const safe = ((_ep && _ep.title) || '제안서') + '_' + ((_ep && _ep.clientName) || '');
+        pdf.save(safe.replace(/[\\/:*?"<>|]/g, '_') + '.pdf');
+    } catch (err) {
+        console.error(err);
+        alert('PDF 생성 실패: ' + (err.message || ''));
+    } finally {
+        btn.disabled = false;
+        btn.textContent = orig;
+    }
+}
+
+load();
+</script>
+</body>
+</html>

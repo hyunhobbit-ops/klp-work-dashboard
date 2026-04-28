@@ -7566,7 +7566,7 @@ function renderProposalEditor() {
         <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:18px 20px">
             <div style="font-size:14px;font-weight:800;color:var(--gray-900);margin-bottom:12px">📤 발송</div>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
-                <button class="panel-link" style="padding:10px 16px;border:1px solid var(--gray-200);border-radius:8px;background:var(--white);color:var(--gray-700);font-weight:700" onclick="showToast('PDF 기능 준비 중')">📄 PDF 다운로드</button>
+                <button class="panel-link" style="padding:10px 16px;border:1px solid var(--gray-200);border-radius:8px;background:var(--white);color:var(--gray-700);font-weight:700" onclick="downloadProposalPdf(this)">📄 PDF 다운로드</button>
                 <button class="btn-primary" onclick="generateShareLink()">🔗 링크 생성 및 공유</button>
             </div>
             ${ep.shareLink ? `<div style="margin-top:12px;padding:10px 14px;background:var(--blue-light);border-radius:8px;font-size:12px;color:var(--blue);font-weight:600;word-break:break-all">공유 링크: ${ep.shareLink}</div>` : ''}
@@ -7739,19 +7739,113 @@ function confirmProductPicker() {
     renderProposalEditor();
 }
 
-function generateShareLink() {
-    if (!editingProposal) return;
+// 미저장 제안서면 먼저 DB 에 INSERT 해서 실제 id 를 확보. 저장 성공 시 true 반환.
+async function _ensureProposalSaved() {
+    if (!editingProposal) return false;
     syncProposalEditorFromDom();
-    const id = editingProposal.id || Date.now();
-    const link = `#proposal-preview-${id}`;
-    editingProposal.shareLink = link;
-    const full = location.origin + location.pathname + link;
+    if (editingProposal.id) {
+        // 기존 제안서 — 변경분 저장 (조용히)
+        const updated = await dbUpdateProposal(editingProposal.id, editingProposal);
+        if (!updated) return false;
+        const idx = proposals.findIndex(p => p.id === editingProposal.id);
+        if (idx >= 0) proposals[idx] = updated;
+        return true;
+    }
+    // 신규 — 필수값 체크 후 INSERT
+    const title = (editingProposal.title || '').trim();
+    const clientName = (editingProposal.clientName || '').trim();
+    if (!title || !clientName) {
+        showToast('거래처명과 제안서 제목을 먼저 입력해주세요');
+        return false;
+    }
+    recalcProposalTotal();
+    const inserted = await dbInsertProposal(editingProposal);
+    if (!inserted) return false;
+    editingProposal.id = inserted.id;
+    editingProposal.createdAt = inserted.createdAt;
+    proposals.unshift(inserted);
+    return true;
+}
+
+async function generateShareLink() {
+    if (!editingProposal) return;
+    const ok = await _ensureProposalSaved();
+    if (!ok) return;
+    const url = `${location.origin}/proposal-view.html?id=${editingProposal.id}`;
+    editingProposal.shareLink = url;
+    // 링크를 DB 에 저장 (다음에 열어도 같은 링크 유지)
+    await dbUpdateProposal(editingProposal.id, editingProposal);
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(full).then(() => showToast('공유 링크가 생성되고 복사되었습니다')).catch(() => showToast('링크 생성됨 (복사 실패)'));
+        navigator.clipboard.writeText(url).then(() => showToast('공유 링크가 복사되었습니다')).catch(() => showToast('링크 생성됨 (복사 실패)'));
     } else {
         showToast('공유 링크가 생성되었습니다');
     }
     renderProposalEditor();
+}
+
+// 제안서 미리보기 컨테이너(.pp-wrap)를 캡처해 A4 멀티페이지 PDF 로 저장.
+// 라이트 모드 강제(data-theme=dark 일시 제거), 비율 유지, 페이지 단위 슬라이스.
+async function downloadProposalPdf(btn) {
+    if (!editingProposal) return;
+    // 미리보기가 열려있지 않으면 먼저 띄움 (이미 열려있다면 그대로)
+    let opened = false;
+    if (!document.getElementById('proposalPreviewOverlay') ||
+        !document.getElementById('proposalPreviewOverlay').classList.contains('show')) {
+        openProposalPreview();
+        opened = true;
+        // 렌더 끝나길 한 프레임 대기
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    }
+    const wrap = document.querySelector('#proposalPreviewOverlay .pp-wrap');
+    if (!wrap) { showToast('미리보기 화면을 찾을 수 없습니다'); return; }
+
+    const origLabel = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'PDF 생성 중...'; }
+    // 라이트 모드 강제 — 다크 테마 일시 해제
+    const docEl = document.documentElement;
+    const wasDark = docEl.getAttribute('data-theme') === 'dark';
+    if (wasDark) docEl.removeAttribute('data-theme');
+    try {
+        const canvas = await html2canvas(wrap, {
+            scale: 2,                          // 해상도
+            backgroundColor: '#ffffff',
+            useCORS: true,
+            logging: false,
+            windowWidth: wrap.scrollWidth,
+            windowHeight: wrap.scrollHeight,
+        });
+        const imgData = canvas.toDataURL('image/jpeg', 0.92);
+        const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pw = pdf.internal.pageSize.getWidth();      // 210
+        const ph = pdf.internal.pageSize.getHeight();     // 297
+        // 비율 유지하며 폭 = A4 폭에 맞춰 스케일
+        const imgW = pw;
+        const imgH = (canvas.height * imgW) / canvas.width;
+        if (imgH <= ph) {
+            pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
+        } else {
+            // 멀티 페이지: 같은 이미지를 위치를 음수로 밀면서 페이지마다 자른 것처럼 표시
+            let heightLeft = imgH;
+            let position = 0;
+            pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+            heightLeft -= ph;
+            while (heightLeft > 0) {
+                position -= ph;
+                pdf.addPage();
+                pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
+                heightLeft -= ph;
+            }
+        }
+        const safeName = ((editingProposal.title || '제안서') + '_' + (editingProposal.clientName || '')).replace(/[\\/:*?"<>|]/g, '_');
+        pdf.save(safeName + '.pdf');
+    } catch (err) {
+        console.error('PDF 생성 실패:', err);
+        showToast('PDF 생성 실패: ' + (err.message || ''));
+    } finally {
+        if (wasDark) docEl.setAttribute('data-theme', 'dark');
+        if (btn) { btn.disabled = false; btn.textContent = origLabel; }
+        if (opened) closeProposalPreview();
+    }
 }
 
 // =====================================
@@ -8023,7 +8117,7 @@ function renderProposalPreview() {
                     <div class="pp-cta-sub">상품을 선택하시면 견적서를 바로 받아보실 수 있습니다</div>
                 </div>
                 <div class="pp-cta-btns">
-                    <button class="pp-cta-btn" onclick="showToast('PDF 기능 준비 중')">📄 PDF 다운로드</button>
+                    <button class="pp-cta-btn" onclick="downloadProposalPdf(this)">📄 PDF 다운로드</button>
                     <button class="pp-cta-btn primary" onclick="showToast('견적 요청이 접수되었습니다')">✉️ 견적 요청하기</button>
                 </div>
             </div>
