@@ -8175,7 +8175,7 @@ function renderProposalPreview() {
             <div class="pp-cta">
                 <div>
                     <div class="pp-cta-title">관심 있는 상품이 있으신가요?</div>
-                    <div class="pp-cta-sub">상품을 선택하시면 견적서를 바로 받아보실 수 있습니다</div>
+                    <div class="pp-cta-sub">문의사항은 우측 견적 요청하기 버튼을 눌러 카카오톡 상담을 통해 안내받으실 수 있습니다.</div>
                 </div>
                 <div class="pp-cta-btns">
                     <button class="pp-cta-btn" onclick="downloadProposalPdf(this)">📄 PDF 다운로드</button>
