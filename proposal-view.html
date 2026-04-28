@@ -340,6 +340,10 @@ async function downloadPdf(btn) {
     const orig = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'PDF 생성 중...';
+    // PDF 출력에는 하단 CTA(관심 있는 상품… + 버튼들)는 불필요 — 캡처 중 일시 숨김
+    const ctaEls = wrap.querySelectorAll('.pp-cta');
+    const ctaPrev = [];
+    ctaEls.forEach(el => { ctaPrev.push(el.style.display); el.style.display = 'none'; });
     try {
         const canvas = await html2canvas(wrap, {
             scale: 2,
@@ -366,6 +370,7 @@ async function downloadPdf(btn) {
         console.error(err);
         alert('PDF 생성 실패: ' + (err.message || ''));
     } finally {
+        ctaEls.forEach((el, i) => { el.style.display = ctaPrev[i] || ''; });
         btn.disabled = false;
         btn.textContent = orig;
     }

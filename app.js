@@ -7843,6 +7843,10 @@ async function downloadProposalPdf(btn) {
     const docEl = document.documentElement;
     const wasDark = docEl.getAttribute('data-theme') === 'dark';
     if (wasDark) docEl.removeAttribute('data-theme');
+    // PDF 출력에는 하단 CTA(관심 있는 상품… + PDF/견적 요청 버튼)는 불필요 — 캡처 중 일시 숨김
+    const ctaEls = wrap.querySelectorAll('.pp-cta');
+    const ctaPrev = [];
+    ctaEls.forEach(el => { ctaPrev.push(el.style.display); el.style.display = 'none'; });
     try {
         const canvas = await html2canvas(wrap, {
             scale: 2,                          // 해상도
@@ -7869,6 +7873,8 @@ async function downloadProposalPdf(btn) {
         console.error('PDF 생성 실패:', err);
         showToast('PDF 생성 실패: ' + (err.message || ''));
     } finally {
+        // CTA 복원
+        ctaEls.forEach((el, i) => { el.style.display = ctaPrev[i] || ''; });
         if (wasDark) docEl.setAttribute('data-theme', 'dark');
         if (btn) { btn.disabled = false; btn.textContent = origLabel; }
         if (opened) closeProposalPreview();
