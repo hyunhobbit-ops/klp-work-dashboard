@@ -106,18 +106,20 @@ function showLogin() {
 async function showApp() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
-    // 프로필 목록 로드 (임원 구분용)
-    const { data } = await sb.from('profiles').select('name, role');
-    if (data) allProfiles = data;
-    await loadDomesticProjectsFromDb();
-    await loadDailyTasksFromDb();
-    await loadDeliveriesFromDb();
-    await loadClientsFromDb();
-    await loadClientsOverseasFromDb();
-    await loadMarketingCampaignsFromDb();
-    await loadProductCategoriesFromDb();
-    await loadProductsFromDb();
-    await loadProposalsFromDb();
+    // 모든 초기 데이터 로드를 병렬로 (서로 독립적). 순차 await 9개 → 한 번의 라운드트립 시간으로 단축.
+    const profilesP = sb.from('profiles').select('name, role').then(({ data }) => { if (data) allProfiles = data; });
+    await Promise.all([
+        profilesP,
+        loadDomesticProjectsFromDb(),
+        loadDailyTasksFromDb(),
+        loadDeliveriesFromDb(),
+        loadClientsFromDb(),
+        loadClientsOverseasFromDb(),
+        loadMarketingCampaignsFromDb(),
+        loadProductCategoriesFromDb(),
+        loadProductsFromDb(),
+        loadProposalsFromDb(),
+    ]);
     subscribeDailyTasks();
     subscribeAllRealtime();
     renderAll();
