@@ -1510,7 +1510,7 @@ body {
 
 .pp-table-view, .pp-table-view td, .pp-table-view th { border-width: 2px; }
 .pp-table-view th, .pp-table-view td { font-size: 15px; padding: 16px 18px; }
-.pp-footer { font-size: 14px; border-top-width: 2px; padding: 32px 0 16px; }
+.pp-footer { font-size: 17px; border-top-width: 2px; padding: 32px 0 16px; line-height: 1.9; }
 
 /* 로고 이미지 (회사 이름 자리 대체) */
 .pp-hero-logo {
