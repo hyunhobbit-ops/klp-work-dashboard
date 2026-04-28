@@ -7894,7 +7894,7 @@ function renderProposalPreview() {
             <div class="pp-card-body">
                 <div class="pp-card-name">${p.name}</div>
                 ${p.description ? `<div class="pp-card-desc">${p.description}</div>` : ''}
-                <div class="pp-card-price">₩${(p.unitPrice || 0).toLocaleString()} <small>(${vatLabel})</small></div>
+                <div class="pp-card-price">${(Number(p.unitPrice) || 0) > 0 ? `₩${Number(p.unitPrice).toLocaleString()} <small>(${vatLabel})</small>` : '포함'}</div>
                 ${bulkHtml}
                 <div class="pp-card-opts">
                     ${printRow}
@@ -7937,7 +7937,7 @@ function renderProposalPreview() {
         return `<tr>
             <td><strong>${p.name}</strong>${p.description ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">${p.description}</div>` : ''}</td>
             <td><span class="badge badge-gray">${p.category}</span></td>
-            <td><strong>₩${(p.unitPrice || 0).toLocaleString()}</strong> <span style="color:var(--gray-500);font-size:11px">${vatLabel}</span>${bulkInline}</td>
+            <td>${(Number(p.unitPrice) || 0) > 0 ? `<strong>₩${Number(p.unitPrice).toLocaleString()}</strong> <span style="color:var(--gray-500);font-size:11px">${vatLabel}</span>` : `<strong>포함</strong>`}${bulkInline}</td>
             <td>${printCell}</td>
             <td>${packCell}</td>
             <td>${labelCell}</td>
