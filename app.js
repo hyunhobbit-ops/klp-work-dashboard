@@ -6855,7 +6855,7 @@ function renderProductDB() {
         const packs = p.packagings || [];
         const labels = p.labels || [];
 
-        tableHtml += `<tr onclick="showProductDetail(${p.id})" style="cursor:pointer">
+        tableHtml += `<tr onclick="openProductDBModal(${p.id})" style="cursor:pointer">
             <td>${productThumb(p)}</td>
             <td>
                 <div style="font-weight:700;color:var(--gray-900)">${p.name}</div>
@@ -6875,7 +6875,7 @@ function renderProductDB() {
             </td>
         </tr>`;
 
-        cardHtml += `<div class="resp-card" onclick="showProductDetail(${p.id})">
+        cardHtml += `<div class="resp-card" onclick="openProductDBModal(${p.id})">
             <div class="resp-card-top">
                 <div style="display:flex;gap:12px;align-items:center">
                     ${productThumb(p)}
