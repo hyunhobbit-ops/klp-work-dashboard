@@ -728,14 +728,8 @@
                 </div>
 
                 <div class="content-toolbar" style="margin-top:8px">
-                    <div class="filter-bar" id="productCategoryFilter">
-                        <button class="filter-chip active" data-pcat="all">전체</button>
-                        <button class="filter-chip" data-pcat="시계">시계</button>
-                        <button class="filter-chip" data-pcat="생활용품">생활용품</button>
-                        <button class="filter-chip" data-pcat="사무용품">사무용품</button>
-                        <button class="filter-chip" data-pcat="상패,트로피">상패,트로피</button>
-                        <button class="filter-chip" data-pcat="기타">기타</button>
-                    </div>
+                    <!-- 칩은 JS 에서 렌더 (renderProductCategoryChips). + 카테고리 버튼 포함 -->
+                    <div class="filter-bar" id="productCategoryFilter"></div>
                     <div class="search-bar">
                         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
                         <input type="text" id="productSearch" placeholder="상품명·설명 검색">

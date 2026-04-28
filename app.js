@@ -115,6 +115,7 @@ async function showApp() {
     await loadClientsFromDb();
     await loadClientsOverseasFromDb();
     await loadMarketingCampaignsFromDb();
+    await loadProductCategoriesFromDb();
     await loadProductsFromDb();
     await loadProposalsFromDb();
     subscribeDailyTasks();
@@ -6547,7 +6548,65 @@ function ratingBadgeClass(r) {
 // =====================================
 // 상품 DB (제안서 시스템 파트 2)
 // =====================================
-const PRODUCT_CATEGORIES = ['시계', '생활용품', '사무용품', '상패,트로피', '기타'];
+// 상품 카테고리 — Supabase product_categories 테이블에서 로드. DB 미적용 시 아래 기본값 사용.
+let PRODUCT_CATEGORIES = ['시계', '생활용품', '사무용품', '상패,트로피', '기타'];
+async function loadProductCategoriesFromDb() {
+    try {
+        const { data, error } = await sb.from('product_categories')
+            .select('name')
+            .order('sort_order', { ascending: true })
+            .order('name', { ascending: true });
+        if (error) throw error;
+        if (Array.isArray(data) && data.length > 0) {
+            PRODUCT_CATEGORIES = data.map(r => r.name);
+        }
+    } catch (err) {
+        console.warn('카테고리 로드 실패(기본값 사용):', err.message);
+    }
+    try { renderProductCategoryChips(); } catch (e) {}
+}
+function renderProductCategoryChips() {
+    const wrap = document.getElementById('productCategoryFilter');
+    if (!wrap) return;
+    const escAttr = s => String(s || '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    const chips = ['all', ...PRODUCT_CATEGORIES];
+    wrap.innerHTML = chips.map((cat) => {
+        const label = cat === 'all' ? '전체' : cat;
+        const isActive = (currentProductCategory || 'all') === cat;
+        return `<button class="filter-chip${isActive ? ' active' : ''}" data-pcat="${escAttr(cat)}">${escAttr(label)}</button>`;
+    }).join('') + `<button class="filter-chip" id="productCategoryAddBtn" style="border-style:dashed;color:var(--gray-600)" title="카테고리 추가">+ 카테고리</button>`;
+    // 인라인 onclick 대신 이벤트 바인딩(따옴표 포함 카테고리명도 안전)
+    wrap.querySelectorAll('[data-pcat]').forEach(btn => {
+        btn.addEventListener('click', () => setProductCategory(btn.dataset.pcat));
+    });
+    const addBtn = wrap.querySelector('#productCategoryAddBtn');
+    if (addBtn) addBtn.addEventListener('click', promptNewProductCategory);
+}
+function setProductCategory(cat) {
+    currentProductCategory = cat;
+    renderProductCategoryChips();
+    renderProductDB();
+}
+async function promptNewProductCategory() {
+    const name = (prompt('새 카테고리명을 입력하세요') || '').trim();
+    if (!name) return;
+    if (PRODUCT_CATEGORIES.includes(name)) { showToast('이미 존재하는 카테고리입니다'); return; }
+    const { error } = await sb.from('product_categories').insert({ name, sort_order: 100 });
+    if (error) {
+        if (/relation .* does not exist/i.test(error.message || '')) {
+            // 테이블이 아직 없으면 메모리에만 추가 (이번 세션 한정)
+            PRODUCT_CATEGORIES.push(name);
+            renderProductCategoryChips();
+            showToast('카테고리 추가됨 (DB 미적용 — product_categories.sql 실행 필요)');
+            return;
+        }
+        showToast('카테고리 추가 실패: ' + (error.message || ''));
+        return;
+    }
+    PRODUCT_CATEGORIES.push(name);
+    renderProductCategoryChips();
+    showToast('카테고리가 추가되었습니다');
+}
 const PRINT_TYPES = ['불가', '레이저각인', '실크인쇄', '패드인쇄', '기타'];
 const PACKAGING_TYPES = ['기본박스', '선물포장', '전용케이스', '전용보관함', '기타'];
 const PRODUCT_STATUSES = ['판매 중', '품절', '단종'];
