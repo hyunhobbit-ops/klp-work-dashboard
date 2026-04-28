@@ -713,6 +713,21 @@ function switchTab(tabId, fromHistory = false) {
     if (tabId === 'quotes') {
         loadQuotesFromDb().then(() => renderQuotes()).catch(e => console.error('loadQuotes failed', e));
     }
+
+    // 제안서 탭 진입 시 항상 목록 뷰로 (편집 화면이 떠 있던 채로 다른 탭 갔다 돌아왔을 때 잔존 방지)
+    if (tabId === 'proposals') {
+        try {
+            const ev = document.getElementById('proposalEditorView');
+            const lv = document.getElementById('proposalListView');
+            if (ev && lv && ev.style.display !== 'none') {
+                editingProposal = null;
+                ev.style.display = 'none';
+                ev.innerHTML = '';
+                lv.style.display = 'block';
+                renderProposals();
+            }
+        } catch (e) { console.warn('proposal list reset failed:', e); }
+    }
 }
 
 // 브라우저 뒤로/앞으로 → 모달 열려있으면 모달만 닫기, 아니면 탭 전환
