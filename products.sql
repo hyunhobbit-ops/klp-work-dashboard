@@ -49,11 +49,14 @@ for each row execute function public.set_updated_at();
 --   prints       : [{ type: '레이저각인'|..., fee: int, feeApply: '1개당'|'일괄' }, ...]
 --   packagings   : [{ type: '선물포장'|...,  fee: int, feeApply: '1개당'|'일괄' }, ...]
 --   labels       : [{ note: text,            fee: int, feeApply: '1개당'|'일괄' }, ...]
+--   bulk_prices  : [{ minQty: int, maxQty: int, price: int }, ...]
+--                  -- maxQty = 0 이면 '이상' (상한 없음)
 -- 기존 단일 컬럼(print_type 등)은 호환을 위해 유지하되, 새 코드는 더 이상 쓰지 않음.
 -- ============================================================
 alter table public.products add column if not exists prints jsonb not null default '[]'::jsonb;
 alter table public.products add column if not exists packagings jsonb not null default '[]'::jsonb;
 alter table public.products add column if not exists labels jsonb not null default '[]'::jsonb;
+alter table public.products add column if not exists bulk_prices jsonb not null default '[]'::jsonb;
 
 -- 기존 단일 컬럼을 배열로 1회 백필 (이미 배열에 값이 있는 경우 건너뜀).
 -- 인쇄: print_type 이 '불가'/공란이 아니면 1개 항목으로 변환

@@ -6592,6 +6592,14 @@ function _normLabelRow(o) {
         feeApply: (o && o.feeApply) || '1개당',
     };
 }
+// 대량구매 단가 한 행: { minQty, maxQty, price } — maxQty === 0 이면 '이상'
+function _normBulkPriceRow(o) {
+    return {
+        minQty: Number(o && o.minQty) || 0,
+        maxQty: Number(o && o.maxQty) || 0,
+        price: Number(o && o.price) || 0,
+    };
+}
 function productFromDb(r) {
     return {
         id: r.id,
@@ -6604,6 +6612,7 @@ function productFromDb(r) {
         prints: Array.isArray(r.prints) ? r.prints.map(_normPrintRow) : [],
         packagings: Array.isArray(r.packagings) ? r.packagings.map(_normPackRow) : [],
         labels: Array.isArray(r.labels) ? r.labels.map(_normLabelRow) : [],
+        bulkPrices: Array.isArray(r.bulk_prices) ? r.bulk_prices.map(_normBulkPriceRow) : [],
         status: r.status || '판매 중',
         createdAt: r.created_at || new Date().toISOString(),
     };
@@ -6612,6 +6621,7 @@ function productToDb(p) {
     const prints = (p.prints || []).map(_normPrintRow);
     const packagings = (p.packagings || []).map(_normPackRow);
     const labels = (p.labels || []).map(_normLabelRow);
+    const bulk_prices = (p.bulkPrices || []).map(_normBulkPriceRow);
     return {
         name: p.name || '',
         description: p.description || '',
@@ -6619,7 +6629,7 @@ function productToDb(p) {
         image: p.image || '',
         unit_price: Number(p.unitPrice) || 0,
         vat_included: !!p.vatIncluded,
-        prints, packagings, labels,
+        prints, packagings, labels, bulk_prices,
         // 레거시 단일 컬럼도 첫 항목 기준으로 함께 채워 하위 호환 유지
         print_type: prints[0] ? prints[0].type : '불가',
         print_fee: prints[0] ? prints[0].fee : 0,
@@ -6652,9 +6662,9 @@ async function loadProductsFromDb() {
 function _isMissingNewColumnError(err) {
     if (!err) return false;
     const msg = (err.message || '') + ' ' + (err.hint || '') + ' ' + (err.details || '');
-    if (/column .* (prints|packagings|labels)/i.test(msg)) return true;
+    if (/column .* (prints|packagings|labels|bulk_prices)/i.test(msg)) return true;
     if (/Could not find the .* column/i.test(msg)) return true;
-    if (/schema cache/i.test(msg) && /(prints|packagings|labels)/i.test(msg)) return true;
+    if (/schema cache/i.test(msg) && /(prints|packagings|labels|bulk_prices)/i.test(msg)) return true;
     return false;
 }
 function _stripNewColumns(row) {
@@ -6662,6 +6672,7 @@ function _stripNewColumns(row) {
     delete c.prints;
     delete c.packagings;
     delete c.labels;
+    delete c.bulk_prices;
     return c;
 }
 async function dbInsertProduct(p) {
@@ -6873,8 +6884,8 @@ function renderProductDB() {
 }
 
 // 상품 등록/편집 모달
-// 편집 중인 상품의 옵션 행 상태 (인쇄/포장/라벨 — 다중 행 지원)
-let editingProduct = { prints: [], packagings: [], labels: [] };
+// 편집 중인 상품의 옵션 행 상태 (인쇄/포장/라벨/대량단가 — 다중 행 지원)
+let editingProduct = { prints: [], packagings: [], labels: [], bulkPrices: [] };
 
 // 옵션 행 한 줄을 그린다. kind: 'print' | 'pack' | 'label'
 function renderProductOptionRow(kind, idx, row) {
@@ -6995,6 +7006,53 @@ function removeProductOption(kind, idx) {
     renderProductOptionSection(kind);
 }
 
+// ===== 대량구매 단가 행 =====
+function renderProductBulkRow(idx, row) {
+    const numFmt = n => (Number(n) || 0).toLocaleString();
+    return `
+    <div class="prod-bulk-row" data-idx="${idx}" style="display:grid;grid-template-columns:1fr 1fr 1fr 36px;gap:8px;align-items:end;margin-bottom:8px">
+        <div><label class="form-label">최소 수량 (이상)</label>
+            <input type="text" inputmode="numeric" class="form-input prod-bulk-min" placeholder="예: 10" value="${row.minQty ? numFmt(row.minQty) : ''}" oninput="fmtProjectNumberInput(this)">
+        </div>
+        <div><label class="form-label">최대 수량 (이하 · 비우면 무제한)</label>
+            <input type="text" inputmode="numeric" class="form-input prod-bulk-max" placeholder="예: 49" value="${row.maxQty ? numFmt(row.maxQty) : ''}" oninput="fmtProjectNumberInput(this)">
+        </div>
+        <div><label class="form-label">단가 (원)</label>
+            <input type="text" inputmode="numeric" class="form-input prod-bulk-price" placeholder="0" value="${row.price ? numFmt(row.price) : ''}" oninput="fmtProjectNumberInput(this)">
+        </div>
+        <button type="button" onclick="removeBulkPrice(${idx})" title="삭제" style="background:none;border:1px solid var(--gray-200);border-radius:8px;color:var(--red);height:38px;cursor:pointer;font-size:16px">✕</button>
+    </div>`;
+}
+function renderProductBulkSection() {
+    const el = document.getElementById('productBulkRows');
+    if (!el) return;
+    const rows = editingProduct.bulkPrices || [];
+    el.innerHTML = rows.map((r, i) => renderProductBulkRow(i, r)).join('');
+}
+function syncProductBulkFromDom() {
+    const root = document.getElementById('productBulkRows');
+    if (!root) return;
+    const rows = root.querySelectorAll('.prod-bulk-row');
+    editingProduct.bulkPrices = Array.from(rows).map(r => {
+        const min = (r.querySelector('.prod-bulk-min') || { value: '' }).value.replace(/[^0-9]/g, '');
+        const max = (r.querySelector('.prod-bulk-max') || { value: '' }).value.replace(/[^0-9]/g, '');
+        const price = (r.querySelector('.prod-bulk-price') || { value: '' }).value.replace(/[^0-9]/g, '');
+        return { minQty: Number(min) || 0, maxQty: Number(max) || 0, price: Number(price) || 0 };
+    });
+}
+function addBulkPrice() {
+    syncProductBulkFromDom();
+    if (!editingProduct.bulkPrices) editingProduct.bulkPrices = [];
+    editingProduct.bulkPrices.push({ minQty: 0, maxQty: 0, price: 0 });
+    renderProductBulkSection();
+}
+function removeBulkPrice(idx) {
+    syncProductBulkFromDom();
+    if (!editingProduct.bulkPrices) return;
+    editingProduct.bulkPrices.splice(idx, 1);
+    renderProductBulkSection();
+}
+
 function openProductDBModal(editId) {
     const overlay = document.getElementById('modalOverlay');
     const title = document.getElementById('modalTitle');
@@ -7006,6 +7064,7 @@ function openProductDBModal(editId) {
         prints: p && Array.isArray(p.prints) ? p.prints.map(_normPrintRow) : [],
         packagings: p && Array.isArray(p.packagings) ? p.packagings.map(_normPackRow) : [],
         labels: p && Array.isArray(p.labels) ? p.labels.map(_normLabelRow) : [],
+        bulkPrices: p && Array.isArray(p.bulkPrices) ? p.bulkPrices.map(_normBulkPriceRow) : [],
     };
     const v = (k, d = '') => (p && p[k] != null ? p[k] : d);
     const sel = (opts, cur) => opts.map(o => `<option value="${o}" ${cur === o ? 'selected' : ''}>${o}</option>`).join('');
@@ -7028,6 +7087,15 @@ function openProductDBModal(editId) {
                 <label style="display:flex;align-items:center;gap:8px;padding:10px 0;font-weight:500;color:var(--gray-700)">
                     <input type="checkbox" id="productVatIncluded" ${v('vatIncluded', true) ? 'checked' : ''}> 단가에 VAT 포함</label>
             </div>
+        </div>
+
+        <!-- 대량 구매 단가 (선택) — 수량 구간별 단가 -->
+        <div class="form-group" style="margin-top:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <label class="form-label" style="margin:0">💰 대량 구매 단가 (선택)</label>
+                <button type="button" onclick="addBulkPrice()" style="padding:6px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ 단가 추가</button>
+            </div>
+            <div id="productBulkRows"></div>
         </div>
 
         <!-- 인쇄 / 포장 / 라벨 — 동적 추가 행 (기본 0행, 추가 버튼으로 늘림) -->
@@ -7078,6 +7146,7 @@ function openProductDBModal(editId) {
     renderProductOptionSection('print');
     renderProductOptionSection('pack');
     renderProductOptionSection('label');
+    renderProductBulkSection();
     overlay.classList.add('show'); openModalHistory();
     const mb = document.getElementById('modalBody');
     if (mb) mb.scrollTop = 0;
@@ -7113,6 +7182,7 @@ async function saveProduct() {
     const name = document.getElementById('productName').value.trim();
     if (!name) { showToast('상품명을 입력해주세요'); return; }
     syncProductOptionsFromDom();                       // 옵션 행 입력값 → editingProduct
+    syncProductBulkFromDom();                          // 대량 단가 행 입력값 → editingProduct
     const data = {
         name,
         description: document.getElementById('productDescription').value.trim(),
@@ -7123,6 +7193,7 @@ async function saveProduct() {
         prints: editingProduct.prints || [],
         packagings: editingProduct.packagings || [],
         labels: editingProduct.labels || [],
+        bulkPrices: editingProduct.bulkPrices || [],
         status: document.getElementById('productStatus').value,
     };
     if (editId) {
@@ -7697,6 +7768,20 @@ function renderProposalPreview() {
             ? `<img src="${p.image}" alt="${p.name}">`
             : `<svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
 
+        // 대량 구매 단가 (있을 때만 단가 라인 아래에 작은 표 형태로)
+        const bulks = Array.isArray(p.bulkPrices) ? p.bulkPrices.filter(b => (b.minQty || b.maxQty) && b.price) : [];
+        const bulkLabel = (b) => {
+            if (b.minQty && b.maxQty) return `${b.minQty.toLocaleString()}개 ~ ${b.maxQty.toLocaleString()}개`;
+            if (b.minQty) return `${b.minQty.toLocaleString()}개 이상`;
+            if (b.maxQty) return `${b.maxQty.toLocaleString()}개 이하`;
+            return '';
+        };
+        const bulkHtml = bulks.length === 0 ? '' : `
+            <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--gray-200);font-size:11px;color:var(--gray-600)">
+                <div style="font-weight:700;color:var(--gray-700);margin-bottom:4px">대량 구매가</div>
+                ${bulks.map(b => `<div style="display:flex;justify-content:space-between;padding:2px 0"><span>${bulkLabel(b)}</span><span style="font-weight:700;color:var(--gray-900)">₩${(b.price || 0).toLocaleString()}</span></div>`).join('')}
+            </div>`;
+
         return `<div class="pp-card">
             <div class="pp-card-img">
                 ${imgHtml}
@@ -7706,6 +7791,7 @@ function renderProposalPreview() {
                 <div class="pp-card-name">${p.name}</div>
                 ${p.description ? `<div class="pp-card-desc">${p.description}</div>` : ''}
                 <div class="pp-card-price">₩${(p.unitPrice || 0).toLocaleString()} <small>(${vatLabel})</small></div>
+                ${bulkHtml}
                 <div class="pp-card-opts">
                     ${printRow}
                     ${printFeeRow}
@@ -7736,10 +7822,18 @@ function renderProposalPreview() {
         const labelCell = labels2.length === 0
             ? '-'
             : labels2.map(o => `<div><span style="font-weight:600">가능${o.note ? ' · ' + o.note : ''}</span> <span style="color:var(--gray-500)">${feeText2(o)}</span></div>`).join('');
+        const bulks = Array.isArray(p.bulkPrices) ? p.bulkPrices.filter(b => (b.minQty || b.maxQty) && b.price) : [];
+        const bulkLabel = (b) => {
+            if (b.minQty && b.maxQty) return `${b.minQty.toLocaleString()}~${b.maxQty.toLocaleString()}개`;
+            if (b.minQty) return `${b.minQty.toLocaleString()}개+`;
+            if (b.maxQty) return `~${b.maxQty.toLocaleString()}개`;
+            return '';
+        };
+        const bulkInline = bulks.length === 0 ? '' : `<div style="margin-top:4px;font-size:11px;color:var(--gray-600)">${bulks.map(b => `${bulkLabel(b)} <strong style="color:var(--gray-900)">₩${(b.price||0).toLocaleString()}</strong>`).join(' · ')}</div>`;
         return `<tr>
             <td><strong>${p.name}</strong>${p.description ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">${p.description}</div>` : ''}</td>
             <td><span class="badge badge-gray">${p.category}</span></td>
-            <td><strong>₩${(p.unitPrice || 0).toLocaleString()}</strong> <span style="color:var(--gray-500);font-size:11px">${vatLabel}</span></td>
+            <td><strong>₩${(p.unitPrice || 0).toLocaleString()}</strong> <span style="color:var(--gray-500);font-size:11px">${vatLabel}</span>${bulkInline}</td>
             <td>${printCell}</td>
             <td>${packCell}</td>
             <td>${labelCell}</td>
