@@ -7765,6 +7765,16 @@ function _previewInitials(name) {
     const n = name.trim();
     return n.length >= 2 ? n.slice(-2) : n;
 }
+// 제안서 미리보기 담당자 카드에 표시할 직급 (이름 옆에 붙음)
+function _assigneeRoleTitle(name) {
+    if (!name) return '';
+    const n = name.trim();
+    if (n === '김관택' || n === '대표님') return '대표';
+    if (n === '김현호') return '팀장';
+    if (n === '이현주') return '실장';
+    if (n === '유지은') return '대리';
+    return '';
+}
 
 function _ppCollectProducts(ep) {
     // items + productsDB 조인
@@ -7977,11 +7987,7 @@ function renderProposalPreview() {
                 <div class="pp-info-card">
                     <div class="pp-info-title">담당자 정보</div>
                     <div class="pp-mgr-row">
-                        <div class="pp-mgr-avatar">${_previewInitials(ep.assignee)}</div>
-                        <div>
-                            <div class="pp-mgr-name">${ep.assignee || 'KLP 담당자'}</div>
-                            <div class="pp-mgr-title">KLP KOREA · 영업팀</div>
-                        </div>
+                        <div class="pp-mgr-name">${ep.assignee || 'KLP 담당자'}${_assigneeRoleTitle(ep.assignee) ? ` <span style="font-size:14px;font-weight:600;color:var(--gray-500);margin-left:6px">${_assigneeRoleTitle(ep.assignee)}</span>` : ''}</div>
                     </div>
                     <div class="pp-mgr-contact">
                         <div>📧 ${ep.assigneeEmail || 'klpkorea@agift.kr'}</div>

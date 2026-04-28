@@ -1241,7 +1241,7 @@ body {
     margin-bottom: 10px;
     line-height: 1.2;
 }
-.pp-hero-sub { font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 500; }
+.pp-hero-sub { font-size: 22px; color: rgba(255,255,255,0.92); font-weight: 700; }
 .pp-hero-right { position: relative; z-index: 2; text-align: right; }
 .pp-hero-brand {
     font-size: 26px;
