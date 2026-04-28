@@ -1487,30 +1487,33 @@ body {
 }
 .pp-hero::before, .pp-hero::after, .pp-hero-circle3 { display: none !important; }
 .pp-hero-label { display: none !important; }
-.pp-hero-title { color: var(--gray-900) !important; font-size: 44px; letter-spacing: -1px; }
-.pp-hero-sub { color: var(--gray-700) !important; font-size: 24px; font-weight: 700; }
-.pp-hero-date { font-size: 16px; color: var(--gray-600); font-weight: 600; margin-top: 8px; letter-spacing: 0.2px; }
-.pp-hero-brand { color: var(--gray-900) !important; font-size: 28px; }
-.pp-hero-slogan { color: var(--gray-600) !important; font-size: 14px; }
+.pp-hero-title { color: #000 !important; font-size: 47px; letter-spacing: -1px; }
+.pp-hero-sub { color: #000 !important; font-size: 27px; font-weight: 700; }
+.pp-hero-date { font-size: 19px; color: #000 !important; font-weight: 700; margin-top: 8px; letter-spacing: 0.2px; }
+.pp-hero-brand { color: #000 !important; font-size: 31px; }
+.pp-hero-slogan { color: #000 !important; font-size: 17px; }
 
-.pp-info-card { border-width: 2px; }
-.pp-info-title { font-size: 14px; letter-spacing: 1.2px; }
-.pp-info-desc { font-size: 16px; line-height: 1.7; color: var(--gray-800); }
-.pp-mgr-name { font-size: 22px; }
-.pp-mgr-contact { font-size: 15px; color: var(--gray-700); }
+.pp-info-card { border-width: 2px; border-color: #000 !important; }
+.pp-info-title { font-size: 17px; letter-spacing: 1.2px; }                /* 포인트 블루 유지 */
+.pp-info-desc { font-size: 19px; line-height: 1.7; color: #000 !important; }
+.pp-mgr-name { font-size: 25px; color: #000 !important; }
+.pp-mgr-contact { font-size: 18px; color: #000 !important; }
 .pp-mgr-contact div { padding: 5px 0; }
 
-.pp-card { border-width: 2px; }
-.pp-card-name { font-size: 17px; font-weight: 700; }
-.pp-card-desc { font-size: 13px; }
-.pp-card-price { font-size: 24px; }
-.pp-card-price small { font-size: 13px; }
-.pp-card-opts { font-size: 14px; border-top-width: 2px; gap: 8px; }
+.pp-card { border-width: 2px; border-color: #000 !important; }
+.pp-card-name { font-size: 20px; font-weight: 700; color: #000 !important; }
+.pp-card-desc { font-size: 16px; color: #000 !important; }
+.pp-card-price { font-size: 27px; }                                       /* 포인트 블루 유지 */
+.pp-card-price small { font-size: 16px; color: #000 !important; }
+.pp-card-opts { font-size: 17px; border-top-width: 2px; border-top-color: #000 !important; gap: 8px; color: #000; }
 .pp-opt-row { grid-template-columns: 60px 1fr; }
+.pp-opt-label, .pp-opt-value { color: #000 !important; }
+.pp-opt-muted { color: #000 !important; }
 
-.pp-table-view, .pp-table-view td, .pp-table-view th { border-width: 2px; }
-.pp-table-view th, .pp-table-view td { font-size: 15px; padding: 16px 18px; }
-.pp-footer { font-size: 17px; border-top-width: 2px; padding: 32px 0 16px; line-height: 1.9; }
+.pp-table-view, .pp-table-view td, .pp-table-view th { border-width: 2px; border-color: #000 !important; }
+.pp-table-view th, .pp-table-view td { font-size: 18px; padding: 16px 18px; color: #000 !important; }
+.pp-table-view th { background: var(--gray-50); }
+.pp-footer { font-size: 20px; border-top-width: 2px; border-top-color: #000 !important; color: #000 !important; padding: 32px 0 16px; line-height: 1.9; }
 
 /* 로고 이미지 (회사 이름 자리 대체) */
 .pp-hero-logo {

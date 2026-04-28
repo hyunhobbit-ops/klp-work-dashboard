@@ -8024,15 +8024,15 @@ function renderProposalPreview() {
         const labels = Array.isArray(p.labels) ? p.labels : [];
         const printRow = prints.length === 0
             ? ''
-            : prints.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value"><span style="font-weight:600;color:var(--gray-900)">${_optDisplayType(o)}</span> <span style="color:var(--gray-500);font-size:11px">${feeText(o)}</span></span></div>`).join('');
+            : prints.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">${_optDisplayType(o)}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`).join('');
         const printFeeRow = '';
         const packRow = packs.length === 0
             ? ''
-            : packs.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">포장</span><span class="pp-opt-value"><span style="font-weight:600;color:var(--gray-900)">${_optDisplayType(o)}</span> <span style="color:var(--gray-500);font-size:11px">${feeText(o)}</span></span></div>`).join('');
+            : packs.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">포장</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">${_optDisplayType(o)}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`).join('');
         const packFeeRow = '';
         const labelRow = labels.length === 0
             ? ''
-            : labels.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span style="font-weight:600;color:var(--gray-900)">부착 가능${o.note ? ' · ' + o.note : ''}</span> <span style="color:var(--gray-500);font-size:11px">${feeText(o)}</span></span></div>`).join('');
+            : labels.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">부착 가능${o.note ? ' · ' + o.note : ''}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`).join('');
 
         const imgHtml = p.image
             ? `<img src="${p.image}" alt="${p.name}">`
@@ -8047,9 +8047,9 @@ function renderProposalPreview() {
             return '';
         };
         const bulkHtml = bulks.length === 0 ? '' : `
-            <div style="margin-top:10px;padding-top:10px;border-top:2px dashed var(--gray-200);font-size:14px;color:var(--gray-700)">
-                <div style="font-weight:800;color:var(--gray-800);margin-bottom:6px;font-size:14px">수량별 단가</div>
-                ${bulks.map(b => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px"><span>${bulkLabel(b)}</span><span style="font-weight:800;color:var(--gray-900)">₩${(b.price || 0).toLocaleString()}</span></div>`).join('')}
+            <div style="margin-top:10px;padding-top:10px;border-top:2px dashed #000;font-size:17px;color:#000">
+                <div style="font-weight:800;color:#000;margin-bottom:6px;font-size:17px">수량별 단가</div>
+                ${bulks.map(b => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:17px;color:#000"><span>${bulkLabel(b)}</span><span style="font-weight:800;color:#000">₩${(b.price || 0).toLocaleString()}</span></div>`).join('')}
             </div>`;
 
         return `<div class="pp-card">
@@ -8142,7 +8142,7 @@ function renderProposalPreview() {
                 <div class="pp-info-card">
                     <div class="pp-info-title">담당자 정보</div>
                     <div class="pp-mgr-row">
-                        <div class="pp-mgr-name">${ep.assignee || 'KLP 담당자'}${_assigneeRoleTitle(ep.assignee) ? ` <span style="font-size:14px;font-weight:600;color:var(--gray-500);margin-left:6px">${_assigneeRoleTitle(ep.assignee)}</span>` : ''}</div>
+                        <div class="pp-mgr-name">${ep.assignee || 'KLP 담당자'}${_assigneeRoleTitle(ep.assignee) ? ` <span style="font-size:17px;font-weight:600;color:#000;margin-left:6px">${_assigneeRoleTitle(ep.assignee)}</span>` : ''}</div>
                     </div>
                     <div class="pp-mgr-contact">
                         <div>📧 ${ep.assigneeEmail || 'klpkorea@agift.kr'}</div>
