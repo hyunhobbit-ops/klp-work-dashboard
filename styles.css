@@ -1515,6 +1515,18 @@ body {
 .pp-table-view th { background: var(--gray-50); }
 .pp-footer { font-size: 20px; border-top-width: 2px; border-top-color: #000 !important; color: #000 !important; padding: 32px 0 16px; line-height: 1.9; }
 
+/* PDF 캡처 일시 적용 — 캔버스 비율을 A4 에 가깝게 만들기 위해 여백 축소 */
+.pp-pdf-tight.pp-wrap { padding: 12px 16px 16px !important; }
+.pp-pdf-tight .pp-hero { margin-bottom: 16px !important; padding: 14px 0 16px !important; }
+.pp-pdf-tight .pp-info-row { margin-bottom: 14px !important; gap: 14px !important; }
+.pp-pdf-tight .pp-info-card { padding: 14px 16px !important; }
+.pp-pdf-tight .pp-grid { gap: 12px !important; margin-bottom: 16px !important; }
+.pp-pdf-tight .pp-card-body { padding: 12px 14px !important; }
+.pp-pdf-tight .pp-card-opts { margin-top: 8px !important; padding-top: 8px !important; gap: 5px !important; }
+.pp-pdf-tight .pp-mgr-row { margin-bottom: 8px !important; }
+.pp-pdf-tight .pp-mgr-contact div { padding: 3px 0 !important; }
+.pp-pdf-tight .pp-footer { padding: 18px 0 6px !important; }
+
 /* 로고 이미지 (회사 이름 자리 대체) */
 .pp-hero-logo {
     max-height: 88px;

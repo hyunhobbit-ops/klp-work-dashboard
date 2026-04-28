@@ -7879,6 +7879,8 @@ async function downloadProposalPdf(btn) {
     const hideEls = wrap.querySelectorAll('.pp-cta, .pp-filter-bar');
     const hidePrev = [];
     hideEls.forEach(el => { hidePrev.push(el.style.display); el.style.display = 'none'; });
+    // 여백 압축 클래스 적용 — 캔버스 비율을 A4 에 가깝게 만들어 가장자리 빈 공간 최소화
+    wrap.classList.add('pp-pdf-tight');
     try {
         const canvas = await html2canvas(wrap, {
             scale: 2,                          // 해상도
@@ -7892,8 +7894,11 @@ async function downloadProposalPdf(btn) {
         const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         const pw = pdf.internal.pageSize.getWidth();      // 210
         const ph = pdf.internal.pageSize.getHeight();     // 297
-        // A4 한 페이지에 비율 유지하며 fit (가로·세로 중 더 작은 비율로 축소)
-        const ratio = Math.min(pw / canvas.width, ph / canvas.height);
+        // A4 한 페이지에 비율 유지하며 fit. 가장자리 여백 최소(2mm) 만 남김.
+        const margin = 2;
+        const innerW = pw - margin * 2;
+        const innerH = ph - margin * 2;
+        const ratio = Math.min(innerW / canvas.width, innerH / canvas.height);
         const finalW = canvas.width * ratio;
         const finalH = canvas.height * ratio;
         const x = (pw - finalW) / 2;
@@ -7905,8 +7910,9 @@ async function downloadProposalPdf(btn) {
         console.error('PDF 생성 실패:', err);
         showToast('PDF 생성 실패: ' + (err.message || ''));
     } finally {
-        // 숨겼던 영역 복원
+        // 숨겼던 영역 + 압축 클래스 복원
         hideEls.forEach((el, i) => { el.style.display = hidePrev[i] || ''; });
+        wrap.classList.remove('pp-pdf-tight');
         if (wasDark) docEl.setAttribute('data-theme', 'dark');
         if (btn) { btn.disabled = false; btn.textContent = origLabel; }
         if (opened) closeProposalPreview();
