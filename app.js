@@ -7783,6 +7783,44 @@ async function generateShareLink() {
     renderProposalEditor();
 }
 
+// 견적 요청 — 사용자 기본 메일 클라이언트로 klpkorea@agift.kr 에 보낼 메일 작성창 열기.
+// 제안서 내용(거래처명·제목·담은 상품 목록)을 본문으로 미리 채워준다.
+function requestQuoteEmail(ep) {
+    ep = ep || editingProposal;
+    if (!ep) return;
+    const lines = [];
+    lines.push('아래 제안서에 대한 견적을 요청드립니다.');
+    lines.push('');
+    lines.push('━━━━━━━━━━━━━━━━━━━━');
+    if (ep.title) lines.push('제안서: ' + ep.title);
+    if (ep.clientName) lines.push('거래처: ' + ep.clientName + (ep.clientContact ? ' / 담당 ' + ep.clientContact : ''));
+    if (ep.assignee) lines.push('KLP 담당: ' + ep.assignee);
+    lines.push('━━━━━━━━━━━━━━━━━━━━');
+    lines.push('');
+    lines.push('[관심 상품]');
+    const items = Array.isArray(ep.items) ? ep.items : [];
+    if (items.length === 0) {
+        lines.push('  (상품 미선택)');
+    } else {
+        items.forEach((it, i) => {
+            const p = productsDB.find(x => x.id === it.productId);
+            const name = p ? p.name : ('상품 #' + it.productId);
+            lines.push(`  ${i + 1}. ${name}  ×  ${it.quantity || 1}개`);
+        });
+    }
+    lines.push('');
+    lines.push('수량 / 납기 / 인쇄·포장 옵션 협의 부탁드립니다.');
+    lines.push('');
+    lines.push('회신 정보');
+    lines.push('  · 회사명:');
+    lines.push('  · 담당자:');
+    lines.push('  · 연락처:');
+    const subject = `[견적 요청] ${ep.clientName || ''}${ep.title ? ' / ' + ep.title : ''}`.trim();
+    const body = lines.join('\n');
+    const mailto = `mailto:klpkorea@agift.kr?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    location.href = mailto;
+}
+
 // 제안서 미리보기 컨테이너(.pp-wrap)를 캡처해 A4 멀티페이지 PDF 로 저장.
 // 라이트 모드 강제(data-theme=dark 일시 제거), 비율 유지, 페이지 단위 슬라이스.
 async function downloadProposalPdf(btn) {
@@ -8107,7 +8145,7 @@ function renderProposalPreview() {
                 </div>
                 <div class="pp-cta-btns">
                     <button class="pp-cta-btn" onclick="downloadProposalPdf(this)">📄 PDF 다운로드</button>
-                    <button class="pp-cta-btn primary" onclick="showToast('견적 요청이 접수되었습니다')">✉️ 견적 요청하기</button>
+                    <button class="pp-cta-btn primary" onclick="requestQuoteEmail()">✉️ 견적 요청하기</button>
                 </div>
             </div>
 
