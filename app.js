@@ -7238,8 +7238,30 @@ function recalcProposalTotal() {
     editingProposal.totalAmount = total;
 }
 
+// 편집 화면이 떠 있는 동안 사용자가 input 에 친 값을 editingProposal 로 동기화.
+// 상품 추가/삭제/수량변경 등 리렌더 직전에 호출해야 입력이 날아가지 않는다.
+function syncProposalEditorFromDom() {
+    if (!editingProposal) return;
+    const get = id => {
+        const el = document.getElementById(id);
+        return el ? el.value : undefined;
+    };
+    const t = get('epTitle');         if (t !== undefined) editingProposal.title = t.trim();
+    const cn = get('epClientName');   if (cn !== undefined) editingProposal.clientName = cn.trim();
+    const cc = get('epClientContact');if (cc !== undefined) editingProposal.clientContact = cc.trim();
+    const cp = get('epClientPhone');  if (cp !== undefined) editingProposal.clientPhone = cp.trim();
+    const ce = get('epClientEmail');  if (ce !== undefined) editingProposal.clientEmail = ce.trim();
+    const vu = get('epValidUntil');   if (vu !== undefined) editingProposal.validUntil = vu;
+    const as = get('epAssignee');     if (as !== undefined) editingProposal.assignee = as;
+    const ap = get('epAssigneePhone');if (ap !== undefined) editingProposal.assigneePhone = ap;
+    const ae = get('epAssigneeEmail');if (ae !== undefined) editingProposal.assigneeEmail = ae;
+    const st = get('epStatus');       if (st !== undefined) editingProposal.status = st;
+    const ds = get('epDescription');  if (ds !== undefined) editingProposal.description = ds.trim();
+}
+
 function updateProposalItemQty(index, val) {
     if (!editingProposal || !editingProposal.items[index]) return;
+    syncProposalEditorFromDom();
     const qty = Math.max(1, parseInt(val) || 1);
     editingProposal.items[index].quantity = qty;
     recalcProposalTotal();
@@ -7248,6 +7270,7 @@ function updateProposalItemQty(index, val) {
 
 function removeProductFromProposal(index) {
     if (!editingProposal) return;
+    syncProposalEditorFromDom();
     editingProposal.items.splice(index, 1);
     recalcProposalTotal();
     renderProposalEditor();
@@ -7300,6 +7323,8 @@ function openProductPicker() {
 
 function confirmProductPicker() {
     if (!editingProposal) { closeModal(); return; }
+    // 상품 선택 모달 위에서 닫기 전에, 편집 폼의 입력값을 먼저 state 로 보존
+    syncProposalEditorFromDom();
     const checks = document.querySelectorAll('.product-picker-check:not(:disabled):checked');
     checks.forEach(c => {
         const pid = parseInt(c.dataset.id);
@@ -7311,6 +7336,7 @@ function confirmProductPicker() {
 
 function generateShareLink() {
     if (!editingProposal) return;
+    syncProposalEditorFromDom();
     const id = editingProposal.id || Date.now();
     const link = `#proposal-preview-${id}`;
     editingProposal.shareLink = link;
@@ -7354,6 +7380,7 @@ function _ppFilterProducts(list, filter) {
 
 function openProposalPreview() {
     if (!editingProposal) return;
+    syncProposalEditorFromDom();
     let overlay = document.getElementById('proposalPreviewOverlay');
     if (!overlay) {
         overlay = document.createElement('div');
