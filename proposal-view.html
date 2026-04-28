@@ -306,10 +306,10 @@ async function downloadPdf(btn) {
     const orig = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'PDF 생성 중...';
-    // PDF 출력에는 하단 CTA(관심 있는 상품… + 버튼들)는 불필요 — 캡처 중 일시 숨김
-    const ctaEls = wrap.querySelectorAll('.pp-cta');
-    const ctaPrev = [];
-    ctaEls.forEach(el => { ctaPrev.push(el.style.display); el.style.display = 'none'; });
+    // PDF 출력에 불필요한 영역(CTA, 필터 칩·뷰 토글) 캡처 중 일시 숨김
+    const hideEls = wrap.querySelectorAll('.pp-cta, .pp-filter-bar');
+    const hidePrev = [];
+    hideEls.forEach(el => { hidePrev.push(el.style.display); el.style.display = 'none'; });
     try {
         const canvas = await html2canvas(wrap, {
             scale: 2,
@@ -336,7 +336,7 @@ async function downloadPdf(btn) {
         console.error(err);
         alert('PDF 생성 실패: ' + (err.message || ''));
     } finally {
-        ctaEls.forEach((el, i) => { el.style.display = ctaPrev[i] || ''; });
+        hideEls.forEach((el, i) => { el.style.display = hidePrev[i] || ''; });
         btn.disabled = false;
         btn.textContent = orig;
     }
