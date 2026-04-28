@@ -6648,14 +6648,48 @@ async function loadProductsFromDb() {
         }
     }
 }
+// '컬럼이 없다' / '스키마 캐시에 컬럼이 없다' 류 에러를 감지해 새 jsonb 컬럼을 빼고 재시도.
+function _isMissingNewColumnError(err) {
+    if (!err) return false;
+    const msg = (err.message || '') + ' ' + (err.hint || '') + ' ' + (err.details || '');
+    if (/column .* (prints|packagings|labels)/i.test(msg)) return true;
+    if (/Could not find the .* column/i.test(msg)) return true;
+    if (/schema cache/i.test(msg) && /(prints|packagings|labels)/i.test(msg)) return true;
+    return false;
+}
+function _stripNewColumns(row) {
+    const c = { ...row };
+    delete c.prints;
+    delete c.packagings;
+    delete c.labels;
+    return c;
+}
 async function dbInsertProduct(p) {
-    const { data, error } = await sb.from('products').insert(productToDb(p)).select().single();
-    if (error) { console.error(error); showToast('상품 저장 실패: ' + error.message); return null; }
+    const payload = productToDb(p);
+    let { data, error } = await sb.from('products').insert(payload).select().single();
+    if (error && _isMissingNewColumnError(error)) {
+        console.warn('products 테이블에 prints/packagings/labels 컬럼이 없어 레거시 컬럼만으로 재시도합니다. products.sql 을 다시 실행해주세요.');
+        ({ data, error } = await sb.from('products').insert(_stripNewColumns(payload)).select().single());
+    }
+    if (error) {
+        console.error('상품 저장 실패:', error);
+        showToast('상품 저장 실패: ' + (error.message || '') + (error.hint ? ' — ' + error.hint : ''));
+        return null;
+    }
     return productFromDb(data);
 }
 async function dbUpdateProduct(id, patch) {
-    const { data, error } = await sb.from('products').update(productToDb(patch)).eq('id', id).select().single();
-    if (error) { console.error(error); showToast('상품 수정 실패: ' + error.message); return null; }
+    const payload = productToDb(patch);
+    let { data, error } = await sb.from('products').update(payload).eq('id', id).select().single();
+    if (error && _isMissingNewColumnError(error)) {
+        console.warn('products 테이블에 prints/packagings/labels 컬럼이 없어 레거시 컬럼만으로 재시도합니다. products.sql 을 다시 실행해주세요.');
+        ({ data, error } = await sb.from('products').update(_stripNewColumns(payload)).eq('id', id).select().single());
+    }
+    if (error) {
+        console.error('상품 수정 실패:', error);
+        showToast('상품 수정 실패: ' + (error.message || '') + (error.hint ? ' — ' + error.hint : ''));
+        return null;
+    }
     return productFromDb(data);
 }
 async function dbDeleteProduct(id) {
