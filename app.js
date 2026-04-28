@@ -7454,7 +7454,9 @@ function renderProposals() {
 function copyProposalLink(id) {
     const p = proposals.find(x => x.id === id);
     if (!p || !p.shareLink) return;
-    const full = location.origin + location.pathname + p.shareLink;
+    // shareLink 가 절대 URL(http/https) 이면 그대로 복사. 레거시 형식(#hash) 이면 origin 을 붙임.
+    const link = p.shareLink || '';
+    const full = /^https?:\/\//i.test(link) ? link : (location.origin + location.pathname + link);
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(full).then(() => showToast('링크가 복사되었습니다')).catch(() => showToast('복사 실패'));
     } else {
