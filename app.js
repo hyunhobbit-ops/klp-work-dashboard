@@ -3730,10 +3730,21 @@ function closeDetail() {
     document.getElementById('detailOverlay').classList.remove('show');
 }
 
+// 백드롭 클릭 안전 가드 — 사용자가 모달 안에서 마우스를 누른 채 바깥(overlay)으로
+// 드래그해서 떼면, 일반 click 이벤트는 mousedown/mouseup 의 공통 부모인 overlay 에 발화돼
+// 모달이 의도치 않게 닫히는 문제가 있다. mousedown 도 overlay 본체에서 시작했을 때만 닫는다.
+let _backdropMouseDownEl = null;
+document.addEventListener('mousedown', (e) => { _backdropMouseDownEl = e.target; }, true);
+function isBackdropClick(e, overlayEl) {
+    return e.target === overlayEl && _backdropMouseDownEl === overlayEl;
+}
+
 // Click overlay to close
 document.addEventListener('click', (e) => {
-    if (e.target.id === 'detailOverlay') closeDetail();
-    if (e.target.id === 'modalOverlay') closeModal();
+    const detailOverlay = document.getElementById('detailOverlay');
+    const modalOverlay = document.getElementById('modalOverlay');
+    if (detailOverlay && isBackdropClick(e, detailOverlay)) closeDetail();
+    if (modalOverlay && isBackdropClick(e, modalOverlay)) closeModal();
 });
 
 // =====================================
@@ -8876,7 +8887,7 @@ function openTempProjectModal(id) {
         overlay = document.createElement('div');
         overlay.id = 'tempModalOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px)';
-        overlay.addEventListener('click', e => { if (e.target === overlay) closeTempModal(); });
+        overlay.addEventListener('click', e => { if (isBackdropClick(e, overlay)) closeTempModal(); });
         document.body.appendChild(overlay);
     }
     overlay.innerHTML = `<div style="background:var(--white);border-radius:20px;padding:28px;width:90%;max-width:480px;box-shadow:0 16px 48px rgba(0,0,0,.15)">${html}</div>`;
@@ -9293,7 +9304,7 @@ function openTempGroupEdit(gi) {
         overlay = document.createElement('div');
         overlay.id = 'tempModalOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px)';
-        overlay.addEventListener('click', e => { if (e.target === overlay) closeTempModal(); });
+        overlay.addEventListener('click', e => { if (isBackdropClick(e, overlay)) closeTempModal(); });
         document.body.appendChild(overlay);
     }
     overlay.innerHTML = `<div style="background:var(--white);border-radius:20px;padding:28px;width:95%;max-width:960px;max-height:85vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,.15)">${html}</div>`;
