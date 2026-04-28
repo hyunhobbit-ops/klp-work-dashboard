@@ -7671,21 +7671,27 @@ function renderProposalPreview() {
             : (idx < 3 ? `<span class="pp-card-badge new">NEW</span>` : '');
 
         // 옵션 행 구성 (다중 인쇄/포장/라벨)
+        // - 옵션 미선택(빈 배열) → 행 자체 숨김
+        // - 비용 0원 → "포함" 으로 표기
+        // - 라벨/태그 배경 제거하고 일반 텍스트로 표시
         const feeUnit = a => a === '일괄' ? '일괄' : '개당';
+        const feeText = o => (Number(o.fee) || 0) > 0
+            ? `${feeUnit(o.feeApply)} ₩${Number(o.fee).toLocaleString()}`
+            : '포함';
         const prints = Array.isArray(p.prints) ? p.prints : [];
         const packs = Array.isArray(p.packagings) ? p.packagings : [];
         const labels = Array.isArray(p.labels) ? p.labels : [];
         const printRow = prints.length === 0
-            ? `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value pp-opt-muted">불가</span></div>`
-            : prints.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value"><span class="pp-tag pp-tag-print">${_optDisplayType(o)}</span>${o.fee ? ` <span style="color:var(--gray-500);font-size:11px">${feeUnit(o.feeApply)} ₩${(o.fee||0).toLocaleString()}</span>` : ''}</span></div>`).join('');
+            ? ''
+            : prints.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value"><span style="font-weight:600;color:var(--gray-900)">${_optDisplayType(o)}</span> <span style="color:var(--gray-500);font-size:11px">${feeText(o)}</span></span></div>`).join('');
         const printFeeRow = '';
         const packRow = packs.length === 0
             ? ''
-            : packs.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">포장</span><span class="pp-opt-value">${o.type === '기본박스' ? `<span class="pp-opt-muted">기본박스</span>` : `<span class="pp-tag pp-tag-pack">${_optDisplayType(o)}</span>`}${o.fee ? ` <span style="color:var(--gray-500);font-size:11px">${feeUnit(o.feeApply)} ₩${(o.fee||0).toLocaleString()}</span>` : ''}</span></div>`).join('');
+            : packs.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">포장</span><span class="pp-opt-value"><span style="font-weight:600;color:var(--gray-900)">${_optDisplayType(o)}</span> <span style="color:var(--gray-500);font-size:11px">${feeText(o)}</span></span></div>`).join('');
         const packFeeRow = '';
         const labelRow = labels.length === 0
-            ? `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span class="pp-tag pp-tag-label-no">부착 불가</span></span></div>`
-            : labels.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span class="pp-tag pp-tag-label-yes">부착 가능${o.note ? ' · ' + o.note : ''}</span>${o.fee ? ` <span style="color:var(--gray-500);font-size:11px">${feeUnit(o.feeApply)} ₩${(o.fee||0).toLocaleString()}</span>` : ''}</span></div>`).join('');
+            ? ''
+            : labels.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span style="font-weight:600;color:var(--gray-900)">부착 가능${o.note ? ' · ' + o.note : ''}</span> <span style="color:var(--gray-500);font-size:11px">${feeText(o)}</span></span></div>`).join('');
 
         const imgHtml = p.image
             ? `<img src="${p.image}" alt="${p.name}">`
@@ -7715,18 +7721,21 @@ function renderProposalPreview() {
     const tableRows = filtered.map(p => {
         const vatLabel = p.vatIncluded ? 'VAT 포함' : 'VAT 별도';
         const fu = a => a === '일괄' ? '일괄' : '개당';
+        const feeText2 = o => (Number(o.fee) || 0) > 0
+            ? `₩${Number(o.fee).toLocaleString()} ${fu(o.feeApply)}`
+            : '포함';
         const prints2 = Array.isArray(p.prints) ? p.prints : [];
         const packs2 = Array.isArray(p.packagings) ? p.packagings : [];
         const labels2 = Array.isArray(p.labels) ? p.labels : [];
         const printCell = prints2.length === 0
-            ? `<span class="pp-opt-muted">불가</span>`
-            : prints2.map(o => `<div><span class="pp-tag pp-tag-print">${_optDisplayType(o)}</span>${o.fee ? ` <span style="color:var(--gray-500)">₩${(o.fee||0).toLocaleString()} ${fu(o.feeApply)}</span>` : ''}</div>`).join('');
+            ? '-'
+            : prints2.map(o => `<div><span style="font-weight:600">${_optDisplayType(o)}</span> <span style="color:var(--gray-500)">${feeText2(o)}</span></div>`).join('');
         const packCell = packs2.length === 0
             ? '-'
-            : packs2.map(o => `<div><span class="pp-tag pp-tag-pack">${_optDisplayType(o)}</span>${o.fee ? ` <span style="color:var(--gray-500)">₩${(o.fee||0).toLocaleString()} ${fu(o.feeApply)}</span>` : ''}</div>`).join('');
+            : packs2.map(o => `<div><span style="font-weight:600">${_optDisplayType(o)}</span> <span style="color:var(--gray-500)">${feeText2(o)}</span></div>`).join('');
         const labelCell = labels2.length === 0
-            ? `<span class="pp-tag pp-tag-label-no">불가</span>`
-            : labels2.map(o => `<div><span class="pp-tag pp-tag-label-yes">가능${o.note ? ' · ' + o.note : ''}</span>${o.fee ? ` <span style="color:var(--gray-500)">₩${(o.fee||0).toLocaleString()} ${fu(o.feeApply)}</span>` : ''}</div>`).join('');
+            ? '-'
+            : labels2.map(o => `<div><span style="font-weight:600">가능${o.note ? ' · ' + o.note : ''}</span> <span style="color:var(--gray-500)">${feeText2(o)}</span></div>`).join('');
         return `<tr>
             <td><strong>${p.name}</strong>${p.description ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">${p.description}</div>` : ''}</td>
             <td><span class="badge badge-gray">${p.category}</span></td>
