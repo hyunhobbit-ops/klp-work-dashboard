@@ -7465,7 +7465,14 @@ function renderProposalEditor() {
             const p = productsDB.find(x => x.id === it.productId);
             if (!p) return '';
             const vatLabel = p.vatIncluded ? 'VAT 포함' : 'VAT 별도';
-            return `<div style="display:grid;grid-template-columns:56px 1fr 160px 120px 140px 40px;gap:12px;align-items:center;padding:12px;border-bottom:1px solid var(--gray-100)">
+            return `<div class="proposal-item-row" draggable="true" data-idx="${idx}"
+                ondragstart="onProposalItemDragStart(event, ${idx})"
+                ondragover="onProposalItemDragOver(event)"
+                ondragleave="onProposalItemDragLeave(event)"
+                ondrop="onProposalItemDrop(event, ${idx})"
+                ondragend="onProposalItemDragEnd(event)"
+                style="display:grid;grid-template-columns:24px 56px 1fr 160px 120px 140px 40px;gap:12px;align-items:center;padding:12px;border-bottom:1px solid var(--gray-100);transition:background .12s">
+                <div style="cursor:grab;user-select:none;color:var(--gray-400);font-size:18px;line-height:1;text-align:center" title="드래그하여 순서 변경">⋮⋮</div>
                 ${p.image
                     ? `<img src="${p.image}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--gray-200)">`
                     : `<div style="width:56px;height:56px;border-radius:8px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;color:var(--gray-400)"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>`}
@@ -7577,6 +7584,63 @@ function recalcProposalTotal() {
         total += it.subtotal;
     });
     editingProposal.totalAmount = total;
+}
+
+// ===== 담은 상품 드래그 정렬 =====
+let _proposalDragIdx = null;
+// 행이 다시 렌더되기 전에, 사용자가 친 수량 input 값을 state 로 보존
+function syncProposalItemsFromDom() {
+    if (!editingProposal) return;
+    const list = document.getElementById('proposalItemsList');
+    if (!list) return;
+    list.querySelectorAll('.proposal-item-row').forEach(r => {
+        const idx = parseInt(r.dataset.idx, 10);
+        if (!Number.isInteger(idx) || !editingProposal.items[idx]) return;
+        const qtyInput = r.querySelector('input[type="number"]');
+        if (qtyInput) {
+            const qty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
+            editingProposal.items[idx].quantity = qty;
+        }
+    });
+}
+function onProposalItemDragStart(e, idx) {
+    _proposalDragIdx = idx;
+    syncProposalEditorFromDom();        // 헤더 입력값 보존
+    syncProposalItemsFromDom();         // 수량 입력값 보존
+    if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', String(idx)); } catch (_) {}
+    }
+    e.currentTarget.style.opacity = '0.5';
+}
+function onProposalItemDragOver(e) {
+    if (_proposalDragIdx === null) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    e.currentTarget.style.background = 'var(--blue-light)';
+}
+function onProposalItemDragLeave(e) {
+    e.currentTarget.style.background = '';
+}
+function onProposalItemDrop(e, targetIdx) {
+    e.preventDefault();
+    e.currentTarget.style.background = '';
+    const fromIdx = _proposalDragIdx;
+    _proposalDragIdx = null;
+    if (fromIdx === null || fromIdx === targetIdx) return;
+    if (!editingProposal || !editingProposal.items) return;
+    const items = editingProposal.items;
+    if (fromIdx < 0 || fromIdx >= items.length || targetIdx < 0 || targetIdx >= items.length) return;
+    const [moved] = items.splice(fromIdx, 1);
+    items.splice(targetIdx, 0, moved);
+    recalcProposalTotal();
+    renderProposalEditor();
+}
+function onProposalItemDragEnd(e) {
+    _proposalDragIdx = null;
+    if (e && e.currentTarget) e.currentTarget.style.opacity = '';
+    // 안전망: 모든 행의 잔여 하이라이트 제거
+    document.querySelectorAll('.proposal-item-row').forEach(r => { r.style.background = ''; });
 }
 
 // 편집 화면이 떠 있는 동안 사용자가 input 에 친 값을 editingProposal 로 동기화.
