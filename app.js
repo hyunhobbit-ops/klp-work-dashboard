@@ -6854,6 +6854,12 @@ function renderProductDB() {
             <td>${packsCell(packs)}</td>
             <td>${labelsCell(labels)}</td>
             <td><span class="badge ${productStatusBadge(p.status)}">${p.status}</span></td>
+            <td onclick="event.stopPropagation()" style="cursor:default">
+                <div style="display:flex;gap:4px;flex-wrap:wrap">
+                    <button class="edit-btn" style="font-size:11px;padding:5px 8px" onclick="duplicateProduct(${p.id})" title="복제">📋 복제</button>
+                    <button class="form-delete-btn" style="font-size:11px;padding:5px 8px" onclick="deleteProduct(${p.id})" title="삭제">🗑️ 삭제</button>
+                </div>
+            </td>
         </tr>`;
 
         cardHtml += `<div class="resp-card" onclick="showProductDetail(${p.id})">
@@ -6873,11 +6879,15 @@ function renderProductDB() {
                 ${summaryRow('포장', packs)}
                 ${summaryRow('라벨', labels)}
             </div>
+            <div onclick="event.stopPropagation()" style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--gray-100)">
+                <button class="edit-btn" style="flex:1;font-size:12px" onclick="duplicateProduct(${p.id})">📋 복제</button>
+                <button class="form-delete-btn" style="flex:1;font-size:12px" onclick="deleteProduct(${p.id})">🗑️ 삭제</button>
+            </div>
         </div>`;
     });
 
     if (!tableHtml) {
-        tableHtml = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--gray-500)">등록된 상품이 없습니다</td></tr>`;
+        tableHtml = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-500)">등록된 상품이 없습니다</td></tr>`;
     }
     document.getElementById('productTableBody').innerHTML = tableHtml;
     document.getElementById('productCardGrid').innerHTML = cardHtml;
@@ -7137,8 +7147,9 @@ function openProductDBModal(editId) {
                 <span style="font-size:11px;color:var(--gray-500)">PNG/JPG · 2MB 이하 권장</span>
             </div>
         </div>
-        <div class="form-actions" style="display:flex;gap:10px;margin-top:16px">
-            <button class="form-submit" style="flex:1" onclick="saveProduct()">${p ? '저장' : '상품 등록'}</button>
+        <div class="form-actions" style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+            <button class="form-submit" style="flex:1;min-width:120px" onclick="saveProduct()">${p ? '저장' : '상품 등록'}</button>
+            ${p ? `<button class="edit-btn" style="padding:10px 14px" onclick="closeModal();duplicateProduct(${p.id})">📋 복제</button>` : ''}
             ${p ? `<button class="form-delete-btn" onclick="deleteProduct(${p.id})">🗑️ 삭제</button>` : ''}
         </div>
     `;
@@ -7224,6 +7235,21 @@ async function deleteProduct(id) {
     showToast('삭제되었습니다');
 }
 
+// 상품 복제 — 기존 상품의 모든 필드를 그대로 복사 + 이름에 "(사본)" 추가, id/createdAt 은 새로
+async function duplicateProduct(id) {
+    const src = productsDB.find(x => x.id === id);
+    if (!src) return;
+    const copy = JSON.parse(JSON.stringify(src));
+    delete copy.id;
+    delete copy.createdAt;
+    copy.name = (src.name || '') + ' (사본)';
+    const inserted = await dbInsertProduct(copy);
+    if (!inserted) return;                         // dbInsertProduct 가 토스트 띄움
+    productsDB.unshift(inserted);
+    renderProductDB();
+    showToast('상품이 복제되었습니다');
+}
+
 function showProductDetail(id) {
     const p = productsDB.find(x => x.id === id);
     if (!p) return;
@@ -7254,8 +7280,9 @@ function showProductDetail(id) {
                 + row('포장', fmtArr(p.packagings, 'pack'))
                 + row('라벨', fmtArr(p.labels, 'label'));
         })()}
-        <div style="display:flex;gap:10px;margin-top:20px">
-            <button class="form-submit" style="flex:1" onclick="closeDetail();openProductDBModal(${p.id})">✏️ 편집</button>
+        <div style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap">
+            <button class="form-submit" style="flex:1;min-width:100px" onclick="closeDetail();openProductDBModal(${p.id})">✏️ 편집</button>
+            <button class="edit-btn" style="padding:10px 14px" onclick="closeDetail();duplicateProduct(${p.id})">📋 복제</button>
             <button class="form-delete-btn" onclick="deleteProduct(${p.id})">🗑️ 삭제</button>
         </div>
     `;
