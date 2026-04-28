@@ -8113,8 +8113,8 @@ function renderProposalPreview() {
 
             <!-- 푸터 -->
             <div class="pp-footer">
-                <strong>KLP KOREA</strong> · 서울시 강남구 · 02-0000-0000 · sales@klpkorea.com · www.klpkorea.com<br>
-                본 제안서는 KLP KOREA의 자산이며, 무단 복제 및 배포를 금합니다.
+                <strong>케이엘피코리아</strong> · 서울시 구로구 디지털로 32길 30, 901호 · 02-2103-5757 · klpkorea@agift.kr · www.klpkorea.co.kr<br>
+                본 제안서는 케이엘피코리아의 자산이며, 무단 복제 및 배포를 금합니다.
             </div>
         </div>
     `;
