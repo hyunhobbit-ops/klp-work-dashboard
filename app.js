@@ -8047,9 +8047,9 @@ function renderProposalPreview() {
             return '';
         };
         const bulkHtml = bulks.length === 0 ? '' : `
-            <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--gray-200);font-size:11px;color:var(--gray-600)">
-                <div style="font-weight:700;color:var(--gray-700);margin-bottom:4px">수량별 단가</div>
-                ${bulks.map(b => `<div style="display:flex;justify-content:space-between;padding:2px 0"><span>${bulkLabel(b)}</span><span style="font-weight:700;color:var(--gray-900)">₩${(b.price || 0).toLocaleString()}</span></div>`).join('')}
+            <div style="margin-top:10px;padding-top:10px;border-top:2px dashed var(--gray-200);font-size:14px;color:var(--gray-700)">
+                <div style="font-weight:800;color:var(--gray-800);margin-bottom:6px;font-size:14px">수량별 단가</div>
+                ${bulks.map(b => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px"><span>${bulkLabel(b)}</span><span style="font-weight:800;color:var(--gray-900)">₩${(b.price || 0).toLocaleString()}</span></div>`).join('')}
             </div>`;
 
         return `<div class="pp-card">
