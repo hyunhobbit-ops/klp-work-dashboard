@@ -8128,8 +8128,7 @@ function renderProposalPreview() {
                     <div class="pp-hero-date">작성일 ${(ep.createdAt || '').substring(0, 10).replace(/-/g, '.')}</div>
                 </div>
                 <div class="pp-hero-right">
-                    <div class="pp-hero-brand">KLP KOREA</div>
-                    <div class="pp-hero-slogan">We Make Better Goods</div>
+                    <img src="logo.png" alt="KLP KOREA" class="pp-hero-logo">
                 </div>
             </div>
 

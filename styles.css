@@ -1512,6 +1512,33 @@ body {
 .pp-table-view th, .pp-table-view td { font-size: 15px; padding: 16px 18px; }
 .pp-footer { font-size: 14px; border-top-width: 2px; padding: 32px 0 16px; }
 
+/* 로고 이미지 (회사 이름 자리 대체) */
+.pp-hero-logo {
+    max-height: 88px;
+    max-width: 300px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+}
+@media (max-width: 900px) {
+    .pp-hero-logo { max-height: 64px; max-width: 220px; margin-top: 8px; }
+}
+
+/* 포인트 컬러 = 로고 블루 (#1E83FF) — 제안서 미리보기 영역 한정 */
+.pp-wrap {
+    --klp-brand: #1E83FF;
+    --klp-brand-dark: #0F6CD9;
+    --klp-brand-light: #E6F0FF;
+    --blue: #1E83FF;
+    --blue-dark: #0F6CD9;
+    --blue-light: #E6F0FF;
+}
+.pp-hero { border-bottom-color: var(--klp-brand) !important; }
+.pp-card-price { color: var(--klp-brand) !important; }
+.pp-info-title { color: var(--klp-brand) !important; }
+.pp-cta-btn.primary { background: var(--klp-brand) !important; border-color: var(--klp-brand) !important; }
+
 /* ============================
    THEME TOGGLE BUTTON (우측 하단)
    ============================ */
