@@ -47,7 +47,10 @@
         .pv-actions button.primary { background: var(--blue, #3182f6); border-color: var(--blue, #3182f6); color: #fff; }
         .pv-actions button:disabled { opacity: .6; cursor: wait; }
         .pv-content { padding: 24px 12px 60px; }
-        .pp-wrap { background: #fff; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.06); overflow: hidden; max-width: 1100px; margin: 0 auto; }
+        /* 인앱 미리보기와 폰트/레이아웃 정확히 일치시키기 위해 styles.css 의 .pp-wrap
+           기본값(max-width:1200px; padding:40px 32px 80px)을 그대로 따름.
+           대신 standalone 전용으로 흰색 카드 배경 + 그림자만 추가. */
+        .pp-wrap { background: #fff; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
         .pv-loading, .pv-error { padding: 80px 24px; text-align: center; color: var(--gray-500); font-size: 14px; }
         .pv-error { color: #dc2626; }
         @media print {
