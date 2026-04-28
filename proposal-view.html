@@ -187,11 +187,8 @@ function render() {
         : '유효기간 미정';
 
     const cardsHtml = all.map((p, idx) => {
-        const isBest = idx === 0 && p.status === '판매 중';
         const vatLabel = p.vatIncluded ? 'VAT 포함' : 'VAT 별도';
-        const badgeHtml = isBest
-            ? `<span class="pp-card-badge best">BEST</span>`
-            : (idx < 3 ? `<span class="pp-card-badge new">NEW</span>` : '');
+        const badgeHtml = '';
 
         const feeText = o => (Number(o.fee) || 0) > 0
             ? `${feeUnit(o.feeApply)} ₩${Number(o.fee).toLocaleString()}`

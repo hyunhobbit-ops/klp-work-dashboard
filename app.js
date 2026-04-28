@@ -7976,11 +7976,8 @@ function renderProposalPreview() {
 
     // 상품 카드 그리드
     const cardsHtml = filtered.map((p, idx) => {
-        const isBest = idx === 0 && p.status === '판매 중';
         const vatLabel = p.vatIncluded ? 'VAT 포함' : 'VAT 별도';
-        const badgeHtml = isBest
-            ? `<span class="pp-card-badge best">BEST</span>`
-            : (idx < 3 ? `<span class="pp-card-badge new">NEW</span>` : '');
+        const badgeHtml = '';
 
         // 옵션 행 구성 (다중 인쇄/포장/라벨)
         // - 옵션 미선택(빈 배열) → 행 자체 숨김
