@@ -714,8 +714,10 @@ function switchTab(tabId, fromHistory = false) {
         loadQuotesFromDb().then(() => renderQuotes()).catch(e => console.error('loadQuotes failed', e));
     }
 
-    // 제안서 탭 진입 시 항상 목록 뷰로 (편집 화면이 떠 있던 채로 다른 탭 갔다 돌아왔을 때 잔존 방지)
-    if (tabId === 'proposals') {
+    // 제안서 탭에 사용자가 직접 진입(사이드바 클릭 등) 시 목록 뷰로 리셋.
+    // fromHistory === true 인 경우(브라우저 back/forward, 모달 closeModal 의 history.back() 등)는
+    // 사용자가 탭을 다시 누른 게 아니라 단순히 편집 중에 모달이 닫힌 상황일 수 있으므로 건드리지 않는다.
+    if (tabId === 'proposals' && !fromHistory) {
         try {
             const ev = document.getElementById('proposalEditorView');
             const lv = document.getElementById('proposalListView');
