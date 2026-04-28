@@ -8123,9 +8123,9 @@ function renderProposalPreview() {
             <div class="pp-hero">
                 <div class="pp-hero-circle3"></div>
                 <div class="pp-hero-left">
-                    <div class="pp-hero-label">PRODUCT PROPOSAL</div>
                     <div class="pp-hero-title">${ep.title || '제안서 제목'}</div>
                     <div class="pp-hero-sub">${ep.clientName || '거래처'}${ep.clientContact ? ' · ' + ep.clientContact + ' 님' : ''}</div>
+                    <div class="pp-hero-date">작성일 ${(ep.createdAt || '').substring(0, 10).replace(/-/g, '.')}</div>
                 </div>
                 <div class="pp-hero-right">
                     <div class="pp-hero-brand">KLP KOREA</div>

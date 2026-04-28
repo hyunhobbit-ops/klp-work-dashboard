@@ -1470,6 +1470,48 @@ body {
     line-height: 1.8;
 }
 
+/* ============================================================
+   제안서 미리보기 / 인쇄·PDF 가독성 강화 오버라이드
+   - 헤더 다크 배경 제거 (잉크 절약)
+   - 'PRODUCT PROPOSAL' 라벨 숨김
+   - 폰트 / 선 굵기 전반 강화
+   ============================================================ */
+.pp-hero {
+    background: transparent !important;
+    color: var(--gray-900);
+    border-radius: 0;
+    border-bottom: 3px solid var(--gray-900);
+    padding: 24px 0 28px;
+    min-height: 0;
+    margin-bottom: 36px;
+}
+.pp-hero::before, .pp-hero::after, .pp-hero-circle3 { display: none !important; }
+.pp-hero-label { display: none !important; }
+.pp-hero-title { color: var(--gray-900) !important; font-size: 44px; letter-spacing: -1px; }
+.pp-hero-sub { color: var(--gray-700) !important; font-size: 24px; font-weight: 700; }
+.pp-hero-date { font-size: 16px; color: var(--gray-600); font-weight: 600; margin-top: 8px; letter-spacing: 0.2px; }
+.pp-hero-brand { color: var(--gray-900) !important; font-size: 28px; }
+.pp-hero-slogan { color: var(--gray-600) !important; font-size: 14px; }
+
+.pp-info-card { border-width: 2px; }
+.pp-info-title { font-size: 14px; letter-spacing: 1.2px; }
+.pp-info-desc { font-size: 16px; line-height: 1.7; color: var(--gray-800); }
+.pp-mgr-name { font-size: 22px; }
+.pp-mgr-contact { font-size: 15px; color: var(--gray-700); }
+.pp-mgr-contact div { padding: 5px 0; }
+
+.pp-card { border-width: 2px; }
+.pp-card-name { font-size: 17px; font-weight: 700; }
+.pp-card-desc { font-size: 13px; }
+.pp-card-price { font-size: 24px; }
+.pp-card-price small { font-size: 13px; }
+.pp-card-opts { font-size: 14px; border-top-width: 2px; gap: 8px; }
+.pp-opt-row { grid-template-columns: 60px 1fr; }
+
+.pp-table-view, .pp-table-view td, .pp-table-view th { border-width: 2px; }
+.pp-table-view th, .pp-table-view td { font-size: 15px; padding: 16px 18px; }
+.pp-footer { font-size: 14px; border-top-width: 2px; padding: 32px 0 16px; }
+
 /* ============================
    THEME TOGGLE BUTTON (우측 하단)
    ============================ */
