@@ -7818,24 +7818,13 @@ async function downloadProposalPdf(btn) {
         const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         const pw = pdf.internal.pageSize.getWidth();      // 210
         const ph = pdf.internal.pageSize.getHeight();     // 297
-        // 비율 유지하며 폭 = A4 폭에 맞춰 스케일
-        const imgW = pw;
-        const imgH = (canvas.height * imgW) / canvas.width;
-        if (imgH <= ph) {
-            pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
-        } else {
-            // 멀티 페이지: 같은 이미지를 위치를 음수로 밀면서 페이지마다 자른 것처럼 표시
-            let heightLeft = imgH;
-            let position = 0;
-            pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
-            heightLeft -= ph;
-            while (heightLeft > 0) {
-                position -= ph;
-                pdf.addPage();
-                pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
-                heightLeft -= ph;
-            }
-        }
+        // A4 한 페이지에 비율 유지하며 fit (가로·세로 중 더 작은 비율로 축소)
+        const ratio = Math.min(pw / canvas.width, ph / canvas.height);
+        const finalW = canvas.width * ratio;
+        const finalH = canvas.height * ratio;
+        const x = (pw - finalW) / 2;
+        const y = (ph - finalH) / 2;
+        pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
         const safeName = ((editingProposal.title || '제안서') + '_' + (editingProposal.clientName || '')).replace(/[\\/:*?"<>|]/g, '_');
         pdf.save(safeName + '.pdf');
     } catch (err) {

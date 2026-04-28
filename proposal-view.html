@@ -304,22 +304,13 @@ async function downloadPdf(btn) {
         const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         const pw = pdf.internal.pageSize.getWidth();
         const ph = pdf.internal.pageSize.getHeight();
-        const imgW = pw;
-        const imgH = (canvas.height * imgW) / canvas.width;
-        if (imgH <= ph) {
-            pdf.addImage(imgData, 'JPEG', 0, 0, imgW, imgH);
-        } else {
-            let heightLeft = imgH;
-            let position = 0;
-            pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
-            heightLeft -= ph;
-            while (heightLeft > 0) {
-                position -= ph;
-                pdf.addPage();
-                pdf.addImage(imgData, 'JPEG', 0, position, imgW, imgH);
-                heightLeft -= ph;
-            }
-        }
+        // A4 한 페이지에 비율 유지하며 fit
+        const ratio = Math.min(pw / canvas.width, ph / canvas.height);
+        const finalW = canvas.width * ratio;
+        const finalH = canvas.height * ratio;
+        const x = (pw - finalW) / 2;
+        const y = (ph - finalH) / 2;
+        pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
         const safe = ((_ep && _ep.title) || '제안서') + '_' + ((_ep && _ep.clientName) || '');
         pdf.save(safe.replace(/[\\/:*?"<>|]/g, '_') + '.pdf');
     } catch (err) {
