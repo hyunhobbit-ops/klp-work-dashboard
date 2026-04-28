@@ -6592,7 +6592,7 @@ function _normLabelRow(o) {
         feeApply: (o && o.feeApply) || '1개당',
     };
 }
-// 대량구매 단가 한 행: { minQty, maxQty, price } — maxQty === 0 이면 '이상'
+// 수량별 단가 한 행: { minQty, maxQty, price } — maxQty === 0 이면 '이상'
 function _normBulkPriceRow(o) {
     return {
         minQty: Number(o && o.minQty) || 0,
@@ -6884,7 +6884,7 @@ function renderProductDB() {
 }
 
 // 상품 등록/편집 모달
-// 편집 중인 상품의 옵션 행 상태 (인쇄/포장/라벨/대량단가 — 다중 행 지원)
+// 편집 중인 상품의 옵션 행 상태 (인쇄/포장/라벨/수량별 단가 — 다중 행 지원)
 let editingProduct = { prints: [], packagings: [], labels: [], bulkPrices: [] };
 
 // 옵션 행 한 줄을 그린다. kind: 'print' | 'pack' | 'label'
@@ -7006,7 +7006,7 @@ function removeProductOption(kind, idx) {
     renderProductOptionSection(kind);
 }
 
-// ===== 대량구매 단가 행 =====
+// ===== 수량별 단가 행 =====
 function renderProductBulkRow(idx, row) {
     const numFmt = n => (Number(n) || 0).toLocaleString();
     return `
@@ -7089,10 +7089,10 @@ function openProductDBModal(editId) {
             </div>
         </div>
 
-        <!-- 대량 구매 단가 (선택) — 수량 구간별 단가 -->
+        <!-- 수량별 단가 (선택) — 수량 구간별 단가 -->
         <div class="form-group" style="margin-top:8px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                <label class="form-label" style="margin:0">💰 대량 구매 단가 (선택)</label>
+                <label class="form-label" style="margin:0">💰 수량별 단가 (선택)</label>
                 <button type="button" onclick="addBulkPrice()" style="padding:6px 12px;border:1px dashed var(--gray-300);background:transparent;color:var(--gray-700);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">+ 단가 추가</button>
             </div>
             <div id="productBulkRows"></div>
@@ -7182,7 +7182,7 @@ async function saveProduct() {
     const name = document.getElementById('productName').value.trim();
     if (!name) { showToast('상품명을 입력해주세요'); return; }
     syncProductOptionsFromDom();                       // 옵션 행 입력값 → editingProduct
-    syncProductBulkFromDom();                          // 대량 단가 행 입력값 → editingProduct
+    syncProductBulkFromDom();                          // 수량별 단가 행 입력값 → editingProduct
     const data = {
         name,
         description: document.getElementById('productDescription').value.trim(),
@@ -7768,7 +7768,7 @@ function renderProposalPreview() {
             ? `<img src="${p.image}" alt="${p.name}">`
             : `<svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
 
-        // 대량 구매 단가 (있을 때만 단가 라인 아래에 작은 표 형태로)
+        // 수량별 단가 (있을 때만 단가 라인 아래에 작은 표 형태로)
         const bulks = Array.isArray(p.bulkPrices) ? p.bulkPrices.filter(b => (b.minQty || b.maxQty) && b.price) : [];
         const bulkLabel = (b) => {
             if (b.minQty && b.maxQty) return `${b.minQty.toLocaleString()}개 ~ ${b.maxQty.toLocaleString()}개`;
@@ -7778,7 +7778,7 @@ function renderProposalPreview() {
         };
         const bulkHtml = bulks.length === 0 ? '' : `
             <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--gray-200);font-size:11px;color:var(--gray-600)">
-                <div style="font-weight:700;color:var(--gray-700);margin-bottom:4px">대량 구매가</div>
+                <div style="font-weight:700;color:var(--gray-700);margin-bottom:4px">수량별 단가</div>
                 ${bulks.map(b => `<div style="display:flex;justify-content:space-between;padding:2px 0"><span>${bulkLabel(b)}</span><span style="font-weight:700;color:var(--gray-900)">₩${(b.price || 0).toLocaleString()}</span></div>`).join('')}
             </div>`;
 
