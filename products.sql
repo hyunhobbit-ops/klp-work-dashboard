@@ -43,6 +43,52 @@ for each row execute function public.set_updated_at();
 -- alter table public.products add constraint products_status_check
 --     check (status in ('판매 중', '품절', '단종'));
 
+-- ============================================================
+-- 멀티-옵션 컬럼 (인쇄/포장/라벨이 여러 가지 일 수 있음)
+-- 각 항목 구조:
+--   prints       : [{ type: '레이저각인'|..., fee: int, feeApply: '1개당'|'일괄' }, ...]
+--   packagings   : [{ type: '선물포장'|...,  fee: int, feeApply: '1개당'|'일괄' }, ...]
+--   labels       : [{ note: text,            fee: int, feeApply: '1개당'|'일괄' }, ...]
+-- 기존 단일 컬럼(print_type 등)은 호환을 위해 유지하되, 새 코드는 더 이상 쓰지 않음.
+-- ============================================================
+alter table public.products add column if not exists prints jsonb not null default '[]'::jsonb;
+alter table public.products add column if not exists packagings jsonb not null default '[]'::jsonb;
+alter table public.products add column if not exists labels jsonb not null default '[]'::jsonb;
+
+-- 기존 단일 컬럼을 배열로 1회 백필 (이미 배열에 값이 있는 경우 건너뜀).
+-- 인쇄: print_type 이 '불가'/공란이 아니면 1개 항목으로 변환
+update public.products
+   set prints = jsonb_build_array(jsonb_build_object(
+        'type',     coalesce(print_type, ''),
+        'fee',      coalesce(print_fee, 0),
+        'feeApply', coalesce(print_fee_apply, '1개당')
+   ))
+ where (prints is null or prints = '[]'::jsonb)
+   and print_type is not null
+   and print_type <> ''
+   and print_type <> '불가';
+
+-- 포장: packaging_type 이 공란이 아니면 1개 항목으로 변환
+update public.products
+   set packagings = jsonb_build_array(jsonb_build_object(
+        'type',     coalesce(packaging_type, ''),
+        'fee',      coalesce(packaging_fee, 0),
+        'feeApply', coalesce(packaging_fee_apply, '1개당')
+   ))
+ where (packagings is null or packagings = '[]'::jsonb)
+   and packaging_type is not null
+   and packaging_type <> '';
+
+-- 라벨: label_available = true 이면 1개 항목으로 변환 (note 비어있음)
+update public.products
+   set labels = jsonb_build_array(jsonb_build_object(
+        'note',     '',
+        'fee',      coalesce(label_fee, 0),
+        'feeApply', coalesce(label_fee_apply, '1개당')
+   ))
+ where (labels is null or labels = '[]'::jsonb)
+   and label_available = true;
+
 -- RLS: 대시보드 전체 공유 정책 (다른 테이블과 동일)
 alter table public.products enable row level security;
 
