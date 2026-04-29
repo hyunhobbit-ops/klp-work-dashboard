@@ -10492,10 +10492,12 @@ function renderPlanningDetail(p) {
         return acc;
     }, {});
 
+    const myNameForCard = currentUser ? currentUser.name : '';
     const renderCard = (post) => {
         const meta = planningCategoryMeta(post.category);
         const imgs = Array.isArray(post.images) ? post.images : (post.image ? [post.image] : []);
         const thumbHtml = imgs.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${imgs.slice(0,3).map(src => `<img src="${planningEsc(src)}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--gray-200)">`).join('')}${imgs.length > 3 ? `<div style="width:60px;height:60px;background:var(--gray-100);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--gray-500)">+${imgs.length-3}</div>` : ''}</div>` : '';
+        const isCardAuthor = !!myNameForCard && post.author === myNameForCard;
         const replyCount = (byParent[post.id] || []).length;
         const preview = String(post.content || '').slice(0, 100);
         const dd = planningDDay(post.deadline);
@@ -10512,7 +10514,7 @@ function renderPlanningDetail(p) {
                     <span style="background:${meta.bg};color:${meta.fg};font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px">${meta.icon} ${meta.label}</span>
                     ${ddBadge}
                 </div>
-                <button onclick="event.stopPropagation();openPlanningCardEdit(${post.id})" title="편집" style="background:var(--white);border:1px solid var(--gray-200);color:var(--gray-600,#6B7280);font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px;cursor:pointer;white-space:nowrap" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.color='var(--gray-600)'">✏️ 편집</button>
+                ${isCardAuthor ? `<button onclick="event.stopPropagation();openPlanningCardEdit(${post.id})" title="편집" style="background:var(--white);border:1px solid var(--gray-200);color:var(--gray-600,#6B7280);font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px;cursor:pointer;white-space:nowrap" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.color='var(--gray-600)'">✏️ 편집</button>` : ''}
             </div>
             ${post.title ? `<div style="font-size:19px;font-weight:800;color:var(--gray-900);line-height:1.4;letter-spacing:-0.01em;margin-bottom:6px">${planningEsc(post.title)}</div>` : ''}
             ${preview ? `<div style="font-size:14px;font-weight:500;color:var(--gray-700,#4B5563);line-height:1.5;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(preview)}${post.content.length > 100 ? '...' : ''}</div>` : (post.title ? '' : `<div style="font-size:14px;color:var(--gray-400);font-style:italic">내용 없음</div>`)}
@@ -10654,10 +10656,14 @@ function openPlanningPostDetail(postId) {
         const active = (post.taskStatus || 'todo') === s.key;
         return `<button onclick="setPlanningPostTaskStatus(${post.id},'${s.key}')" style="padding:4px 10px;border:1px solid ${active ? s.bar : 'var(--gray-200)'};background:${active ? s.bg : 'var(--white)'};color:${active ? s.text : 'var(--gray-500)'};border-radius:6px;font-size:11px;font-weight:800;cursor:pointer">${s.label}</button>`;
     }).join('');
+    const myName = currentUser ? currentUser.name : '';
     const repliesHtml = replies.map(r => {
         const rm = planningCategoryMeta(r.category);
         const rImgs = Array.isArray(r.images) ? r.images : (r.image ? [r.image] : []);
         const rImgHtml = rImgs.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${rImgs.map(src => `<img src="${planningEsc(src)}" style="max-width:140px;max-height:140px;border-radius:6px;border:1px solid var(--gray-200);cursor:zoom-in;object-fit:cover" onclick="openPlanningImage('${String(src).replace(/'/g,'&#39;')}')">`).join('')}</div>` : '';
+        const isReplyAuthor = !!myName && r.author === myName;
+        const replyEditBtn = isReplyAuthor ? `<button onclick="openPlanningReplyEdit(${r.id})" style="background:none;border:none;color:var(--blue);font-size:11px;font-weight:700;cursor:pointer;padding:0 4px">✏️ 편집</button>` : '';
+        const replyDelBtn = isReplyAuthor ? `<button onclick="deletePlanningPost(${r.id})" style="background:none;border:none;color:var(--red);font-size:11px;cursor:pointer;padding:0 4px">삭제</button>` : '';
         return `<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-left:3px solid ${rm.fg};border-radius:8px;padding:10px 12px;margin-left:24px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px;flex-wrap:wrap">
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -10665,7 +10671,7 @@ function openPlanningPostDetail(postId) {
                     <strong style="font-size:12px;color:var(--gray-900)">${planningEsc(r.author)}</strong>
                     <span style="font-size:11px;color:var(--gray-500)">${planningFmtDate(r.createdAt)}</span>
                 </div>
-                <button onclick="deletePlanningPost(${r.id})" style="background:none;border:none;color:var(--red);font-size:11px;cursor:pointer">삭제</button>
+                <div style="display:flex;gap:2px;align-items:center">${replyEditBtn}${replyDelBtn}</div>
             </div>
             <div style="font-size:13px;color:var(--gray-900);white-space:pre-wrap;line-height:1.5">${planningEsc(r.content)}</div>
             ${rImgHtml}
@@ -10684,13 +10690,17 @@ function openPlanningPostDetail(postId) {
     if (post.deadline) metaRows.push(`<div style="font-size:12px;color:var(--gray-600,#4B5563)"><span style="color:var(--gray-500)">⏰ 마감일:</span> <strong>${planningEsc(post.deadline)}</strong> ${ddBadge}</div>`);
     if (assignees.length) metaRows.push(`<div style="font-size:12px;color:var(--gray-600,#4B5563);display:flex;gap:4px;align-items:center;flex-wrap:wrap"><span style="color:var(--gray-500)">👥 담당:</span> ${assignees.map(n => `<span style="background:var(--blue-light);color:var(--blue);font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">${planningEsc(n)}</span>`).join('')}</div>`);
     const metaBlock = metaRows.length ? `<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;padding:10px 12px;background:var(--gray-50);border-radius:8px;border:1px solid var(--gray-200)">${metaRows.join('')}</div>` : '';
+    const isPostAuthor = !!myName && post.author === myName;
+    const postEditBtn = isPostAuthor ? `<button onclick="closeModal();openPlanningCardEdit(${post.id})" style="background:var(--white);border:1px solid var(--blue);color:var(--blue);font-size:12px;font-weight:700;padding:4px 12px;border-radius:6px;cursor:pointer">✏️ 편집</button>` : '';
+    const postDelBtn = isPostAuthor ? `<button onclick="deletePlanningPost(${post.id});closeModal()" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer">삭제</button>` : '';
     body.innerHTML = `
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
             <span style="background:${meta.bg};color:${meta.fg};font-size:12px;font-weight:800;padding:4px 10px;border-radius:6px">${meta.icon} ${meta.label}</span>
             <strong style="font-size:14px;color:var(--gray-900)">${planningEsc(post.author)}</strong>
             <span style="font-size:12px;color:var(--gray-500)">${planningFmtDate(post.createdAt)}</span>
             <div style="flex:1"></div>
-            <button onclick="deletePlanningPost(${post.id});closeModal()" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer">삭제</button>
+            ${postEditBtn}
+            ${postDelBtn}
         </div>
         <div style="display:flex;gap:6px;margin-bottom:14px">${taskStatusBadges}</div>
         ${post.title ? `<div style="font-size:22px;font-weight:800;color:var(--gray-900);line-height:1.35;letter-spacing:-0.01em;margin-bottom:12px">${planningEsc(post.title)}</div>` : ''}
@@ -10820,6 +10830,7 @@ function openPlanningCardEdit(postId) {
     if (!proj) return;
     const post = (proj.posts || []).find(x => x.id === postId);
     if (!post) return;
+    if (currentUser && post.author !== currentUser.name) { showToast('작성자만 편집할 수 있습니다'); return; }
     const body = document.getElementById('modalBody');
     if (!body) return;
     const catOpts = PLANNING_CATEGORIES.map(c => `<option value="${c.key}" ${c.key === post.category ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('');
@@ -11025,6 +11036,83 @@ async function submitPlanningReply(parentPostId) {
     } catch (err) {
         console.error(err);
         showToast('답글 저장 실패: ' + err.message);
+    }
+}
+
+// 답글 편집 (작성자만)
+function openPlanningReplyEdit(replyId) {
+    const proj = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!proj) return;
+    const reply = (proj.posts || []).find(x => x.id === replyId);
+    if (!reply) return;
+    if (currentUser && reply.author !== currentUser.name) { showToast('작성자만 편집할 수 있습니다'); return; }
+    const body = document.getElementById('modalBody');
+    if (!body) return;
+    const catOpts = PLANNING_CATEGORIES.map(c => `<option value="${c.key}" ${c.key === reply.category ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('');
+    planningPendingImages = (Array.isArray(reply.images) ? reply.images : []).map(url => ({ file: null, url }));
+    body.innerHTML = `
+        <div class="form-section-title">✏️ 답글 편집</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div class="form-group" style="margin:0"><label class="form-label">카테고리</label>
+                <select id="planningPostCategory" class="form-select">${catOpts}</select>
+            </div>
+            <div class="form-group" style="margin:0"><label class="form-label">작성자</label>
+                <input id="planningPostAuthor" class="form-input" value="${planningEsc(reply.author || '')}" readonly style="background:var(--gray-50);color:var(--gray-600)">
+            </div>
+        </div>
+        <div class="form-group"><label class="form-label">내용</label>
+            <textarea id="planningPostContent" class="form-input" rows="8" style="font-family:inherit;min-height:200px;resize:vertical;line-height:1.6">${planningEsc(reply.content || '')}</textarea>
+        </div>
+        <div class="form-group"><label class="form-label">📷 이미지 (여러 장 선택 가능)</label>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <label style="padding:8px 12px;background:var(--gray-100);color:var(--gray-900);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                    📁 이미지 파일 선택 (복수 가능)
+                    <input type="file" accept="image/*" multiple onchange="handlePlanningImageFiles(event)" style="display:none">
+                </label>
+                <input id="planningPostImageUrl" placeholder="또는 이미지 URL" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px">
+                <button type="button" onclick="addPlanningImageUrl()" style="padding:8px 12px;background:var(--gray-100);color:var(--gray-900);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">URL 추가</button>
+            </div>
+            <div style="font-size:11px;color:var(--gray-500);margin-top:6px">파일 선택 창에서 Ctrl(또는 Shift) 키를 누른 채 클릭하면 여러 장을 한 번에 선택할 수 있습니다.</div>
+            <div id="planningImagePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="btn-export" onclick="openPlanningPostDetail(${reply.parentId})" style="flex:0 0 auto">취소</button>
+            <button class="form-submit" style="flex:1;background:var(--blue)" onclick="submitPlanningReplyEdit(${reply.id})">수정 저장</button>
+        </div>
+    `;
+    document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
+    refreshPlanningImagePreview();
+    setTimeout(() => { const el = document.getElementById('planningPostContent'); if (el) el.focus(); }, 60);
+}
+
+async function submitPlanningReplyEdit(replyId) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!p) return;
+    const reply = (p.posts || []).find(x => x.id === replyId);
+    if (!reply) return;
+    if (currentUser && reply.author !== currentUser.name) { showToast('작성자만 편집할 수 있습니다'); return; }
+    const content = (document.getElementById('planningPostContent').value || '').trim();
+    if (!content && !planningPendingImages.length) { showToast('내용 또는 이미지를 입력하세요'); return; }
+    const category = document.getElementById('planningPostCategory').value;
+    let imageUrls;
+    try {
+        imageUrls = await resolvePlanningPendingImages();
+    } catch (err) {
+        showToast('이미지 업로드 실패: ' + err.message);
+        return;
+    }
+    const patch = { category, content, images: imageUrls };
+    try {
+        const { error } = await sb.from('planning_posts').update(patch).eq('id', replyId);
+        if (error) throw error;
+        Object.assign(reply, { category, content, images: imageUrls });
+        planningPendingImages = [];
+        openPlanningPostDetail(reply.parentId);
+        await renderPlanning({ skipLoad: true });
+        showToast('답글이 수정되었습니다');
+    } catch (err) {
+        console.error(err);
+        showToast('수정 실패: ' + err.message);
     }
 }
 
