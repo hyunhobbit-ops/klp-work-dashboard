@@ -10085,6 +10085,7 @@ function planningPostFromDb(r) {
         parentId: r.parent_id,
         author: r.author || '',
         category: r.category || 'propose',
+        title: r.title || '',
         content: r.content || '',
         vendor: r.vendor || '',
         deadline: r.deadline || '',
@@ -10100,6 +10101,7 @@ function planningPostToDb(post, projectId) {
         parent_id: post.parentId || null,
         author: post.author || '',
         category: post.category || 'propose',
+        title: post.title || '',
         content: post.content || '',
         vendor: post.vendor || '',
         deadline: post.deadline || null,
@@ -10512,7 +10514,8 @@ function renderPlanningDetail(p) {
                 </div>
                 <button onclick="event.stopPropagation();openPlanningCardEdit(${post.id})" title="편집" style="background:var(--white);border:1px solid var(--gray-200);color:var(--gray-600,#6B7280);font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px;cursor:pointer;white-space:nowrap" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.color='var(--gray-600)'">✏️ 편집</button>
             </div>
-            ${preview ? `<div style="font-size:18px;font-weight:800;color:var(--gray-900);line-height:1.5;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;letter-spacing:-0.01em">${planningEsc(preview)}${post.content.length > 100 ? '...' : ''}</div>` : `<div style="font-size:14px;color:var(--gray-400);font-style:italic">내용 없음</div>`}
+            ${post.title ? `<div style="font-size:19px;font-weight:800;color:var(--gray-900);line-height:1.4;letter-spacing:-0.01em;margin-bottom:6px">${planningEsc(post.title)}</div>` : ''}
+            ${preview ? `<div style="font-size:14px;font-weight:500;color:var(--gray-700,#4B5563);line-height:1.5;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(preview)}${post.content.length > 100 ? '...' : ''}</div>` : (post.title ? '' : `<div style="font-size:14px;color:var(--gray-400);font-style:italic">내용 없음</div>`)}
             ${vendorTag}
             ${assigneeRow}
             ${thumbHtml}
@@ -10690,6 +10693,7 @@ function openPlanningPostDetail(postId) {
             <button onclick="deletePlanningPost(${post.id});closeModal()" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer">삭제</button>
         </div>
         <div style="display:flex;gap:6px;margin-bottom:14px">${taskStatusBadges}</div>
+        ${post.title ? `<div style="font-size:22px;font-weight:800;color:var(--gray-900);line-height:1.35;letter-spacing:-0.01em;margin-bottom:12px">${planningEsc(post.title)}</div>` : ''}
         ${metaBlock}
         <div style="font-size:14px;color:var(--gray-900);white-space:pre-wrap;line-height:1.6;padding:12px;background:var(--gray-50);border-radius:8px">${planningEsc(post.content || '(내용 없음)')}</div>
         ${imgHtml}
@@ -10773,8 +10777,11 @@ function openPlanningPostEditor() {
                 <input id="planningPostAuthor" class="form-input" placeholder="작성자" value="${planningEsc(currentUser ? currentUser.name : '')}">
             </div>
         </div>
+        <div class="form-group"><label class="form-label">제목</label>
+            <input id="planningPostTitle" class="form-input" placeholder="카드 제목을 입력하세요" style="font-weight:700">
+        </div>
         <div class="form-group"><label class="form-label">내용</label>
-            <textarea id="planningPostContent" class="form-input" rows="4" placeholder="내용을 입력하세요..." style="font-family:inherit"></textarea>
+            <textarea id="planningPostContent" class="form-input" rows="12" placeholder="내용을 자세히 입력하세요..." style="font-family:inherit;min-height:280px;resize:vertical;line-height:1.6"></textarea>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">🏭 거래처 (선택)</label>
@@ -10787,15 +10794,16 @@ function openPlanningPostEditor() {
         <div class="form-group"><label class="form-label">👥 담당자 (여러 명 선택 가능)</label>
             <div id="planningAssigneeChips" style="display:flex;flex-wrap:wrap;gap:6px">${renderPlanningAssigneeChips()}</div>
         </div>
-        <div class="form-group"><label class="form-label">📷 이미지 (선택)</label>
+        <div class="form-group"><label class="form-label">📷 이미지 (여러 장 선택 가능)</label>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <label style="padding:8px 12px;background:var(--gray-100);color:var(--gray-900);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-                    이미지 파일 선택
+                    📁 이미지 파일 선택 (복수 가능)
                     <input type="file" accept="image/*" multiple onchange="handlePlanningImageFiles(event)" style="display:none">
                 </label>
                 <input id="planningPostImageUrl" placeholder="또는 이미지 URL" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px">
                 <button type="button" onclick="addPlanningImageUrl()" style="padding:8px 12px;background:var(--gray-100);color:var(--gray-900);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">URL 추가</button>
             </div>
+            <div style="font-size:11px;color:var(--gray-500);margin-top:6px">파일 선택 창에서 Ctrl(또는 Shift) 키를 누른 채 클릭하면 여러 장을 한 번에 선택할 수 있습니다.</div>
             <div id="planningImagePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
         </div>
         <button class="form-submit" style="background:var(--blue);margin-top:6px" onclick="submitPlanningCard()">저장</button>
@@ -10803,7 +10811,7 @@ function openPlanningPostEditor() {
     document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
     planningPendingImages = [];
     refreshPlanningImagePreview();
-    setTimeout(() => { const el = document.getElementById('planningPostContent'); if (el) el.focus(); }, 60);
+    setTimeout(() => { const el = document.getElementById('planningPostTitle'); if (el) el.focus(); }, 60);
 }
 
 function openPlanningCardEdit(postId) {
@@ -10826,8 +10834,11 @@ function openPlanningCardEdit(postId) {
                 <input id="planningPostAuthor" class="form-input" value="${planningEsc(post.author || '')}">
             </div>
         </div>
+        <div class="form-group"><label class="form-label">제목</label>
+            <input id="planningPostTitle" class="form-input" placeholder="카드 제목을 입력하세요" value="${planningEsc(post.title || '')}" style="font-weight:700">
+        </div>
         <div class="form-group"><label class="form-label">내용</label>
-            <textarea id="planningPostContent" class="form-input" rows="4" style="font-family:inherit">${planningEsc(post.content || '')}</textarea>
+            <textarea id="planningPostContent" class="form-input" rows="12" style="font-family:inherit;min-height:280px;resize:vertical;line-height:1.6">${planningEsc(post.content || '')}</textarea>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">🏭 거래처</label>
@@ -10840,22 +10851,23 @@ function openPlanningCardEdit(postId) {
         <div class="form-group"><label class="form-label">👥 담당자</label>
             <div id="planningAssigneeChips" style="display:flex;flex-wrap:wrap;gap:6px">${renderPlanningAssigneeChips()}</div>
         </div>
-        <div class="form-group"><label class="form-label">📷 이미지</label>
+        <div class="form-group"><label class="form-label">📷 이미지 (여러 장 선택 가능)</label>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 <label style="padding:8px 12px;background:var(--gray-100);color:var(--gray-900);border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-                    이미지 파일 선택
+                    📁 이미지 파일 선택 (복수 가능)
                     <input type="file" accept="image/*" multiple onchange="handlePlanningImageFiles(event)" style="display:none">
                 </label>
                 <input id="planningPostImageUrl" placeholder="또는 이미지 URL" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px">
                 <button type="button" onclick="addPlanningImageUrl()" style="padding:8px 12px;background:var(--gray-100);color:var(--gray-900);border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">URL 추가</button>
             </div>
+            <div style="font-size:11px;color:var(--gray-500);margin-top:6px">파일 선택 창에서 Ctrl(또는 Shift) 키를 누른 채 클릭하면 여러 장을 한 번에 선택할 수 있습니다.</div>
             <div id="planningImagePreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
         </div>
         <button class="form-submit" style="background:var(--blue);margin-top:6px" onclick="submitPlanningCardEdit(${postId})">저장</button>
     `;
     document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
     refreshPlanningImagePreview();
-    setTimeout(() => { const el = document.getElementById('planningPostContent'); if (el) el.focus(); }, 60);
+    setTimeout(() => { const el = document.getElementById('planningPostTitle'); if (el) el.focus(); }, 60);
 }
 
 async function submitPlanningCardEdit(postId) {
@@ -10863,8 +10875,10 @@ async function submitPlanningCardEdit(postId) {
     if (!p) return;
     const post = (p.posts || []).find(x => x.id === postId);
     if (!post) return;
+    const titleEl = document.getElementById('planningPostTitle');
+    const title = titleEl ? (titleEl.value || '').trim() : '';
     const content = (document.getElementById('planningPostContent').value || '').trim();
-    if (!content && !planningPendingImages.length) { showToast('내용 또는 이미지를 입력하세요'); return; }
+    if (!title && !content && !planningPendingImages.length) { showToast('제목, 내용 또는 이미지를 입력하세요'); return; }
     const author = (document.getElementById('planningPostAuthor').value || '').trim() || post.author;
     const category = document.getElementById('planningPostCategory').value;
     const vendor = (document.getElementById('planningPostVendor').value || '').trim();
@@ -10877,7 +10891,7 @@ async function submitPlanningCardEdit(postId) {
         return;
     }
     const patch = {
-        author, category, content, vendor,
+        author, category, title, content, vendor,
         deadline: deadline || null,
         assignees: planningPendingAssignees.slice(),
         images: imageUrls
@@ -10886,7 +10900,7 @@ async function submitPlanningCardEdit(postId) {
         const { error } = await sb.from('planning_posts').update(patch).eq('id', postId);
         if (error) throw error;
         Object.assign(post, {
-            author, category, content, vendor,
+            author, category, title, content, vendor,
             deadline: deadline || '',
             assignees: patch.assignees,
             images: imageUrls
@@ -10905,8 +10919,10 @@ async function submitPlanningCardEdit(postId) {
 async function submitPlanningCard() {
     const p = planningProjects.find(x => x.id === currentPlanningProjectId);
     if (!p) return;
+    const titleEl = document.getElementById('planningPostTitle');
+    const title = titleEl ? (titleEl.value || '').trim() : '';
     const content = (document.getElementById('planningPostContent').value || '').trim();
-    if (!content && !planningPendingImages.length) { showToast('내용 또는 이미지를 입력하세요'); return; }
+    if (!title && !content && !planningPendingImages.length) { showToast('제목, 내용 또는 이미지를 입력하세요'); return; }
     const author = (document.getElementById('planningPostAuthor').value || '').trim() || (currentUser ? currentUser.name : '익명');
     const category = document.getElementById('planningPostCategory').value;
     const vendor = (document.getElementById('planningPostVendor').value || '').trim();
@@ -10920,7 +10936,7 @@ async function submitPlanningCard() {
         return;
     }
     const newPost = {
-        author, category, content, vendor, deadline,
+        author, category, title, content, vendor, deadline,
         assignees: planningPendingAssignees.slice(),
         images: imageUrls,
         taskStatus: mode.taskStatus || 'todo',
@@ -10951,7 +10967,7 @@ async function syncPlanningCardToDaily(project, post) {
     if (!assignees.length) return;
     const priority = PLANNING_CATEGORY_TO_PRIORITY[post.category] || '🟡 보통';
     const createdDate = (post.createdAt || new Date().toISOString()).slice(0, 10);
-    const summary = (post.content || '(내용 없음)').replace(/\s+/g, ' ').slice(0, 50);
+    const summary = (post.title || post.content || '(내용 없음)').replace(/\s+/g, ' ').slice(0, 50);
     const baseTitle = `[${project.name}] ${summary}`;
     const insertedIds = [];
     for (const person of assignees) {
