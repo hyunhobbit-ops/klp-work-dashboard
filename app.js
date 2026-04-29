@@ -11381,6 +11381,14 @@ function openEditPlanningModal(id) {
         <div class="form-group"><label class="form-label">마감일 (선택)</label>
             <input id="editPlanningDeadline" class="form-input" type="date" value="${planningEsc(p.deadline || '')}">
         </div>
+        ${planningIsAdmin() ? `
+        <div class="form-group"><label class="form-label">📂 공개 범위 (이동)</label>
+            <select id="editPlanningAccess" class="form-select">
+                <option value="company" ${(p.access || 'company') === 'company' ? 'selected' : ''}>🏢 회사 (관리자 3인 공유)</option>
+                <option value="personal" ${(p.access || 'company') === 'personal' ? 'selected' : ''}>🔒 개인 (본인만)</option>
+            </select>
+            <div style="font-size:11px;color:var(--gray-500);margin-top:4px">변경 시 해당 메뉴로 이동합니다. 개인으로 이동하면 본인 소유로 전환됩니다.</div>
+        </div>` : ''}
         <button class="form-submit" style="background:var(--blue)" onclick="savePlanningProjectEdit(${id})">저장</button>
     `;
     document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
@@ -11433,8 +11441,15 @@ async function savePlanningProjectEdit(id) {
     const description = (document.getElementById('editPlanningDesc').value || '').trim();
     const status = document.getElementById('editPlanningStatus').value;
     const period = document.getElementById('editPlanningPeriod').value;
-    // 공개 범위는 기존 값 유지 (UI에서 제거됨)
-    const access = p.access || 'company';
+    // 공개 범위 — 관리자만 회사 ↔ 개인 이동 가능. 그 외엔 기존 값 유지
+    const accessEl = document.getElementById('editPlanningAccess');
+    const prevAccess = p.access || 'company';
+    let access = (planningIsAdmin() && accessEl) ? accessEl.value : prevAccess;
+    // 'family' 레거시 보호: 가족 프로젝트도 회사 메뉴에 노출되므로, 회사를 그대로 두면 family 유지
+    if (prevAccess === 'family' && access === 'company') access = 'family';
+    const accessChanged = access !== prevAccess;
+    // 회사 → 개인으로 이동 시 본인을 소유자로 지정 (개인 메뉴에서 보이도록)
+    const newOwnerLogin = (accessChanged && access === 'personal') ? planningCurrentOwner() : (p.ownerLogin || '');
     const editLocEl = document.getElementById('editPlanningLocation');
     const editCostEl = document.getElementById('editPlanningCost');
     const location = editLocEl && editLocEl.offsetParent !== null ? (editLocEl.value || '').trim() : '';
@@ -11453,14 +11468,22 @@ async function savePlanningProjectEdit(id) {
         deadline: deadline || null,
         location: location || '',
         cost: cost == null ? null : cost,
+        owner_login: newOwnerLogin,
         updated_at: new Date().toISOString()
     };
     try {
         const { error } = await sb.from('planning_projects').update(patch).eq('id', id);
         if (error) throw error;
         closeModal();
-        await renderPlanning();
-        showToast('수정되었습니다');
+        if (accessChanged) {
+            // 이동된 메뉴로 전환 (회사 ↔ 개인)
+            currentPlanningProjectId = null;
+            switchTab('planning-' + access);
+            showToast(access === 'company' ? '🏢 회사 프로젝트로 이동했습니다' : '🔒 개인 프로젝트로 이동했습니다');
+        } else {
+            await renderPlanning();
+            showToast('수정되었습니다');
+        }
     } catch (err) {
         console.error(err);
         showToast('수정 실패: ' + err.message);
