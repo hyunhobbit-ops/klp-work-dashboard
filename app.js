@@ -10092,11 +10092,12 @@ function planningPostFromDb(r) {
         assignees: Array.isArray(r.assignees) ? r.assignees : [],
         images: Array.isArray(r.images) ? r.images : [],
         taskStatus: r.task_status || 'todo',
+        sortOrder: r.sort_order != null ? Number(r.sort_order) : null,
         createdAt: r.created_at
     };
 }
 function planningPostToDb(post, projectId) {
-    return {
+    const out = {
         project_id: projectId,
         parent_id: post.parentId || null,
         author: post.author || '',
@@ -10109,6 +10110,8 @@ function planningPostToDb(post, projectId) {
         images: post.images || [],
         task_status: post.taskStatus || 'todo'
     };
+    if (post.sortOrder != null) out.sort_order = post.sortOrder;
+    return out;
 }
 
 async function loadPlanningProjects() {
@@ -10488,7 +10491,16 @@ const PLANNING_TASK_STATUSES = [
 ];
 
 function renderPlanningDetail(p) {
-    const posts = (p.posts || []).slice().sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    const planningPostSortKey = (post) => {
+        if (post.sortOrder != null && !isNaN(Number(post.sortOrder))) return Number(post.sortOrder);
+        const t = post.createdAt ? new Date(post.createdAt).getTime() : 0;
+        return isNaN(t) ? 0 : t;
+    };
+    const posts = (p.posts || []).slice().sort((a, b) => {
+        const sa = planningPostSortKey(a), sb = planningPostSortKey(b);
+        if (sa !== sb) return sa - sb;
+        return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+    });
     const parents = posts.filter(x => !x.parentId);
     const byParent = posts.reduce((acc, x) => {
         if (x.parentId) (acc[x.parentId] = acc[x.parentId] || []).push(x);
@@ -10511,7 +10523,7 @@ function renderPlanningDetail(p) {
         const replyText = replyCount > 0 ? `<span style="font-size:14px;color:var(--blue);font-weight:800;white-space:nowrap">💬 댓글 : ${replyCount}개</span>` : '';
         const assigneeRow = (assignees.length || replyCount > 0) ? `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:12px;flex-wrap:wrap">${assigneeText}${replyText}</div>` : '';
         return `
-        <div draggable="true" ondragstart="planningPostDragStart(event,${post.id})" ondragend="planningPostDragEnd(event)" onclick="openPlanningPostDetail(${post.id})" style="background:var(--white);border:1px solid var(--gray-200);border-left:4px solid ${meta.fg};border-radius:12px;padding:14px 16px;cursor:grab;transition:all .12s;user-select:none" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 10px rgba(0,0,0,0.08)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
+        <div draggable="true" ondragstart="planningPostDragStart(event,${post.id})" ondragend="planningPostDragEnd(event)" ondragover="planningCardDragOver(event)" ondragleave="planningCardDragLeave(event)" ondrop="planningCardDrop(event,${post.id})" onclick="openPlanningPostDetail(${post.id})" style="background:var(--white);border:1px solid var(--gray-200);border-left:4px solid ${meta.fg};border-radius:12px;padding:14px 16px;cursor:grab;transition:all .12s;user-select:none" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 10px rgba(0,0,0,0.08)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
             <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                     <span style="background:${meta.bg};color:${meta.fg};font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px">${meta.icon} ${meta.label}</span>
@@ -10599,6 +10611,11 @@ function renderPlanningDetail(p) {
 }
 
 let planningPostDragId = null;
+function planningPostSortKeyOf(post) {
+    if (post.sortOrder != null && !isNaN(Number(post.sortOrder))) return Number(post.sortOrder);
+    const t = post.createdAt ? new Date(post.createdAt).getTime() : 0;
+    return isNaN(t) ? 0 : t;
+}
 function planningPostDragStart(ev, id) {
     planningPostDragId = id;
     ev.dataTransfer.effectAllowed = 'move';
@@ -10619,23 +10636,85 @@ function planningPostDragLeave(ev) {
     if (ev.currentTarget.contains(ev.relatedTarget)) return;
     ev.currentTarget.style.background = '';
 }
+function planningCardDragOver(ev) {
+    if (planningPostDragId === null) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.dataTransfer.dropEffect = 'move';
+    ev.currentTarget.style.borderTop = '3px solid var(--blue)';
+}
+function planningCardDragLeave(ev) {
+    if (ev.currentTarget.contains(ev.relatedTarget)) return;
+    ev.currentTarget.style.borderTop = '';
+}
+async function planningCardDrop(ev, targetPostId) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.currentTarget.style.borderTop = '';
+    const draggedId = planningPostDragId || parseInt(ev.dataTransfer.getData('text/plain'), 10);
+    planningPostDragId = null;
+    if (!draggedId || draggedId === targetPostId) return;
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!p) return;
+    const dragged = (p.posts || []).find(x => x.id === draggedId);
+    const target = (p.posts || []).find(x => x.id === targetPostId);
+    if (!dragged || !target) return;
+
+    // 같은 컬럼 카드 정렬값 수집
+    const targetStatus = target.taskStatus || 'todo';
+    const sameColumn = (p.posts || [])
+        .filter(x => !x.parentId && (x.taskStatus || 'todo') === targetStatus && x.id !== draggedId)
+        .slice()
+        .sort((a, b) => planningPostSortKeyOf(a) - planningPostSortKeyOf(b));
+    const targetIdx = sameColumn.findIndex(x => x.id === targetPostId);
+    if (targetIdx < 0) return;
+    const targetKey = planningPostSortKeyOf(target);
+    const prevKey = targetIdx === 0 ? targetKey - 1000 : planningPostSortKeyOf(sameColumn[targetIdx - 1]);
+    const newSortOrder = (prevKey + targetKey) / 2;
+
+    const patch = { sort_order: newSortOrder };
+    if ((dragged.taskStatus || 'todo') !== targetStatus) patch.task_status = targetStatus;
+    try {
+        const { error } = await sb.from('planning_posts').update(patch).eq('id', draggedId);
+        if (error) throw error;
+        dragged.sortOrder = newSortOrder;
+        if (patch.task_status) dragged.taskStatus = targetStatus;
+        await renderPlanning({ skipLoad: true });
+    } catch (err) {
+        console.error(err);
+        showToast('순서 변경 실패: ' + err.message);
+    }
+}
 async function planningPostDrop(ev, newStatus) {
     ev.preventDefault();
     ev.currentTarget.style.background = '';
     const id = planningPostDragId || parseInt(ev.dataTransfer.getData('text/plain'), 10);
+    planningPostDragId = null;
     if (!id) return;
     const p = planningProjects.find(x => x.id === currentPlanningProjectId);
     if (!p) return;
     const post = (p.posts || []).find(x => x.id === id);
     if (!post) return;
-    if ((post.taskStatus || 'todo') === newStatus) return;
+    // 같은 컬럼 끝으로 이동: max + 1000
+    const sameColumn = (p.posts || [])
+        .filter(x => !x.parentId && (x.taskStatus || 'todo') === newStatus && x.id !== id);
+    const maxKey = sameColumn.length
+        ? Math.max(...sameColumn.map(planningPostSortKeyOf))
+        : 0;
+    const newSortOrder = maxKey + 1000;
+    const sameStatus = (post.taskStatus || 'todo') === newStatus;
+    const patch = { sort_order: newSortOrder };
+    if (!sameStatus) patch.task_status = newStatus;
     try {
-        const { error } = await sb.from('planning_posts').update({ task_status: newStatus }).eq('id', id);
+        const { error } = await sb.from('planning_posts').update(patch).eq('id', id);
         if (error) throw error;
-        post.taskStatus = newStatus;
+        post.sortOrder = newSortOrder;
+        if (!sameStatus) post.taskStatus = newStatus;
         await renderPlanning({ skipLoad: true });
-        const label = (PLANNING_TASK_STATUSES.find(s => s.key === newStatus) || {}).label || newStatus;
-        showToast(`→ ${label}`);
+        if (!sameStatus) {
+            const label = (PLANNING_TASK_STATUSES.find(s => s.key === newStatus) || {}).label || newStatus;
+            showToast(`→ ${label}`);
+        }
     } catch (err) {
         console.error(err);
         showToast('이동 실패: ' + err.message);
@@ -10953,12 +11032,16 @@ async function submitPlanningCard() {
         showToast('이미지 업로드 실패: ' + err.message);
         return;
     }
+    const targetStatus = mode.taskStatus || 'todo';
+    const sameCol = (p.posts || []).filter(x => !x.parentId && (x.taskStatus || 'todo') === targetStatus);
+    const maxKey = sameCol.length ? Math.max(...sameCol.map(planningPostSortKeyOf)) : 0;
     const newPost = {
         author, category, title, content, vendor, deadline,
         assignees: planningPendingAssignees.slice(),
         images: imageUrls,
-        taskStatus: mode.taskStatus || 'todo',
-        parentId: mode.parentId || null
+        taskStatus: targetStatus,
+        parentId: mode.parentId || null,
+        sortOrder: maxKey + 1000
     };
     try {
         const { data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single();
