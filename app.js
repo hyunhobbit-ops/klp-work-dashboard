@@ -10327,10 +10327,13 @@ function renderPlanningList() {
                 const sym = m.currency === 'USD' ? '$' : '₩';
                 const amt = m.targetAmount != null ? Number(m.targetAmount).toLocaleString() : '';
                 const qty = m.targetQty != null ? Number(m.targetQty).toLocaleString() : '';
+                const fp = (m.folderPath || '').trim();
+                const fpEsc = fp ? planningEsc(fp).replace(/'/g, '&#39;') : '';
                 return `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;font-size:13px">
                     ${m.platform ? `<span style="background:#EDE9FE;color:#6D28D9;padding:4px 10px;border-radius:6px;font-weight:700">💸 발행처 : ${planningEsc(m.platform)}</span>` : ''}
                     ${amt ? `<span style="background:#D1FAE5;color:#047857;padding:4px 10px;border-radius:6px;font-weight:700">🎯 목표금액 : ${sym}${amt}</span>` : ''}
                     ${qty ? `<span style="background:#DBEAFE;color:#1D4ED8;padding:4px 10px;border-radius:6px;font-weight:700">📦 목표수량 : ${qty}개</span>` : ''}
+                    ${fp ? `<span onclick="event.stopPropagation();openFolderPath('${fpEsc}')" title="클릭하여 경로 복사" style="background:#FEF3C7;color:#92400E;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'Consolas','Courier New',monospace;font-size:12px" onmouseover="this.style.background='#FDE68A'" onmouseout="this.style.background='#FEF3C7'">📁 ${planningEsc(fp)}</span>` : ''}
                 </div>`;
             })() : ''}
             ${posts.length ? `
@@ -10568,6 +10571,8 @@ function renderPlanningDetail(p) {
                             const qty = m.targetQty != null ? Number(m.targetQty).toLocaleString() : '';
                             const unit = (m.targetAmount && m.targetQty) ? (m.currency === 'USD' ? (m.targetAmount / m.targetQty).toFixed(2) : Math.round(m.targetAmount / m.targetQty).toLocaleString()) : '';
                             const period = (m.startDate || m.endDate) ? `${planningEsc(m.startDate || '')} ~ ${planningEsc(m.endDate || '')}` : '';
+                            const fp = (m.folderPath || '').trim();
+                            const fpEsc = fp ? planningEsc(fp).replace(/'/g, '&#39;') : '';
                             return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:14px">
                                 ${m.client ? `<span style="background:#F3F4F6;color:#374151;padding:5px 12px;border-radius:7px;font-weight:700">🏢 진행사 : ${planningEsc(m.client)}</span>` : ''}
                                 ${m.manufacturer ? `<span style="background:#F3F4F6;color:#374151;padding:5px 12px;border-radius:7px;font-weight:700">🏭 제조사 : ${planningEsc(m.manufacturer)}</span>` : ''}
@@ -10576,7 +10581,8 @@ function renderPlanningDetail(p) {
                                 ${qty ? `<span style="background:#DBEAFE;color:#1D4ED8;padding:5px 12px;border-radius:7px;font-weight:700">📦 목표수량 : ${qty}개</span>` : ''}
                                 ${unit ? `<span style="background:#FEF3C7;color:#92400E;padding:5px 12px;border-radius:7px;font-weight:700">💵 예상단가 : ${sym}${unit}</span>` : ''}
                                 ${period ? `<span style="background:#FFE4E6;color:#BE123C;padding:5px 12px;border-radius:7px;font-weight:700">📅 기간 : ${period}</span>` : ''}
-                            </div>`;
+                            </div>
+                            ${fp ? `<div style="margin-top:10px"><span onclick="openFolderPath('${fpEsc}')" title="클릭하여 경로 복사" style="display:inline-flex;align-items:center;gap:6px;background:#FEF3C7;color:#92400E;padding:6px 12px;border-radius:7px;font-weight:700;cursor:pointer;font-family:'Consolas','Courier New',monospace;font-size:13px;max-width:100%" onmouseover="this.style.background='#FDE68A'" onmouseout="this.style.background='#FEF3C7'">📁 ${planningEsc(fp)} <span style="font-size:11px;color:#A16207;font-family:Pretendard,sans-serif">📋 클릭하여 복사</span></span></div>` : ''}`;
                         })() : ''}
                         <div style="font-size:11px;color:var(--gray-500);margin-top:8px">만든 사람: ${planningEsc(p.createdBy)} · ${planningFmtDate(p.createdAt)}</div>
                     </div>
@@ -11303,6 +11309,12 @@ function openFundingPlanningModal(p) {
             <input id="fundPlanPlatformCustom" class="form-input" placeholder="발행처 직접 입력" value="${esc(platformCustom)}" style="margin-top:6px;display:${platformSelected === '기타' ? '' : 'none'}">
         </div>
 
+        <div class="form-group">
+            <label class="form-label">📁 폴더 경로 <span style="color:var(--gray-400);font-weight:400;font-size:11px">(예: D:\\프로젝트\\펀딩\\2026\\스마트워치)</span></label>
+            <input id="fundPlanFolderPath" class="form-input" placeholder="네트워크/로컬 폴더 경로를 붙여넣으세요" value="${esc(m.folderPath || '')}" style="font-family:'Consolas','Courier New',monospace;font-size:13px">
+            <div style="font-size:11px;color:var(--gray-500);margin-top:4px;line-height:1.5">💡 저장 후 프로젝트 카드/상세에서 경로를 클릭하면 클립보드에 복사됩니다. (브라우저 보안 정책상 파일 탐색기를 자동으로 여는 것은 제한적입니다 — 파일 탐색기 주소창에 붙여넣어 열어주세요)</div>
+        </div>
+
         <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div class="form-group">
                 <label class="form-label">진행 시작일</label>
@@ -11372,6 +11384,7 @@ async function saveFundingPlanningProject(id) {
     const platform = platformSel === '기타' ? (platformCustom || '기타') : platformSel;
     const startDate = v('fundPlanStartDate', '') || null;
     const endDate = v('fundPlanEndDate', '') || null;
+    const folderPath = (v('fundPlanFolderPath') || '').trim();
 
     const fundingMeta = {
         client, manufacturer,
@@ -11379,7 +11392,8 @@ async function saveFundingPlanningProject(id) {
         targetQty: targetQty == null ? null : targetQty,
         currency, platform,
         startDate: startDate || '',
-        endDate: endDate || ''
+        endDate: endDate || '',
+        folderPath
     };
 
     const deadline = endDate || null;
@@ -11675,6 +11689,38 @@ async function resolvePlanningPendingImages() {
 function openPlanningImage(src) {
     const win = window.open('', '_blank');
     if (win) win.document.write(`<title>이미지</title><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh"><img src="${src}" style="max-width:100%;max-height:100vh"></body>`);
+}
+
+// 폴더 경로 클릭: 클립보드 복사 + file:// 열기 시도 (브라우저 보안상 https에서는 대부분 차단됨)
+function openFolderPath(rawPath) {
+    if (!rawPath) return;
+    const path = String(rawPath).trim();
+    const copy = (text, ok, fail) => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(ok).catch(fail);
+        } else {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+                document.body.appendChild(ta); ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                ok();
+            } catch (e) { fail(e); }
+        }
+    };
+    copy(path,
+        () => {
+            showToast('📋 경로 복사 완료 — 탐색기 주소창에 붙여넣기');
+            // file:// 열기 시도 (브라우저가 차단할 수 있음 — 차단되어도 무해)
+            try {
+                let url = path.replace(/\\/g, '/');
+                if (!/^[a-zA-Z]+:\/\//.test(url)) url = 'file:///' + url.replace(/^\/+/, '');
+                window.open(url, '_blank');
+            } catch (_) {}
+        },
+        () => { showToast('복사 실패 — 직접 복사해주세요'); }
+    );
 }
 async function deletePlanningPost(postId) {
     if (!confirm('이 카드를 삭제할까요? (답글도 함께 삭제)')) return;
