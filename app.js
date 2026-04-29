@@ -10705,15 +10705,16 @@ function openPlanningPostDetail(postId) {
                     <select id="planningPostCategory" style="padding:8px 10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px">${catOpts}</select>
                     <input id="planningPostAuthor" placeholder="작성자" value="${planningEsc(currentUser ? currentUser.name : '')}" style="padding:8px 10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px">
                 </div>
-                <textarea id="planningPostContent" placeholder="답글을 입력하세요..." rows="2" style="width:100%;padding:10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;margin-bottom:8px"></textarea>
-                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+                <textarea id="planningPostContent" placeholder="답글을 입력하세요..." rows="4" style="width:100%;padding:10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;margin-bottom:8px;min-height:100px;line-height:1.5"></textarea>
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
                     <label style="padding:7px 10px;background:var(--gray-100);color:var(--gray-900);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-                        📷 이미지
+                        📁 이미지 파일 (복수 가능)
                         <input type="file" accept="image/*" multiple onchange="handlePlanningImageFiles(event)" style="display:none">
                     </label>
                     <input id="planningPostImageUrl" placeholder="또는 이미지 URL" style="flex:1;min-width:160px;padding:7px 10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:12px">
-                    <button type="button" onclick="addPlanningImageUrl()" style="padding:7px 10px;background:var(--gray-100);color:var(--gray-900);border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">추가</button>
+                    <button type="button" onclick="addPlanningImageUrl()" style="padding:7px 10px;background:var(--gray-100);color:var(--gray-900);border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">URL 추가</button>
                 </div>
+                <div style="font-size:11px;color:var(--gray-500);margin-bottom:8px">파일 선택 창에서 Ctrl(또는 Shift) 키를 누른 채 클릭하면 여러 장을 한 번에 선택할 수 있습니다.</div>
                 <div id="planningImagePreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>
                 <button onclick="submitPlanningReply(${post.id})" style="width:100%;padding:9px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">↩ 답글 작성</button>
             </div>
