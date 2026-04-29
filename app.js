@@ -10096,6 +10096,8 @@ function planningPostFromDb(r) {
         createdAt: r.created_at
     };
 }
+// sort_order 컬럼이 아직 마이그레이션되지 않은 DB에서도 동작하도록 플래그로 관리
+let planningSortOrderColumnAvailable = true;
 function planningPostToDb(post, projectId) {
     const out = {
         project_id: projectId,
@@ -10110,8 +10112,13 @@ function planningPostToDb(post, projectId) {
         images: post.images || [],
         task_status: post.taskStatus || 'todo'
     };
-    if (post.sortOrder != null) out.sort_order = post.sortOrder;
+    if (post.sortOrder != null && planningSortOrderColumnAvailable) out.sort_order = post.sortOrder;
     return out;
+}
+function planningIsSortOrderSchemaError(err) {
+    if (!err) return false;
+    const msg = String(err.message || err.details || err.hint || '').toLowerCase();
+    return msg.includes('sort_order') && (msg.includes('schema cache') || msg.includes('not find') || msg.includes('column'));
 }
 
 async function loadPlanningProjects() {
@@ -10675,7 +10682,12 @@ async function planningCardDrop(ev, targetPostId) {
     const patch = { sort_order: newSortOrder };
     if ((dragged.taskStatus || 'todo') !== targetStatus) patch.task_status = targetStatus;
     try {
-        const { error } = await sb.from('planning_posts').update(patch).eq('id', draggedId);
+        let { error } = await sb.from('planning_posts').update(patch).eq('id', draggedId);
+        if (error && planningIsSortOrderSchemaError(error)) {
+            planningSortOrderColumnAvailable = false;
+            showToast('정렬 순서 기능을 쓰려면 planning_posts_sort_order.sql 실행 필요');
+            return;
+        }
         if (error) throw error;
         dragged.sortOrder = newSortOrder;
         if (patch.task_status) dragged.taskStatus = targetStatus;
@@ -10706,9 +10718,19 @@ async function planningPostDrop(ev, newStatus) {
     const patch = { sort_order: newSortOrder };
     if (!sameStatus) patch.task_status = newStatus;
     try {
-        const { error } = await sb.from('planning_posts').update(patch).eq('id', id);
+        let { error } = await sb.from('planning_posts').update(patch).eq('id', id);
+        if (error && planningIsSortOrderSchemaError(error)) {
+            planningSortOrderColumnAvailable = false;
+            // sort_order 빼고 task_status만 (필요한 경우) 재시도
+            if (!sameStatus) {
+                ({ error } = await sb.from('planning_posts').update({ task_status: newStatus }).eq('id', id));
+            } else {
+                showToast('정렬 순서 기능을 쓰려면 planning_posts_sort_order.sql 실행 필요');
+                return;
+            }
+        }
         if (error) throw error;
-        post.sortOrder = newSortOrder;
+        if (planningSortOrderColumnAvailable) post.sortOrder = newSortOrder;
         if (!sameStatus) post.taskStatus = newStatus;
         await renderPlanning({ skipLoad: true });
         if (!sameStatus) {
@@ -11044,7 +11066,13 @@ async function submitPlanningCard() {
         sortOrder: maxKey + 1000
     };
     try {
-        const { data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single();
+        let { data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single();
+        if (error && planningIsSortOrderSchemaError(error)) {
+            // sort_order 컬럼이 없는 환경 → 플래그 끄고 재시도
+            planningSortOrderColumnAvailable = false;
+            showToast('정렬 순서 기능을 쓰려면 planning_posts_sort_order.sql 실행 필요');
+            ({ data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single());
+        }
         if (error) throw error;
         const inserted = planningPostFromDb(data);
         p.posts = p.posts || [];
