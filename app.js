@@ -11635,14 +11635,31 @@ async function updatePlanningStatus(id, newStatus) {
 }
 // planningPendingImages: [{file: File|null, url: string (preview or final URL)}]
 let planningPendingImages = [];
+let planningImageDragIdx = null;
 function refreshPlanningImagePreview() {
     const box = document.getElementById('planningImagePreview');
     if (!box) return;
-    box.innerHTML = planningPendingImages.map((item, i) => `
-        <div style="position:relative;display:inline-block">
-            <img src="${planningEsc(item.url)}" style="width:80px;height:80px;object-fit:cover;border:1px solid var(--gray-200);border-radius:8px">
-            ${item.file ? `<span style="position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,0.6);color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px">업로드 대기</span>` : ''}
-            <button type="button" onclick="removePlanningPendingImage(${i})" style="position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;background:var(--red);color:white;border:none;font-size:12px;font-weight:700;cursor:pointer;line-height:1">×</button>
+    const total = planningPendingImages.length;
+    const hint = total > 1 ? `<div style="width:100%;font-size:11px;color:var(--gray-500);margin-bottom:4px">💡 사진을 드래그하거나 ◀ ▶ 버튼으로 순서를 바꿀 수 있습니다</div>` : '';
+    box.innerHTML = hint + planningPendingImages.map((item, i) => `
+        <div draggable="true"
+             ondragstart="planningImageDragStart(event, ${i})"
+             ondragover="planningImageDragOver(event)"
+             ondragleave="planningImageDragLeave(event)"
+             ondrop="planningImageDrop(event, ${i})"
+             ondragend="planningImageDragEnd(event)"
+             data-img-idx="${i}"
+             style="position:relative;display:inline-flex;flex-direction:column;align-items:center;gap:4px;padding:6px;border:1px solid var(--gray-200);border-radius:10px;background:var(--white);cursor:grab;transition:all .12s">
+            <div style="position:relative">
+                <img src="${planningEsc(item.url)}" style="width:80px;height:80px;object-fit:cover;border-radius:6px;pointer-events:none">
+                <span style="position:absolute;top:2px;left:2px;background:rgba(0,0,0,0.7);color:white;font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px">${i + 1}</span>
+                ${item.file ? `<span style="position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,0.6);color:white;font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px">업로드 대기</span>` : ''}
+                <button type="button" onclick="removePlanningPendingImage(${i})" style="position:absolute;top:-8px;right:-8px;width:22px;height:22px;border-radius:50%;background:var(--red);color:white;border:none;font-size:12px;font-weight:700;cursor:pointer;line-height:1;z-index:2">×</button>
+            </div>
+            ${total > 1 ? `<div style="display:flex;gap:2px;width:100%;justify-content:center">
+                <button type="button" onclick="movePlanningPendingImage(${i}, -1)" ${i === 0 ? 'disabled' : ''} title="왼쪽으로" style="flex:1;padding:2px;background:${i === 0 ? 'var(--gray-50)' : 'var(--gray-100)'};color:${i === 0 ? 'var(--gray-300)' : 'var(--gray-700)'};border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:${i === 0 ? 'not-allowed' : 'pointer'};line-height:1">◀</button>
+                <button type="button" onclick="movePlanningPendingImage(${i}, 1)" ${i === total - 1 ? 'disabled' : ''} title="오른쪽으로" style="flex:1;padding:2px;background:${i === total - 1 ? 'var(--gray-50)' : 'var(--gray-100)'};color:${i === total - 1 ? 'var(--gray-300)' : 'var(--gray-700)'};border:none;border-radius:4px;font-size:11px;font-weight:700;cursor:${i === total - 1 ? 'not-allowed' : 'pointer'};line-height:1">▶</button>
+            </div>` : ''}
         </div>`).join('');
 }
 function removePlanningPendingImage(idx) {
@@ -11652,6 +11669,46 @@ function removePlanningPendingImage(idx) {
     }
     planningPendingImages.splice(idx, 1);
     refreshPlanningImagePreview();
+}
+function movePlanningPendingImage(idx, delta) {
+    const newIdx = idx + delta;
+    if (newIdx < 0 || newIdx >= planningPendingImages.length) return;
+    const [item] = planningPendingImages.splice(idx, 1);
+    planningPendingImages.splice(newIdx, 0, item);
+    refreshPlanningImagePreview();
+}
+function planningImageDragStart(ev, idx) {
+    planningImageDragIdx = idx;
+    ev.dataTransfer.effectAllowed = 'move';
+    try { ev.dataTransfer.setData('text/plain', String(idx)); } catch (_) {}
+    ev.currentTarget.style.opacity = '0.4';
+}
+function planningImageDragOver(ev) {
+    if (planningImageDragIdx === null) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    ev.currentTarget.style.borderColor = 'var(--blue)';
+    ev.currentTarget.style.background = 'var(--blue-light, #DBEAFE)';
+}
+function planningImageDragLeave(ev) {
+    if (ev.currentTarget.contains(ev.relatedTarget)) return;
+    ev.currentTarget.style.borderColor = '';
+    ev.currentTarget.style.background = '';
+}
+function planningImageDrop(ev, targetIdx) {
+    ev.preventDefault();
+    ev.currentTarget.style.borderColor = '';
+    ev.currentTarget.style.background = '';
+    const fromIdx = planningImageDragIdx;
+    planningImageDragIdx = null;
+    if (fromIdx === null || fromIdx === targetIdx) return;
+    const [item] = planningPendingImages.splice(fromIdx, 1);
+    planningPendingImages.splice(targetIdx, 0, item);
+    refreshPlanningImagePreview();
+}
+function planningImageDragEnd(ev) {
+    planningImageDragIdx = null;
+    ev.currentTarget.style.opacity = '';
 }
 function handlePlanningImageFiles(ev) {
     const files = Array.from(ev.target.files || []);
