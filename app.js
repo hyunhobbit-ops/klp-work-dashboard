@@ -10350,7 +10350,7 @@ function mountPlanningRichEditor(containerId, initialHtml, opts) {
     const clipboard = quill.getModule('clipboard');
     if (clipboard && typeof clipboard.onCapturePaste === 'function') {
         const originalOnCapturePaste = clipboard.onCapturePaste.bind(clipboard);
-        clipboard.onCapturePaste = function(e) {
+        clipboard.onCapturePaste = async function(e) {
             const items = e.clipboardData && e.clipboardData.items;
             if (items) {
                 for (const item of items) {
@@ -10358,7 +10358,7 @@ function mountPlanningRichEditor(containerId, initialHtml, opts) {
                         e.preventDefault();
                         e.stopPropagation();
                         const file = item.getAsFile();
-                        if (file) insertResizedImageIntoQuill(quill, file);
+                        if (file) await insertResizedImageIntoQuill(quill, file);
                         return;
                     }
                 }
