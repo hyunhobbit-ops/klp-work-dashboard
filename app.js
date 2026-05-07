@@ -11383,7 +11383,7 @@ function openPlanningReplyEdit(replyId) {
             </div>
         </div>
         <div class="form-group"><label class="form-label">내용</label>
-            <textarea id="planningPostContent" class="form-input" rows="8" style="font-family:inherit;min-height:200px;resize:vertical;line-height:1.6">${planningEsc(reply.content || '')}</textarea>
+            <div id="planningPostContent"></div>
         </div>
         <div class="form-group"><label class="form-label">📷 이미지 (여러 장 선택 가능)</label>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -11404,7 +11404,9 @@ function openPlanningReplyEdit(replyId) {
     `;
     document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
     refreshPlanningImagePreview();
-    setTimeout(() => { const el = document.getElementById('planningPostContent'); if (el) el.focus(); }, 60);
+    const initialHtml = planningSanitizeHtml(reply.content || '');
+    currentPlanningQuill = mountPlanningRichEditor('planningPostContent', initialHtml, { placeholder: '답글 내용을 입력하세요…' });
+    setTimeout(() => { if (currentPlanningQuill) currentPlanningQuill.focus(); }, 60);
 }
 
 async function submitPlanningReplyEdit(replyId) {
@@ -11413,8 +11415,10 @@ async function submitPlanningReplyEdit(replyId) {
     const reply = (p.posts || []).find(x => x.id === replyId);
     if (!reply) return;
     if (currentUser && reply.author !== currentUser.name) { showToast('작성자만 편집할 수 있습니다'); return; }
-    const content = (document.getElementById('planningPostContent').value || '').trim();
-    if (!content && !planningPendingImages.length) { showToast('내용 또는 이미지를 입력하세요'); return; }
+    const quill = currentPlanningQuill;
+    const isEmpty = planningQuillIsEmpty(quill);
+    const content = (!quill || isEmpty) ? '' : quill.root.innerHTML;
+    if (isEmpty && !planningPendingImages.length) { showToast('내용 또는 이미지를 입력하세요'); return; }
     const category = document.getElementById('planningPostCategory').value;
     let imageUrls;
     try {
