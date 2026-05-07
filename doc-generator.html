@@ -531,8 +531,10 @@ function syncDcSections(){
   var dcPm=(document.getElementById('printMethod')||{}).value;
   var dcPf=toNum((document.getElementById('printFee')||{}).value);
   var dcPk=toNum((document.getElementById('packagingFee')||{}).value);
+  var dcPkg=(document.getElementById('packaging')||{}).value;
   var dcShowPrint=(dcPm&&dcPm!=='없음')||dcPf>0;
-  var dcShowPack=dcPk>0;
+  /* 포장방법이 기본값('개별박스')이 아니면 비용이 0이어도 섹션을 유지해야 select 값이 리셋되지 않음 */
+  var dcShowPack=dcPk>0||(dcPkg&&dcPkg!=='개별박스');
   if(document.getElementById('dcPrintSec'))toggleDcSection('dcPrintSec','dcPrintAdd',dcShowPrint);
   if(document.getElementById('dcPackSec'))toggleDcSection('dcPackSec','dcPackAdd',dcShowPack);
   var wrPf=toNum((document.getElementById('wrPrintFee')||{}).value);
