@@ -426,6 +426,8 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    /* flex item이 자식 콘텐츠에 떠밀려 뷰포트보다 커지는 것을 방지 (기본값 min-width:auto 보정) */
+    min-width: 0;
 }
 
 /* ========== Top Bar ========== */
@@ -480,6 +482,9 @@ body {
     display: none;
     padding: 28px 32px 40px;
     animation: fadeIn 0.25s ease;
+    /* 자식 콘텐츠로 인한 가로 오버플로우 방지 */
+    min-width: 0;
+    max-width: 100%;
 }
 
 .content.active {
@@ -2262,7 +2267,7 @@ body {
 /* ============================
    DAILY PLAN
    ============================ */
-.daily-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.daily-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
 
 /* 전체(공통) 가로 풀폭 배너 — 일일계획표 맨 위에 항상 노출 */
 .daily-common-bar { grid-column: 1 / -1; background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-xs); overflow: hidden; border: 2px solid var(--blue, #1F85FF); min-width: 0; box-sizing: border-box; }
@@ -2347,8 +2352,8 @@ body {
 .wk-nav-btn { padding: 6px 14px; border: 1px solid var(--gray-200); border-radius: 8px; background: var(--white); color: var(--gray-600); font-size: 13px; font-weight: 600; cursor: pointer; transition: all var(--transition); }
 .wk-nav-btn:hover { background: var(--gray-50); border-color: var(--blue); color: var(--blue); }
 .wk-nav-btn.wk-nav-today.active { background: var(--blue); color: var(--white); border-color: var(--blue); }
-.weekly-kanban-board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
-.wk-day-col { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-xs); overflow: hidden; min-height: 200px; display: flex; flex-direction: column; }
+.weekly-kanban-board { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.wk-day-col { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-xs); overflow: hidden; min-height: 200px; display: flex; flex-direction: column; min-width: 0; }
 .wk-day-col.wk-today { box-shadow: 0 0 0 2px var(--blue), var(--shadow-xs); }
 .wk-day-col.wk-weekend { background: var(--gray-50); }
 .wk-day-header { padding: 10px 12px; border-bottom: 1px solid var(--gray-100); display: flex; align-items: center; justify-content: space-between; }
@@ -2399,10 +2404,10 @@ body {
 
 /* 주간 칸반 모바일 반응형 */
 @media (max-width: 900px) {
-    .weekly-kanban-board { grid-template-columns: repeat(3, 1fr); }
+    .weekly-kanban-board { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
-    .weekly-kanban-board { grid-template-columns: 1fr 1fr; }
+    .weekly-kanban-board { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 
 /* ============================
@@ -2414,7 +2419,7 @@ body {
 .mc-title { font-size: 16px; font-weight: 700; color: var(--gray-900); }
 .mc-range { font-size: 13px; font-weight: 500; color: var(--gray-400); }
 
-.mc-grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; background: var(--white); box-shadow: var(--shadow-xs); }
+.mc-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; background: var(--white); box-shadow: var(--shadow-xs); }
 .mc-dow { padding: 10px 8px; text-align: center; font-size: 12px; font-weight: 700; color: var(--gray-500); background: var(--gray-50); border-bottom: 1px solid var(--gray-200); }
 .mc-weekend-header { color: var(--red); }
 
@@ -2554,7 +2559,7 @@ body {
    ============================ */
 @media (min-width: 1441px) {
     .content { padding: 32px 40px 48px; }
-    .daily-columns { grid-template-columns: 1fr 1fr 1fr; }
+    .daily-columns { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); }
 }
 
 @media (max-width: 1440px) {
