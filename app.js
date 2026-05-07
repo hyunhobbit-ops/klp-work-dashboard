@@ -10712,6 +10712,7 @@ function renderPlanningDetail(p) {
         const isCardAuthor = !!myNameForCard && post.author === myNameForCard;
         const replyCount = (byParent[post.id] || []).length;
         const preview = planningHtmlToText(post.content).slice(0, 100);
+        const hasInlineImg = !preview && post.content && /<img\b/i.test(post.content);
         const dd = planningDDay(post.deadline);
         const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px">${dd.label}</span>` : '';
         const vendorTag = post.vendor ? `<div style="color:var(--orange);font-size:14px;font-weight:700;margin-top:8px">🏭 ${planningEsc(post.vendor)}</div>` : '';
@@ -10729,7 +10730,7 @@ function renderPlanningDetail(p) {
                 ${isCardAuthor ? `<button onclick="event.stopPropagation();openPlanningCardEdit(${post.id})" title="편집" style="background:var(--white);border:1px solid var(--gray-200);color:var(--gray-600,#6B7280);font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px;cursor:pointer;white-space:nowrap" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.color='var(--gray-600)'">✏️ 편집</button>` : ''}
             </div>
             ${post.title ? `<div style="font-size:19px;font-weight:800;color:var(--gray-900);line-height:1.4;letter-spacing:-0.01em;margin-bottom:6px">${planningEsc(post.title)}</div>` : ''}
-            ${preview ? `<div style="font-size:14px;font-weight:500;color:var(--gray-700,#4B5563);line-height:1.5;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(preview)}${preview.length >= 100 ? '...' : ''}</div>` : (post.title ? '' : `<div style="font-size:14px;color:var(--gray-400);font-style:italic">내용 없음</div>`)}
+            ${preview ? `<div style="font-size:14px;font-weight:500;color:var(--gray-700,#4B5563);line-height:1.5;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(preview)}${preview.length >= 100 ? '...' : ''}</div>` : (post.title || hasInlineImg ? '' : `<div style="font-size:14px;color:var(--gray-400);font-style:italic">내용 없음</div>`)}
             ${vendorTag}
             ${assigneeRow}
             ${thumbHtml}
