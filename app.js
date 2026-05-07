@@ -4247,6 +4247,7 @@ function closeModal(fromPopstate) {
     if (wasOpen && !fromPopstate && history.state && history.state.modal) {
         history.back();
     }
+    currentPlanningQuill = null;
 }
 
 // ===== Add Handlers =====
@@ -11288,7 +11289,7 @@ async function syncPlanningCardToDaily(project, post) {
     if (!assignees.length) return;
     const priority = PLANNING_CATEGORY_TO_PRIORITY[post.category] || '🟡 보통';
     const createdDate = (post.createdAt || new Date().toISOString()).slice(0, 10);
-    const summary = (post.title || post.content || '(내용 없음)').replace(/\s+/g, ' ').slice(0, 50);
+    const summary = (post.title || planningHtmlToText(post.content) || '(내용 없음)').replace(/\s+/g, ' ').slice(0, 50);
     const baseTitle = `[${project.name}] ${summary}`;
     const insertedIds = [];
     for (const person of assignees) {
