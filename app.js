@@ -10521,7 +10521,7 @@ function renderPlanningList() {
                 </div>
             </div>
             ${p.deadline ? `<div style="font-size:12px;color:var(--gray-500)">⏰ 마감 ${planningEsc(p.deadline)}</div>` : ''}
-            ${p.description ? `<div style="font-size:13px;color:var(--gray-500);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(p.description)}</div>` : ''}
+            ${p.description ? `<div style="font-size:13px;color:var(--gray-500);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(planningHtmlToText(p.description))}</div>` : ''}
             ${(p.access === 'funding' && p.fundingMeta) ? (() => {
                 const m = p.fundingMeta;
                 const sym = m.currency === 'USD' ? '$' : '₩';
@@ -10769,7 +10769,7 @@ function renderPlanningDetail(p) {
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
                     <div style="flex:1;min-width:0">
                         <div style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">${planningEsc(p.name)}</div>
-                        ${p.description ? `<div style="font-size:13px;color:var(--gray-500);line-height:1.5;white-space:pre-wrap">${planningEsc(p.description)}</div>` : ''}
+                        ${(p.description && (planningHtmlToText(p.description) || /<img\b/i.test(p.description))) ? `<div class="ql-snow planning-content-readonly" style="font-size:13px;color:var(--gray-500);line-height:1.5"><div class="ql-editor" style="padding:0">${planningSanitizeHtml(p.description)}</div></div>` : ''}
                         ${(p.location || p.cost != null) ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:12px">
                             ${p.location ? `<span style="background:var(--blue-light,#DBEAFE);color:#1D4ED8;padding:3px 10px;border-radius:6px;font-weight:700">📍 ${planningEsc(p.location)}</span>` : ''}
                             ${p.cost != null ? `<span style="background:var(--green-light,#D1FAE5);color:#047857;padding:3px 10px;border-radius:6px;font-weight:700">💰 ${Number(p.cost).toLocaleString()}원</span>` : ''}
@@ -11500,7 +11500,7 @@ function openNewPlanningModal(defaultPeriod) {
     body.innerHTML = `
         <div class="form-section-title">+ 새 프로젝트</div>
         <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="newPlanningName" class="form-input" placeholder="예: 원데이강의 준비, 시계 부품 구입"></div>
-        <div class="form-group"><label class="form-label">설명 (선택)</label><textarea id="newPlanningDesc" class="form-input" rows="8" placeholder="이 프로젝트의 목표, 배경을 적어주세요" style="min-height:180px;resize:vertical"></textarea></div>
+        <div class="form-group"><label class="form-label">설명 (선택)</label><div id="newPlanningDesc"></div></div>
         ${extrasBlock}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">기간 구분</label>
@@ -11526,6 +11526,7 @@ function openNewPlanningModal(defaultPeriod) {
         <button class="form-submit" style="background:var(--blue)" onclick="savePlanningProject()">저장</button>
     `;
     document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
+    currentPlanningQuill = mountPlanningRichEditor('newPlanningDesc', '', { placeholder: '이 프로젝트의 목표, 배경을 적어주세요' });
     setTimeout(() => {
         const el = document.getElementById('newPlanningName'); if (el) el.focus();
         const chosen = document.querySelector('.planning-access-option input[checked]') || document.querySelector('.planning-access-option input');
@@ -11582,7 +11583,7 @@ function openFundingPlanningModal(p) {
 
         <div class="form-group">
             <label class="form-label">설명</label>
-            <textarea id="fundPlanDesc" class="form-input" rows="6" placeholder="펀딩 개요, 목표, 배경 등" style="min-height:140px;resize:vertical">${esc(p ? p.description : '')}</textarea>
+            <div id="fundPlanDesc"></div>
         </div>
 
         <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -11660,6 +11661,8 @@ function openFundingPlanningModal(p) {
         </div>
     `;
     document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
+    const fundInitialHtml = (p && p.description) ? planningSanitizeHtml(p.description) : '';
+    currentPlanningQuill = mountPlanningRichEditor('fundPlanDesc', fundInitialHtml, { placeholder: '펀딩 개요, 목표, 배경 등' });
     openModalHistory();
     setTimeout(() => { try { fundPlanRecalcUnit(); } catch (e) {} const el = document.getElementById('fundPlanName'); if (el && !isEdit) el.focus(); }, 30);
 }
@@ -11691,7 +11694,9 @@ async function saveFundingPlanningProject(id) {
     const v = (idd, def = '') => { const el = document.getElementById(idd); return el ? (el.value || def) : def; };
     const name = (v('fundPlanName') || '').trim();
     if (!name) { showToast('프로젝트 이름을 입력하세요'); return; }
-    const description = (v('fundPlanDesc') || '').trim();
+    const quill = currentPlanningQuill;
+    const isEmpty = planningQuillIsEmpty(quill);
+    const description = (!quill || isEmpty) ? '' : quill.root.innerHTML;
     const status = v('fundPlanStatus', '진행 중');
     const client = (v('fundPlanClient') || '').trim();
     const manufacturer = (v('fundPlanManufacturer') || '').trim();
@@ -11798,7 +11803,7 @@ function openEditPlanningModal(id) {
     body.innerHTML = `
         <div class="form-section-title">✏️ 프로젝트 편집</div>
         <div class="form-group"><label class="form-label">프로젝트 이름 *</label><input id="editPlanningName" class="form-input" value="${planningEsc(p.name)}"></div>
-        <div class="form-group"><label class="form-label">설명</label><textarea id="editPlanningDesc" class="form-input" rows="8" style="min-height:180px;resize:vertical">${planningEsc(p.description || '')}</textarea></div>
+        <div class="form-group"><label class="form-label">설명</label><div id="editPlanningDesc"></div></div>
         ${editExtrasBlock}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">기간 구분</label>
@@ -11832,11 +11837,15 @@ function openEditPlanningModal(id) {
         <button class="form-submit" style="background:var(--blue)" onclick="savePlanningProjectEdit(${id})">저장</button>
     `;
     document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
+    const editInitialHtml = planningSanitizeHtml(p.description || '');
+    currentPlanningQuill = mountPlanningRichEditor('editPlanningDesc', editInitialHtml, { placeholder: '이 프로젝트의 목표, 배경을 적어주세요' });
 }
 async function savePlanningProject() {
     const name = (document.getElementById('newPlanningName').value || '').trim();
     if (!name) { showToast('프로젝트 이름을 입력하세요'); return; }
-    const desc = (document.getElementById('newPlanningDesc').value || '').trim();
+    const quill = currentPlanningQuill;
+    const isEmpty = planningQuillIsEmpty(quill);
+    const desc = (!quill || isEmpty) ? '' : quill.root.innerHTML;
     const status = document.getElementById('newPlanningStatus').value;
     const period = document.getElementById('newPlanningPeriod').value;
     let deadline = document.getElementById('newPlanningDeadline').value || '';
@@ -11878,7 +11887,9 @@ async function savePlanningProjectEdit(id) {
     if (!p) return;
     const name = (document.getElementById('editPlanningName').value || '').trim();
     if (!name) { showToast('이름을 입력하세요'); return; }
-    const description = (document.getElementById('editPlanningDesc').value || '').trim();
+    const quill = currentPlanningQuill;
+    const isEmpty = planningQuillIsEmpty(quill);
+    const description = (!quill || isEmpty) ? '' : quill.root.innerHTML;
     const status = document.getElementById('editPlanningStatus').value;
     const period = document.getElementById('editPlanningPeriod').value;
     // 공개 범위 — 관리자만 회사 ↔ 개인 이동 가능. 그 외엔 기존 값 유지
