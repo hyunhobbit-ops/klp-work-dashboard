@@ -2273,19 +2273,18 @@ body {
 .daily-common-bar { grid-column: 1 / -1; background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-xs); overflow: hidden; border: 2px solid var(--blue, #1F85FF); min-width: 0; box-sizing: border-box; }
 .daily-common-bar-header { padding: 14px 20px; background: linear-gradient(90deg, rgba(31,133,255,0.08), transparent 60%); display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--gray-100); flex-wrap: wrap; }
 .daily-common-bar-title { font-size: 15px; font-weight: 800; color: var(--blue, #1F85FF); display: inline-flex; align-items: center; gap: 8px; letter-spacing: -0.2px; }
-.daily-common-bar-body { padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; box-sizing: border-box; max-width: 100%; }
-/* 공통 카드: 최소 폭은 컨테이너에 맞춰 줄어들 수 있게 0으로, 기본 폭은 260px, 텍스트가 길면 줄바꿈해서 폭 유지 */
-.daily-common-bar-body .daily-item.daily-common-item { flex: 1 1 260px; min-width: 0; max-width: 100%; border: 1px solid var(--gray-200); background: var(--gray-50); padding: 10px 14px; align-items: flex-start; box-sizing: border-box; }
+.daily-common-bar-body { padding: 14px 20px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: stretch; box-sizing: border-box; max-width: 100%; }
+/* 공통 카드: 그리드 셀에 맞춰 자동으로 폭이 결정되고, 긴 텍스트는 줄바꿈 */
+.daily-common-bar-body .daily-item.daily-common-item { min-width: 0; max-width: 100%; border: 1px solid var(--gray-200); background: var(--gray-50); padding: 10px 14px; align-items: flex-start; box-sizing: border-box; }
 .daily-common-bar-body .daily-item.daily-common-item:hover { background: var(--white); border-color: var(--blue, #1F85FF); }
 .daily-common-bar-body .daily-common-item .daily-info { flex: 1 1 auto; min-width: 0; }
 .daily-common-bar-body .daily-common-item .daily-title { white-space: normal; word-break: break-word; overflow-wrap: anywhere; }
 .daily-common-bar-body .daily-common-item .daily-meta { flex-wrap: wrap; row-gap: 4px; }
-.daily-common-empty { color: var(--gray-400); font-size: 13px; padding: 8px 4px; flex: 1 1 100%; }
-.daily-common-inline-add { flex: 1 1 260px; min-width: 0; }
+.daily-common-empty { color: var(--gray-400); font-size: 13px; padding: 8px 4px; grid-column: 1 / -1; }
+.daily-common-inline-add { grid-column: 1 / -1; min-width: 0; }
 .daily-common-inline-add .daily-inline-input { width: 100%; box-sizing: border-box; }
 @media (max-width: 640px) {
-  .daily-common-bar-body { padding: 12px 14px; gap: 8px; }
-  .daily-common-bar-body .daily-item.daily-common-item { flex: 1 1 100%; }
+  .daily-common-bar-body { padding: 12px 14px; gap: 8px; grid-template-columns: minmax(0, 1fr); }
 }
 
 .daily-column { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-xs); overflow: hidden; }
