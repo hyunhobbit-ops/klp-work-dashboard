@@ -3113,4 +3113,62 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
   background: var(--white); border-color: rgba(240,68,82,0.3);
 }
 
+/* === Quill 리치 에디터 (기획 보드 카드 본문) === */
+.ql-toolbar.ql-snow,
+.ql-container.ql-snow {
+    border-color: var(--gray-200);
+    font-family: 'Pretendard', sans-serif;
+}
+.ql-toolbar.ql-snow {
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    background: var(--gray-50, #F9FAFB);
+}
+.ql-container.ql-snow {
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    min-height: 280px;
+    font-size: 14px;
+    line-height: 1.6;
+}
+.ql-editor {
+    min-height: 280px;
+    color: var(--gray-900);
+}
+.ql-editor.compact { min-height: 100px; }
+.ql-editor:focus { outline: none; }
+.ql-editor.ql-blank::before {
+    color: var(--gray-400);
+    font-style: normal;
+}
+/* 글꼴 라벨 한글화 */
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=sans]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value=sans]::before { content: '기본'; font-family: sans-serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=pretendard]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value=pretendard]::before { content: 'Pretendard'; font-family: 'Pretendard', sans-serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=nanumgothic]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value=nanumgothic]::before { content: '나눔고딕'; font-family: '나눔고딕', NanumGothic, sans-serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=malgun]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value=malgun]::before { content: '맑은 고딕'; font-family: 'Malgun Gothic', sans-serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=serif]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value=serif]::before { content: '명조'; font-family: serif; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value=mono]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value=mono]::before { content: '고정폭'; font-family: monospace; }
+/* font-family 적용 */
+.ql-font-pretendard { font-family: 'Pretendard', sans-serif; }
+.ql-font-nanumgothic { font-family: '나눔고딕', NanumGothic, sans-serif; }
+.ql-font-malgun { font-family: 'Malgun Gothic', sans-serif; }
+.ql-font-serif { font-family: serif; }
+.ql-font-mono { font-family: monospace; }
+/* 크기 라벨 한글화 */
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value=small]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value=small]::before { content: '작게'; }
+.ql-snow .ql-picker.ql-size .ql-picker-label::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item:not([data-value])::before { content: '보통'; }
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value=large]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value=large]::before { content: '크게'; }
+.ql-snow .ql-picker.ql-size .ql-picker-label[data-value=huge]::before,
+.ql-snow .ql-picker.ql-size .ql-picker-item[data-value=huge]::before { content: '매우 크게'; }
+/* 카드 상세에서 readonly로 보여줄 때 */
+.planning-content-readonly .ql-editor { padding: 0; min-height: 0; }
 

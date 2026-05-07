@@ -10234,6 +10234,174 @@ function planningCategoryMeta(key) {
 function planningEsc(s) {
     return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
+
+// HTML → plain text (목록·미리보기·인덱스 슬라이스용)
+function planningHtmlToText(html) {
+    if (!html) return '';
+    if (typeof html !== 'string') return String(html);
+    // 기존 plain text 데이터 fast path: '<' 없으면 그대로 반환
+    if (html.indexOf('<') === -1) return html;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
+}
+
+// HTML 정화 (출력용)
+function planningSanitizeHtml(html) {
+    if (!html) return '';
+    if (typeof DOMPurify === 'undefined') return planningEsc(html);
+    return DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: ['p','br','strong','b','em','i','u','s','span','div','blockquote',
+                       'ol','ul','li','a','img','h1','h2','h3','h4','h5','h6'],
+        ALLOWED_ATTR: ['href','target','rel','src','alt','class','style'],
+        ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|data:image\/(?:png|jpeg|gif|webp);base64,)|\/|#)/i
+    });
+}
+
+// Quill 빈값 판정 (HTML이 <p><br></p>만 있어도 빈 것으로 처리)
+function planningQuillIsEmpty(quill) {
+    if (!quill) return true;
+    const text = quill.getText().trim();
+    if (text) return false;
+    // 이미지가 있으면 빈 것 아님
+    return quill.root.querySelectorAll('img').length === 0;
+}
+
+// 큰 base64 이미지를 캔버스로 다운스케일 (최대 변 1600px, JPEG 0.85)
+async function planningResizeImageDataUrl(dataUrl, maxSide = 1600, quality = 0.85) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            let w = img.naturalWidth, h = img.naturalHeight;
+            const scale = Math.min(1, maxSide / Math.max(w, h));
+            if (scale >= 1 && dataUrl.length < 1.5 * 1024 * 1024) {
+                resolve({ dataUrl, resized: false });
+                return;
+            }
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            const out = canvas.toDataURL('image/jpeg', quality);
+            resolve({ dataUrl: out, resized: true });
+        };
+        img.onerror = () => reject(new Error('이미지 로드 실패'));
+        img.src = dataUrl;
+    });
+}
+
+// 전역 보관: 현재 열린 모달의 Quill 인스턴스 (저장 핸들러가 참조)
+let currentPlanningQuill = null;
+
+// 4개 모달이 공유하는 빌더. div#containerId 자리에 Quill 마운트.
+function mountPlanningRichEditor(containerId, initialHtml, opts) {
+    opts = opts || {};
+    const el = document.getElementById(containerId);
+    if (!el) { console.warn('mountPlanningRichEditor: 컨테이너 없음', containerId); return null; }
+    if (typeof Quill === 'undefined') {
+        console.error('Quill 미로드');
+        return null;
+    }
+    // 폰트·크기 화이트리스트 등록 (한 번만)
+    if (!mountPlanningRichEditor._registered) {
+        const Font = Quill.import('formats/font');
+        Font.whitelist = ['sans', 'pretendard', 'nanumgothic', 'malgun', 'serif', 'mono'];
+        Quill.register(Font, true);
+        mountPlanningRichEditor._registered = true;
+    }
+    const quill = new Quill('#' + containerId, {
+        theme: 'snow',
+        placeholder: opts.placeholder || '내용을 입력하세요…',
+        modules: {
+            toolbar: {
+                container: [
+                    [{ font: ['sans', 'pretendard', 'nanumgothic', 'malgun', 'serif', 'mono'] },
+                     { size: ['small', false, 'large', 'huge'] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ color: [] }, { background: [] }],
+                    [{ align: [] }],
+                    [{ list: 'ordered' }, { list: 'bullet' }],
+                    ['blockquote'],
+                    ['link', 'image'],
+                    ['clean']
+                ]
+            }
+        }
+    });
+    if (initialHtml) {
+        // dangerouslyPasteHTML은 Quill이 허용하지 않는 태그를 자동 정리
+        quill.clipboard.dangerouslyPasteHTML(0, initialHtml);
+    }
+    // 이미지 붙여넣기 → 자동 리사이즈
+    quill.root.addEventListener('paste', async (e) => {
+        const items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        for (const item of items) {
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                e.preventDefault();
+                const file = item.getAsFile();
+                await insertResizedImageIntoQuill(quill, file);
+                return;
+            }
+        }
+    });
+    // 이미지 드래그 드롭
+    quill.root.addEventListener('drop', async (e) => {
+        const files = e.dataTransfer && e.dataTransfer.files;
+        if (!files || !files.length) return;
+        const imgs = Array.from(files).filter(f => f.type.startsWith('image/'));
+        if (!imgs.length) return;
+        e.preventDefault();
+        for (const file of imgs) {
+            await insertResizedImageIntoQuill(quill, file);
+        }
+    });
+    // 툴바 이미지 버튼 → 자체 핸들러로 교체 (리사이즈 포함)
+    const toolbar = quill.getModule('toolbar');
+    toolbar.addHandler('image', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = async () => {
+            const file = input.files && input.files[0];
+            if (file) await insertResizedImageIntoQuill(quill, file);
+        };
+        input.click();
+    });
+    return quill;
+}
+
+// 파일 → base64 → 리사이즈 → Quill 커서 위치에 삽입
+async function insertResizedImageIntoQuill(quill, file) {
+    if (file.size > 5 * 1024 * 1024 * 4) { // 원본 20MB 초과는 거부
+        showToast('이미지가 너무 큽니다 (20MB 초과)');
+        return;
+    }
+    const dataUrl = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = () => reject(new Error('파일 읽기 실패'));
+        r.readAsDataURL(file);
+    });
+    let finalUrl = dataUrl;
+    try {
+        const res = await planningResizeImageDataUrl(dataUrl);
+        finalUrl = res.dataUrl;
+        if (res.resized) showToast('이미지 크기를 조정했습니다');
+    } catch (e) {
+        console.warn('리사이즈 실패, 원본 사용', e);
+    }
+    if (finalUrl.length > 5 * 1024 * 1024) {
+        showToast('리사이즈 후에도 너무 큽니다 — 더 작은 이미지를 사용해주세요');
+        return;
+    }
+    const range = quill.getSelection(true);
+    quill.insertEmbed(range.index, 'image', finalUrl, 'user');
+    quill.setSelection(range.index + 1, 0);
+}
+
 function planningDDay(dateStr) {
     if (!dateStr) return null;
     const today = new Date(); today.setHours(0, 0, 0, 0);
