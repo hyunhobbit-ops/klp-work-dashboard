@@ -10264,8 +10264,10 @@ function planningSanitizeHtml(html) {
     }
     return DOMPurify.sanitize(html, {
         ALLOWED_TAGS: ['p','br','strong','b','em','i','u','s','span','div','blockquote',
-                       'ol','ul','li','a','img','h1','h2','h3','h4','h5','h6'],
-        ALLOWED_ATTR: ['href','target','rel','src','alt','class','style'],
+                       'ol','ul','li','a','img','h1','h2','h3','h4','h5','h6',
+                       'table','thead','tbody','tfoot','tr','td','th','caption','colgroup','col','hr','pre','code'],
+        ALLOWED_ATTR: ['href','target','rel','src','alt','class','style',
+                       'colspan','rowspan','width','height','align','valign','bgcolor','border','cellpadding','cellspacing','scope'],
         ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel|data:image\/(?:png|jpeg|gif|webp);base64,)|\/|#)/i
     });
 }
