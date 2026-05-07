@@ -3131,9 +3131,11 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
     font-size: 14px;
     line-height: 1.6;
 }
-#modalOverlay .ql-editor,
-.planning-content-readonly .ql-editor {
+#modalOverlay .ql-editor {
     min-height: 280px;
+    color: var(--gray-900);
+}
+.planning-content-readonly .ql-editor {
     color: var(--gray-900);
 }
 #modalOverlay .ql-editor.compact { min-height: 100px; }
