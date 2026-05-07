@@ -10249,7 +10249,18 @@ function planningHtmlToText(html) {
 // HTML 정화 (출력용)
 function planningSanitizeHtml(html) {
     if (!html) return '';
-    if (typeof DOMPurify === 'undefined') return planningEsc(html);
+    if (typeof DOMPurify === 'undefined') {
+        console.error('DOMPurify 미로드 — plain text로 fallback');
+        return planningEsc(html);
+    }
+    if (!planningSanitizeHtml._hookRegistered) {
+        DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+            if (node.tagName === 'A' && node.getAttribute('target') === '_blank') {
+                node.setAttribute('rel', 'noopener noreferrer');
+            }
+        });
+        planningSanitizeHtml._hookRegistered = true;
+    }
     return DOMPurify.sanitize(html, {
         ALLOWED_TAGS: ['p','br','strong','b','em','i','u','s','span','div','blockquote',
                        'ol','ul','li','a','img','h1','h2','h3','h4','h5','h6'],
@@ -10274,7 +10285,8 @@ async function planningResizeImageDataUrl(dataUrl, maxSide = 1600, quality = 0.8
         img.onload = () => {
             let w = img.naturalWidth, h = img.naturalHeight;
             const scale = Math.min(1, maxSide / Math.max(w, h));
-            if (scale >= 1 && dataUrl.length < 1.5 * 1024 * 1024) {
+            // base64는 raw 대비 ~33% 큼 → 2MB 문자열 ≈ raw 1.5MB
+            if (scale >= 1 && dataUrl.length < 2 * 1024 * 1024) {
                 resolve({ dataUrl, resized: false });
                 return;
             }
@@ -10334,26 +10346,34 @@ function mountPlanningRichEditor(containerId, initialHtml, opts) {
         // dangerouslyPasteHTML은 Quill이 허용하지 않는 태그를 자동 정리
         quill.clipboard.dangerouslyPasteHTML(0, initialHtml);
     }
-    // 이미지 붙여넣기 → 자동 리사이즈
-    quill.root.addEventListener('paste', async (e) => {
-        const items = e.clipboardData && e.clipboardData.items;
-        if (!items) return;
-        for (const item of items) {
-            if (item.kind === 'file' && item.type.startsWith('image/')) {
-                e.preventDefault();
-                const file = item.getAsFile();
-                await insertResizedImageIntoQuill(quill, file);
-                return;
+    // 이미지 붙여넣기 → 자동 리사이즈 (Quill 2.x clipboard 모듈 onCapturePaste 오버라이드)
+    const clipboard = quill.getModule('clipboard');
+    if (clipboard && typeof clipboard.onCapturePaste === 'function') {
+        const originalOnCapturePaste = clipboard.onCapturePaste.bind(clipboard);
+        clipboard.onCapturePaste = function(e) {
+            const items = e.clipboardData && e.clipboardData.items;
+            if (items) {
+                for (const item of items) {
+                    if (item.kind === 'file' && item.type.startsWith('image/')) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const file = item.getAsFile();
+                        if (file) insertResizedImageIntoQuill(quill, file);
+                        return;
+                    }
+                }
             }
-        }
-    });
+            return originalOnCapturePaste(e);
+        };
+    }
     // 이미지 드래그 드롭
     quill.root.addEventListener('drop', async (e) => {
         const files = e.dataTransfer && e.dataTransfer.files;
         if (!files || !files.length) return;
+        // 파일 드롭이면 무조건 브라우저 기본 동작(파일 열기) 차단
+        e.preventDefault();
         const imgs = Array.from(files).filter(f => f.type.startsWith('image/'));
         if (!imgs.length) return;
-        e.preventDefault();
         for (const file of imgs) {
             await insertResizedImageIntoQuill(quill, file);
         }
@@ -10375,7 +10395,7 @@ function mountPlanningRichEditor(containerId, initialHtml, opts) {
 
 // 파일 → base64 → 리사이즈 → Quill 커서 위치에 삽입
 async function insertResizedImageIntoQuill(quill, file) {
-    if (file.size > 5 * 1024 * 1024 * 4) { // 원본 20MB 초과는 거부
+    if (file.size > 20 * 1024 * 1024) { // 원본 20MB 초과는 거부
         showToast('이미지가 너무 큽니다 (20MB 초과)');
         return;
     }
@@ -10393,11 +10413,12 @@ async function insertResizedImageIntoQuill(quill, file) {
     } catch (e) {
         console.warn('리사이즈 실패, 원본 사용', e);
     }
-    if (finalUrl.length > 5 * 1024 * 1024) {
+    // base64는 raw 대비 ~33% 큼 → 6.7MB 문자열 ≈ raw 5MB
+    if (finalUrl.length > 6.7 * 1024 * 1024) {
         showToast('리사이즈 후에도 너무 큽니다 — 더 작은 이미지를 사용해주세요');
         return;
     }
-    const range = quill.getSelection(true);
+    const range = quill.getSelection(true) || { index: quill.getLength() - 1, length: 0 };
     quill.insertEmbed(range.index, 'image', finalUrl, 'user');
     quill.setSelection(range.index + 1, 0);
 }

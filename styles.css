@@ -3131,13 +3131,14 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
     font-size: 14px;
     line-height: 1.6;
 }
-.ql-editor {
+#modalOverlay .ql-editor,
+.planning-content-readonly .ql-editor {
     min-height: 280px;
     color: var(--gray-900);
 }
-.ql-editor.compact { min-height: 100px; }
-.ql-editor:focus { outline: none; }
-.ql-editor.ql-blank::before {
+#modalOverlay .ql-editor.compact { min-height: 100px; }
+#modalOverlay .ql-editor:focus { outline: none; }
+#modalOverlay .ql-editor.ql-blank::before {
     color: var(--gray-400);
     font-style: normal;
 }
@@ -3155,6 +3156,7 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value=mono]::before,
 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value=mono]::before { content: '고정폭'; font-family: monospace; }
 /* font-family 적용 */
+.ql-font-sans { font-family: 'Pretendard', sans-serif; }
 .ql-font-pretendard { font-family: 'Pretendard', sans-serif; }
 .ql-font-nanumgothic { font-family: '나눔고딕', NanumGothic, sans-serif; }
 .ql-font-malgun { font-family: 'Malgun Gothic', sans-serif; }
