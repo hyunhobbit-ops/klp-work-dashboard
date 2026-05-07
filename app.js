@@ -11012,7 +11012,7 @@ function openPlanningPostDetail(postId) {
                     <select id="planningPostCategory" style="padding:8px 10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px">${catOpts}</select>
                     <input id="planningPostAuthor" placeholder="작성자" value="${planningEsc(currentUser ? currentUser.name : '')}" style="padding:8px 10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px">
                 </div>
-                <textarea id="planningPostContent" placeholder="답글을 입력하세요..." rows="4" style="width:100%;padding:10px;border:1px solid var(--gray-200);background:var(--white);color:var(--gray-900);border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;margin-bottom:8px;min-height:100px;line-height:1.5"></textarea>
+                <div id="planningPostContent" class="planning-reply-editor" style="margin-bottom:8px"></div>
                 <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
                     <label style="padding:7px 10px;background:var(--gray-100);color:var(--gray-900);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
                         📁 이미지 파일 (복수 가능)
@@ -11030,6 +11030,12 @@ function openPlanningPostDetail(postId) {
     document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
     planningPendingImages = [];
     refreshPlanningImagePreview();
+    currentPlanningQuill = mountPlanningRichEditor('planningPostContent', '', { placeholder: '답글을 입력하세요…' });
+    if (currentPlanningQuill) {
+        const editor = currentPlanningQuill.root;
+        editor.classList.add('compact');
+        editor.style.minHeight = '100px';
+    }
 }
 
 async function setPlanningPostTaskStatus(postId, newStatus) {
@@ -11321,8 +11327,10 @@ async function syncPlanningCardToDaily(project, post) {
 async function submitPlanningReply(parentPostId) {
     const p = planningProjects.find(x => x.id === currentPlanningProjectId);
     if (!p) return;
-    const content = (document.getElementById('planningPostContent').value || '').trim();
-    if (!content && !planningPendingImages.length) { showToast('내용 또는 이미지를 입력하세요'); return; }
+    const quill = currentPlanningQuill;
+    const isEmpty = planningQuillIsEmpty(quill);
+    const content = (!quill || isEmpty) ? '' : quill.root.innerHTML;
+    if (isEmpty && !planningPendingImages.length) { showToast('내용 또는 이미지를 입력하세요'); return; }
     const author = (document.getElementById('planningPostAuthor').value || '').trim() || (currentUser ? currentUser.name : '익명');
     const category = document.getElementById('planningPostCategory').value;
     let imageUrls;
