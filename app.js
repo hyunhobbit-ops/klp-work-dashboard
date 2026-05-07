@@ -11148,7 +11148,7 @@ function openPlanningCardEdit(postId) {
             <input id="planningPostTitle" class="form-input" placeholder="카드 제목을 입력하세요" value="${planningEsc(post.title || '')}" style="font-weight:700">
         </div>
         <div class="form-group"><label class="form-label">내용</label>
-            <textarea id="planningPostContent" class="form-input" rows="12" style="font-family:inherit;min-height:280px;resize:vertical;line-height:1.6">${planningEsc(post.content || '')}</textarea>
+            <div id="planningPostContent"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">🏭 거래처</label>
@@ -11177,6 +11177,8 @@ function openPlanningCardEdit(postId) {
     `;
     document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
     refreshPlanningImagePreview();
+    const initialHtml = planningSanitizeHtml(post.content || '');
+    currentPlanningQuill = mountPlanningRichEditor('planningPostContent', initialHtml, { placeholder: '내용을 자세히 입력하세요…' });
     setTimeout(() => { const el = document.getElementById('planningPostTitle'); if (el) el.focus(); }, 60);
 }
 
@@ -11187,8 +11189,10 @@ async function submitPlanningCardEdit(postId) {
     if (!post) return;
     const titleEl = document.getElementById('planningPostTitle');
     const title = titleEl ? (titleEl.value || '').trim() : '';
-    const content = (document.getElementById('planningPostContent').value || '').trim();
-    if (!title && !content && !planningPendingImages.length) { showToast('제목, 내용 또는 이미지를 입력하세요'); return; }
+    const quill = currentPlanningQuill;
+    const isEmpty = planningQuillIsEmpty(quill);
+    const content = (!quill || isEmpty) ? '' : quill.root.innerHTML;
+    if (!title && isEmpty && !planningPendingImages.length) { showToast('제목, 내용 또는 이미지를 입력하세요'); return; }
     const author = (document.getElementById('planningPostAuthor').value || '').trim() || post.author;
     const category = document.getElementById('planningPostCategory').value;
     const vendor = (document.getElementById('planningPostVendor').value || '').trim();
