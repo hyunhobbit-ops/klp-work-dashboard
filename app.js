@@ -11088,7 +11088,7 @@ function openPlanningPostEditor() {
             <input id="planningPostTitle" class="form-input" placeholder="카드 제목을 입력하세요" style="font-weight:700">
         </div>
         <div class="form-group"><label class="form-label">내용</label>
-            <textarea id="planningPostContent" class="form-input" rows="12" placeholder="내용을 자세히 입력하세요..." style="font-family:inherit;min-height:280px;resize:vertical;line-height:1.6"></textarea>
+            <div id="planningPostContent"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div class="form-group"><label class="form-label">🏭 거래처 (선택)</label>
@@ -11118,6 +11118,7 @@ function openPlanningPostEditor() {
     document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
     planningPendingImages = [];
     refreshPlanningImagePreview();
+    currentPlanningQuill = mountPlanningRichEditor('planningPostContent', '', { placeholder: '내용을 자세히 입력하세요…' });
     setTimeout(() => { const el = document.getElementById('planningPostTitle'); if (el) el.focus(); }, 60);
 }
 
@@ -11229,8 +11230,10 @@ async function submitPlanningCard() {
     if (!p) return;
     const titleEl = document.getElementById('planningPostTitle');
     const title = titleEl ? (titleEl.value || '').trim() : '';
-    const content = (document.getElementById('planningPostContent').value || '').trim();
-    if (!title && !content && !planningPendingImages.length) { showToast('제목, 내용 또는 이미지를 입력하세요'); return; }
+    const quill = currentPlanningQuill;
+    const isEmpty = planningQuillIsEmpty(quill);
+    const content = (!quill || isEmpty) ? '' : quill.root.innerHTML;
+    if (!title && isEmpty && !planningPendingImages.length) { showToast('제목, 내용 또는 이미지를 입력하세요'); return; }
     const author = (document.getElementById('planningPostAuthor').value || '').trim() || (currentUser ? currentUser.name : '익명');
     const category = document.getElementById('planningPostCategory').value;
     const vendor = (document.getElementById('planningPostVendor').value || '').trim();
