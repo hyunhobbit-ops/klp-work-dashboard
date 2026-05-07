@@ -2264,6 +2264,17 @@ body {
    ============================ */
 .daily-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
+/* 전체(공통) 가로 풀폭 배너 — 일일계획표 맨 위에 항상 노출 */
+.daily-common-bar { grid-column: 1 / -1; background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-xs); overflow: hidden; border: 2px solid var(--blue, #1F85FF); }
+.daily-common-bar-header { padding: 14px 20px; background: linear-gradient(90deg, rgba(31,133,255,0.08), transparent 60%); display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--gray-100); }
+.daily-common-bar-title { font-size: 15px; font-weight: 800; color: var(--blue, #1F85FF); display: inline-flex; align-items: center; gap: 8px; letter-spacing: -0.2px; }
+.daily-common-bar-body { padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+.daily-common-bar-body .daily-item.daily-common-item { flex: 0 1 auto; min-width: 240px; max-width: 380px; border: 1px solid var(--gray-200); background: var(--gray-50); padding: 10px 14px; }
+.daily-common-bar-body .daily-item.daily-common-item:hover { background: var(--white); border-color: var(--blue, #1F85FF); }
+.daily-common-empty { color: var(--gray-400); font-size: 13px; padding: 8px 4px; flex: 1 1 100%; }
+.daily-common-inline-add { flex: 1 1 240px; min-width: 240px; }
+.daily-common-inline-add .daily-inline-input { width: 100%; }
+
 .daily-column { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-xs); overflow: hidden; }
 .daily-col-header { padding: 16px 20px; border-bottom: 1px solid var(--gray-100); display: flex; align-items: center; justify-content: space-between; }
 .daily-col-title { font-size: 14px; font-weight: 700; color: var(--gray-900); }

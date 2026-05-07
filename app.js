@@ -1680,16 +1680,62 @@ function renderDaily() {
     // 개인 탭(대표님 포함)일 때: 본인 컬럼을 맨 앞에, 그 다음 전체/임원 순
     const isPersonalTab = currentPersonFilter !== 'viewall';
 
+    // 전체(공통) 가로 풀폭 배너 — 모든 탭 맨 위에 항상 노출
+    const renderCommonBar = () => {
+        if (!showCommonColumn) return '';
+        const commonTasks = dailyTasks.filter(t =>
+            t.assignee === '전체' &&
+            (t.date === todayStr || (t.date && t.date < todayStr && !t.done))
+        );
+        const doneCount = commonTasks.filter(t => t.done).length;
+        const sorted = [...commonTasks].sort((a, b) => a.done - b.done);
+        const itemsHtml = sorted.map(t => {
+            const tagClass = (t.priority || '').includes('긴급') ? 'tag-urgent' : (t.priority || '').includes('낮음') ? 'tag-low' : 'tag-normal';
+            const tagLabel = (t.priority || '').includes('긴급') ? '긴급' : (t.priority || '').includes('낮음') ? '낮음' : '보통';
+            const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
+            const clientStr = t.client ? `<span class="daily-client">📌 ${t.client}</span>` : '';
+            const ddayStr = t.deadline ? getDday(t.deadline) : '';
+            const ddayClass = ddayStr.includes('D+') ? 'dday-over' : ddayStr.includes('D-Day') ? 'dday-today' : 'dday-left';
+            const isDeadline = t.isDeadlineCopy;
+            const ddayHtml = isDeadline
+                ? `<span class="deadline-badge-lg">🔥 마감일</span>`
+                : t.deadline ? `<span class="daily-dday ${ddayClass}">${ddayStr}</span>` : '';
+            return `<div class="daily-item daily-common-item ${t.done ? 'completed' : ''} ${isDeadline ? 'deadline-item' : ''}" onclick="openEditTask(${t.id})" style="cursor:pointer">
+                <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">${checkSvg}</div>
+                <div class="daily-info">
+                    <div class="daily-title">${t.task}</div>
+                    <div class="daily-meta">
+                        <span class="daily-tag ${tagClass}">${tagLabel}</span>
+                        ${labelStr}
+                        ${clientStr}
+                        ${ddayHtml}
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+        const emptyHtml = sorted.length === 0
+            ? `<div class="daily-common-empty">공통 할 일이 없습니다 — 아래에 입력해 추가하세요</div>`
+            : '';
+        return `<div class="daily-common-bar">
+            <div class="daily-common-bar-header">
+                <span class="daily-common-bar-title">📢 전체 (공통)</span>
+                <div class="daily-col-actions">
+                    <span class="daily-col-count">${doneCount}/${sorted.length}</span>
+                    <button class="daily-add-btn" onclick="openQuickTask('전체')"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg> 새 할 일</button>
+                </div>
+            </div>
+            <div class="daily-common-bar-body">
+                ${emptyHtml}
+                ${itemsHtml}
+                <div class="daily-inline-add daily-common-inline-add">
+                    <input type="text" class="daily-inline-input" placeholder="공통 할 일 입력 후 Enter" data-assignee="전체">
+                </div>
+            </div>
+        </div>`;
+    };
+
     const renderCommonCols = (includeCeo) => {
         let h = '';
-        if (showCommonColumn) {
-            // 전체(공통) 업무는 당일 + 과거 미체크까지 계속 노출 (미완료 컬럼으로 이동시키지 않음)
-            const commonTasks = dailyTasks.filter(t =>
-                t.assignee === '전체' &&
-                (t.date === todayStr || (t.date && t.date < todayStr && !t.done))
-            );
-            h += renderColumn('전체 (공통)', commonTasks, '전체');
-        }
         if (showExecColumn) {
             const execTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '임원');
             h += renderColumn('임원', execTasks, '임원');
@@ -1705,8 +1751,11 @@ function renderDaily() {
         return renderColumn(person, tasks, person);
     }).join('');
 
+    // 전체(공통) 배너는 항상 맨 위에 풀폭으로
+    html += renderCommonBar();
+
     if (currentPersonFilter === 'ceo') {
-        // 대표님 탭: 대표님 컬럼을 맨 앞에, 그 다음 전체/임원 + 미완료
+        // 대표님 탭: 대표님 컬럼을 맨 앞에, 그 다음 임원 + 미완료
         const ceoTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '대표님');
         html += renderColumn('대표님', ceoTasks, '대표님');
         html += renderCommonCols(false);
@@ -1716,7 +1765,7 @@ function renderDaily() {
         html += renderCommonCols(false);
         displayPeople.forEach(person => { html += renderOverdueColumn(person); });
     } else {
-        // 전체보기: 전체/임원/대표님/개인별 순
+        // 전체보기: 임원/대표님/개인별 순 (전체는 위에 배너로 이미 노출)
         html += renderCommonCols(true);
         html += renderPersonalCols();
     }
