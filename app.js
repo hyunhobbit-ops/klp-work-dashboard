@@ -10198,7 +10198,7 @@ async function renderPlanningHomeSection() {
             const ddStr = post.deadline ? planningFmtDate(post.deadline) : '미정';
             const dd = planningDDay(post.deadline);
             const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:11px;font-weight:800;padding:2px 7px;border-radius:5px">${dd.label}</span>` : '';
-            const preview = String(post.content || '').slice(0, 60);
+            const preview = planningHtmlToText(post.content).slice(0, 60);
             // 회사/가족 → 회사 메뉴, 펀딩 → 펀딩 메뉴, 개인 → 개인 메뉴
             const projAcc = proj.access || 'company';
             const projMode = projAcc === 'personal' ? 'personal'
@@ -10207,7 +10207,7 @@ async function renderPlanningHomeSection() {
             return `<div onclick="switchTab('planning-${projMode}');setTimeout(()=>openPlanningProject(${proj.id}),60)" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--gray-100);cursor:pointer;transition:background .1s" onmouseover="this.style.background='var(--gray-50)'" onmouseout="this.style.background='transparent'">
                 <span style="background:${s[0]};color:${s[1]};font-size:11px;font-weight:800;padding:3px 8px;border-radius:5px;white-space:nowrap">${s[2]}</span>
                 <div style="flex:1;min-width:0">
-                    <div style="font-size:13px;font-weight:700;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${planningEsc(proj.name)} · ${planningEsc(preview)}${post.content && post.content.length > 60 ? '...' : ''}</div>
+                    <div style="font-size:13px;font-weight:700;color:var(--gray-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${planningEsc(proj.name)} · ${planningEsc(preview)}${preview.length >= 60 ? '...' : ''}</div>
                     <div style="font-size:11px;color:var(--gray-500);margin-top:2px">마감 ${planningEsc(ddStr)}</div>
                 </div>
                 ${ddBadge}
@@ -10711,7 +10711,7 @@ function renderPlanningDetail(p) {
         const thumbHtml = imgs.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${imgs.slice(0,3).map(src => `<img src="${planningEsc(src)}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--gray-200)">`).join('')}${imgs.length > 3 ? `<div style="width:60px;height:60px;background:var(--gray-100);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--gray-500)">+${imgs.length-3}</div>` : ''}</div>` : '';
         const isCardAuthor = !!myNameForCard && post.author === myNameForCard;
         const replyCount = (byParent[post.id] || []).length;
-        const preview = String(post.content || '').slice(0, 100);
+        const preview = planningHtmlToText(post.content).slice(0, 100);
         const dd = planningDDay(post.deadline);
         const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:12px;font-weight:800;padding:3px 9px;border-radius:6px">${dd.label}</span>` : '';
         const vendorTag = post.vendor ? `<div style="color:var(--orange);font-size:14px;font-weight:700;margin-top:8px">🏭 ${planningEsc(post.vendor)}</div>` : '';
@@ -10729,7 +10729,7 @@ function renderPlanningDetail(p) {
                 ${isCardAuthor ? `<button onclick="event.stopPropagation();openPlanningCardEdit(${post.id})" title="편집" style="background:var(--white);border:1px solid var(--gray-200);color:var(--gray-600,#6B7280);font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px;cursor:pointer;white-space:nowrap" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.color='var(--gray-600)'">✏️ 편집</button>` : ''}
             </div>
             ${post.title ? `<div style="font-size:19px;font-weight:800;color:var(--gray-900);line-height:1.4;letter-spacing:-0.01em;margin-bottom:6px">${planningEsc(post.title)}</div>` : ''}
-            ${preview ? `<div style="font-size:14px;font-weight:500;color:var(--gray-700,#4B5563);line-height:1.5;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(preview)}${post.content.length > 100 ? '...' : ''}</div>` : (post.title ? '' : `<div style="font-size:14px;color:var(--gray-400);font-style:italic">내용 없음</div>`)}
+            ${preview ? `<div style="font-size:14px;font-weight:500;color:var(--gray-700,#4B5563);line-height:1.5;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(preview)}${preview.length >= 100 ? '...' : ''}</div>` : (post.title ? '' : `<div style="font-size:14px;color:var(--gray-400);font-style:italic">내용 없음</div>`)}
             ${vendorTag}
             ${assigneeRow}
             ${thumbHtml}
@@ -10970,7 +10970,7 @@ function openPlanningPostDetail(postId) {
                 </div>
                 <div style="display:flex;gap:2px;align-items:center">${replyEditBtn}${replyDelBtn}</div>
             </div>
-            <div style="font-size:13px;color:var(--gray-900);white-space:pre-wrap;line-height:1.5">${planningEsc(r.content)}</div>
+            <div class="ql-snow planning-content-readonly" style="font-size:13px;color:var(--gray-900);line-height:1.5"><div class="ql-editor" style="padding:0">${planningSanitizeHtml(r.content || '')}</div></div>
             ${rImgHtml}
         </div>`;
     }).join('');
@@ -11002,7 +11002,7 @@ function openPlanningPostDetail(postId) {
         <div style="display:flex;gap:6px;margin-bottom:14px">${taskStatusBadges}</div>
         ${post.title ? `<div style="font-size:22px;font-weight:800;color:var(--gray-900);line-height:1.35;letter-spacing:-0.01em;margin-bottom:12px">${planningEsc(post.title)}</div>` : ''}
         ${metaBlock}
-        <div style="font-size:14px;color:var(--gray-900);white-space:pre-wrap;line-height:1.6;padding:12px;background:var(--gray-50);border-radius:8px">${planningEsc(post.content || '(내용 없음)')}</div>
+        ${(post.content && planningHtmlToText(post.content)) ? `<div class="ql-snow planning-content-readonly" style="padding:12px;background:var(--gray-50);border-radius:8px"><div class="ql-editor" style="padding:0;font-size:14px;color:var(--gray-900);line-height:1.6">${planningSanitizeHtml(post.content)}</div></div>` : `<div style="font-size:14px;color:var(--gray-400);padding:12px;background:var(--gray-50);border-radius:8px">(내용 없음)</div>`}
         ${imgHtml}
         <div style="margin-top:18px">
             <div style="font-size:13px;font-weight:800;color:var(--gray-900);margin-bottom:10px">↩ 답글 ${replies.length}</div>
