@@ -735,10 +735,25 @@ function switchTab(tabId, fromHistory = false) {
         } catch (e) { console.warn('proposal list reset failed:', e); }
     }
 
-    // 마진계산기 탭 열릴 때: 시뮬레이션 목록 로드 + 렌더
+    // 마진계산기 탭 열릴 때: 시뮬레이션 목록 로드 + 카드 그리드 렌더 (기본 첫 화면 = 리스트 뷰)
     if (tabId === 'margin-calc') {
-        try { initMarginCalcIfNeeded(); } catch (e) { console.error('initMarginCalc failed', e); }
-        loadMarginSimulationsFromDb().then(() => renderMarginSimSelect()).catch(e => console.error('loadMarginSims failed', e));
+        if (!fromHistory) {
+            // 사이드바 클릭으로 들어올 때는 항상 리스트 뷰로 리셋
+            showMarginListView();
+        }
+        loadMarginSimulationsFromDb().then(async () => {
+            // 빈 상태 + 시드 안 한 적 없으면 예시 자동 시드 (시드 성공 시에만 flag set)
+            if (marginSimulations.length === 0 && !localStorage.getItem('klp_margin_seeded')) {
+                try {
+                    await seedExampleMarginSimulations();
+                    localStorage.setItem('klp_margin_seeded', '1');
+                    await loadMarginSimulationsFromDb();
+                } catch (e) {
+                    console.warn('example seed failed (margin_simulations 테이블이 없을 수 있음):', e.message);
+                }
+            }
+            renderMarginListCards();
+        }).catch(e => console.error('loadMarginSims failed', e));
     }
 }
 
@@ -13255,11 +13270,45 @@ function defaultMarginState() {
 
 function initMarginCalcIfNeeded() {
     if (marginCalcInited) return;
-    marginCalcState = defaultMarginState();
+    if (!marginCalcState) marginCalcState = defaultMarginState();
     bindMarginInputsFromState();
     renderMarginCategories();
     recalcMargin();
     marginCalcInited = true;
+}
+
+// 리스트 뷰 ↔ 편집 뷰 전환
+function showMarginListView() {
+    const list = document.getElementById('marginListView');
+    const edit = document.getElementById('marginEditView');
+    if (list) list.style.display = '';
+    if (edit) edit.style.display = 'none';
+    renderMarginListCards();
+}
+
+function showMarginEditView() {
+    const list = document.getElementById('marginListView');
+    const edit = document.getElementById('marginEditView');
+    if (list) list.style.display = 'none';
+    if (edit) edit.style.display = '';
+    initMarginCalcIfNeeded();
+    bindMarginInputsFromState();
+    renderMarginCategories();
+    recalcMargin();
+    updateMarginEditTitle();
+}
+
+function updateMarginEditTitle() {
+    const el = document.getElementById('marginEditTitle');
+    if (!el || !marginCalcState) return;
+    if (marginCalcState.id) el.textContent = `편집 — ${marginCalcState.name || '(이름 없음)'}`;
+    else el.textContent = '새 시뮬레이션';
+}
+
+// "새 시뮬레이션 만들기" 버튼
+function newMarginSimulation() {
+    marginCalcState = defaultMarginState();
+    showMarginEditView();
 }
 
 function resetMarginCalc() {
@@ -13267,8 +13316,7 @@ function resetMarginCalc() {
     bindMarginInputsFromState();
     renderMarginCategories();
     recalcMargin();
-    const sel = document.getElementById('marginSimSelect');
-    if (sel) sel.value = '';
+    updateMarginEditTitle();
     showToast('초기화되었습니다');
 }
 
@@ -13510,38 +13558,40 @@ function renderMarginSummary(r) {
     let recHtml = '';
     let deleteHtml = '';
     if (marginCalcState && marginCalcState.id) {
-        deleteHtml = `<button onclick="deleteCurrentMarginSimulation()" style="margin-top:4px;padding:10px;border:1px solid var(--gray-200);background:#fff;color:#dc2626;border-radius:10px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700">🗑 이 시뮬레이션 삭제</button>`;
+        deleteHtml = `<button onclick="deleteCurrentMarginSimulation()" style="margin-top:4px;padding:10px;border:1px solid var(--gray-200);background:var(--white);color:var(--red);border-radius:10px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700">🗑 이 시뮬레이션 삭제</button>`;
     }
     if (r.targetRate != null && r.recommendedSaleVatIncl != null) {
         recHtml = `
-            <div class="mg-summary-card" style="background:linear-gradient(135deg,#FFF5E5 0%,#FFE9CC 100%);border-color:#FFB870">
-                <div style="font-size:12px;font-weight:700;color:#B45309;margin-bottom:8px">🎯 목표 마진율 ${r.targetRate}% 달성을 위한 권장 판매가</div>
+            <div class="mg-summary-card mg-summary-rec">
+                <div class="mg-summary-title" style="font-size:12px;font-weight:700;margin-bottom:8px">🎯 목표 마진율 ${r.targetRate}% 달성을 위한 권장 판매가</div>
                 <div class="mg-summary-row" style="padding:6px 0">
                     <span class="mg-summary-label">권장 판매가 (VAT 포함, 1개)</span>
-                    <span class="mg-summary-value" style="color:#B45309">${fmt(r.recommendedSaleVatIncl)}</span>
+                    <span class="mg-summary-value">${fmt(r.recommendedSaleVatIncl)}</span>
                 </div>
                 <div class="mg-summary-row" style="padding:6px 0">
                     <span class="mg-summary-label">권장 판매가 (VAT 별도, 1개)</span>
-                    <span class="mg-summary-value" style="color:#B45309">${fmt(r.recommendedSaleNoVat)}</span>
+                    <span class="mg-summary-value">${fmt(r.recommendedSaleNoVat)}</span>
                 </div>
             </div>`;
     }
+
+    const marginCardClass = r.margin >= 0 ? 'mg-summary-profit' : 'mg-summary-loss';
 
     wrap.innerHTML = `
         <div class="mg-summary-card">
             <div style="font-size:12px;font-weight:700;color:var(--text-tertiary);margin-bottom:8px">총 원가 (${r.qty.toLocaleString()}개)</div>
             <div class="mg-summary-value big">${fmt(r.totalCost)}</div>
-            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">개당 ${fmt(r.costPerUnit)}</div>
+            <div style="font-size:12px;color:var(--gray-700);margin-top:4px">개당 ${fmt(r.costPerUnit)}</div>
         </div>
 
         <div class="mg-summary-card">
             <div style="font-size:12px;font-weight:700;color:var(--text-tertiary);margin-bottom:8px">총 판매액 ${r.saleVatIncluded ? '(VAT 포함)' : '(VAT 포함가 환산)'}</div>
             <div class="mg-summary-value big brand">${fmt(r.totalSale)}</div>
-            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">개당 ${fmt(r.salePerUnitVatIncl)}${r.saleVatIncluded ? '' : ` <span style="color:var(--text-tertiary)">(별도 ${fmt(r.salePerUnit)})</span>`}</div>
+            <div style="font-size:12px;color:var(--gray-700);margin-top:4px">개당 ${fmt(r.salePerUnitVatIncl)}${r.saleVatIncluded ? '' : ` <span style="color:var(--text-tertiary)">(별도 ${fmt(r.salePerUnit)})</span>`}</div>
         </div>
 
-        <div class="mg-summary-card" style="background:${r.margin >= 0 ? 'linear-gradient(135deg,#ECFDF5 0%,#D1FAE5 100%)' : 'linear-gradient(135deg,#FEF2F2 0%,#FEE2E2 100%)'};border-color:${r.margin >= 0 ? '#86EFAC' : '#FCA5A5'}">
-            <div style="font-size:12px;font-weight:700;color:${r.margin >= 0 ? '#065F46' : '#991B1B'};margin-bottom:8px">${r.margin >= 0 ? '💰 예상 마진' : '⚠️ 적자'}</div>
+        <div class="mg-summary-card ${marginCardClass}">
+            <div class="mg-summary-title" style="font-size:12px;font-weight:700;margin-bottom:8px">${r.margin >= 0 ? '💰 예상 마진' : '⚠️ 적자'}</div>
             <div class="mg-summary-value big ${profitClass}">${fmt(r.margin)}</div>
             <div class="mg-summary-row" style="padding:6px 0;margin-top:6px;border-top:1px solid rgba(0,0,0,.08)">
                 <span class="mg-summary-label">개당 마진</span>
@@ -13700,14 +13750,15 @@ function renderMarginSimSelect() {
 
 function onMarginSimSelectChange(idStr) {
     if (!idStr) return;
-    const id = Number(idStr);
+    openMarginSimulationById(Number(idStr));
+}
+
+// 카드 클릭 또는 select 호환용 — 시뮬레이션 불러오기 + 편집 뷰 진입
+function openMarginSimulationById(id) {
     const s = marginSimulations.find(x => x.id === id);
     if (!s) return;
     marginCalcState = JSON.parse(JSON.stringify(s));
-    bindMarginInputsFromState();
-    renderMarginCategories();
-    recalcMargin();
-    showToast(`"${s.name}" 시뮬레이션을 불러왔습니다`);
+    showMarginEditView();
 }
 
 async function saveMarginSimulation() {
@@ -13739,9 +13790,7 @@ async function saveMarginSimulation() {
         if (idx >= 0) marginSimulations[idx] = fresh; else marginSimulations.unshift(fresh);
         marginCalcState.id = fresh.id;
         marginCalcState.updatedAt = fresh.updatedAt;
-        renderMarginSimSelect();
-        const sel = document.getElementById('marginSimSelect');
-        if (sel) sel.value = String(fresh.id);
+        updateMarginEditTitle();
         showToast('시뮬레이션이 저장되었습니다');
     } catch (err) {
         console.error('시뮬레이션 저장 실패:', err);
@@ -13759,11 +13808,242 @@ async function deleteCurrentMarginSimulation() {
         const { error } = await sb.from('margin_simulations').delete().eq('id', marginCalcState.id);
         if (error) throw error;
         marginSimulations = marginSimulations.filter(x => x.id !== marginCalcState.id);
-        marginCalcState.id = null;
-        renderMarginSimSelect();
+        marginCalcState = defaultMarginState();
+        showToast('삭제되었습니다');
+        showMarginListView();
+    } catch (err) {
+        console.error('시뮬레이션 삭제 실패:', err);
+        showToast('삭제 실패: ' + err.message);
+    }
+}
+
+// 카드에서 직접 삭제 (편집 뷰 진입 안 함)
+async function deleteMarginSimulationById(event, id) {
+    if (event) event.stopPropagation();
+    const s = marginSimulations.find(x => x.id === id);
+    if (!s) return;
+    if (!confirm(`"${s.name}" 시뮬레이션을 삭제하시겠습니까?`)) return;
+    try {
+        const { error } = await sb.from('margin_simulations').delete().eq('id', id);
+        if (error) throw error;
+        marginSimulations = marginSimulations.filter(x => x.id !== id);
+        renderMarginListCards();
         showToast('삭제되었습니다');
     } catch (err) {
         console.error('시뮬레이션 삭제 실패:', err);
         showToast('삭제 실패: ' + err.message);
+    }
+}
+
+// 카드에서 복제 (편집 뷰 진입)
+function duplicateMarginSimulationById(event, id) {
+    if (event) event.stopPropagation();
+    const s = marginSimulations.find(x => x.id === id);
+    if (!s) return;
+    const copy = JSON.parse(JSON.stringify(s));
+    copy.id = null;
+    copy.name = `${s.name} (복사본)`;
+    copy.updatedAt = null;
+    marginCalcState = copy;
+    showMarginEditView();
+    showToast('복제되었습니다. 저장 버튼을 눌러 저장하세요');
+}
+
+// 시뮬레이션 카드 그리드 렌더 (리스트 뷰 첫 화면)
+function renderMarginListCards() {
+    const grid = document.getElementById('marginListGrid');
+    const stats = document.getElementById('marginListStats');
+    const searchEl = document.getElementById('marginListSearch');
+    if (!grid) return;
+
+    const search = (searchEl ? searchEl.value : '').trim().toLowerCase();
+    const filtered = marginSimulations.filter(s => {
+        if (!search) return true;
+        return [s.name, s.productName, s.client, s.manufacturer]
+            .some(v => (v || '').toLowerCase().includes(search));
+    });
+
+    if (stats) stats.textContent = `${marginSimulations.length}개 저장됨${search ? ` · 검색결과 ${filtered.length}개` : ''}`;
+
+    const newCardHtml = `
+        <div class="mg-list-card new-card" onclick="newMarginSimulation()">
+            <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+            <div style="font-size:14px;font-weight:700;margin-top:8px">새 시뮬레이션 만들기</div>
+            <div style="font-size:12px;color:var(--text-tertiary);margin-top:4px">빈 카드부터 시작</div>
+        </div>`;
+
+    if (marginSimulations.length === 0) {
+        grid.innerHTML = `<div class="mg-list-empty" style="grid-column:1/-1">
+            <div style="font-size:48px;margin-bottom:12px">📊</div>
+            <div style="font-size:16px;font-weight:700;margin-bottom:6px">아직 저장된 시뮬레이션이 없어요</div>
+            <div style="font-size:13px;margin-bottom:18px">'새 시뮬레이션 만들기' 또는 편집 뷰의 '엑셀 양식 불러오기'로 시작하세요</div>
+            <button class="btn-primary" onclick="newMarginSimulation()" style="margin:0 auto">+ 새 시뮬레이션 만들기</button>
+        </div>`;
+        return;
+    }
+    if (filtered.length === 0) {
+        grid.innerHTML = newCardHtml + `<div class="mg-list-empty" style="grid-column:span 2">검색 결과가 없습니다</div>`;
+        return;
+    }
+
+    const fmt = (n) => Math.round(n).toLocaleString() + '원';
+    const fmtPct = (n) => n.toFixed(1) + '%';
+
+    grid.innerHTML = newCardHtml + filtered.map(s => {
+        const qty = Math.max(1, s.quantity || 1);
+        const totalCost = s.categories.reduce((sum, c) => sum + c.items.reduce((a, it) => {
+            const rate = s.exchangeRate || 1500;
+            let amt = it.currency === 'USD' ? (it.amountUsd || 0) * rate : (it.amountKrw || 0);
+            if (it.quantityMul) amt *= qty;
+            if (it.vat) amt *= 1.1;
+            return a + amt;
+        }, 0), 0);
+        const salePerUnitVatIncl = s.saleVatIncluded ? (s.salePrice || 0) : (s.salePrice || 0) * 1.1;
+        const totalSale = salePerUnitVatIncl * qty;
+        const margin = totalSale - totalCost;
+        const marginRate = totalSale > 0 ? (margin / totalSale * 100) : 0;
+        const profitClass = margin >= 0 ? 'profit' : 'loss';
+        const subParts = [];
+        if (s.productName) subParts.push(`<span>📦 ${escapeHtml(s.productName)}</span>`);
+        if (s.client) subParts.push(`<span>🏢 ${escapeHtml(s.client)}</span>`);
+        if (qty > 1) subParts.push(`<span>📋 ${qty.toLocaleString()}개</span>`);
+        const dateStr = (s.updatedAt || '').slice(0, 10);
+
+        return `
+            <div class="mg-list-card" onclick="openMarginSimulationById(${s.id})">
+                <div class="mg-list-card-head">
+                    <div class="mg-list-card-title">${escapeHtml(s.name)}</div>
+                </div>
+                ${subParts.length ? `<div class="mg-list-card-sub">${subParts.join('')}</div>` : ''}
+                <div class="mg-list-card-stats">
+                    <div>
+                        <div class="mg-list-card-stat-label">총 원가</div>
+                        <div class="mg-list-card-stat-value">${fmt(totalCost)}</div>
+                    </div>
+                    <div>
+                        <div class="mg-list-card-stat-label">총 판매액</div>
+                        <div class="mg-list-card-stat-value">${fmt(totalSale)}</div>
+                    </div>
+                    <div>
+                        <div class="mg-list-card-stat-label">마진</div>
+                        <div class="mg-list-card-stat-value ${profitClass}">${fmt(margin)}</div>
+                    </div>
+                    <div>
+                        <div class="mg-list-card-stat-label">마진율</div>
+                        <div class="mg-list-card-stat-value ${profitClass}">${fmtPct(marginRate)}</div>
+                    </div>
+                </div>
+                <div class="mg-list-card-foot">
+                    <div class="mg-list-card-date">${dateStr || ''}</div>
+                    <div class="mg-list-card-actions">
+                        <button class="mg-icon-btn" onclick="duplicateMarginSimulationById(event, ${s.id})" title="복제">📄</button>
+                        <button class="mg-icon-btn danger" onclick="deleteMarginSimulationById(event, ${s.id})" title="삭제">🗑</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// ===== 예시 시뮬레이션 자동 시드 =====
+async function seedExampleMarginSimulations() {
+    const examples = [
+        // 1) 이니셜D 손목시계 (엑셀 풀 양식)
+        {
+            name: '이니셜D 손목시계',
+            productName: '이니셜D 콜라보 손목시계',
+            client: '에스에스애니먼트',
+            manufacturer: 'Chingchi',
+            salesMethod: '납품',
+            exchangeRate: 1500,
+            quantity: 500,
+            salePrice: 72000,
+            saleVatIncluded: false,
+            targetMarginRate: 35,
+            categories: [
+                { id: 1, name: '본품', items: [
+                    { id: 1, name: '시계 단가', currency: 'USD', amountUsd: 16.7, amountKrw: 25050, quantityMul: true, vat: false, note: '' },
+                    { id: 2, name: '메탈밴드', currency: 'USD', amountUsd: 2, amountKrw: 3000, quantityMul: true, vat: false, note: '' },
+                    { id: 3, name: '본품 부가세 10%', currency: 'KRW', amountKrw: 25050, amountUsd: 16.7, quantityMul: true, vat: true, note: '본품 단가 기준 자동 가산' }
+                ]},
+                { id: 2, name: '패키지', items: [
+                    { id: 4, name: '본품 박스', currency: 'USD', amountUsd: 1.8, amountKrw: 2700, quantityMul: true, vat: false, note: '' }
+                ]},
+                { id: 3, name: '품질보증서', items: [
+                    { id: 5, name: '보증서 1매', currency: 'KRW', amountKrw: 400, amountUsd: 0, quantityMul: true, vat: true, note: '' }
+                ]},
+                { id: 4, name: '국내 배송비', items: [
+                    { id: 6, name: '국내 배송 일괄', currency: 'KRW', amountKrw: 200000, amountUsd: 0, quantityMul: false, vat: true, note: '500개 일괄 배송 가정' }
+                ]},
+                { id: 5, name: '라이선스', items: [
+                    { id: 7, name: 'MG 선급금', currency: 'KRW', amountKrw: 3000000, amountUsd: 0, quantityMul: false, vat: true, note: '' }
+                ]}
+            ],
+            note: '엑셀 양식 기반 예시. 환율 1,500원, 수량 500개 기준',
+            note: '엑셀 양식 기반 예시. 환율 1,500원, 수량 500개 기준'
+        },
+        // 2) 이니셜D 키링 (소액 굿즈)
+        {
+            name: '이니셜D 키링',
+            productName: '이니셜D 메탈 키링',
+            client: '에스에스애니먼트',
+            manufacturer: 'Kunshan Krell',
+            salesMethod: '납품',
+            exchangeRate: 1500,
+            quantity: 1000,
+            salePrice: 2500,
+            saleVatIncluded: false,
+            targetMarginRate: 25,
+            categories: [
+                { id: 1, name: '본품', items: [
+                    { id: 1, name: '키링 단가', currency: 'USD', amountUsd: 0.335, amountKrw: 503, quantityMul: true, vat: false, note: '' },
+                    { id: 2, name: '샘플비 (분할)', currency: 'KRW', amountKrw: 80, amountUsd: 0, quantityMul: true, vat: false, note: '$53 / 1000개' }
+                ]},
+                { id: 2, name: '국내 배송비', items: [
+                    { id: 3, name: '국내 배송 일괄', currency: 'KRW', amountKrw: 50000, amountUsd: 0, quantityMul: false, vat: true, note: '' }
+                ]}
+            ],
+            note: '소액 굿즈 — 단가 매우 낮으므로 마진율보다 회전율 중심',
+        },
+        // 3) 자사 상품 머그컵 (간단 예시)
+        {
+            name: '자사몰 머그컵 — 기본형',
+            productName: '로고 머그컵 (350ml)',
+            client: '자사몰',
+            manufacturer: '국내 OEM',
+            salesMethod: '자사몰',
+            exchangeRate: 1500,
+            quantity: 200,
+            salePrice: 12000,
+            saleVatIncluded: true,
+            targetMarginRate: 40,
+            categories: [
+                { id: 1, name: '본품', items: [
+                    { id: 1, name: '머그컵 단가', currency: 'KRW', amountKrw: 3500, amountUsd: 0, quantityMul: true, vat: true, note: '' },
+                    { id: 2, name: '실크 인쇄', currency: 'KRW', amountKrw: 800, amountUsd: 0, quantityMul: true, vat: true, note: '1도 1면' }
+                ]},
+                { id: 2, name: '패키지', items: [
+                    { id: 3, name: '개별 박스', currency: 'KRW', amountKrw: 700, amountUsd: 0, quantityMul: true, vat: true, note: '' }
+                ]},
+                { id: 3, name: '국내 배송비', items: [
+                    { id: 4, name: '택배비 (개당)', currency: 'KRW', amountKrw: 3000, amountUsd: 0, quantityMul: true, vat: true, note: '자사몰 발송' }
+                ]},
+                { id: 4, name: '판매 수수료', items: [
+                    { id: 5, name: 'PG 수수료 (3%)', currency: 'KRW', amountKrw: 360, amountUsd: 0, quantityMul: true, vat: true, note: '12,000 × 3%' }
+                ]}
+            ],
+            note: '자사몰 직판 케이스. 판매가는 VAT 포함 12,000원'
+        }
+    ];
+
+    for (const ex of examples) {
+        const payload = marginSimToDb(ex);
+        try {
+            const { error } = await sb.from('margin_simulations').insert(payload);
+            if (error) throw error;
+        } catch (err) {
+            console.warn('예시 시드 실패:', ex.name, err.message);
+            throw err; // 첫 실패에서 중단 (테이블 없을 가능성)
+        }
     }
 }

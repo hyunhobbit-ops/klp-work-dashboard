@@ -1312,75 +1312,93 @@
 
             <!-- ===== 마진계산기 ===== -->
             <main class="content" id="tab-margin-calc">
-                <div class="content-toolbar">
-                    <div class="toolbar-left">
-                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                            <select id="marginSimSelect" class="date-filter-select" onchange="onMarginSimSelectChange(this.value)" style="min-width:200px">
-                                <option value="">— 저장된 시뮬레이션 불러오기 —</option>
-                            </select>
-                            <button class="btn-secondary" onclick="resetMarginCalc()" style="padding:8px 14px;border-radius:10px">초기화</button>
+                <!-- 리스트 뷰 (기본 첫 화면) -->
+                <div id="marginListView">
+                    <div class="content-toolbar">
+                        <div class="toolbar-left">
+                            <div class="search-bar">
+                                <svg width="16" height="16" fill="none" stroke="#999" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                                <input type="text" id="marginListSearch" placeholder="시뮬레이션 이름, 상품, 고객사 검색" oninput="renderMarginListCards()">
+                            </div>
+                            <span id="marginListStats" style="color:var(--gray-700);font-size:13px;font-weight:600"></span>
+                        </div>
+                        <div class="toolbar-buttons">
+                            <button class="btn-primary" onclick="newMarginSimulation()">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                                새 시뮬레이션 만들기
+                            </button>
                         </div>
                     </div>
-                    <div class="toolbar-buttons">
-                        <button class="btn-secondary" onclick="seedMarginTemplate()" style="padding:8px 14px;border-radius:10px" title="엑셀 양식으로 초기화">📋 엑셀 양식 불러오기</button>
-                        <button class="btn-primary" onclick="saveMarginSimulation()">
-                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
-                            시뮬레이션 저장
-                        </button>
-                    </div>
+                    <div id="marginListGrid" class="mg-list-grid"></div>
                 </div>
 
-                <div class="page-section" style="padding:0">
-                    <div id="marginCalcLayout" style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;padding:16px;align-items:start">
-
-                        <!-- 좌측: 입력 영역 -->
-                        <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
-
-                            <!-- 시뮬레이션 정보 -->
-                            <div class="card" style="padding:18px;background:#fff;border:1px solid var(--gray-200);border-radius:14px">
-                                <div style="font-weight:800;font-size:15px;margin-bottom:14px;color:var(--text-primary)">📌 시뮬레이션 정보</div>
-                                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
-                                    <label style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:var(--text-secondary);font-weight:600">시뮬레이션 이름 *</span><input type="text" id="marginName" placeholder="예: 이니셜D 손목시계" oninput="onMarginFieldInput()" style="padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;font-family:inherit;font-size:14px"></label>
-                                    <label style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:var(--text-secondary);font-weight:600">상품명</span><input type="text" id="marginProductName" placeholder="상품명" oninput="onMarginFieldInput()" style="padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;font-family:inherit;font-size:14px"></label>
-                                    <label style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:var(--text-secondary);font-weight:600">고객사</span><input type="text" id="marginClient" placeholder="예: 에스에스애니먼트" oninput="onMarginFieldInput()" style="padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;font-family:inherit;font-size:14px"></label>
-                                    <label style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:var(--text-secondary);font-weight:600">제작사</span><input type="text" id="marginManufacturer" placeholder="예: Chingchi" oninput="onMarginFieldInput()" style="padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;font-family:inherit;font-size:14px"></label>
-                                    <label style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:var(--text-secondary);font-weight:600">판매방식</span><input type="text" id="marginSalesMethod" placeholder="납품 / 위탁 / 자사몰" oninput="onMarginFieldInput()" style="padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;font-family:inherit;font-size:14px"></label>
-                                </div>
-                            </div>
-
-                            <!-- 글로벌 설정 (환율, 수량, 판매가) -->
-                            <div class="card" style="padding:18px;background:#fff;border:1px solid var(--gray-200);border-radius:14px">
-                                <div style="font-weight:800;font-size:15px;margin-bottom:14px;color:var(--text-primary)">⚙️ 환율 · 수량 · 판매가</div>
-                                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
-                                    <label style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:var(--text-secondary);font-weight:600">환율 (USD → KRW)</span><input type="number" id="marginExchangeRate" value="1500" step="1" min="0" oninput="onExchangeRateChange()" style="padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;font-family:inherit;font-size:14px"></label>
-                                    <label style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:var(--text-secondary);font-weight:600">수량 (개)</span><input type="number" id="marginQuantity" value="1" step="1" min="1" oninput="onMarginGlobalChange()" style="padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;font-family:inherit;font-size:14px"></label>
-                                    <label style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:var(--text-secondary);font-weight:600">판매가 (1개)</span><input type="number" id="marginSalePrice" value="0" step="100" min="0" oninput="onMarginGlobalChange()" style="padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;font-family:inherit;font-size:14px"></label>
-                                    <label style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:var(--text-secondary);font-weight:600">판매가 VAT</span>
-                                        <select id="marginSaleVat" onchange="onMarginGlobalChange()" style="padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;font-family:inherit;font-size:14px">
-                                            <option value="false">VAT 별도 (+10%)</option>
-                                            <option value="true">VAT 포함</option>
-                                        </select>
-                                    </label>
-                                    <label style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:var(--text-secondary);font-weight:600">목표 마진율(%) <span title="목표 마진율 입력 시 권장 판매가가 우측에 자동 표시됩니다" style="cursor:help;color:var(--text-tertiary)">ⓘ</span></span><input type="number" id="marginTargetRate" placeholder="예: 30" step="1" min="0" max="99" oninput="recalcMargin()" style="padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;font-family:inherit;font-size:14px"></label>
-                                </div>
-                            </div>
-
-                            <!-- 카테고리/항목 -->
-                            <div id="marginCategoriesWrap" style="display:flex;flex-direction:column;gap:14px"></div>
-
-                            <button onclick="addMarginCategory()" style="padding:14px;border:2px dashed var(--gray-300);background:transparent;color:var(--text-secondary);border-radius:12px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:600;transition:all .15s" onmouseover="this.style.borderColor='var(--brand)';this.style.color='var(--brand)'" onmouseout="this.style.borderColor='var(--gray-300)';this.style.color='var(--text-secondary)'">
-                                + 카테고리 추가
-                            </button>
-
-                            <!-- 비고 -->
-                            <div class="card" style="padding:18px;background:#fff;border:1px solid var(--gray-200);border-radius:14px">
-                                <div style="font-weight:800;font-size:15px;margin-bottom:10px;color:var(--text-primary)">📝 비고</div>
-                                <textarea id="marginNote" rows="3" placeholder="협상 메모, 주의사항, 가정 조건 등을 자유롭게 작성하세요" oninput="onMarginFieldInput()" style="width:100%;padding:10px 12px;border:1px solid var(--gray-300);border-radius:8px;font-family:inherit;font-size:14px;resize:vertical"></textarea>
-                            </div>
+                <!-- 편집 뷰 (시뮬레이션 카드를 누르거나 '새 시뮬레이션 만들기' 클릭 시) -->
+                <div id="marginEditView" style="display:none">
+                    <div class="content-toolbar">
+                        <div class="toolbar-left">
+                            <button class="btn-secondary" onclick="showMarginListView()" style="padding:8px 14px;border-radius:10px">← 목록으로</button>
+                            <span id="marginEditTitle" style="font-size:15px;font-weight:800;color:var(--gray-900)"></span>
                         </div>
+                        <div class="toolbar-buttons">
+                            <button class="btn-secondary" onclick="seedMarginTemplate()" style="padding:8px 14px;border-radius:10px" title="엑셀 양식으로 초기화">📋 엑셀 양식 불러오기</button>
+                            <button class="btn-secondary" onclick="resetMarginCalc()" style="padding:8px 14px;border-radius:10px">초기화</button>
+                            <button class="btn-primary" onclick="saveMarginSimulation()">
+                                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+                                시뮬레이션 저장
+                            </button>
+                        </div>
+                    </div>
 
-                        <!-- 우측: 요약 패널 -->
-                        <aside id="marginSummaryPanel" style="position:sticky;top:16px;display:flex;flex-direction:column;gap:12px"></aside>
+                    <div class="page-section" style="padding:0">
+                        <div id="marginCalcLayout" style="display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;padding:16px;align-items:start">
+
+                            <!-- 좌측: 입력 영역 -->
+                            <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+
+                                <!-- 시뮬레이션 정보 -->
+                                <div class="mg-card">
+                                    <div class="mg-card-title">📌 시뮬레이션 정보</div>
+                                    <div class="mg-field-grid">
+                                        <label class="mg-field"><span class="mg-field-label">시뮬레이션 이름 *</span><input class="mg-input" type="text" id="marginName" placeholder="예: 이니셜D 손목시계" oninput="onMarginFieldInput()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">상품명</span><input class="mg-input" type="text" id="marginProductName" placeholder="상품명" oninput="onMarginFieldInput()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">고객사</span><input class="mg-input" type="text" id="marginClient" placeholder="예: 에스에스애니먼트" oninput="onMarginFieldInput()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">제작사</span><input class="mg-input" type="text" id="marginManufacturer" placeholder="예: Chingchi" oninput="onMarginFieldInput()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">판매방식</span><input class="mg-input" type="text" id="marginSalesMethod" placeholder="납품 / 위탁 / 자사몰" oninput="onMarginFieldInput()"></label>
+                                    </div>
+                                </div>
+
+                                <!-- 글로벌 설정 (환율, 수량, 판매가) -->
+                                <div class="mg-card">
+                                    <div class="mg-card-title">⚙️ 환율 · 수량 · 판매가</div>
+                                    <div class="mg-field-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+                                        <label class="mg-field"><span class="mg-field-label">환율 (USD → KRW)</span><input class="mg-input" type="number" id="marginExchangeRate" value="1500" step="1" min="0" oninput="onExchangeRateChange()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">수량 (개)</span><input class="mg-input" type="number" id="marginQuantity" value="1" step="1" min="1" oninput="onMarginGlobalChange()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">판매가 (1개)</span><input class="mg-input" type="number" id="marginSalePrice" value="0" step="100" min="0" oninput="onMarginGlobalChange()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">판매가 VAT</span>
+                                            <select class="mg-input" id="marginSaleVat" onchange="onMarginGlobalChange()">
+                                                <option value="false">VAT 별도 (+10%)</option>
+                                                <option value="true">VAT 포함</option>
+                                            </select>
+                                        </label>
+                                        <label class="mg-field"><span class="mg-field-label">목표 마진율(%) <span title="목표 마진율 입력 시 권장 판매가가 우측에 자동 표시됩니다" style="cursor:help;color:var(--text-tertiary)">ⓘ</span></span><input class="mg-input" type="number" id="marginTargetRate" placeholder="예: 30" step="1" min="0" max="99" oninput="recalcMargin()"></label>
+                                    </div>
+                                </div>
+
+                                <!-- 카테고리/항목 -->
+                                <div id="marginCategoriesWrap" style="display:flex;flex-direction:column;gap:14px"></div>
+
+                                <button class="mg-add-cat" onclick="addMarginCategory()">+ 카테고리 추가</button>
+
+                                <!-- 비고 -->
+                                <div class="mg-card">
+                                    <div class="mg-card-title">📝 비고</div>
+                                    <textarea class="mg-textarea" id="marginNote" rows="3" placeholder="협상 메모, 주의사항, 가정 조건 등을 자유롭게 작성하세요" oninput="onMarginFieldInput()"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- 우측: 요약 패널 -->
+                            <aside id="marginSummaryPanel" style="position:sticky;top:16px;display:flex;flex-direction:column;gap:12px"></aside>
+                        </div>
                     </div>
                 </div>
             </main>
