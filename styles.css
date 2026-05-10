@@ -3199,3 +3199,49 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 /* 카드 상세에서 readonly로 보여줄 때 */
 .planning-content-readonly .ql-editor { padding: 0; min-height: 0; }
 
+/* ============================
+   마진계산기 (Margin Calculator)
+   ============================ */
+.mg-cat { background: #fff; border: 1px solid var(--gray-200); border-radius: 14px; padding: 14px; }
+[data-theme="dark"] .mg-cat { background: var(--white); border-color: var(--gray-200); }
+.mg-cat-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.mg-cat-name { flex: 1; font-weight: 800; font-size: 14px; padding: 6px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text-primary); font-family: inherit; }
+.mg-cat-name:focus { border-color: var(--gray-300); background: var(--gray-50); outline: none; }
+.mg-cat-subtotal { font-size: 13px; font-weight: 700; color: var(--text-secondary); padding: 4px 10px; background: var(--gray-100); border-radius: 8px; }
+.mg-icon-btn { padding: 6px 8px; border: 1px solid var(--gray-200); border-radius: 8px; background: #fff; color: var(--text-secondary); cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 700; transition: all .15s; }
+.mg-icon-btn:hover { background: var(--gray-50); color: var(--text-primary); }
+.mg-icon-btn.danger:hover { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+[data-theme="dark"] .mg-icon-btn { background: var(--white); }
+
+.mg-item { display: grid; grid-template-columns: 140px 90px 110px 110px 60px 60px 28px; gap: 8px; align-items: center; padding: 8px; border-radius: 8px; transition: background .1s; }
+.mg-item:hover { background: var(--gray-50); }
+.mg-item input, .mg-item select { padding: 6px 8px; border: 1px solid var(--gray-200); border-radius: 6px; background: #fff; font-family: inherit; font-size: 13px; color: var(--text-primary); min-width: 0; }
+.mg-item input:focus, .mg-item select:focus { border-color: var(--brand); outline: none; }
+[data-theme="dark"] .mg-item input, [data-theme="dark"] .mg-item select { background: var(--white); }
+.mg-item-headrow { font-size: 11px; font-weight: 700; color: var(--text-tertiary); padding: 0 8px; }
+.mg-item-headrow > div { padding: 0 4px; }
+
+.mg-add-row { padding: 10px; border: 1px dashed var(--gray-300); background: transparent; color: var(--text-secondary); border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; transition: all .15s; }
+.mg-add-row:hover { border-color: var(--brand); color: var(--brand); }
+
+.mg-summary-card { background: #fff; border: 1px solid var(--gray-200); border-radius: 14px; padding: 16px; }
+[data-theme="dark"] .mg-summary-card { background: var(--white); }
+.mg-summary-row { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--gray-100); }
+.mg-summary-row:last-child { border-bottom: none; }
+.mg-summary-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.mg-summary-value { font-size: 15px; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.mg-summary-value.big { font-size: 22px; }
+.mg-summary-value.profit { color: #059669; }
+.mg-summary-value.loss { color: #dc2626; }
+.mg-summary-value.brand { color: var(--brand); }
+
+@media (max-width: 1100px) {
+  #marginCalcLayout { grid-template-columns: minmax(0,1fr) !important; }
+  #marginSummaryPanel { position: static !important; }
+}
+@media (max-width: 768px) {
+  .mg-item { grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; border: 1px solid var(--gray-100); border-radius: 8px; }
+  .mg-item-headrow { display: none; }
+  .mg-item > * { min-width: 0; }
+}
+

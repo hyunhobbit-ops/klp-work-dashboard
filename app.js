@@ -242,6 +242,7 @@ const pageTitles = {
     'clients-overseas': '해외 거래처 DB',
     marketdb: '중고마켓DB',
     quotes: '견적서 만들기',
+    'margin-calc': '마진계산기',
     planning: '프로젝트',
     'planning-company': '회사 프로젝트',
     'planning-funding': '펀딩 프로젝트',
@@ -732,6 +733,12 @@ function switchTab(tabId, fromHistory = false) {
                 renderProposals();
             }
         } catch (e) { console.warn('proposal list reset failed:', e); }
+    }
+
+    // 마진계산기 탭 열릴 때: 시뮬레이션 목록 로드 + 렌더
+    if (tabId === 'margin-calc') {
+        try { initMarginCalcIfNeeded(); } catch (e) { console.error('initMarginCalc failed', e); }
+        loadMarginSimulationsFromDb().then(() => renderMarginSimSelect()).catch(e => console.error('loadMarginSims failed', e));
     }
 }
 
@@ -13196,4 +13203,567 @@ async function dlQuotePreview(type) {
     b1.disabled = b2.disabled = false;
     b1.textContent = '📷 JPG';
     b2.textContent = '📄 PDF';
+}
+
+// =============================================================
+// ===== 마진계산기 (Margin Calculator) =====
+// =============================================================
+let marginSimulations = [];
+let marginCalcState = null;
+let marginCalcInited = false;
+let marginNextItemId = 1;
+let marginNextCatId = 1;
+
+function makeMarginItem(partial = {}) {
+    return Object.assign({
+        id: marginNextItemId++,
+        name: '',
+        currency: 'KRW',     // 'USD' | 'KRW'
+        amountUsd: 0,
+        amountKrw: 0,
+        quantityMul: true,   // true: 단가성 (수량 × 단가), false: 일괄
+        vat: false,          // 부가세 10% 가산 여부
+        note: ''
+    }, partial);
+}
+function makeMarginCategory(name = '카테고리', items = []) {
+    return { id: marginNextCatId++, name, items };
+}
+
+function defaultMarginState() {
+    return {
+        id: null,
+        name: '',
+        productName: '',
+        client: '',
+        manufacturer: '',
+        salesMethod: '',
+        exchangeRate: 1500,
+        quantity: 1,
+        salePrice: 0,
+        saleVatIncluded: false,
+        targetMarginRate: null,
+        categories: [
+            makeMarginCategory('본품', [makeMarginItem({ name: '본품 단가' })]),
+            makeMarginCategory('패키지', [makeMarginItem({ name: '박스/포장' })]),
+            makeMarginCategory('기타 비용', [])
+        ],
+        note: '',
+        updatedAt: null
+    };
+}
+
+function initMarginCalcIfNeeded() {
+    if (marginCalcInited) return;
+    marginCalcState = defaultMarginState();
+    bindMarginInputsFromState();
+    renderMarginCategories();
+    recalcMargin();
+    marginCalcInited = true;
+}
+
+function resetMarginCalc() {
+    marginCalcState = defaultMarginState();
+    bindMarginInputsFromState();
+    renderMarginCategories();
+    recalcMargin();
+    const sel = document.getElementById('marginSimSelect');
+    if (sel) sel.value = '';
+    showToast('초기화되었습니다');
+}
+
+// 엑셀 양식(이니셜D 시계 굿즈 기준) 시드
+function seedMarginTemplate() {
+    if (!confirm('현재 입력 내용이 사라집니다. 엑셀 양식으로 새로 시작할까요?')) return;
+    marginCalcState = defaultMarginState();
+    marginCalcState.exchangeRate = 1500;
+    marginCalcState.quantity = 1;
+    marginCalcState.salePrice = 72000;
+    marginCalcState.saleVatIncluded = false;
+    marginCalcState.client = '';
+    marginCalcState.manufacturer = '';
+    marginCalcState.salesMethod = '납품';
+    marginCalcState.categories = [
+        makeMarginCategory('본품', [
+            makeMarginItem({ name: '본품 단가', currency: 'USD', amountUsd: 16.7, quantityMul: true, vat: false }),
+            makeMarginItem({ name: '메탈밴드/부품1', currency: 'USD', amountUsd: 2, quantityMul: true, vat: false }),
+            makeMarginItem({ name: '샘플비 (분할 상각)', currency: 'KRW', amountKrw: 0, quantityMul: false, vat: false }),
+            makeMarginItem({ name: '관세', currency: 'KRW', amountKrw: 0, quantityMul: true, vat: false }),
+            makeMarginItem({ name: '국제 배송비', currency: 'KRW', amountKrw: 0, quantityMul: false, vat: false }),
+            makeMarginItem({ name: '본품 부가세 10%', currency: 'KRW', amountKrw: 0, quantityMul: true, vat: true, note: '본품 단가 기준' })
+        ]),
+        makeMarginCategory('패키지', [
+            makeMarginItem({ name: '본품 박스', currency: 'USD', amountUsd: 1.8, quantityMul: true, vat: false }),
+            makeMarginItem({ name: '관세', currency: 'KRW', amountKrw: 0, quantityMul: true, vat: false }),
+            makeMarginItem({ name: '배송비', currency: 'KRW', amountKrw: 0, quantityMul: false, vat: false })
+        ]),
+        makeMarginCategory('품질보증서', [
+            makeMarginItem({ name: '본품', currency: 'KRW', amountKrw: 400, quantityMul: true, vat: true })
+        ]),
+        makeMarginCategory('국내 배송비', [
+            makeMarginItem({ name: '국내 배송비', currency: 'KRW', amountKrw: 0, quantityMul: false, vat: true })
+        ]),
+        makeMarginCategory('판매 수수료', [
+            makeMarginItem({ name: '플랫폼 수수료', currency: 'KRW', amountKrw: 0, quantityMul: true, vat: true })
+        ]),
+        makeMarginCategory('라이선스', [
+            makeMarginItem({ name: 'MG (선급금)', currency: 'KRW', amountKrw: 0, quantityMul: false, vat: true }),
+            makeMarginItem({ name: '런닝개런티', currency: 'KRW', amountKrw: 0, quantityMul: true, vat: true })
+        ]),
+        makeMarginCategory('특전', []),
+        makeMarginCategory('기타 비용', [])
+    ];
+    bindMarginInputsFromState();
+    renderMarginCategories();
+    recalcMargin();
+    showToast('엑셀 양식을 불러왔습니다');
+}
+
+// 글로벌 입력 → state
+function onMarginGlobalChange() {
+    if (!marginCalcState) return;
+    const q = Number(document.getElementById('marginQuantity').value) || 1;
+    marginCalcState.quantity = Math.max(1, q);
+    marginCalcState.salePrice = Number(document.getElementById('marginSalePrice').value) || 0;
+    marginCalcState.saleVatIncluded = document.getElementById('marginSaleVat').value === 'true';
+    recalcMargin();
+}
+
+function onExchangeRateChange() {
+    if (!marginCalcState) return;
+    const newRate = Number(document.getElementById('marginExchangeRate').value) || 0;
+    if (newRate <= 0) return;
+    marginCalcState.exchangeRate = newRate;
+    // 항목별로 한쪽 입력값을 기준으로 반대편 input value만 갱신 (전체 재렌더 X → 포커스 유지)
+    marginCalcState.categories.forEach(cat => cat.items.forEach(it => {
+        if (it.currency === 'USD') {
+            it.amountKrw = it.amountUsd * newRate;
+            const krwEl = document.querySelector(`[data-mg-field="amountKrw"][data-mg-cat="${cat.id}"][data-mg-item="${it.id}"]`);
+            if (krwEl) krwEl.value = it.amountKrw ? Math.round(it.amountKrw) : '';
+        } else {
+            it.amountUsd = newRate ? (it.amountKrw / newRate) : 0;
+            const usdEl = document.querySelector(`[data-mg-field="amountUsd"][data-mg-cat="${cat.id}"][data-mg-item="${it.id}"]`);
+            if (usdEl) usdEl.value = it.amountUsd ? (Math.round(it.amountUsd * 100) / 100) : '';
+        }
+    }));
+    recalcMargin();
+}
+
+function onMarginFieldInput() {
+    if (!marginCalcState) return;
+    marginCalcState.name = document.getElementById('marginName').value.trim();
+    marginCalcState.productName = document.getElementById('marginProductName').value;
+    marginCalcState.client = document.getElementById('marginClient').value;
+    marginCalcState.manufacturer = document.getElementById('marginManufacturer').value;
+    marginCalcState.salesMethod = document.getElementById('marginSalesMethod').value;
+    marginCalcState.note = document.getElementById('marginNote').value;
+}
+
+function bindMarginInputsFromState() {
+    const s = marginCalcState;
+    if (!s) return;
+    const set = (id, val) => { const el = document.getElementById(id); if (el != null) el.value = val == null ? '' : val; };
+    set('marginName', s.name);
+    set('marginProductName', s.productName);
+    set('marginClient', s.client);
+    set('marginManufacturer', s.manufacturer);
+    set('marginSalesMethod', s.salesMethod);
+    set('marginExchangeRate', s.exchangeRate);
+    set('marginQuantity', s.quantity);
+    set('marginSalePrice', s.salePrice);
+    const svEl = document.getElementById('marginSaleVat'); if (svEl) svEl.value = s.saleVatIncluded ? 'true' : 'false';
+    set('marginTargetRate', s.targetMarginRate == null ? '' : s.targetMarginRate);
+    set('marginNote', s.note);
+}
+
+// 카테고리/항목 CRUD
+function addMarginCategory() {
+    marginCalcState.categories.push(makeMarginCategory('새 카테고리', [makeMarginItem()]));
+    renderMarginCategories();
+    recalcMargin();
+}
+function removeMarginCategory(catId) {
+    if (!confirm('이 카테고리를 삭제하시겠습니까? (포함된 항목 모두 삭제됩니다)')) return;
+    marginCalcState.categories = marginCalcState.categories.filter(c => c.id !== catId);
+    renderMarginCategories();
+    recalcMargin();
+}
+function renameMarginCategory(catId, name) {
+    const cat = marginCalcState.categories.find(c => c.id === catId);
+    if (cat) cat.name = name;
+}
+function addMarginItem(catId) {
+    const cat = marginCalcState.categories.find(c => c.id === catId);
+    if (!cat) return;
+    cat.items.push(makeMarginItem());
+    renderMarginCategories();
+    recalcMargin();
+}
+function removeMarginItem(catId, itemId) {
+    const cat = marginCalcState.categories.find(c => c.id === catId);
+    if (!cat) return;
+    cat.items = cat.items.filter(it => it.id !== itemId);
+    renderMarginCategories();
+    recalcMargin();
+}
+function updateMarginItem(catId, itemId, field, value) {
+    const cat = marginCalcState.categories.find(c => c.id === catId);
+    if (!cat) return;
+    const it = cat.items.find(x => x.id === itemId);
+    if (!it) return;
+    const rate = marginCalcState.exchangeRate || 1500;
+
+    if (field === 'name' || field === 'note') {
+        it[field] = value;
+    } else if (field === 'currency') {
+        it.currency = value;
+        // 통화 변경 시 입력값은 유지, 반대편 자동 환산
+        if (value === 'USD') it.amountKrw = it.amountUsd * rate;
+        else it.amountUsd = rate ? (it.amountKrw / rate) : 0;
+        renderMarginCategories();
+    } else if (field === 'amountUsd') {
+        it.amountUsd = Number(value) || 0;
+        it.currency = 'USD';
+        it.amountKrw = it.amountUsd * rate;
+        // 자매 KRW 입력란만 갱신 (전체 재렌더 안 함 → 포커스 유지)
+        const krwEl = document.querySelector(`[data-mg-field="amountKrw"][data-mg-cat="${catId}"][data-mg-item="${itemId}"]`);
+        if (krwEl) krwEl.value = Math.round(it.amountKrw);
+    } else if (field === 'amountKrw') {
+        it.amountKrw = Number(value) || 0;
+        it.currency = 'KRW';
+        it.amountUsd = rate ? (it.amountKrw / rate) : 0;
+        const usdEl = document.querySelector(`[data-mg-field="amountUsd"][data-mg-cat="${catId}"][data-mg-item="${itemId}"]`);
+        if (usdEl) usdEl.value = Math.round(it.amountUsd * 100) / 100;
+    } else if (field === 'quantityMul' || field === 'vat') {
+        it[field] = !!value;
+    }
+    recalcMargin();
+}
+
+// 항목 비용 (KRW 기준) 계산
+function marginItemCost(item, quantity) {
+    const rate = marginCalcState.exchangeRate || 0;
+    let amount = item.currency === 'USD' ? (item.amountUsd || 0) * rate : (item.amountKrw || 0);
+    if (item.quantityMul) amount *= quantity;
+    if (item.vat) amount *= 1.1;
+    return amount;
+}
+function marginCategorySubtotal(cat, quantity) {
+    return cat.items.reduce((sum, it) => sum + marginItemCost(it, quantity), 0);
+}
+
+// 메인 재계산 + 요약 패널 렌더
+function recalcMargin() {
+    if (!marginCalcState) return;
+    const s = marginCalcState;
+    const qty = Math.max(1, s.quantity || 1);
+
+    // 총 원가
+    const totalCost = s.categories.reduce((sum, c) => sum + marginCategorySubtotal(c, qty), 0);
+    const costPerUnit = qty > 0 ? totalCost / qty : 0;
+
+    // 판매가 (VAT 포함가 기준으로 환산)
+    const salePerUnit = s.salePrice || 0;
+    const saleVatIncluded = s.saleVatIncluded;
+    const salePerUnitVatIncl = saleVatIncluded ? salePerUnit : salePerUnit * 1.1;
+    const totalSale = salePerUnitVatIncl * qty;
+
+    // 마진
+    const margin = totalSale - totalCost;
+    const marginPerUnit = qty > 0 ? margin / qty : 0;
+    const marginRate = totalSale > 0 ? (margin / totalSale) * 100 : 0;
+
+    // 목표 마진율 → 권장 판매가 (VAT 포함 기준 1개)
+    const tEl = document.getElementById('marginTargetRate');
+    const targetStr = tEl ? tEl.value : '';
+    const targetRate = targetStr === '' ? null : Number(targetStr);
+    s.targetMarginRate = (targetRate == null || isNaN(targetRate)) ? null : targetRate;
+    let recommendedSaleVatIncl = null, recommendedSaleNoVat = null;
+    if (s.targetMarginRate != null && s.targetMarginRate < 100 && totalCost > 0) {
+        const recommendedTotal = totalCost / (1 - s.targetMarginRate / 100);
+        recommendedSaleVatIncl = recommendedTotal / qty;
+        recommendedSaleNoVat = recommendedSaleVatIncl / 1.1;
+    }
+
+    // 카테고리 소계 갱신
+    s.categories.forEach(cat => {
+        const el = document.querySelector(`[data-mg-subtotal="${cat.id}"]`);
+        if (el) el.textContent = Math.round(marginCategorySubtotal(cat, qty)).toLocaleString() + '원';
+    });
+
+    renderMarginSummary({
+        qty, totalCost, costPerUnit,
+        salePerUnit, saleVatIncluded, salePerUnitVatIncl, totalSale,
+        margin, marginPerUnit, marginRate,
+        targetRate: s.targetMarginRate,
+        recommendedSaleVatIncl, recommendedSaleNoVat
+    });
+}
+
+function renderMarginSummary(r) {
+    const wrap = document.getElementById('marginSummaryPanel');
+    if (!wrap) return;
+    const fmt = (n) => Math.round(n).toLocaleString() + '원';
+    const fmtPct = (n) => (n).toFixed(1) + '%';
+    const profitClass = r.margin >= 0 ? 'profit' : 'loss';
+
+    let recHtml = '';
+    let deleteHtml = '';
+    if (marginCalcState && marginCalcState.id) {
+        deleteHtml = `<button onclick="deleteCurrentMarginSimulation()" style="margin-top:4px;padding:10px;border:1px solid var(--gray-200);background:#fff;color:#dc2626;border-radius:10px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700">🗑 이 시뮬레이션 삭제</button>`;
+    }
+    if (r.targetRate != null && r.recommendedSaleVatIncl != null) {
+        recHtml = `
+            <div class="mg-summary-card" style="background:linear-gradient(135deg,#FFF5E5 0%,#FFE9CC 100%);border-color:#FFB870">
+                <div style="font-size:12px;font-weight:700;color:#B45309;margin-bottom:8px">🎯 목표 마진율 ${r.targetRate}% 달성을 위한 권장 판매가</div>
+                <div class="mg-summary-row" style="padding:6px 0">
+                    <span class="mg-summary-label">권장 판매가 (VAT 포함, 1개)</span>
+                    <span class="mg-summary-value" style="color:#B45309">${fmt(r.recommendedSaleVatIncl)}</span>
+                </div>
+                <div class="mg-summary-row" style="padding:6px 0">
+                    <span class="mg-summary-label">권장 판매가 (VAT 별도, 1개)</span>
+                    <span class="mg-summary-value" style="color:#B45309">${fmt(r.recommendedSaleNoVat)}</span>
+                </div>
+            </div>`;
+    }
+
+    wrap.innerHTML = `
+        <div class="mg-summary-card">
+            <div style="font-size:12px;font-weight:700;color:var(--text-tertiary);margin-bottom:8px">총 원가 (${r.qty.toLocaleString()}개)</div>
+            <div class="mg-summary-value big">${fmt(r.totalCost)}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">개당 ${fmt(r.costPerUnit)}</div>
+        </div>
+
+        <div class="mg-summary-card">
+            <div style="font-size:12px;font-weight:700;color:var(--text-tertiary);margin-bottom:8px">총 판매액 ${r.saleVatIncluded ? '(VAT 포함)' : '(VAT 포함가 환산)'}</div>
+            <div class="mg-summary-value big brand">${fmt(r.totalSale)}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">개당 ${fmt(r.salePerUnitVatIncl)}${r.saleVatIncluded ? '' : ` <span style="color:var(--text-tertiary)">(별도 ${fmt(r.salePerUnit)})</span>`}</div>
+        </div>
+
+        <div class="mg-summary-card" style="background:${r.margin >= 0 ? 'linear-gradient(135deg,#ECFDF5 0%,#D1FAE5 100%)' : 'linear-gradient(135deg,#FEF2F2 0%,#FEE2E2 100%)'};border-color:${r.margin >= 0 ? '#86EFAC' : '#FCA5A5'}">
+            <div style="font-size:12px;font-weight:700;color:${r.margin >= 0 ? '#065F46' : '#991B1B'};margin-bottom:8px">${r.margin >= 0 ? '💰 예상 마진' : '⚠️ 적자'}</div>
+            <div class="mg-summary-value big ${profitClass}">${fmt(r.margin)}</div>
+            <div class="mg-summary-row" style="padding:6px 0;margin-top:6px;border-top:1px solid rgba(0,0,0,.08)">
+                <span class="mg-summary-label">개당 마진</span>
+                <span class="mg-summary-value ${profitClass}">${fmt(r.marginPerUnit)}</span>
+            </div>
+            <div class="mg-summary-row" style="padding:6px 0">
+                <span class="mg-summary-label">마진율</span>
+                <span class="mg-summary-value ${profitClass}">${fmtPct(r.marginRate)}</span>
+            </div>
+        </div>
+
+        ${recHtml}
+        ${deleteHtml}
+    `;
+}
+
+// 카테고리/항목 렌더
+function renderMarginCategories() {
+    const wrap = document.getElementById('marginCategoriesWrap');
+    if (!wrap || !marginCalcState) return;
+
+    const cats = marginCalcState.categories;
+    if (cats.length === 0) {
+        wrap.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-tertiary);background:var(--gray-50);border-radius:12px;font-size:14px">아직 카테고리가 없습니다. 아래 "+ 카테고리 추가" 버튼으로 시작하세요.</div>`;
+        return;
+    }
+
+    wrap.innerHTML = cats.map(cat => {
+        const itemsHtml = cat.items.length === 0
+            ? `<div style="padding:14px;text-align:center;color:var(--text-tertiary);font-size:13px">항목이 없습니다</div>`
+            : `<div class="mg-item mg-item-headrow">
+                    <div>항목명</div><div>USD</div><div>KRW</div><div>메모</div>
+                    <div style="text-align:center">수량×</div><div style="text-align:center">VAT</div><div></div>
+               </div>` + cat.items.map(it => `
+                <div class="mg-item">
+                    <input type="text" value="${escapeHtml(it.name)}" placeholder="항목명" oninput="updateMarginItem(${cat.id}, ${it.id}, 'name', this.value)">
+                    <input type="number" step="0.01" min="0" value="${it.currency === 'USD' || it.amountUsd ? (Math.round(it.amountUsd * 100) / 100) : ''}" placeholder="$" data-mg-field="amountUsd" data-mg-cat="${cat.id}" data-mg-item="${it.id}" oninput="updateMarginItem(${cat.id}, ${it.id}, 'amountUsd', this.value)">
+                    <input type="number" step="1" min="0" value="${it.amountKrw ? Math.round(it.amountKrw) : ''}" placeholder="원" data-mg-field="amountKrw" data-mg-cat="${cat.id}" data-mg-item="${it.id}" oninput="updateMarginItem(${cat.id}, ${it.id}, 'amountKrw', this.value)">
+                    <input type="text" value="${escapeHtml(it.note || '')}" placeholder="메모" oninput="updateMarginItem(${cat.id}, ${it.id}, 'note', this.value)">
+                    <label style="display:flex;align-items:center;justify-content:center;cursor:pointer" title="수량과 곱하기 (단가성 항목)"><input type="checkbox" ${it.quantityMul ? 'checked' : ''} onchange="updateMarginItem(${cat.id}, ${it.id}, 'quantityMul', this.checked)" style="cursor:pointer;width:16px;height:16px"></label>
+                    <label style="display:flex;align-items:center;justify-content:center;cursor:pointer" title="부가세 10% 자동 가산"><input type="checkbox" ${it.vat ? 'checked' : ''} onchange="updateMarginItem(${cat.id}, ${it.id}, 'vat', this.checked)" style="cursor:pointer;width:16px;height:16px"></label>
+                    <button class="mg-icon-btn danger" onclick="removeMarginItem(${cat.id}, ${it.id})" title="항목 삭제">×</button>
+                </div>
+            `).join('');
+
+        return `
+            <div class="mg-cat" data-mg-cat-card="${cat.id}">
+                <div class="mg-cat-head">
+                    <input class="mg-cat-name" type="text" value="${escapeHtml(cat.name)}" oninput="renameMarginCategory(${cat.id}, this.value)">
+                    <span class="mg-cat-subtotal" data-mg-subtotal="${cat.id}">0원</span>
+                    <button class="mg-icon-btn danger" onclick="removeMarginCategory(${cat.id})" title="카테고리 삭제">삭제</button>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:2px">
+                    ${itemsHtml}
+                </div>
+                <button class="mg-add-row" style="margin-top:10px;width:100%" onclick="addMarginItem(${cat.id})">+ 항목 추가</button>
+            </div>
+        `;
+    }).join('');
+}
+
+function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ===== Supabase 연동 =====
+async function loadMarginSimulationsFromDb() {
+    try {
+        const { data, error } = await sb.from('margin_simulations').select('*').order('updated_at', { ascending: false });
+        if (error) throw error;
+        marginSimulations = (data || []).map(marginSimFromDb);
+    } catch (err) {
+        console.error('마진계산기 시뮬레이션 로드 실패:', err.message);
+        // 테이블 없을 때 안내 (한 번만)
+        if (/relation .* does not exist/i.test(err.message || '') || /Could not find the table/i.test(err.message || '')) {
+            showToast('margin_simulations 테이블이 없습니다. margin_simulations.sql을 Supabase에 실행해주세요.');
+        } else {
+            showToast('시뮬레이션 로드 실패: ' + err.message);
+        }
+        marginSimulations = [];
+    }
+}
+
+function marginSimFromDb(r) {
+    return {
+        id: r.id,
+        name: r.name || '',
+        productName: r.product_name || '',
+        client: r.client || '',
+        manufacturer: r.manufacturer || '',
+        salesMethod: r.sales_method || '',
+        exchangeRate: Number(r.exchange_rate) || 1500,
+        quantity: Number(r.quantity) || 1,
+        salePrice: Number(r.sale_price) || 0,
+        saleVatIncluded: !!r.sale_vat_included,
+        targetMarginRate: r.target_margin_rate == null ? null : Number(r.target_margin_rate),
+        categories: Array.isArray(r.categories) ? r.categories.map(c => ({
+            id: c.id != null ? c.id : marginNextCatId++,
+            name: c.name || '',
+            items: Array.isArray(c.items) ? c.items.map(it => ({
+                id: it.id != null ? it.id : marginNextItemId++,
+                name: it.name || '',
+                currency: it.currency === 'USD' ? 'USD' : 'KRW',
+                amountUsd: Number(it.amountUsd) || 0,
+                amountKrw: Number(it.amountKrw) || 0,
+                quantityMul: !!it.quantityMul,
+                vat: !!it.vat,
+                note: it.note || ''
+            })) : []
+        })) : [],
+        note: r.note || '',
+        updatedAt: r.updated_at || null
+    };
+}
+
+function marginSimToDb(s) {
+    return {
+        name: s.name || '',
+        product_name: s.productName || '',
+        client: s.client || '',
+        manufacturer: s.manufacturer || '',
+        sales_method: s.salesMethod || '',
+        exchange_rate: s.exchangeRate || 1500,
+        quantity: s.quantity || 1,
+        sale_price: s.salePrice || 0,
+        sale_vat_included: !!s.saleVatIncluded,
+        target_margin_rate: s.targetMarginRate == null ? null : s.targetMarginRate,
+        categories: (s.categories || []).map(c => ({
+            id: c.id, name: c.name,
+            items: (c.items || []).map(it => ({
+                id: it.id, name: it.name,
+                currency: it.currency,
+                amountUsd: Number(it.amountUsd) || 0,
+                amountKrw: Number(it.amountKrw) || 0,
+                quantityMul: !!it.quantityMul,
+                vat: !!it.vat,
+                note: it.note || ''
+            }))
+        })),
+        note: s.note || '',
+        author: (typeof currentUser !== 'undefined' && currentUser) ? currentUser.name : null,
+        updated_at: new Date().toISOString()
+    };
+}
+
+function renderMarginSimSelect() {
+    const sel = document.getElementById('marginSimSelect');
+    if (!sel) return;
+    const currentVal = marginCalcState && marginCalcState.id ? String(marginCalcState.id) : '';
+    sel.innerHTML = `<option value="">— 저장된 시뮬레이션 불러오기 —</option>` +
+        marginSimulations.map(s => {
+            const date = (s.updatedAt || '').slice(0, 10);
+            return `<option value="${s.id}" ${currentVal === String(s.id) ? 'selected' : ''}>${escapeHtml(s.name)} ${date ? `(${date})` : ''}</option>`;
+        }).join('');
+}
+
+function onMarginSimSelectChange(idStr) {
+    if (!idStr) return;
+    const id = Number(idStr);
+    const s = marginSimulations.find(x => x.id === id);
+    if (!s) return;
+    marginCalcState = JSON.parse(JSON.stringify(s));
+    bindMarginInputsFromState();
+    renderMarginCategories();
+    recalcMargin();
+    showToast(`"${s.name}" 시뮬레이션을 불러왔습니다`);
+}
+
+async function saveMarginSimulation() {
+    if (!marginCalcState) return;
+    onMarginFieldInput();
+    onMarginGlobalChange();
+    if (!marginCalcState.name) {
+        const name = prompt('시뮬레이션 이름을 입력하세요', marginCalcState.productName || '새 마진 시뮬레이션');
+        if (!name) return;
+        marginCalcState.name = name;
+        const nameEl = document.getElementById('marginName'); if (nameEl) nameEl.value = name;
+    }
+
+    const payload = marginSimToDb(marginCalcState);
+    try {
+        let saved;
+        if (marginCalcState.id) {
+            const { data, error } = await sb.from('margin_simulations').update(payload).eq('id', marginCalcState.id).select().single();
+            if (error) throw error;
+            saved = data;
+        } else {
+            const { data, error } = await sb.from('margin_simulations').insert(payload).select().single();
+            if (error) throw error;
+            saved = data;
+        }
+        const fresh = marginSimFromDb(saved);
+        // 목록 갱신
+        const idx = marginSimulations.findIndex(x => x.id === fresh.id);
+        if (idx >= 0) marginSimulations[idx] = fresh; else marginSimulations.unshift(fresh);
+        marginCalcState.id = fresh.id;
+        marginCalcState.updatedAt = fresh.updatedAt;
+        renderMarginSimSelect();
+        const sel = document.getElementById('marginSimSelect');
+        if (sel) sel.value = String(fresh.id);
+        showToast('시뮬레이션이 저장되었습니다');
+    } catch (err) {
+        console.error('시뮬레이션 저장 실패:', err);
+        showToast('저장 실패: ' + err.message);
+    }
+}
+
+async function deleteCurrentMarginSimulation() {
+    if (!marginCalcState || !marginCalcState.id) {
+        showToast('저장된 시뮬레이션이 아닙니다');
+        return;
+    }
+    if (!confirm(`"${marginCalcState.name}" 시뮬레이션을 삭제하시겠습니까?`)) return;
+    try {
+        const { error } = await sb.from('margin_simulations').delete().eq('id', marginCalcState.id);
+        if (error) throw error;
+        marginSimulations = marginSimulations.filter(x => x.id !== marginCalcState.id);
+        marginCalcState.id = null;
+        renderMarginSimSelect();
+        showToast('삭제되었습니다');
+    } catch (err) {
+        console.error('시뮬레이션 삭제 실패:', err);
+        showToast('삭제 실패: ' + err.message);
+    }
 }

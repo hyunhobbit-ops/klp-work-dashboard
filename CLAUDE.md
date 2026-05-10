@@ -84,6 +84,20 @@
 - 주요 함수: `renderProductDB`, `openProductDBModal`, `saveProduct`, `showProductDetail`, `renderProposals`, `openProposalEditor`, `closeProposalEditor`, `renderProposalEditor`, `saveProposal`, `addProductToProposal`, `removeProductFromProposal`, `updateProposalItemQty`, `recalcProposalTotal`, `openProductPicker`, `generateShareLink`, `openProposalPreview`, `renderProposalPreview`, `setPreviewFilter`, `setPreviewView`
 - 데이터: 현재 JS 배열 → Supabase `products`, `proposals`, `proposal_items` 테이블로 전환 예정
 
+## 마진계산기 (편의성 그룹)
+- **목적**: 원가 항목들과 판매가를 입력해 마진/마진율을 계산. 기존 엑셀 양식(이니셜D 시계 굿즈 기준)을 발전시킨 자유형 구조
+- **데이터 모델**: `margin_simulations` 테이블 (margin_simulations.sql 참조). 자유형 카테고리/항목을 `categories` jsonb 컬럼에 저장
+  - 항목 필드: `name`, `currency('USD'|'KRW')`, `amountUsd`, `amountKrw`, `quantityMul`(수량× 여부), `vat`(부가세 10% 자동 가산), `note`
+- **핵심 로직** (recalcMargin):
+  - 항목 비용 = (USD면 amountUsd × 환율, KRW면 amountKrw) × (수량× 토글) × (VAT면 ×1.1)
+  - 총 판매액 = 판매가(VAT 포함가 환산) × 수량
+  - 마진 = 총 판매액 − 총 원가, 마진율 = 마진 / 총 판매액 × 100
+  - 권장 판매가 (목표 마진율 입력 시) = 총 원가 / (1 − 목표마진율/100) / 수량
+- **양방향 환산**: 항목의 USD/KRW 두 입력 중 어디든 입력하면 반대편 자동 환산. 환율 변경 시 currency가 source-of-truth (전체 재렌더 없이 input value만 갱신해 포커스 유지)
+- **시뮬레이션 저장/불러오기**: 상단 셀렉트로 불러오기, 우상단 "시뮬레이션 저장" 버튼, 요약 패널 하단에 삭제 버튼. `currentUser.name`을 author로 기록
+- **엑셀 양식 시드**: `seedMarginTemplate()` — 본품/패키지/품질보증서/국내배송비/판매수수료/라이선스/특전/기타비용 8개 카테고리를 엑셀 기준으로 채움
+- **주요 함수**: `initMarginCalcIfNeeded`, `defaultMarginState`, `seedMarginTemplate`, `addMarginCategory`, `removeMarginCategory`, `addMarginItem`, `removeMarginItem`, `updateMarginItem`, `recalcMargin`, `renderMarginCategories`, `renderMarginSummary`, `loadMarginSimulationsFromDb`, `saveMarginSimulation`, `onMarginSimSelectChange`, `deleteCurrentMarginSimulation`
+
 ## 문서 생성기 (DC/WR) 연동
 - **생성 흐름**: 프로젝트 진행사항 → 상세/편집 모달의 `📄 디자인확인서 만들기` / `📋 작업요청서 만들기` 버튼 → `doc-generator.html`로 이동하여 pre-fill
   - 프로젝트 데이터는 `localStorage.klp_doc_prefill`로 전달 (doc-generator가 로드 시 읽고 즉시 삭제)
