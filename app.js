@@ -13583,6 +13583,7 @@ function recalcMargin() {
     }
 
     // 카테고리 소계 갱신 + breakdown 데이터 구성
+    const rate = s.exchangeRate || 0;
     const breakdown = s.categories.map(cat => {
         const subtotal = marginCategorySubtotal(cat, qty);
         const el = document.querySelector(`[data-mg-subtotal="${cat.id}"]`);
@@ -13590,12 +13591,17 @@ function recalcMargin() {
         return {
             name: cat.name || '(이름 없음)',
             subtotal,
-            items: cat.items.map(it => ({
-                name: (it.name || '').trim() || '(이름 없음)',
-                cost: marginItemCost(it, qty),
-                quantityMul: it.quantityMul,
-                vat: it.vat
-            }))
+            items: cat.items.map(it => {
+                // 1단위 KRW 환산 (수량/VAT 적용 전 raw 단가)
+                const unitAmount = it.currency === 'USD' ? (it.amountUsd || 0) * rate : (it.amountKrw || 0);
+                return {
+                    name: (it.name || '').trim() || '(이름 없음)',
+                    cost: marginItemCost(it, qty),
+                    unitAmount,
+                    quantityMul: it.quantityMul,
+                    vat: it.vat
+                };
+            })
         };
     }).filter(c => c.subtotal !== 0 || c.items.some(it => it.cost !== 0));
 
@@ -13646,22 +13652,23 @@ function renderMarginSummary(r) {
                 <div style="font-size:11px;font-weight:700;color:var(--text-tertiary);margin-bottom:6px;letter-spacing:0.04em">세부 내역</div>
                 ${r.breakdown.map(cat => {
                     const nonzero = cat.items.filter(it => it.cost !== 0);
-                    // 항목이 1개뿐이고 카테고리 합계와 동일 → 중복이라 항목 line 생략
-                    const skipItems = nonzero.length === 1 && Math.abs(nonzero[0].cost - cat.subtotal) < 0.5;
                     return `
                     <div style="margin-bottom:8px">
                         <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:12px;font-weight:800;color:var(--gray-900);padding:4px 0">
-                            <span>${escapeHtml(cat.name)}${skipItems && nonzero[0].name && nonzero[0].name !== cat.name ? ` <span style="font-size:10.5px;color:var(--text-tertiary);font-weight:600">— ${escapeHtml(nonzero[0].name)}</span>` : ''}</span>
+                            <span>${escapeHtml(cat.name)}</span>
                             <span style="font-variant-numeric:tabular-nums">${fmt(cat.subtotal)}</span>
                         </div>
-                        ${skipItems ? '' : nonzero.map(it => {
-                            const tags = [];
-                            if (!it.quantityMul) tags.push('일괄');
-                            if (it.vat) tags.push('+VAT');
-                            const tagHtml = tags.length ? ` <span style="font-size:10px;color:var(--text-tertiary);font-weight:600">(${tags.join(', ')})</span>` : '';
-                            return `<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:var(--gray-700);padding:2px 0 2px 10px;line-height:1.4">
-                                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">↳ ${escapeHtml(it.name)}${tagHtml}</span>
-                                <span style="font-variant-numeric:tabular-nums;flex-shrink:0;margin-left:6px">${fmt(it.cost)}</span>
+                        ${nonzero.map(it => {
+                            // 단가 × 수량 (× 1.1) 형식 — 누구나 이해할 수 있게
+                            const unitStr = (formatMarginValue(it.unitAmount, false) || '0') + '원';
+                            const parts = [unitStr];
+                            if (it.quantityMul) parts.push(`× ${r.qty.toLocaleString()}개`);
+                            else parts.push('(일괄)');
+                            if (it.vat) parts.push('× 1.1');
+                            const calcStr = parts.join(' ');
+                            return `<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:var(--gray-700);padding:2px 0 2px 10px;line-height:1.5;gap:6px">
+                                <span style="flex:1;min-width:0;white-space:normal;word-break:keep-all">↳ ${escapeHtml(it.name)} : <span style="color:var(--gray-900);font-variant-numeric:tabular-nums">${calcStr}</span></span>
+                                <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-weight:700">${fmt(it.cost)}</span>
                             </div>`;
                         }).join('')}
                     </div>`;
