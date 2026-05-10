@@ -13340,10 +13340,21 @@ function showMarginEditView() {
     if (list) list.style.display = 'none';
     if (edit) edit.style.display = '';
     initMarginCalcIfNeeded();
+    populateMarginClientsList();
     bindMarginInputsFromState();
     renderMarginCategories();
     recalcMargin();
     updateMarginEditTitle();
+}
+
+// 고객사 datalist 채우기 — 국내 + 해외 거래처 통합, 중복 제거
+function populateMarginClientsList() {
+    const dl = document.getElementById('marginClientsList');
+    if (!dl) return;
+    const domestic = Array.isArray(clients) ? clients.map(c => (c.companyName || '').trim()).filter(Boolean) : [];
+    const overseas = Array.isArray(clientsOverseas) ? clientsOverseas.map(c => (c.companyName || '').trim()).filter(Boolean) : [];
+    const unique = Array.from(new Set([...domestic, ...overseas])).sort((a, b) => a.localeCompare(b, 'ko'));
+    dl.innerHTML = unique.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
 }
 
 function updateMarginEditTitle() {

@@ -1361,7 +1361,7 @@
                                     <div class="mg-field-grid">
                                         <label class="mg-field"><span class="mg-field-label">프로젝트 이름 *</span><input class="mg-input" type="text" id="marginName" placeholder="예: 이니셜D 손목시계" oninput="onMarginFieldInput()"></label>
                                         <label class="mg-field"><span class="mg-field-label">상품명</span><input class="mg-input" type="text" id="marginProductName" placeholder="상품명" oninput="onMarginFieldInput()"></label>
-                                        <label class="mg-field"><span class="mg-field-label">고객사</span><input class="mg-input" type="text" id="marginClient" placeholder="예: 에스에스애니먼트" oninput="onMarginFieldInput()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">고객사</span><input class="mg-input" type="text" id="marginClient" list="marginClientsList" autocomplete="off" placeholder="거래처 DB에서 검색 또는 직접 입력" oninput="onMarginFieldInput()"><datalist id="marginClientsList"></datalist></label>
                                         <label class="mg-field"><span class="mg-field-label">제작사</span><input class="mg-input" type="text" id="marginManufacturer" placeholder="예: Chingchi" oninput="onMarginFieldInput()"></label>
                                         <label class="mg-field"><span class="mg-field-label">판매방식</span><input class="mg-input" type="text" id="marginSalesMethod" placeholder="납품 / 위탁 / 자사몰" oninput="onMarginFieldInput()"></label>
                                     </div>
