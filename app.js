@@ -13230,6 +13230,53 @@ let marginCalcInited = false;
 let marginNextItemId = 1;
 let marginNextCatId = 1;
 
+// 콤마 자동 포맷 — 입력 중 커서 위치 보정 포함
+function formatMarginNumberInput(el, allowDecimal) {
+    if (!el) return;
+    const start = el.selectionStart != null ? el.selectionStart : el.value.length;
+    const before = el.value;
+    const beforeCommasLeft = (before.slice(0, start).match(/,/g) || []).length;
+
+    const cleaned = before.replace(/,/g, '');
+    if (cleaned === '') { el.value = ''; return; }
+
+    let formatted;
+    if (allowDecimal && cleaned.indexOf('.') >= 0) {
+        const dotIdx = cleaned.indexOf('.');
+        const intRaw = cleaned.slice(0, dotIdx).replace(/[^\d]/g, '');
+        const decRaw = cleaned.slice(dotIdx + 1).replace(/[^\d]/g, '');
+        const intFmt = intRaw === '' ? '0' : Number(intRaw).toLocaleString();
+        formatted = intFmt + '.' + decRaw;
+    } else {
+        const num = cleaned.replace(/[^\d]/g, '');
+        formatted = num === '' ? '' : Number(num).toLocaleString();
+    }
+    if (formatted === before) return;
+    el.value = formatted;
+
+    // 콤마 추가/제거에 맞춰 커서 위치 보정
+    const afterCommasLeft = (formatted.slice(0, start).match(/,/g) || []).length;
+    let newPos = start + (afterCommasLeft - beforeCommasLeft);
+    if (newPos < 0) newPos = 0;
+    if (newPos > formatted.length) newPos = formatted.length;
+    try { el.setSelectionRange(newPos, newPos); } catch (e) {}
+}
+
+function parseMarginNumber(v) {
+    return Number(String(v == null ? '' : v).replace(/,/g, '')) || 0;
+}
+
+// 콤마 포함 표시값 — 빈 값 처리 + USD 소수점 유지
+function formatMarginValue(n, allowDecimal) {
+    if (n == null || n === '' || n === 0) return '';
+    if (allowDecimal) {
+        const rounded = Math.round(Number(n) * 100) / 100;
+        if (rounded === Math.floor(rounded)) return rounded.toLocaleString();
+        return rounded.toLocaleString();
+    }
+    return Math.round(Number(n)).toLocaleString();
+}
+
 function makeMarginItem(partial = {}) {
     return Object.assign({
         id: marginNextItemId++,
@@ -13371,16 +13418,16 @@ function seedMarginTemplate() {
 // 글로벌 입력 → state
 function onMarginGlobalChange() {
     if (!marginCalcState) return;
-    const q = Number(document.getElementById('marginQuantity').value) || 1;
+    const q = parseMarginNumber(document.getElementById('marginQuantity').value) || 1;
     marginCalcState.quantity = Math.max(1, q);
-    marginCalcState.salePrice = Number(document.getElementById('marginSalePrice').value) || 0;
+    marginCalcState.salePrice = parseMarginNumber(document.getElementById('marginSalePrice').value);
     marginCalcState.saleVatIncluded = document.getElementById('marginSaleVat').value === 'true';
     recalcMargin();
 }
 
 function onExchangeRateChange() {
     if (!marginCalcState) return;
-    const newRate = Number(document.getElementById('marginExchangeRate').value) || 0;
+    const newRate = parseMarginNumber(document.getElementById('marginExchangeRate').value);
     if (newRate <= 0) return;
     marginCalcState.exchangeRate = newRate;
     // 항목별로 한쪽 입력값을 기준으로 반대편 input value만 갱신 (전체 재렌더 X → 포커스 유지)
@@ -13388,11 +13435,11 @@ function onExchangeRateChange() {
         if (it.currency === 'USD') {
             it.amountKrw = it.amountUsd * newRate;
             const krwEl = document.querySelector(`[data-mg-field="amountKrw"][data-mg-cat="${cat.id}"][data-mg-item="${it.id}"]`);
-            if (krwEl) krwEl.value = it.amountKrw ? Math.round(it.amountKrw) : '';
+            if (krwEl) krwEl.value = formatMarginValue(it.amountKrw, false);
         } else {
             it.amountUsd = newRate ? (it.amountKrw / newRate) : 0;
             const usdEl = document.querySelector(`[data-mg-field="amountUsd"][data-mg-cat="${cat.id}"][data-mg-item="${it.id}"]`);
-            if (usdEl) usdEl.value = it.amountUsd ? (Math.round(it.amountUsd * 100) / 100) : '';
+            if (usdEl) usdEl.value = formatMarginValue(it.amountUsd, true);
         }
     }));
     recalcMargin();
@@ -13417,9 +13464,10 @@ function bindMarginInputsFromState() {
     set('marginClient', s.client);
     set('marginManufacturer', s.manufacturer);
     set('marginSalesMethod', s.salesMethod);
-    set('marginExchangeRate', s.exchangeRate);
-    set('marginQuantity', s.quantity);
-    set('marginSalePrice', s.salePrice);
+    // 숫자 input — 콤마 포맷
+    set('marginExchangeRate', formatMarginValue(s.exchangeRate, false) || '0');
+    set('marginQuantity', formatMarginValue(s.quantity, false) || '1');
+    set('marginSalePrice', formatMarginValue(s.salePrice, false) || '0');
     const svEl = document.getElementById('marginSaleVat'); if (svEl) svEl.value = s.saleVatIncluded ? 'true' : 'false';
     set('marginTargetRate', s.targetMarginRate == null ? '' : s.targetMarginRate);
     set('marginNote', s.note);
@@ -13471,18 +13519,18 @@ function updateMarginItem(catId, itemId, field, value) {
         else it.amountUsd = rate ? (it.amountKrw / rate) : 0;
         renderMarginCategories();
     } else if (field === 'amountUsd') {
-        it.amountUsd = Number(value) || 0;
+        it.amountUsd = parseMarginNumber(value);
         it.currency = 'USD';
         it.amountKrw = it.amountUsd * rate;
         // 자매 KRW 입력란만 갱신 (전체 재렌더 안 함 → 포커스 유지)
         const krwEl = document.querySelector(`[data-mg-field="amountKrw"][data-mg-cat="${catId}"][data-mg-item="${itemId}"]`);
-        if (krwEl) krwEl.value = Math.round(it.amountKrw);
+        if (krwEl) krwEl.value = formatMarginValue(it.amountKrw, false);
     } else if (field === 'amountKrw') {
-        it.amountKrw = Number(value) || 0;
+        it.amountKrw = parseMarginNumber(value);
         it.currency = 'KRW';
         it.amountUsd = rate ? (it.amountKrw / rate) : 0;
         const usdEl = document.querySelector(`[data-mg-field="amountUsd"][data-mg-cat="${catId}"][data-mg-item="${itemId}"]`);
-        if (usdEl) usdEl.value = Math.round(it.amountUsd * 100) / 100;
+        if (usdEl) usdEl.value = formatMarginValue(it.amountUsd, true);
     } else if (field === 'quantityMul' || field === 'vat') {
         it[field] = !!value;
     }
@@ -13596,13 +13644,17 @@ function renderMarginSummary(r) {
         breakdownHtml = `
             <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--gray-100)">
                 <div style="font-size:11px;font-weight:700;color:var(--text-tertiary);margin-bottom:6px;letter-spacing:0.04em">세부 내역</div>
-                ${r.breakdown.map(cat => `
+                ${r.breakdown.map(cat => {
+                    const nonzero = cat.items.filter(it => it.cost !== 0);
+                    // 항목이 1개뿐이고 카테고리 합계와 동일 → 중복이라 항목 line 생략
+                    const skipItems = nonzero.length === 1 && Math.abs(nonzero[0].cost - cat.subtotal) < 0.5;
+                    return `
                     <div style="margin-bottom:8px">
                         <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:12px;font-weight:800;color:var(--gray-900);padding:4px 0">
-                            <span>${escapeHtml(cat.name)}</span>
+                            <span>${escapeHtml(cat.name)}${skipItems && nonzero[0].name && nonzero[0].name !== cat.name ? ` <span style="font-size:10.5px;color:var(--text-tertiary);font-weight:600">— ${escapeHtml(nonzero[0].name)}</span>` : ''}</span>
                             <span style="font-variant-numeric:tabular-nums">${fmt(cat.subtotal)}</span>
                         </div>
-                        ${cat.items.filter(it => it.cost !== 0).map(it => {
+                        ${skipItems ? '' : nonzero.map(it => {
                             const tags = [];
                             if (!it.quantityMul) tags.push('일괄');
                             if (it.vat) tags.push('+VAT');
@@ -13612,8 +13664,8 @@ function renderMarginSummary(r) {
                                 <span style="font-variant-numeric:tabular-nums;flex-shrink:0;margin-left:6px">${fmt(it.cost)}</span>
                             </div>`;
                         }).join('')}
-                    </div>
-                `).join('')}
+                    </div>`;
+                }).join('')}
             </div>`;
     }
 
@@ -13671,8 +13723,8 @@ function renderMarginCategories() {
                </div>` + cat.items.map(it => `
                 <div class="mg-item">
                     <input type="text" value="${escapeHtml(it.name)}" placeholder="항목명" oninput="updateMarginItem(${cat.id}, ${it.id}, 'name', this.value)">
-                    <input type="number" step="0.01" min="0" value="${it.currency === 'USD' || it.amountUsd ? (Math.round(it.amountUsd * 100) / 100) : ''}" placeholder="$" data-mg-field="amountUsd" data-mg-cat="${cat.id}" data-mg-item="${it.id}" oninput="updateMarginItem(${cat.id}, ${it.id}, 'amountUsd', this.value)">
-                    <input type="number" step="1" min="0" value="${it.amountKrw ? Math.round(it.amountKrw) : ''}" placeholder="원" data-mg-field="amountKrw" data-mg-cat="${cat.id}" data-mg-item="${it.id}" oninput="updateMarginItem(${cat.id}, ${it.id}, 'amountKrw', this.value)">
+                    <input type="text" inputmode="decimal" value="${formatMarginValue(it.amountUsd, true)}" placeholder="$" data-mg-field="amountUsd" data-mg-cat="${cat.id}" data-mg-item="${it.id}" oninput="formatMarginNumberInput(this,true); updateMarginItem(${cat.id}, ${it.id}, 'amountUsd', this.value)">
+                    <input type="text" inputmode="numeric" value="${formatMarginValue(it.amountKrw, false)}" placeholder="원" data-mg-field="amountKrw" data-mg-cat="${cat.id}" data-mg-item="${it.id}" oninput="formatMarginNumberInput(this,false); updateMarginItem(${cat.id}, ${it.id}, 'amountKrw', this.value)">
                     <input type="text" value="${escapeHtml(it.note || '')}" placeholder="메모" oninput="updateMarginItem(${cat.id}, ${it.id}, 'note', this.value)">
                     <select onchange="updateMarginItem(${cat.id}, ${it.id}, 'quantityMul', this.value === '1')" title="이 항목 비용을 수량만큼 곱할지 결정">
                         <option value="1" ${it.quantityMul ? 'selected' : ''}>1개당 단가</option>

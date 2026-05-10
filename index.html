@@ -1371,9 +1371,9 @@
                                 <div class="mg-card">
                                     <div class="mg-card-title">⚙️ 환율 · 수량 · 판매가</div>
                                     <div class="mg-field-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
-                                        <label class="mg-field"><span class="mg-field-label">환율 (USD → KRW)</span><input class="mg-input" type="number" id="marginExchangeRate" value="1500" step="1" min="0" oninput="onExchangeRateChange()"></label>
-                                        <label class="mg-field"><span class="mg-field-label">수량 (개)</span><input class="mg-input" type="number" id="marginQuantity" value="1" step="1" min="1" oninput="onMarginGlobalChange()"></label>
-                                        <label class="mg-field"><span class="mg-field-label">판매가 (1개)</span><input class="mg-input" type="number" id="marginSalePrice" value="0" step="100" min="0" oninput="onMarginGlobalChange()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">환율 (USD → KRW)</span><input class="mg-input" type="text" inputmode="numeric" id="marginExchangeRate" value="1,500" oninput="formatMarginNumberInput(this,false); onExchangeRateChange()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">수량 (개)</span><input class="mg-input" type="text" inputmode="numeric" id="marginQuantity" value="1" oninput="formatMarginNumberInput(this,false); onMarginGlobalChange()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">판매가 (1개)</span><input class="mg-input" type="text" inputmode="numeric" id="marginSalePrice" value="0" oninput="formatMarginNumberInput(this,false); onMarginGlobalChange()"></label>
                                         <label class="mg-field"><span class="mg-field-label">판매가 VAT</span>
                                             <select class="mg-input" id="marginSaleVat" onchange="onMarginGlobalChange()">
                                                 <option value="false">VAT 별도 (+10%)</option>
