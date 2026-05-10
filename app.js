@@ -743,10 +743,11 @@ function switchTab(tabId, fromHistory = false) {
         }
         loadMarginSimulationsFromDb().then(async () => {
             // 빈 상태 + 시드 안 한 적 없으면 예시 자동 시드 (시드 성공 시에만 flag set)
-            if (marginSimulations.length === 0 && !localStorage.getItem('klp_margin_seeded')) {
+            // v2: 부가세 행 계산 정확도 수정으로 flag 갱신
+            if (marginSimulations.length === 0 && !localStorage.getItem('klp_margin_seeded_v2')) {
                 try {
                     await seedExampleMarginSimulations();
-                    localStorage.setItem('klp_margin_seeded', '1');
+                    localStorage.setItem('klp_margin_seeded_v2', '1');
                     await loadMarginSimulationsFromDb();
                 } catch (e) {
                     console.warn('example seed failed (margin_simulations 테이블이 없을 수 있음):', e.message);
@@ -13814,7 +13815,7 @@ async function saveMarginSimulation() {
     onMarginFieldInput();
     onMarginGlobalChange();
     if (!marginCalcState.name) {
-        const name = prompt('시뮬레이션 이름을 입력하세요', marginCalcState.productName || '새 마진 시뮬레이션');
+        const name = prompt('프로젝트 이름을 입력하세요', marginCalcState.productName || '새 마진 시뮬레이션');
         if (!name) return;
         marginCalcState.name = name;
         const nameEl = document.getElementById('marginName'); if (nameEl) nameEl.value = name;
@@ -14020,7 +14021,7 @@ async function seedExampleMarginSimulations() {
                 { id: 1, name: '본품', items: [
                     { id: 1, name: '시계 단가', currency: 'USD', amountUsd: 16.7, amountKrw: 25050, quantityMul: true, vat: false, note: '' },
                     { id: 2, name: '메탈밴드', currency: 'USD', amountUsd: 2, amountKrw: 3000, quantityMul: true, vat: false, note: '' },
-                    { id: 3, name: '본품 부가세 10%', currency: 'KRW', amountKrw: 25050, amountUsd: 16.7, quantityMul: true, vat: true, note: '본품 단가 기준 자동 가산' }
+                    { id: 3, name: '본품 부가세', currency: 'KRW', amountKrw: 2505, amountUsd: 0, quantityMul: true, vat: false, note: '시계 단가 25,050원의 10%' }
                 ]},
                 { id: 2, name: '패키지', items: [
                     { id: 4, name: '본품 박스', currency: 'USD', amountUsd: 1.8, amountKrw: 2700, quantityMul: true, vat: false, note: '' }
