@@ -13625,17 +13625,17 @@ function renderMarginSummary(r) {
     let recHtml = '';
     let deleteHtml = '';
     if (marginCalcState && marginCalcState.id) {
-        deleteHtml = `<button onclick="deleteCurrentMarginSimulation()" style="margin-top:4px;padding:10px;border:1px solid var(--gray-200);background:var(--white);color:var(--red);border-radius:10px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700">🗑 이 시뮬레이션 삭제</button>`;
+        deleteHtml = `<button onclick="deleteCurrentMarginSimulation()" style="margin-top:4px;padding:12px;border:1px solid var(--gray-200);background:var(--white);color:var(--red);border-radius:10px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700">🗑 이 시뮬레이션 삭제</button>`;
     }
     if (r.targetRate != null && r.recommendedSaleVatIncl != null) {
         recHtml = `
             <div class="mg-summary-card mg-summary-rec">
-                <div class="mg-summary-title" style="font-size:12px;font-weight:700;margin-bottom:8px">🎯 목표 마진율 ${r.targetRate}% 달성을 위한 권장 판매가</div>
-                <div class="mg-summary-row" style="padding:6px 0">
+                <div class="mg-summary-title" style="font-size:13px;font-weight:700;margin-bottom:10px">🎯 목표 마진율 ${r.targetRate}% 달성을 위한 권장 판매가</div>
+                <div class="mg-summary-row" style="padding:8px 0">
                     <span class="mg-summary-label">권장 판매가 (VAT 포함, 1개)</span>
                     <span class="mg-summary-value">${fmt(r.recommendedSaleVatIncl)}</span>
                 </div>
-                <div class="mg-summary-row" style="padding:6px 0">
+                <div class="mg-summary-row" style="padding:8px 0">
                     <span class="mg-summary-label">권장 판매가 (VAT 별도, 1개)</span>
                     <span class="mg-summary-value">${fmt(r.recommendedSaleNoVat)}</span>
                 </div>
@@ -13648,13 +13648,13 @@ function renderMarginSummary(r) {
     let breakdownHtml = '';
     if (Array.isArray(r.breakdown) && r.breakdown.length > 0) {
         breakdownHtml = `
-            <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--gray-100)">
-                <div style="font-size:11px;font-weight:700;color:var(--text-tertiary);margin-bottom:6px;letter-spacing:0.04em">세부 내역</div>
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-100)">
+                <div style="font-size:13px;font-weight:700;color:var(--gray-700);margin-bottom:8px;letter-spacing:0.04em">세부 내역</div>
                 ${r.breakdown.map(cat => {
                     const nonzero = cat.items.filter(it => it.cost !== 0);
                     return `
-                    <div style="margin-bottom:8px">
-                        <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:12px;font-weight:800;color:var(--gray-900);padding:4px 0">
+                    <div style="margin-bottom:10px">
+                        <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:14px;font-weight:800;color:var(--gray-900);padding:5px 0">
                             <span>${escapeHtml(cat.name)}</span>
                             <span style="font-variant-numeric:tabular-nums">${fmt(cat.subtotal)}</span>
                         </div>
@@ -13666,7 +13666,7 @@ function renderMarginSummary(r) {
                             else parts.push('(일괄)');
                             if (it.vat) parts.push('× 1.1');
                             const calcStr = parts.join(' ');
-                            return `<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:var(--gray-700);padding:2px 0 2px 10px;line-height:1.5;gap:6px">
+                            return `<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--gray-700);padding:3px 0 3px 12px;line-height:1.5;gap:8px">
                                 <span style="flex:1;min-width:0;white-space:normal;word-break:keep-all">↳ ${escapeHtml(it.name)} : <span style="color:var(--gray-900);font-variant-numeric:tabular-nums">${calcStr}</span></span>
                                 <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-weight:700">${fmt(it.cost)}</span>
                             </div>`;
@@ -13678,26 +13678,26 @@ function renderMarginSummary(r) {
 
     wrap.innerHTML = `
         <div class="mg-summary-card">
-            <div style="font-size:12px;font-weight:700;color:var(--text-tertiary);margin-bottom:8px">총 원가 (${r.qty.toLocaleString()}개)</div>
+            <div style="font-size:13px;font-weight:700;color:var(--gray-700);margin-bottom:10px">총 원가 (${r.qty.toLocaleString()}개)</div>
             <div class="mg-summary-value big">${fmt(r.totalCost)}</div>
-            <div style="font-size:12px;color:var(--gray-700);margin-top:4px">개당 ${fmt(r.costPerUnit)}</div>
+            <div style="font-size:13px;color:var(--gray-700);margin-top:6px">개당 ${fmt(r.costPerUnit)}</div>
             ${breakdownHtml}
         </div>
 
         <div class="mg-summary-card">
-            <div style="font-size:12px;font-weight:700;color:var(--text-tertiary);margin-bottom:8px">총 판매액 ${r.saleVatIncluded ? '(VAT 포함)' : '(VAT 포함가 환산)'}</div>
+            <div style="font-size:13px;font-weight:700;color:var(--gray-700);margin-bottom:10px">총 판매액 ${r.saleVatIncluded ? '(VAT 포함)' : '(VAT 포함가 환산)'}</div>
             <div class="mg-summary-value big brand">${fmt(r.totalSale)}</div>
-            <div style="font-size:12px;color:var(--gray-700);margin-top:4px">개당 ${fmt(r.salePerUnitVatIncl)}${r.saleVatIncluded ? '' : ` <span style="color:var(--text-tertiary)">(별도 ${fmt(r.salePerUnit)})</span>`}</div>
+            <div style="font-size:13px;color:var(--gray-700);margin-top:6px">개당 ${fmt(r.salePerUnitVatIncl)}${r.saleVatIncluded ? '' : ` <span style="color:var(--text-tertiary)">(별도 ${fmt(r.salePerUnit)})</span>`}</div>
         </div>
 
         <div class="mg-summary-card ${marginCardClass}">
-            <div class="mg-summary-title" style="font-size:12px;font-weight:700;margin-bottom:8px">${r.margin >= 0 ? '💰 예상 마진' : '⚠️ 적자'}</div>
+            <div class="mg-summary-title" style="font-size:13px;font-weight:700;margin-bottom:10px">${r.margin >= 0 ? '💰 예상 마진' : '⚠️ 적자'}</div>
             <div class="mg-summary-value big ${profitClass}">${fmt(r.margin)}</div>
-            <div class="mg-summary-row" style="padding:6px 0;margin-top:6px;border-top:1px solid rgba(0,0,0,.08)">
+            <div class="mg-summary-row" style="padding:8px 0;margin-top:8px;border-top:1px solid rgba(0,0,0,.08)">
                 <span class="mg-summary-label">개당 마진</span>
                 <span class="mg-summary-value ${profitClass}">${fmt(r.marginPerUnit)}</span>
             </div>
-            <div class="mg-summary-row" style="padding:6px 0">
+            <div class="mg-summary-row" style="padding:8px 0">
                 <span class="mg-summary-label">마진율</span>
                 <span class="mg-summary-value ${profitClass}">${fmtPct(r.marginRate)}</span>
             </div>
@@ -13715,13 +13715,13 @@ function renderMarginCategories() {
 
     const cats = marginCalcState.categories;
     if (cats.length === 0) {
-        wrap.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text-tertiary);background:var(--gray-50);border-radius:12px;font-size:14px">아직 카테고리가 없습니다. 아래 "+ 카테고리 추가" 버튼으로 시작하세요.</div>`;
+        wrap.innerHTML = `<div style="padding:40px;text-align:center;color:var(--gray-700);background:var(--gray-50);border-radius:12px;font-size:15px">아직 카테고리가 없습니다. 아래 "+ 카테고리 추가" 버튼으로 시작하세요.</div>`;
         return;
     }
 
     wrap.innerHTML = cats.map(cat => {
         const itemsHtml = cat.items.length === 0
-            ? `<div style="padding:14px;text-align:center;color:var(--text-tertiary);font-size:13px">항목이 없습니다</div>`
+            ? `<div style="padding:14px;text-align:center;color:var(--gray-700);font-size:14px">항목이 없습니다</div>`
             : `<div class="mg-item mg-item-headrow">
                     <div>항목명</div><div>USD</div><div>원화</div><div>메모</div>
                     <div title="이 항목 비용을 수량만큼 곱할지(=한 개당 단가) 또는 한 번에만 발생하는 고정 비용인지 선택">비용 적용 방식</div>
@@ -13975,16 +13975,16 @@ function renderMarginListCards() {
 
     const newCardHtml = `
         <div class="mg-list-card new-card" onclick="newMarginSimulation()">
-            <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
-            <div style="font-size:14px;font-weight:700;margin-top:8px">새 시뮬레이션 만들기</div>
-            <div style="font-size:12px;color:var(--text-tertiary);margin-top:4px">빈 카드부터 시작</div>
+            <svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+            <div style="font-size:17px;font-weight:700;margin-top:10px">새 시뮬레이션 만들기</div>
+            <div style="font-size:13px;color:var(--gray-700);margin-top:6px">빈 카드부터 시작</div>
         </div>`;
 
     if (marginSimulations.length === 0) {
         grid.innerHTML = `<div class="mg-list-empty" style="grid-column:1/-1">
-            <div style="font-size:48px;margin-bottom:12px">📊</div>
-            <div style="font-size:16px;font-weight:700;margin-bottom:6px">아직 저장된 시뮬레이션이 없어요</div>
-            <div style="font-size:13px;margin-bottom:18px">'새 시뮬레이션 만들기' 또는 편집 뷰의 '엑셀 양식 불러오기'로 시작하세요</div>
+            <div style="font-size:56px;margin-bottom:14px">📊</div>
+            <div style="font-size:18px;font-weight:700;margin-bottom:8px;color:var(--gray-900)">아직 저장된 시뮬레이션이 없어요</div>
+            <div style="font-size:14px;margin-bottom:20px">'새 시뮬레이션 만들기' 또는 편집 뷰의 '엑셀 양식 불러오기'로 시작하세요</div>
             <button class="btn-primary" onclick="newMarginSimulation()" style="margin:0 auto">+ 새 시뮬레이션 만들기</button>
         </div>`;
         return;
@@ -14019,7 +14019,7 @@ function renderMarginListCards() {
         if (qty > 1) subParts.push(`<span>📋 ${qty.toLocaleString()}개</span>`);
         const dateStr = (s.updatedAt || '').slice(0, 10);
         const subFmt = (n) => Math.round(n).toLocaleString() + '원';
-        const subStyle = 'font-size:11px;color:var(--text-tertiary);font-weight:600;margin-top:2px';
+        const subStyle = 'font-size:12px;color:var(--gray-700);font-weight:600;margin-top:4px';
 
         return `
             <div class="mg-list-card" onclick="openMarginSimulationById(${s.id})">
