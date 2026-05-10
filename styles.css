@@ -3225,7 +3225,7 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .mg-icon-btn.danger:hover { background: var(--red-light); color: var(--red); border-color: var(--red); }
 
 /* 항목 행 */
-.mg-item { display: grid; grid-template-columns: 140px 90px 110px 110px 60px 60px 28px; gap: 8px; align-items: center; padding: 8px; border-radius: 8px; transition: background .1s; }
+.mg-item { display: grid; grid-template-columns: minmax(120px,1.4fr) 80px 110px minmax(100px,1fr) 110px 80px 28px; gap: 8px; align-items: center; padding: 8px; border-radius: 8px; transition: background .1s; }
 .mg-item:hover { background: var(--gray-50); }
 .mg-item input, .mg-item select { padding: 6px 8px; border: 1px solid var(--gray-200); border-radius: 6px; background: var(--white); font-family: inherit; font-size: 13px; color: var(--gray-900); min-width: 0; }
 .mg-item input:focus, .mg-item select:focus { border-color: var(--blue); outline: none; }

@@ -13533,18 +13533,30 @@ function recalcMargin() {
         recommendedSaleNoVat = recommendedSaleVatIncl / 1.1;
     }
 
-    // 카테고리 소계 갱신
-    s.categories.forEach(cat => {
+    // 카테고리 소계 갱신 + breakdown 데이터 구성
+    const breakdown = s.categories.map(cat => {
+        const subtotal = marginCategorySubtotal(cat, qty);
         const el = document.querySelector(`[data-mg-subtotal="${cat.id}"]`);
-        if (el) el.textContent = Math.round(marginCategorySubtotal(cat, qty)).toLocaleString() + '원';
-    });
+        if (el) el.textContent = Math.round(subtotal).toLocaleString() + '원';
+        return {
+            name: cat.name || '(이름 없음)',
+            subtotal,
+            items: cat.items.map(it => ({
+                name: (it.name || '').trim() || '(이름 없음)',
+                cost: marginItemCost(it, qty),
+                quantityMul: it.quantityMul,
+                vat: it.vat
+            }))
+        };
+    }).filter(c => c.subtotal !== 0 || c.items.some(it => it.cost !== 0));
 
     renderMarginSummary({
         qty, totalCost, costPerUnit,
         salePerUnit, saleVatIncluded, salePerUnitVatIncl, totalSale,
         margin, marginPerUnit, marginRate,
         targetRate: s.targetMarginRate,
-        recommendedSaleVatIncl, recommendedSaleNoVat
+        recommendedSaleVatIncl, recommendedSaleNoVat,
+        breakdown
     });
 }
 
@@ -13577,11 +13589,39 @@ function renderMarginSummary(r) {
 
     const marginCardClass = r.margin >= 0 ? 'mg-summary-profit' : 'mg-summary-loss';
 
+    // 총 원가 breakdown HTML
+    let breakdownHtml = '';
+    if (Array.isArray(r.breakdown) && r.breakdown.length > 0) {
+        breakdownHtml = `
+            <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--gray-100)">
+                <div style="font-size:11px;font-weight:700;color:var(--text-tertiary);margin-bottom:6px;letter-spacing:0.04em">세부 내역</div>
+                ${r.breakdown.map(cat => `
+                    <div style="margin-bottom:8px">
+                        <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:12px;font-weight:800;color:var(--gray-900);padding:4px 0">
+                            <span>${escapeHtml(cat.name)}</span>
+                            <span style="font-variant-numeric:tabular-nums">${fmt(cat.subtotal)}</span>
+                        </div>
+                        ${cat.items.filter(it => it.cost !== 0).map(it => {
+                            const tags = [];
+                            if (!it.quantityMul) tags.push('일괄');
+                            if (it.vat) tags.push('+VAT');
+                            const tagHtml = tags.length ? ` <span style="font-size:10px;color:var(--text-tertiary);font-weight:600">(${tags.join(', ')})</span>` : '';
+                            return `<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:var(--gray-700);padding:2px 0 2px 10px;line-height:1.4">
+                                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">↳ ${escapeHtml(it.name)}${tagHtml}</span>
+                                <span style="font-variant-numeric:tabular-nums;flex-shrink:0;margin-left:6px">${fmt(it.cost)}</span>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                `).join('')}
+            </div>`;
+    }
+
     wrap.innerHTML = `
         <div class="mg-summary-card">
             <div style="font-size:12px;font-weight:700;color:var(--text-tertiary);margin-bottom:8px">총 원가 (${r.qty.toLocaleString()}개)</div>
             <div class="mg-summary-value big">${fmt(r.totalCost)}</div>
             <div style="font-size:12px;color:var(--gray-700);margin-top:4px">개당 ${fmt(r.costPerUnit)}</div>
+            ${breakdownHtml}
         </div>
 
         <div class="mg-summary-card">
@@ -13623,16 +13663,24 @@ function renderMarginCategories() {
         const itemsHtml = cat.items.length === 0
             ? `<div style="padding:14px;text-align:center;color:var(--text-tertiary);font-size:13px">항목이 없습니다</div>`
             : `<div class="mg-item mg-item-headrow">
-                    <div>항목명</div><div>USD</div><div>KRW</div><div>메모</div>
-                    <div style="text-align:center">수량×</div><div style="text-align:center">VAT</div><div></div>
+                    <div>항목명</div><div>USD</div><div>원화</div><div>메모</div>
+                    <div title="이 항목 비용을 수량만큼 곱할지(=한 개당 단가) 또는 한 번에만 발생하는 고정 비용인지 선택">비용 적용 방식</div>
+                    <div title="이 항목에 부가세 10%를 자동으로 더할지 선택">부가세</div>
+                    <div></div>
                </div>` + cat.items.map(it => `
                 <div class="mg-item">
                     <input type="text" value="${escapeHtml(it.name)}" placeholder="항목명" oninput="updateMarginItem(${cat.id}, ${it.id}, 'name', this.value)">
                     <input type="number" step="0.01" min="0" value="${it.currency === 'USD' || it.amountUsd ? (Math.round(it.amountUsd * 100) / 100) : ''}" placeholder="$" data-mg-field="amountUsd" data-mg-cat="${cat.id}" data-mg-item="${it.id}" oninput="updateMarginItem(${cat.id}, ${it.id}, 'amountUsd', this.value)">
                     <input type="number" step="1" min="0" value="${it.amountKrw ? Math.round(it.amountKrw) : ''}" placeholder="원" data-mg-field="amountKrw" data-mg-cat="${cat.id}" data-mg-item="${it.id}" oninput="updateMarginItem(${cat.id}, ${it.id}, 'amountKrw', this.value)">
                     <input type="text" value="${escapeHtml(it.note || '')}" placeholder="메모" oninput="updateMarginItem(${cat.id}, ${it.id}, 'note', this.value)">
-                    <label style="display:flex;align-items:center;justify-content:center;cursor:pointer" title="수량과 곱하기 (단가성 항목)"><input type="checkbox" ${it.quantityMul ? 'checked' : ''} onchange="updateMarginItem(${cat.id}, ${it.id}, 'quantityMul', this.checked)" style="cursor:pointer;width:16px;height:16px"></label>
-                    <label style="display:flex;align-items:center;justify-content:center;cursor:pointer" title="부가세 10% 자동 가산"><input type="checkbox" ${it.vat ? 'checked' : ''} onchange="updateMarginItem(${cat.id}, ${it.id}, 'vat', this.checked)" style="cursor:pointer;width:16px;height:16px"></label>
+                    <select onchange="updateMarginItem(${cat.id}, ${it.id}, 'quantityMul', this.value === '1')" title="이 항목 비용을 수량만큼 곱할지 결정">
+                        <option value="1" ${it.quantityMul ? 'selected' : ''}>1개당 단가</option>
+                        <option value="0" ${!it.quantityMul ? 'selected' : ''}>전체 일괄</option>
+                    </select>
+                    <select onchange="updateMarginItem(${cat.id}, ${it.id}, 'vat', this.value === '1')" title="부가세 10% 자동 가산">
+                        <option value="0" ${!it.vat ? 'selected' : ''}>안 함</option>
+                        <option value="1" ${it.vat ? 'selected' : ''}>+10%</option>
+                    </select>
                     <button class="mg-icon-btn danger" onclick="removeMarginItem(${cat.id}, ${it.id})" title="항목 삭제">×</button>
                 </div>
             `).join('');
@@ -13790,8 +13838,8 @@ async function saveMarginSimulation() {
         if (idx >= 0) marginSimulations[idx] = fresh; else marginSimulations.unshift(fresh);
         marginCalcState.id = fresh.id;
         marginCalcState.updatedAt = fresh.updatedAt;
-        updateMarginEditTitle();
         showToast('시뮬레이션이 저장되었습니다');
+        showMarginListView();
     } catch (err) {
         console.error('시뮬레이션 저장 실패:', err);
         showToast('저장 실패: ' + err.message);
@@ -13898,9 +13946,11 @@ function renderMarginListCards() {
             if (it.vat) amt *= 1.1;
             return a + amt;
         }, 0), 0);
+        const costPerUnit = qty > 0 ? totalCost / qty : 0;
         const salePerUnitVatIncl = s.saleVatIncluded ? (s.salePrice || 0) : (s.salePrice || 0) * 1.1;
         const totalSale = salePerUnitVatIncl * qty;
         const margin = totalSale - totalCost;
+        const marginPerUnit = qty > 0 ? margin / qty : 0;
         const marginRate = totalSale > 0 ? (margin / totalSale * 100) : 0;
         const profitClass = margin >= 0 ? 'profit' : 'loss';
         const subParts = [];
@@ -13908,6 +13958,8 @@ function renderMarginListCards() {
         if (s.client) subParts.push(`<span>🏢 ${escapeHtml(s.client)}</span>`);
         if (qty > 1) subParts.push(`<span>📋 ${qty.toLocaleString()}개</span>`);
         const dateStr = (s.updatedAt || '').slice(0, 10);
+        const subFmt = (n) => Math.round(n).toLocaleString() + '원';
+        const subStyle = 'font-size:11px;color:var(--text-tertiary);font-weight:600;margin-top:2px';
 
         return `
             <div class="mg-list-card" onclick="openMarginSimulationById(${s.id})">
@@ -13919,18 +13971,22 @@ function renderMarginListCards() {
                     <div>
                         <div class="mg-list-card-stat-label">총 원가</div>
                         <div class="mg-list-card-stat-value">${fmt(totalCost)}</div>
+                        <div style="${subStyle}">개당 ${subFmt(costPerUnit)}</div>
                     </div>
                     <div>
                         <div class="mg-list-card-stat-label">총 판매액</div>
                         <div class="mg-list-card-stat-value">${fmt(totalSale)}</div>
+                        <div style="${subStyle}">개당 ${subFmt(salePerUnitVatIncl)}</div>
                     </div>
                     <div>
                         <div class="mg-list-card-stat-label">마진</div>
                         <div class="mg-list-card-stat-value ${profitClass}">${fmt(margin)}</div>
+                        <div style="${subStyle}">개당 ${subFmt(marginPerUnit)}</div>
                     </div>
                     <div>
                         <div class="mg-list-card-stat-label">마진율</div>
                         <div class="mg-list-card-stat-value ${profitClass}">${fmtPct(marginRate)}</div>
+                        <div style="${subStyle}">${s.saleVatIncluded ? 'VAT 포함가' : 'VAT 별도가'}</div>
                     </div>
                 </div>
                 <div class="mg-list-card-foot">
