@@ -261,8 +261,78 @@ document.addEventListener('DOMContentLoaded', () => {
     setupShortcuts();
     setupMarketdbHandlers();
     setupNavTooltips();
+    setupDragAutoScroll();
     checkAuth();
 });
+
+// 드래그 중 뷰포트(또는 스크롤 가능한 컨테이너) 상/하 가장자리에 가까워지면
+// 자동 스크롤되어, 현재 보이지 않는 위치에도 드롭할 수 있게 한다.
+// 모든 draggable 요소(카드/태스크/제안서 아이템/이미지 등)에 자동 적용.
+function setupDragAutoScroll() {
+    const EDGE_PX = 90;       // 가장자리로부터 트리거 거리
+    const MAX_SPEED = 22;     // 한 프레임당 최대 픽셀
+    let rafId = null;
+    let target = null;        // { el|null(=window), vy }
+
+    function findScrollable(x, y) {
+        let el = document.elementFromPoint(x, y);
+        while (el && el !== document.body && el !== document.documentElement) {
+            const style = getComputedStyle(el);
+            const oy = style.overflowY;
+            if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 1) {
+                return el;
+            }
+            el = el.parentElement;
+        }
+        return null; // null = window
+    }
+
+    function computeVelocity(top, bottom, cy) {
+        if (cy < top + EDGE_PX) {
+            const t = (top + EDGE_PX - cy) / EDGE_PX;
+            return -Math.ceil(Math.min(1, Math.max(0, t)) * MAX_SPEED);
+        }
+        if (cy > bottom - EDGE_PX) {
+            const t = (cy - (bottom - EDGE_PX)) / EDGE_PX;
+            return Math.ceil(Math.min(1, Math.max(0, t)) * MAX_SPEED);
+        }
+        return 0;
+    }
+
+    function tick() {
+        if (!target || !target.vy) { rafId = null; return; }
+        if (target.el) target.el.scrollTop += target.vy;
+        else window.scrollBy(0, target.vy);
+        rafId = requestAnimationFrame(tick);
+    }
+
+    function onDragOver(e) {
+        const cy = e.clientY;
+        const cx = e.clientX;
+        const el = findScrollable(cx, cy);
+        let top, bottom;
+        if (el) {
+            const r = el.getBoundingClientRect();
+            top = r.top; bottom = r.bottom;
+        } else {
+            top = 0; bottom = window.innerHeight;
+        }
+        const vy = computeVelocity(top, bottom, cy);
+        target = vy ? { el, vy } : null;
+        if (target && rafId == null) rafId = requestAnimationFrame(tick);
+    }
+
+    function stop() {
+        target = null;
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    }
+
+    document.addEventListener('dragover', onDragOver);
+    document.addEventListener('dragend', stop, true);
+    document.addEventListener('drop', stop, true);
+    // 드래그 중에 ESC 등으로 취소되는 케이스도 안전하게 정리
+    window.addEventListener('blur', stop);
+}
 
 // 사이드바 메뉴 hover 시 오른쪽에 설명 툴팁 표시
 // .sidebar 내 [data-tip] 요소에 대해 delegation 으로 동작 — 동적으로 추가되는 URL 바로가기 등에도 자동 적용
