@@ -14026,7 +14026,7 @@ function renderMarginSummary(r) {
                             }
                             if (it.vat) parts.push('× 1.1');
                             const calcStr = parts.join(' ');
-                            return `<div style="padding:4px 0 6px 12px;line-height:1.5;border-bottom:1px dashed var(--gray-100);margin-bottom:2px">
+                            return `<div style="padding:4px 0 4px 12px;line-height:1.5">
                                 <div style="font-size:13px;color:var(--gray-900);font-weight:600;white-space:normal;word-break:keep-all">↳ ${escapeHtml(it.name)}</div>
                                 <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:2px">
                                     <span style="flex:1;min-width:0;font-size:12px;color:var(--gray-700);font-variant-numeric:tabular-nums">${calcStr}</span>
