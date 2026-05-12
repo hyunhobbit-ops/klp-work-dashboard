@@ -14026,9 +14026,12 @@ function renderMarginSummary(r) {
                             }
                             if (it.vat) parts.push('× 1.1');
                             const calcStr = parts.join(' ');
-                            return `<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--gray-700);padding:3px 0 3px 12px;line-height:1.5;gap:8px">
-                                <span style="flex:1;min-width:0;white-space:normal;word-break:keep-all">↳ ${escapeHtml(it.name)} : <span style="color:var(--gray-900);font-variant-numeric:tabular-nums">${calcStr}</span></span>
-                                <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-weight:700;text-align:right">${fmtMain(it.cost)}${subInline(it.cost)}</span>
+                            return `<div style="padding:4px 0 6px 12px;line-height:1.5;border-bottom:1px dashed var(--gray-100);margin-bottom:2px">
+                                <div style="font-size:13px;color:var(--gray-900);font-weight:600;white-space:normal;word-break:keep-all">↳ ${escapeHtml(it.name)}</div>
+                                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:2px">
+                                    <span style="flex:1;min-width:0;font-size:12px;color:var(--gray-700);font-variant-numeric:tabular-nums">${calcStr}</span>
+                                    <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-weight:700;font-size:13px;text-align:right;color:var(--gray-900)">${fmtMain(it.cost)}${subInline(it.cost)}</span>
+                                </div>
                             </div>`;
                         }).join('')}
                     </div>`;
