@@ -9,6 +9,33 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null; // { id, name, role }
 
+// =====================================
+// 🚀 Stale-while-revalidate 캐시 (localStorage)
+// =====================================
+// 새로고침 시: 캐시된 데이터로 즉시 렌더(<100ms) → 백그라운드 fetch → 최신화
+// 캐시 키는 사용자별로 스코프 (공유 PC 안전). 24h TTL (만료 시 캐시 무시하고 fetch만 사용)
+const CACHE_VERSION = 'v1';
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+function _cacheKey(name) {
+    const u = (currentUser && currentUser.name) || 'anon';
+    return `klp_cache_${CACHE_VERSION}_${u}_${name}`;
+}
+function cacheRead(name) {
+    try {
+        const raw = localStorage.getItem(_cacheKey(name));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (!parsed || !parsed.at) return null;
+        if (Date.now() - parsed.at > CACHE_TTL_MS) return null;
+        return parsed.data;
+    } catch (_) { return null; }
+}
+function cacheWrite(name, data) {
+    try {
+        localStorage.setItem(_cacheKey(name), JSON.stringify({ at: Date.now(), data }));
+    } catch (_) { /* QuotaExceeded 등은 무시 */ }
+}
+
 // ===== Auth =====
 // 표시 이름 매핑 (김관택 → 대표님)
 const DISPLAY_NAME_MAP = { '김관택': '대표님' };
@@ -103,11 +130,54 @@ function showLogin() {
     document.getElementById('app').style.display = 'none';
 }
 
+// 캐시된 데이터로 모든 배열을 즉시 채움. 캐시가 하나라도 있으면 true 반환.
+function hydrateAllFromCache() {
+    let any = false;
+    const apply = (cacheName, arr) => {
+        const cached = cacheRead(cacheName);
+        if (Array.isArray(cached)) {
+            arr.length = 0;
+            cached.forEach(x => arr.push(x));
+            any = true;
+        }
+    };
+    const profilesCache = cacheRead('profiles');
+    if (Array.isArray(profilesCache)) { allProfiles = profilesCache; any = true; }
+    apply('domesticProjects', domesticProjects);
+    // projects = domesticProjects + overseasProjects (홈 카운트에 사용) — 캐시 hydrate 시 재구성
+    if (Array.isArray(cacheRead('domesticProjects'))) {
+        projects.length = 0;
+        domesticProjects.forEach(p => projects.push(p));
+        overseasProjects.forEach(p => projects.push(p));
+    }
+    apply('dailyTasks', dailyTasks);
+    apply('deliveries', deliveries);
+    apply('clients', clients);
+    apply('clientsOverseas', clientsOverseas);
+    apply('marketingCampaigns', marketingCampaigns);
+    apply('productsDB', productsDB);
+    apply('proposals', proposals);
+    const cats = cacheRead('productCategories');
+    if (Array.isArray(cats) && cats.length > 0) { PRODUCT_CATEGORIES = cats; any = true; }
+    return any;
+}
+
 async function showApp() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
-    // 모든 초기 데이터 로드를 병렬로 (서로 독립적). 순차 await 9개 → 한 번의 라운드트립 시간으로 단축.
-    const profilesP = sb.from('profiles').select('name, role').then(({ data }) => { if (data) allProfiles = data; });
+
+    // 🚀 1) 캐시 즉시 복원 + 렌더 — 이전 방문이 있으면 100ms 안에 화면 표시
+    const hadCache = hydrateAllFromCache();
+    if (hadCache) {
+        try { renderAll(); } catch (e) { console.warn('cache render:', e); }
+        try { renderProductCategoryChips(); } catch (_) {}
+    }
+
+    // 2) 백그라운드 fetch — 가장 느린 쿼리가 끝나면 한 번 더 renderAll로 최신화
+    //    캐시 hit이면 사용자에겐 변화 없음, miss면 빈 화면에서 채워짐
+    const profilesP = sb.from('profiles').select('name, role').then(({ data }) => {
+        if (data) { allProfiles = data; cacheWrite('profiles', data); }
+    });
     await Promise.all([
         profilesP,
         loadDomesticProjectsFromDb(),
@@ -2616,8 +2686,16 @@ function renderDateFilter() {
     container.innerHTML = html;
 }
 
-function setDeliveryYear(val) {
+async function setDeliveryYear(val) {
     currentDeliveryYear = val;
+    // 사용자가 이전 데이터를 보려는데 6개월치만 있으면 전체 fetch (1회성)
+    if (!deliveriesFullLoaded) {
+        const thisYear = String(new Date().getFullYear());
+        if (val === 'all' || (val && val !== thisYear)) {
+            showToast('이전 택배 데이터를 불러오는 중...');
+            await loadDeliveriesFromDb({ full: true });
+        }
+    }
     renderDeliveries();
 }
 
@@ -4622,6 +4700,7 @@ async function loadDomesticProjectsFromDb() {
         projects.length = 0;
         domesticProjects.forEach(p => projects.push(p));
         overseasProjects.forEach(p => projects.push(p));
+        cacheWrite('domesticProjects', domesticProjects);
     } catch (err) {
         console.error('국내 프로젝트 로드 실패 (테이블 미생성?):', err.message);
     }
@@ -4669,6 +4748,7 @@ async function loadDailyTasksFromDb() {
         if (error) throw error;
         dailyTasks.length = 0;
         (data || []).forEach(r => dailyTasks.push(taskFromDb(r)));
+        cacheWrite('dailyTasks', dailyTasks);
     } catch (err) {
         console.error('일일계획 로드 실패:', err.message);
         showToast('일일계획 로드 실패: ' + err.message);
@@ -4939,12 +5019,27 @@ function deliveryFromDb(r) {
         author: r.author || ''
     };
 }
-async function loadDeliveriesFromDb() {
+// 택배 데이터는 행 수가 많아 (1,800+) 기본은 최근 6개월만 로드 → 초기 fetch 가벼움
+// 사용자가 이전 연도를 선택하면 setDeliveryYear 가 { full:true } 로 재호출
+let deliveriesFullLoaded = false;
+async function loadDeliveriesFromDb({ full = false } = {}) {
     try {
-        const { data, error } = await sb.from('deliveries').select('*').order('date', { ascending: false }).order('id', { ascending: false });
+        let query = sb.from('deliveries').select('*').order('date', { ascending: false }).order('id', { ascending: false });
+        if (!full) {
+            const d = new Date();
+            d.setMonth(d.getMonth() - 6);
+            query = query.gte('date', d.toISOString().slice(0, 10));
+        }
+        const { data, error } = await query;
         if (error) throw error;
         deliveries.length = 0;
         (data || []).forEach(r => deliveries.push(deliveryFromDb(r)));
+        if (full) {
+            deliveriesFullLoaded = true;
+            // 전체 데이터는 양이 커서 캐시하지 않음 (다음 init은 다시 6개월부터)
+        } else {
+            cacheWrite('deliveries', deliveries);
+        }
     } catch (err) {
         console.error('택배 로드 실패:', err.message);
         showToast('택배 로드 실패: ' + err.message);
@@ -5035,6 +5130,7 @@ async function loadClientsFromDb() {
         }
         clients.length = 0;
         all.forEach(c => clients.push(c));
+        cacheWrite('clients', clients);
     } catch (err) {
         console.error('고객사 로드 실패:', err.message);
         showToast('고객사 로드 실패: ' + err.message);
@@ -5611,6 +5707,7 @@ async function loadClientsOverseasFromDb() {
         if (error) throw error;
         clientsOverseas.length = 0;
         (data || []).forEach(r => clientsOverseas.push(clientOverseasFromDb(r)));
+        cacheWrite('clientsOverseas', clientsOverseas);
     } catch (err) {
         console.error('해외 거래처 로드 실패:', err.message);
         // 테이블이 아직 없으면 조용히 무시 (마이그레이션 전)
@@ -5903,6 +6000,7 @@ async function loadMarketingCampaignsFromDb() {
         if (error) throw error;
         marketingCampaigns.length = 0;
         (data || []).forEach(r => marketingCampaigns.push(marketingFromDb(r)));
+        cacheWrite('marketingCampaigns', marketingCampaigns);
     } catch (err) {
         console.error('마케팅 로드 실패:', err.message);
         if (!/relation .* does not exist/i.test(err.message || '')) {
@@ -6704,6 +6802,7 @@ async function loadProductCategoriesFromDb() {
         if (error) throw error;
         if (Array.isArray(data) && data.length > 0) {
             PRODUCT_CATEGORIES = data.map(r => r.name);
+            cacheWrite('productCategories', PRODUCT_CATEGORIES);
         }
     } catch (err) {
         console.warn('카테고리 로드 실패(기본값 사용):', err.message);
@@ -6868,6 +6967,7 @@ async function loadProductsFromDb() {
         if (error) throw error;
         productsDB.length = 0;
         (data || []).forEach(r => productsDB.push(productFromDb(r)));
+        cacheWrite('productsDB', productsDB);
     } catch (err) {
         console.error('상품 DB 로드 실패:', err.message);
         if (!/relation .* does not exist/i.test(err.message || '')) {
@@ -6975,6 +7075,7 @@ async function loadProposalsFromDb() {
         if (error) throw error;
         proposals.length = 0;
         (data || []).forEach(r => proposals.push(proposalFromDb(r)));
+        cacheWrite('proposals', proposals);
     } catch (err) {
         console.error('제안서 로드 실패:', err.message);
         if (!/relation .* does not exist/i.test(err.message || '')) {
