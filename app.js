@@ -13354,13 +13354,15 @@ function makeMarginItem(partial = {}) {
         currency: 'KRW',     // 'USD' | 'KRW'
         amountUsd: 0,
         amountKrw: 0,
+        feeType: 'amount',   // 'amount' | 'percent' (percent: 판매가 × %)
+        feePercent: 0,       // feeType === 'percent'일 때 사용
         quantityMul: true,   // true: 단가성 (수량 × 단가), false: 일괄
         vat: false,          // 부가세 10% 가산 여부
         note: ''
     }, partial);
 }
-function makeMarginCategory(name = '카테고리', items = []) {
-    return { id: marginNextCatId++, name, items };
+function makeMarginCategory(name = '카테고리', items = [], opts = {}) {
+    return Object.assign({ id: marginNextCatId++, name, items, defaultFeeType: 'amount' }, opts);
 }
 
 function defaultMarginState() {
@@ -13371,14 +13373,20 @@ function defaultMarginState() {
         client: '',
         manufacturer: '',
         salesMethod: '',
+        saleCountry: 'domestic',
         exchangeRate: 1500,
         quantity: 1,
         salePrice: 0,
+        salePriceUsd: 0,
+        salePriceCurrency: 'KRW',
         saleVatIncluded: false,
         targetMarginRate: null,
         categories: [
             makeMarginCategory('본품', [makeMarginItem({ name: '본품 단가' })]),
             makeMarginCategory('패키지', [makeMarginItem({ name: '박스/포장' })]),
+            makeMarginCategory('플랫폼 수수료', [
+                makeMarginItem({ name: '', feeType: 'percent', feePercent: 0, quantityMul: false, vat: true })
+            ], { defaultFeeType: 'percent' }),
             makeMarginCategory('기타 비용', [])
         ],
         note: '',
@@ -13456,6 +13464,8 @@ function seedMarginTemplate() {
     marginCalcState.exchangeRate = 1500;
     marginCalcState.quantity = 1;
     marginCalcState.salePrice = 72000;
+    marginCalcState.salePriceUsd = 72000 / 1500;
+    marginCalcState.salePriceCurrency = 'KRW';
     marginCalcState.saleVatIncluded = false;
     marginCalcState.client = '';
     marginCalcState.manufacturer = '';
@@ -13501,8 +13511,33 @@ function onMarginGlobalChange() {
     if (!marginCalcState) return;
     const q = parseMarginNumber(document.getElementById('marginQuantity').value) || 1;
     marginCalcState.quantity = Math.max(1, q);
-    marginCalcState.salePrice = parseMarginNumber(document.getElementById('marginSalePrice').value);
     marginCalcState.saleVatIncluded = document.getElementById('marginSaleVat').value === 'true';
+    recalcMargin();
+}
+
+// 판매가 듀얼 입력 (USD / KRW) — 한쪽 입력 시 반대편 자동 환산 (포커스 유지)
+function onMarginSalePriceChange(field, value) {
+    if (!marginCalcState) return;
+    const rate = marginCalcState.exchangeRate || 1500;
+    if (field === 'USD') {
+        marginCalcState.salePriceUsd = parseMarginNumber(value);
+        marginCalcState.salePriceCurrency = 'USD';
+        marginCalcState.salePrice = marginCalcState.salePriceUsd * rate;
+        const krwEl = document.getElementById('marginSalePrice');
+        if (krwEl) krwEl.value = formatMarginValue(marginCalcState.salePrice, false);
+    } else {
+        marginCalcState.salePrice = parseMarginNumber(value);
+        marginCalcState.salePriceCurrency = 'KRW';
+        marginCalcState.salePriceUsd = rate ? (marginCalcState.salePrice / rate) : 0;
+        const usdEl = document.getElementById('marginSalePriceUsd');
+        if (usdEl) usdEl.value = formatMarginValue(marginCalcState.salePriceUsd, true);
+    }
+    recalcMargin();
+}
+
+function onMarginSaleCountryChange() {
+    if (!marginCalcState) return;
+    marginCalcState.saleCountry = document.getElementById('marginSaleCountry').value === 'global' ? 'global' : 'domestic';
     recalcMargin();
 }
 
@@ -13523,6 +13558,16 @@ function onExchangeRateChange() {
             if (usdEl) usdEl.value = formatMarginValue(it.amountUsd, true);
         }
     }));
+    // 판매가도 source-of-truth 기준으로 반대편 갱신
+    if (marginCalcState.salePriceCurrency === 'USD') {
+        marginCalcState.salePrice = marginCalcState.salePriceUsd * newRate;
+        const krwEl = document.getElementById('marginSalePrice');
+        if (krwEl) krwEl.value = formatMarginValue(marginCalcState.salePrice, false);
+    } else {
+        marginCalcState.salePriceUsd = newRate ? (marginCalcState.salePrice / newRate) : 0;
+        const usdEl = document.getElementById('marginSalePriceUsd');
+        if (usdEl) usdEl.value = formatMarginValue(marginCalcState.salePriceUsd, true);
+    }
     recalcMargin();
 }
 
@@ -13545,10 +13590,12 @@ function bindMarginInputsFromState() {
     set('marginClient', s.client);
     set('marginManufacturer', s.manufacturer);
     set('marginSalesMethod', s.salesMethod);
+    const scEl = document.getElementById('marginSaleCountry'); if (scEl) scEl.value = s.saleCountry === 'global' ? 'global' : 'domestic';
     // 숫자 input — 콤마 포맷
     set('marginExchangeRate', formatMarginValue(s.exchangeRate, false) || '0');
     set('marginQuantity', formatMarginValue(s.quantity, false) || '1');
     set('marginSalePrice', formatMarginValue(s.salePrice, false) || '0');
+    set('marginSalePriceUsd', formatMarginValue(s.salePriceUsd, true) || '0');
     const svEl = document.getElementById('marginSaleVat'); if (svEl) svEl.value = s.saleVatIncluded ? 'true' : 'false';
     set('marginTargetRate', s.targetMarginRate == null ? '' : s.targetMarginRate);
     set('marginNote', s.note);
@@ -13573,7 +13620,11 @@ function renameMarginCategory(catId, name) {
 function addMarginItem(catId) {
     const cat = marginCalcState.categories.find(c => c.id === catId);
     if (!cat) return;
-    cat.items.push(makeMarginItem());
+    if (cat.defaultFeeType === 'percent') {
+        cat.items.push(makeMarginItem({ feeType: 'percent', feePercent: 0, quantityMul: false, vat: true }));
+    } else {
+        cat.items.push(makeMarginItem());
+    }
     renderMarginCategories();
     recalcMargin();
 }
@@ -13612,22 +13663,31 @@ function updateMarginItem(catId, itemId, field, value) {
         it.amountUsd = rate ? (it.amountKrw / rate) : 0;
         const usdEl = document.querySelector(`[data-mg-field="amountUsd"][data-mg-cat="${catId}"][data-mg-item="${itemId}"]`);
         if (usdEl) usdEl.value = formatMarginValue(it.amountUsd, true);
+    } else if (field === 'feePercent') {
+        it.feePercent = parseMarginNumber(value);
+        it.feeType = 'percent';
     } else if (field === 'quantityMul' || field === 'vat') {
         it[field] = !!value;
     }
     recalcMargin();
 }
 
-// 항목 비용 (KRW 기준) 계산
-function marginItemCost(item, quantity) {
-    const rate = marginCalcState.exchangeRate || 0;
-    let amount = item.currency === 'USD' ? (item.amountUsd || 0) * rate : (item.amountKrw || 0);
-    if (item.quantityMul) amount *= quantity;
+// 항목 비용 (KRW 기준) 계산. percent 항목은 총 판매액(=판매가 VAT 포함 × 수량) 기준 — 항상 전체 일괄
+function marginItemCost(item, quantity, salePerUnitVatIncl) {
+    let amount;
+    if (item.feeType === 'percent') {
+        // 플랫폼 수수료는 총 판매액에 대해 적용 (적용 방식 메뉴 없음)
+        amount = (salePerUnitVatIncl || 0) * quantity * ((item.feePercent || 0) / 100);
+    } else {
+        const rate = marginCalcState.exchangeRate || 0;
+        amount = item.currency === 'USD' ? (item.amountUsd || 0) * rate : (item.amountKrw || 0);
+        if (item.quantityMul) amount *= quantity;
+    }
     if (item.vat) amount *= 1.1;
     return amount;
 }
-function marginCategorySubtotal(cat, quantity) {
-    return cat.items.reduce((sum, it) => sum + marginItemCost(it, quantity), 0);
+function marginCategorySubtotal(cat, quantity, salePerUnitVatIncl) {
+    return cat.items.reduce((sum, it) => sum + marginItemCost(it, quantity, salePerUnitVatIncl), 0);
 }
 
 // 메인 재계산 + 요약 패널 렌더
@@ -13636,15 +13696,15 @@ function recalcMargin() {
     const s = marginCalcState;
     const qty = Math.max(1, s.quantity || 1);
 
-    // 총 원가
-    const totalCost = s.categories.reduce((sum, c) => sum + marginCategorySubtotal(c, qty), 0);
-    const costPerUnit = qty > 0 ? totalCost / qty : 0;
-
-    // 판매가 (VAT 포함가 기준으로 환산)
+    // 판매가 (VAT 포함가 기준으로 환산) — 플랫폼 수수료 등 percent 항목에 사용되므로 먼저 계산
     const salePerUnit = s.salePrice || 0;
     const saleVatIncluded = s.saleVatIncluded;
     const salePerUnitVatIncl = saleVatIncluded ? salePerUnit : salePerUnit * 1.1;
     const totalSale = salePerUnitVatIncl * qty;
+
+    // 총 원가
+    const totalCost = s.categories.reduce((sum, c) => sum + marginCategorySubtotal(c, qty, salePerUnitVatIncl), 0);
+    const costPerUnit = qty > 0 ? totalCost / qty : 0;
 
     // 마진
     const margin = totalSale - totalCost;
@@ -13665,22 +13725,45 @@ function recalcMargin() {
 
     // 카테고리 소계 갱신 + breakdown 데이터 구성
     const rate = s.exchangeRate || 0;
+    const usdFmt = (krw) => rate > 0 ? '$' + (krw / rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
     const breakdown = s.categories.map(cat => {
-        const subtotal = marginCategorySubtotal(cat, qty);
+        const subtotal = marginCategorySubtotal(cat, qty, salePerUnitVatIncl);
         const el = document.querySelector(`[data-mg-subtotal="${cat.id}"]`);
-        if (el) el.textContent = Math.round(subtotal).toLocaleString() + '원';
+        if (el) {
+            const krwStr = Math.round(subtotal).toLocaleString() + '원';
+            const usdStr = rate > 0 ? ` (${usdFmt(subtotal)})` : '';
+            el.textContent = krwStr + usdStr;
+        }
         return {
             name: cat.name || '(이름 없음)',
             subtotal,
             items: cat.items.map(it => {
+                const itemCost = marginItemCost(it, qty, salePerUnitVatIncl);
                 // 1단위 KRW 환산 (수량/VAT 적용 전 raw 단가)
-                const unitAmount = it.currency === 'USD' ? (it.amountUsd || 0) * rate : (it.amountKrw || 0);
+                let unitAmount;
+                if (it.feeType === 'percent') {
+                    unitAmount = (salePerUnitVatIncl || 0) * ((it.feePercent || 0) / 100);
+                } else {
+                    unitAmount = it.currency === 'USD' ? (it.amountUsd || 0) * rate : (it.amountKrw || 0);
+                }
+                // percent 행 미리보기 — KRW(상)/USD(하) 2줄 (포커스 보존 위해 직접 갱신)
+                if (it.feeType === 'percent') {
+                    const previewEl = document.querySelector(`[data-mg-preview="${cat.id}-${it.id}"]`);
+                    if (previewEl) {
+                        const krwEl = previewEl.querySelector('[data-mg-preview-krw]');
+                        const usdEl = previewEl.querySelector('[data-mg-preview-usd]');
+                        if (krwEl) krwEl.textContent = '≈ ' + Math.round(unitAmount).toLocaleString() + '원/개';
+                        if (usdEl) usdEl.textContent = rate > 0 ? usdFmt(unitAmount) + '/개' : '';
+                    }
+                }
                 return {
                     name: (it.name || '').trim() || '(이름 없음)',
-                    cost: marginItemCost(it, qty),
+                    cost: itemCost,
                     unitAmount,
                     quantityMul: it.quantityMul,
-                    vat: it.vat
+                    vat: it.vat,
+                    feeType: it.feeType || 'amount',
+                    feePercent: it.feePercent || 0
                 };
             })
         };
@@ -13692,14 +13775,26 @@ function recalcMargin() {
         margin, marginPerUnit, marginRate,
         targetRate: s.targetMarginRate,
         recommendedSaleVatIncl, recommendedSaleNoVat,
-        breakdown
+        breakdown,
+        isGlobal: s.saleCountry === 'global',
+        exchangeRate: s.exchangeRate || 1500
     });
 }
 
 function renderMarginSummary(r) {
     const wrap = document.getElementById('marginSummaryPanel');
     if (!wrap) return;
-    const fmt = (n) => Math.round(n).toLocaleString() + '원';
+    const isGlobal = !!r.isGlobal;
+    const rate = r.exchangeRate || 1500;
+
+    const fmtKrw = (n) => Math.round(n).toLocaleString() + '원';
+    const fmtUsd = (n) => '$' + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    // krw 값을 받아 글로벌 모드면 USD 메인 + KRW 서브, 국내 모드면 KRW만 반환
+    const fmtMain = (krw) => isGlobal ? fmtUsd(rate ? krw / rate : 0) : fmtKrw(krw);
+    const fmtSub = (krw) => isGlobal ? fmtKrw(krw) : '';
+    const subInline = (krw) => isGlobal ? ` <span style="font-size:12px;color:var(--text-tertiary);font-weight:600">(${fmtKrw(krw)})</span>` : '';
+    const subBlock = (krw) => isGlobal ? `<div style="font-size:12px;color:var(--text-tertiary);font-weight:600;margin-top:2px">${fmtKrw(krw)}</div>` : '';
+
     const fmtPct = (n) => (n).toFixed(1) + '%';
     const profitClass = r.margin >= 0 ? 'profit' : 'loss';
 
@@ -13714,11 +13809,11 @@ function renderMarginSummary(r) {
                 <div class="mg-summary-title" style="font-size:13px;font-weight:700;margin-bottom:10px">🎯 목표 마진율 ${r.targetRate}% 달성을 위한 권장 판매가</div>
                 <div class="mg-summary-row" style="padding:8px 0">
                     <span class="mg-summary-label">권장 판매가 (VAT 포함, 1개)</span>
-                    <span class="mg-summary-value">${fmt(r.recommendedSaleVatIncl)}</span>
+                    <span class="mg-summary-value">${fmtMain(r.recommendedSaleVatIncl)}${subInline(r.recommendedSaleVatIncl)}</span>
                 </div>
                 <div class="mg-summary-row" style="padding:8px 0">
                     <span class="mg-summary-label">권장 판매가 (VAT 별도, 1개)</span>
-                    <span class="mg-summary-value">${fmt(r.recommendedSaleNoVat)}</span>
+                    <span class="mg-summary-value">${fmtMain(r.recommendedSaleNoVat)}${subInline(r.recommendedSaleNoVat)}</span>
                 </div>
             </div>`;
     }
@@ -13737,19 +13832,27 @@ function renderMarginSummary(r) {
                     <div style="margin-bottom:10px">
                         <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:14px;font-weight:800;color:var(--gray-900);padding:5px 0">
                             <span>${escapeHtml(cat.name)}</span>
-                            <span style="font-variant-numeric:tabular-nums">${fmt(cat.subtotal)}</span>
+                            <span style="font-variant-numeric:tabular-nums;text-align:right">${fmtMain(cat.subtotal)}${subInline(cat.subtotal)}</span>
                         </div>
                         ${nonzero.map(it => {
                             // 단가 × 수량 (× 1.1) 형식 — 누구나 이해할 수 있게
-                            const unitStr = (formatMarginValue(it.unitAmount, false) || '0') + '원';
-                            const parts = [unitStr];
-                            if (it.quantityMul) parts.push(`× ${r.qty.toLocaleString()}개`);
-                            else parts.push('(일괄)');
+                            const parts = [];
+                            if (it.feeType === 'percent') {
+                                const pctStr = (Number(it.feePercent) || 0).toString();
+                                parts.push(`총 판매액 × ${pctStr}%`);
+                            } else {
+                                const unitStr = isGlobal
+                                    ? fmtUsd(rate ? it.unitAmount / rate : 0)
+                                    : (formatMarginValue(it.unitAmount, false) || '0') + '원';
+                                parts.push(unitStr);
+                                if (it.quantityMul) parts.push(`× ${r.qty.toLocaleString()}개`);
+                                else parts.push('(일괄)');
+                            }
                             if (it.vat) parts.push('× 1.1');
                             const calcStr = parts.join(' ');
                             return `<div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--gray-700);padding:3px 0 3px 12px;line-height:1.5;gap:8px">
                                 <span style="flex:1;min-width:0;white-space:normal;word-break:keep-all">↳ ${escapeHtml(it.name)} : <span style="color:var(--gray-900);font-variant-numeric:tabular-nums">${calcStr}</span></span>
-                                <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-weight:700">${fmt(it.cost)}</span>
+                                <span style="font-variant-numeric:tabular-nums;flex-shrink:0;font-weight:700;text-align:right">${fmtMain(it.cost)}${subInline(it.cost)}</span>
                             </div>`;
                         }).join('')}
                     </div>`;
@@ -13759,24 +13862,27 @@ function renderMarginSummary(r) {
 
     wrap.innerHTML = `
         <div class="mg-summary-card">
-            <div style="font-size:13px;font-weight:700;color:var(--gray-700);margin-bottom:10px">총 원가 (${r.qty.toLocaleString()}개)</div>
-            <div class="mg-summary-value big">${fmt(r.totalCost)}</div>
-            <div style="font-size:13px;color:var(--gray-700);margin-top:6px">개당 ${fmt(r.costPerUnit)}</div>
+            <div style="font-size:13px;font-weight:700;color:var(--gray-700);margin-bottom:10px">총 원가 (${r.qty.toLocaleString()}개)${isGlobal ? ' · 글로벌 USD' : ''}</div>
+            <div class="mg-summary-value big">${fmtMain(r.totalCost)}</div>
+            ${subBlock(r.totalCost)}
+            <div style="font-size:13px;color:var(--gray-700);margin-top:6px">개당 ${fmtMain(r.costPerUnit)}${subInline(r.costPerUnit)}</div>
             ${breakdownHtml}
         </div>
 
         <div class="mg-summary-card">
             <div style="font-size:13px;font-weight:700;color:var(--gray-700);margin-bottom:10px">총 판매액 ${r.saleVatIncluded ? '(VAT 포함)' : '(VAT 포함가 환산)'}</div>
-            <div class="mg-summary-value big brand">${fmt(r.totalSale)}</div>
-            <div style="font-size:13px;color:var(--gray-700);margin-top:6px">개당 ${fmt(r.salePerUnitVatIncl)}${r.saleVatIncluded ? '' : ` <span style="color:var(--text-tertiary)">(별도 ${fmt(r.salePerUnit)})</span>`}</div>
+            <div class="mg-summary-value big brand">${fmtMain(r.totalSale)}</div>
+            ${subBlock(r.totalSale)}
+            <div style="font-size:13px;color:var(--gray-700);margin-top:6px">개당 ${fmtMain(r.salePerUnitVatIncl)}${subInline(r.salePerUnitVatIncl)}${r.saleVatIncluded ? '' : ` <span style="color:var(--text-tertiary)">(별도 ${fmtMain(r.salePerUnit)}${subInline(r.salePerUnit)})</span>`}</div>
         </div>
 
         <div class="mg-summary-card ${marginCardClass}">
             <div class="mg-summary-title" style="font-size:13px;font-weight:700;margin-bottom:10px">${r.margin >= 0 ? '💰 예상 마진' : '⚠️ 적자'}</div>
-            <div class="mg-summary-value big ${profitClass}">${fmt(r.margin)}</div>
+            <div class="mg-summary-value big ${profitClass}">${fmtMain(r.margin)}</div>
+            ${subBlock(r.margin)}
             <div class="mg-summary-row" style="padding:8px 0;margin-top:8px;border-top:1px solid rgba(0,0,0,.08)">
                 <span class="mg-summary-label">개당 마진</span>
-                <span class="mg-summary-value ${profitClass}">${fmt(r.marginPerUnit)}</span>
+                <span class="mg-summary-value ${profitClass}">${fmtMain(r.marginPerUnit)}${subInline(r.marginPerUnit)}</span>
             </div>
             <div class="mg-summary-row" style="padding:8px 0">
                 <span class="mg-summary-label">마진율</span>
@@ -13801,14 +13907,44 @@ function renderMarginCategories() {
     }
 
     wrap.innerHTML = cats.map(cat => {
-        const itemsHtml = cat.items.length === 0
-            ? `<div style="padding:14px;text-align:center;color:var(--gray-700);font-size:14px">항목이 없습니다</div>`
+        const isPercent = cat.defaultFeeType === 'percent';
+        const addBtnLabel = isPercent ? '+ 플랫폼 추가' : '+ 항목 추가';
+        const headHtml = isPercent
+            ? `<div class="mg-item mg-item-headrow">
+                    <div>플랫폼명</div><div>수수료 (%)</div><div title="판매가(VAT 포함) × % 기준 1개당 환산 KRW · USD">환산 (KRW · USD)</div><div>메모</div>
+                    <div title="플랫폼 수수료는 항상 총 판매액에 대해 일괄 적용됩니다">적용 방식</div>
+                    <div title="이 수수료에 부가세 10%를 자동으로 더할지 선택">부가세</div>
+                    <div></div>
+               </div>`
             : `<div class="mg-item mg-item-headrow">
                     <div>항목명</div><div>USD</div><div>원화</div><div>메모</div>
                     <div title="이 항목 비용을 수량만큼 곱할지(=한 개당 단가) 또는 한 번에만 발생하는 고정 비용인지 선택">비용 적용 방식</div>
                     <div title="이 항목에 부가세 10%를 자동으로 더할지 선택">부가세</div>
                     <div></div>
-               </div>` + cat.items.map(it => `
+               </div>`;
+        const itemsHtml = cat.items.length === 0
+            ? `<div style="padding:14px;text-align:center;color:var(--gray-700);font-size:14px">항목이 없습니다</div>`
+            : headHtml + cat.items.map(it => {
+                const isPctItem = it.feeType === 'percent';
+                if (isPctItem) {
+                    return `
+                    <div class="mg-item">
+                        <input type="text" value="${escapeHtml(it.name)}" placeholder="플랫폼명 (예: 쿠팡, 11번가, 자사몰)" oninput="updateMarginItem(${cat.id}, ${it.id}, 'name', this.value)">
+                        <input type="text" inputmode="decimal" value="${formatMarginValue(it.feePercent, true)}" placeholder="%" data-mg-field="feePercent" data-mg-cat="${cat.id}" data-mg-item="${it.id}" oninput="formatMarginNumberInput(this,true); updateMarginItem(${cat.id}, ${it.id}, 'feePercent', this.value)">
+                        <div data-mg-preview="${cat.id}-${it.id}" style="display:flex;flex-direction:column;justify-content:center;padding:2px 10px;font-variant-numeric:tabular-nums;line-height:1.25;overflow:hidden" title="판매가(VAT 포함) × % 환산 (KRW · USD)">
+                            <span data-mg-preview-krw style="font-size:13px;color:var(--gray-700);font-weight:600;white-space:nowrap">≈ 0원/개</span>
+                            <span data-mg-preview-usd style="font-size:11px;color:var(--text-tertiary);font-weight:500;white-space:nowrap"></span>
+                        </div>
+                        <input type="text" value="${escapeHtml(it.note || '')}" placeholder="메모" oninput="updateMarginItem(${cat.id}, ${it.id}, 'note', this.value)">
+                        <div style="display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--gray-700);font-weight:600;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:0 8px" title="플랫폼 수수료는 항상 총 판매액에 대해 일괄 적용됩니다">전체 일괄</div>
+                        <select onchange="updateMarginItem(${cat.id}, ${it.id}, 'vat', this.value === '1')" title="부가세 10% 자동 가산">
+                            <option value="0" ${!it.vat ? 'selected' : ''}>안 함</option>
+                            <option value="1" ${it.vat ? 'selected' : ''}>+10%</option>
+                        </select>
+                        <button class="mg-icon-btn danger" onclick="removeMarginItem(${cat.id}, ${it.id})" title="항목 삭제">×</button>
+                    </div>`;
+                }
+                return `
                 <div class="mg-item">
                     <input type="text" value="${escapeHtml(it.name)}" placeholder="항목명" oninput="updateMarginItem(${cat.id}, ${it.id}, 'name', this.value)">
                     <input type="text" inputmode="decimal" value="${formatMarginValue(it.amountUsd, true)}" placeholder="$" data-mg-field="amountUsd" data-mg-cat="${cat.id}" data-mg-item="${it.id}" oninput="formatMarginNumberInput(this,true); updateMarginItem(${cat.id}, ${it.id}, 'amountUsd', this.value)">
@@ -13824,7 +13960,8 @@ function renderMarginCategories() {
                     </select>
                     <button class="mg-icon-btn danger" onclick="removeMarginItem(${cat.id}, ${it.id})" title="항목 삭제">×</button>
                 </div>
-            `).join('');
+            `;
+            }).join('');
 
         return `
             <div class="mg-cat" data-mg-cat-card="${cat.id}">
@@ -13836,7 +13973,7 @@ function renderMarginCategories() {
                 <div style="display:flex;flex-direction:column;gap:2px">
                     ${itemsHtml}
                 </div>
-                <button class="mg-add-row" style="margin-top:10px;width:100%" onclick="addMarginItem(${cat.id})">+ 항목 추가</button>
+                <button class="mg-add-row" style="margin-top:10px;width:100%" onclick="addMarginItem(${cat.id})">${addBtnLabel}</button>
             </div>
         `;
     }).join('');
@@ -13865,6 +14002,12 @@ async function loadMarginSimulationsFromDb() {
 }
 
 function marginSimFromDb(r) {
+    const rate = Number(r.exchange_rate) || 1500;
+    const salePriceKrw = Number(r.sale_price) || 0;
+    const salePriceCurrency = r.sale_price_currency === 'USD' ? 'USD' : 'KRW';
+    const salePriceUsd = r.sale_price_usd != null
+        ? Number(r.sale_price_usd) || 0
+        : (rate ? salePriceKrw / rate : 0);
     return {
         id: r.id,
         name: r.name || '',
@@ -13872,20 +14015,26 @@ function marginSimFromDb(r) {
         client: r.client || '',
         manufacturer: r.manufacturer || '',
         salesMethod: r.sales_method || '',
-        exchangeRate: Number(r.exchange_rate) || 1500,
+        saleCountry: r.sale_country === 'global' ? 'global' : 'domestic',
+        exchangeRate: rate,
         quantity: Number(r.quantity) || 1,
-        salePrice: Number(r.sale_price) || 0,
+        salePrice: salePriceKrw,
+        salePriceUsd,
+        salePriceCurrency,
         saleVatIncluded: !!r.sale_vat_included,
         targetMarginRate: r.target_margin_rate == null ? null : Number(r.target_margin_rate),
         categories: Array.isArray(r.categories) ? r.categories.map(c => ({
             id: c.id != null ? c.id : marginNextCatId++,
             name: c.name || '',
+            defaultFeeType: c.defaultFeeType === 'percent' ? 'percent' : 'amount',
             items: Array.isArray(c.items) ? c.items.map(it => ({
                 id: it.id != null ? it.id : marginNextItemId++,
                 name: it.name || '',
                 currency: it.currency === 'USD' ? 'USD' : 'KRW',
                 amountUsd: Number(it.amountUsd) || 0,
                 amountKrw: Number(it.amountKrw) || 0,
+                feeType: it.feeType === 'percent' ? 'percent' : 'amount',
+                feePercent: Number(it.feePercent) || 0,
                 quantityMul: !!it.quantityMul,
                 vat: !!it.vat,
                 note: it.note || ''
@@ -13903,18 +14052,24 @@ function marginSimToDb(s) {
         client: s.client || '',
         manufacturer: s.manufacturer || '',
         sales_method: s.salesMethod || '',
+        sale_country: s.saleCountry === 'global' ? 'global' : 'domestic',
         exchange_rate: s.exchangeRate || 1500,
         quantity: s.quantity || 1,
         sale_price: s.salePrice || 0,
+        sale_price_usd: s.salePriceUsd || 0,
+        sale_price_currency: s.salePriceCurrency === 'USD' ? 'USD' : 'KRW',
         sale_vat_included: !!s.saleVatIncluded,
         target_margin_rate: s.targetMarginRate == null ? null : s.targetMarginRate,
         categories: (s.categories || []).map(c => ({
             id: c.id, name: c.name,
+            defaultFeeType: c.defaultFeeType === 'percent' ? 'percent' : 'amount',
             items: (c.items || []).map(it => ({
                 id: it.id, name: it.name,
                 currency: it.currency,
                 amountUsd: Number(it.amountUsd) || 0,
                 amountKrw: Number(it.amountKrw) || 0,
+                feeType: it.feeType === 'percent' ? 'percent' : 'amount',
+                feePercent: Number(it.feePercent) || 0,
                 quantityMul: !!it.quantityMul,
                 vat: !!it.vat,
                 note: it.note || ''
@@ -14080,15 +14235,21 @@ function renderMarginListCards() {
 
     grid.innerHTML = newCardHtml + filtered.map(s => {
         const qty = Math.max(1, s.quantity || 1);
+        const rate = s.exchangeRate || 1500;
+        const salePerUnitVatIncl = s.saleVatIncluded ? (s.salePrice || 0) : (s.salePrice || 0) * 1.1;
         const totalCost = s.categories.reduce((sum, c) => sum + c.items.reduce((a, it) => {
-            const rate = s.exchangeRate || 1500;
-            let amt = it.currency === 'USD' ? (it.amountUsd || 0) * rate : (it.amountKrw || 0);
-            if (it.quantityMul) amt *= qty;
+            let amt;
+            if (it.feeType === 'percent') {
+                // 플랫폼 수수료: 총 판매액 × % (전체 일괄)
+                amt = salePerUnitVatIncl * qty * ((it.feePercent || 0) / 100);
+            } else {
+                amt = it.currency === 'USD' ? (it.amountUsd || 0) * rate : (it.amountKrw || 0);
+                if (it.quantityMul) amt *= qty;
+            }
             if (it.vat) amt *= 1.1;
             return a + amt;
         }, 0), 0);
         const costPerUnit = qty > 0 ? totalCost / qty : 0;
-        const salePerUnitVatIncl = s.saleVatIncluded ? (s.salePrice || 0) : (s.salePrice || 0) * 1.1;
         const totalSale = salePerUnitVatIncl * qty;
         const margin = totalSale - totalCost;
         const marginPerUnit = qty > 0 ? margin / qty : 0;

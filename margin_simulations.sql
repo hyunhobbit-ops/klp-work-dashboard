@@ -15,9 +15,12 @@ create table if not exists public.margin_simulations (
     note text default '',                -- 비고
 
     -- 글로벌 설정
+    sale_country text not null default 'domestic', -- 'domestic' | 'global' (우측 패널 통화 표시)
     exchange_rate numeric not null default 1500,   -- USD → KRW 환율
     quantity numeric not null default 1,           -- 수량
-    sale_price numeric not null default 0,         -- 판매가 (1개 기준)
+    sale_price numeric not null default 0,         -- 판매가 (1개, KRW 기준)
+    sale_price_usd numeric not null default 0,     -- 판매가 (1개, USD 기준 — 듀얼 입력)
+    sale_price_currency text not null default 'KRW', -- 'USD' | 'KRW' (판매가 입력 source-of-truth)
     sale_vat_included boolean default false,       -- 판매가 VAT 포함 여부
     target_margin_rate numeric default null,       -- 목표 마진율(%) — 권장 판매가 역산용
 
@@ -54,6 +57,17 @@ create policy "margin_simulations_select_all" on public.margin_simulations for s
 create policy "margin_simulations_insert_all" on public.margin_simulations for insert with check (true);
 create policy "margin_simulations_update_all" on public.margin_simulations for update using (true);
 create policy "margin_simulations_delete_all" on public.margin_simulations for delete using (true);
+
+-- =============================================================
+-- 기존 테이블 호환 — 컬럼이 없는 경우 추가 (2026-05 마진계산기 확장)
+-- 이미 테이블이 있는 환경에서도 안전하게 실행 가능
+-- =============================================================
+alter table public.margin_simulations
+    add column if not exists sale_country text not null default 'domestic';
+alter table public.margin_simulations
+    add column if not exists sale_price_usd numeric not null default 0;
+alter table public.margin_simulations
+    add column if not exists sale_price_currency text not null default 'KRW';
 
 -- PostgREST 스키마 캐시 리로드
 notify pgrst, 'reload schema';

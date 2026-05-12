@@ -1364,16 +1364,23 @@
                                         <label class="mg-field"><span class="mg-field-label">고객사</span><input class="mg-input" type="text" id="marginClient" list="marginClientsList" autocomplete="off" placeholder="거래처 DB에서 검색 또는 직접 입력" oninput="onMarginFieldInput()"><datalist id="marginClientsList"></datalist></label>
                                         <label class="mg-field"><span class="mg-field-label">제작사</span><input class="mg-input" type="text" id="marginManufacturer" list="marginClientsList" autocomplete="off" placeholder="거래처 DB에서 검색 또는 직접 입력" oninput="onMarginFieldInput()"></label>
                                         <label class="mg-field"><span class="mg-field-label">판매방식</span><input class="mg-input" type="text" id="marginSalesMethod" placeholder="납품 / 위탁 / 자사몰" oninput="onMarginFieldInput()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">환율 (USD → KRW)</span><input class="mg-input" type="text" inputmode="numeric" id="marginExchangeRate" value="1,500" oninput="formatMarginNumberInput(this,false); onExchangeRateChange()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">판매국가</span>
+                                            <select class="mg-input" id="marginSaleCountry" onchange="onMarginSaleCountryChange()">
+                                                <option value="domestic">국내 (원화 표시)</option>
+                                                <option value="global">글로벌 (USD 표시)</option>
+                                            </select>
+                                        </label>
                                     </div>
                                 </div>
 
-                                <!-- 글로벌 설정 (환율, 수량, 판매가) -->
+                                <!-- 예상 판매 수량, 단가 -->
                                 <div class="mg-card">
-                                    <div class="mg-card-title">⚙️ 환율 · 수량 · 판매가</div>
+                                    <div class="mg-card-title">💵 예상 판매 수량, 단가</div>
                                     <div class="mg-field-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
-                                        <label class="mg-field"><span class="mg-field-label">환율 (USD → KRW)</span><input class="mg-input" type="text" inputmode="numeric" id="marginExchangeRate" value="1,500" oninput="formatMarginNumberInput(this,false); onExchangeRateChange()"></label>
                                         <label class="mg-field"><span class="mg-field-label">수량 (개)</span><input class="mg-input" type="text" inputmode="numeric" id="marginQuantity" value="1" oninput="formatMarginNumberInput(this,false); onMarginGlobalChange()"></label>
-                                        <label class="mg-field"><span class="mg-field-label">판매가 (1개)</span><input class="mg-input" type="text" inputmode="numeric" id="marginSalePrice" value="0" oninput="formatMarginNumberInput(this,false); onMarginGlobalChange()"></label>
+                                        <label class="mg-field"><span class="mg-field-label">판매가 USD (1개)</span><input class="mg-input" type="text" inputmode="decimal" id="marginSalePriceUsd" value="0" placeholder="$" oninput="formatMarginNumberInput(this,true); onMarginSalePriceChange('USD', this.value)"></label>
+                                        <label class="mg-field"><span class="mg-field-label">판매가 원화 (1개)</span><input class="mg-input" type="text" inputmode="numeric" id="marginSalePrice" value="0" placeholder="원" oninput="formatMarginNumberInput(this,false); onMarginSalePriceChange('KRW', this.value)"></label>
                                         <label class="mg-field"><span class="mg-field-label">판매가 VAT</span>
                                             <select class="mg-input" id="marginSaleVat" onchange="onMarginGlobalChange()">
                                                 <option value="false">VAT 별도 (+10%)</option>
