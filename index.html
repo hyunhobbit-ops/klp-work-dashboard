@@ -1377,17 +1377,11 @@
                                 <!-- 예상 판매 수량, 단가 -->
                                 <div class="mg-card">
                                     <div class="mg-card-title">💵 예상 판매 수량, 단가</div>
-                                    <div class="mg-field-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
-                                        <label class="mg-field"><span class="mg-field-label">수량 (개)</span><input class="mg-input" type="text" inputmode="numeric" id="marginQuantity" value="1" oninput="formatMarginNumberInput(this,false); onMarginGlobalChange()"></label>
-                                        <label class="mg-field"><span class="mg-field-label">판매가 USD (1개)</span><input class="mg-input" type="text" inputmode="decimal" id="marginSalePriceUsd" value="0" placeholder="$" oninput="formatMarginNumberInput(this,true); onMarginSalePriceChange('USD', this.value)"></label>
-                                        <label class="mg-field"><span class="mg-field-label">판매가 원화 (1개)</span><input class="mg-input" type="text" inputmode="numeric" id="marginSalePrice" value="0" placeholder="원" oninput="formatMarginNumberInput(this,false); onMarginSalePriceChange('KRW', this.value)"></label>
-                                        <label class="mg-field"><span class="mg-field-label">판매가 VAT</span>
-                                            <select class="mg-input" id="marginSaleVat" onchange="onMarginGlobalChange()">
-                                                <option value="false">VAT 별도 (+10%)</option>
-                                                <option value="true">VAT 포함</option>
-                                            </select>
-                                        </label>
-                                        <label class="mg-field"><span class="mg-field-label">목표 마진율(%) <span title="목표 마진율 입력 시 권장 판매가가 우측에 자동 표시됩니다" style="cursor:help;color:var(--text-tertiary)">ⓘ</span></span><input class="mg-input" type="number" id="marginTargetRate" placeholder="예: 30" step="1" min="0" max="99" oninput="recalcMargin()"></label>
+                                    <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px">펀딩 리워드처럼 가격대가 여러 개라면 <strong>+ 항목 추가</strong>로 행을 늘려 입력하세요.</div>
+                                    <div id="marginSaleItemsWrap" style="display:flex;flex-direction:column;gap:6px"></div>
+                                    <button class="mg-add-row" style="margin-top:10px;width:100%" onclick="addSaleItem()">+ 항목 추가</button>
+                                    <div class="mg-field-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-top:12px">
+                                        <label class="mg-field"><span class="mg-field-label">목표 마진율(%) <span title="목표 마진율 입력 시 권장 (평균) 판매가가 우측에 자동 표시됩니다" style="cursor:help;color:var(--text-tertiary)">ⓘ</span></span><input class="mg-input" type="number" id="marginTargetRate" placeholder="예: 30" step="1" min="0" max="99" oninput="recalcMargin()"></label>
                                     </div>
                                 </div>
 

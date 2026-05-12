@@ -21,7 +21,10 @@ create table if not exists public.margin_simulations (
     sale_price numeric not null default 0,         -- 판매가 (1개, KRW 기준)
     sale_price_usd numeric not null default 0,     -- 판매가 (1개, USD 기준 — 듀얼 입력)
     sale_price_currency text not null default 'KRW', -- 'USD' | 'KRW' (판매가 입력 source-of-truth)
-    sale_vat_included boolean default false,       -- 판매가 VAT 포함 여부
+    sale_vat_included boolean default false,       -- 판매가 VAT 포함 여부 (레거시 — 단일 단가용)
+    -- 판매 항목 배열 (펀딩 리워드처럼 여러 가격대 지원). 신규 canonical.
+    -- 항목: { id, name, quantity, salePrice, salePriceUsd, salePriceCurrency, saleVatIncluded }
+    sale_items jsonb not null default '[]'::jsonb,
     target_margin_rate numeric default null,       -- 목표 마진율(%) — 권장 판매가 역산용
 
     -- 카테고리/항목 (자유형 구조)
@@ -68,6 +71,8 @@ alter table public.margin_simulations
     add column if not exists sale_price_usd numeric not null default 0;
 alter table public.margin_simulations
     add column if not exists sale_price_currency text not null default 'KRW';
+alter table public.margin_simulations
+    add column if not exists sale_items jsonb not null default '[]'::jsonb;
 
 -- PostgREST 스키마 캐시 리로드
 notify pgrst, 'reload schema';
