@@ -2716,6 +2716,16 @@ body {
   .market-sales-panel .market-sales-cards { grid-template-columns: 1fr; }
 }
 
+/* 상품 상세 모달 — 담당자 카드 다크모드 */
+[data-theme="dark"] .market-detail-ceo { background: #3a2818 !important; }
+[data-theme="dark"] .market-detail-ceo strong { color: #fcd34d !important; }
+[data-theme="dark"] .market-detail-iyj { background: #1a2f4d !important; }
+[data-theme="dark"] .market-detail-iyj strong { color: #93c5fd !important; }
+[data-theme="dark"] .market-detail-khh { background: #15302a !important; }
+[data-theme="dark"] .market-detail-khh strong { color: #6ee7b7 !important; }
+[data-theme="dark"] .market-detail-nko { background: #2a1f3d !important; }
+[data-theme="dark"] .market-detail-nko strong { color: #c4b5fd !important; }
+
 /* 판매금액 패널 — 다크모드 */
 [data-theme="dark"] .market-sales-card.ceo { background: #3a2818; }
 [data-theme="dark"] .market-sales-card.ceo .who { color: #fcd34d; border-color: #78350f; }

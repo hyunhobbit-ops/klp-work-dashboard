@@ -8881,7 +8881,7 @@ async function renderMarketdb() {
         const dataImg = hasImg?(' data-img="'+marketEsc(r.image)+'"'):'';
         const chk = (k,color) => '<div class="mchk '+color+(r[k]?' yes':'')+'" data-cat="'+r._catKey+'" data-idx="'+r._idx+'" data-key="'+k+'" onclick="marketToggleChk(event,this)"></div>';
         const noprop = ' onclick="event.stopPropagation()"';
-        return '<tr onclick="openMarketModal(\''+r._catKey+'\','+r._idx+')">'+
+        return '<tr onclick="openMarketDetail(\''+r._catKey+'\','+r._idx+')">'+
             '<td><div class="'+thumbCls+'" data-icon="'+ticon+'" data-cls="'+tcls+'"'+dataImg+' style="'+thumbStyle+'">'+thumbInner+'</div></td>'+
             '<td>'+marketParseStatus(r['상태'])+'</td>'+
             '<td class="market-name"><div>'+marketEsc(r['상품명']||'-')+' <span style="font-size:10px;color:var(--text-tertiary);font-weight:500">· '+r._cat+'</span></div>'+(r['상품 설명']?'<div class="desc">'+marketEsc(r['상품 설명']).replace(/\n/g,' ')+'</div>':'')+'</td>'+
@@ -9018,6 +9018,81 @@ function bindMarketThumbHovers() {
 
 // ===== 모달 =====
 let _marketEditCtx = null;
+// 상품 상세 보기 (읽기 전용) — 행 클릭 시 진입
+async function openMarketDetail(cat, idx) {
+    if (!marketdbCanAccess()) return;
+    if (!MARKETDB) await loadMarketdbFromDb();
+    if (!MARKETDB[cat] || !MARKETDB[cat][idx]) { showToast('상품을 찾을 수 없습니다'); return; }
+    const r = MARKETDB[cat][idx];
+    const title = document.getElementById('marketModalTitle');
+    const body = document.getElementById('marketModalBody');
+    const catLabel = cat==='watch'?'⌚ 시계':cat==='goods'?'🎁 굿즈':'📦 기타잡화';
+    const status = r['상태'] || '판매가능';
+    const statusBadge = marketParseStatus(status);
+    const url = r['판매 페이지'] || '';
+    const urlHtml = url
+        ? '<a href="'+marketEsc(url)+'" target="_blank" rel="noopener" style="color:var(--blue);word-break:break-all">'+marketEsc(url)+' ↗</a>'
+        : '<span style="color:var(--text-tertiary)">-</span>';
+    const text = v => v ? marketEsc(v).replace(/\n/g,'<br>') : '<span style="color:var(--text-tertiary)">-</span>';
+
+    // 담당자별 체크 상태 (색상 칩)
+    const people = [
+        { key:'ceo', name:'대표님',  bg:'#fef3c7', color:'#92400e', darkBg:'#3a2818', darkColor:'#fcd34d' },
+        { key:'iyj', name:'이현주',  bg:'#dbeafe', color:'#1e40af', darkBg:'#1a2f4d', darkColor:'#93c5fd' },
+        { key:'khh', name:'김현호',  bg:'#d1fae5', color:'#065f46', darkBg:'#15302a', darkColor:'#6ee7b7' },
+        { key:'nko', name:'뉴코',    bg:'#ede9fe', color:'#5b21b6', darkBg:'#2a1f3d', darkColor:'#c4b5fd' }
+    ];
+    const platforms = [
+        { k:'junggo',   label:'중고' },
+        { k:'bungae',   label:'번개' },
+        { k:'danggeun', label:'당근' }
+    ];
+    const peopleHtml = people.map(p => {
+        const chips = platforms.map(pl => {
+            const field = p.key + '_' + pl.k;
+            if (p.key === 'nko' && pl.k === 'danggeun') return '';
+            const on = !!r[field];
+            const style = on
+                ? 'background:#15803d;color:#fff'
+                : 'background:var(--gray-100);color:var(--gray-500)';
+            return '<span style="padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700;'+style+'">'+pl.label+(on?' ✓':'')+'</span>';
+        }).filter(Boolean).join(' ');
+        return '<div class="market-detail-person market-detail-'+p.key+'" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;background:'+p.bg+'"><strong style="min-width:62px;color:'+p.color+'">'+p.name+'</strong><div style="display:flex;gap:6px;flex-wrap:wrap">'+chips+'</div></div>';
+    }).join('');
+
+    title.textContent = '상품 상세';
+    body.innerHTML =
+        '<div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:16px">'+
+          '<div style="width:140px;height:140px;border-radius:10px;border:1px solid var(--gray-200);background:var(--gray-50);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">'+
+            (r.image ? '<img src="'+marketEsc(r.image)+'" style="width:100%;height:100%;object-fit:cover">' : '<span style="color:var(--text-tertiary);font-size:32px">📦</span>')+
+          '</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">'+
+              '<span style="padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:var(--gray-100);color:var(--gray-700)">'+catLabel+'</span>'+
+              statusBadge+
+            '</div>'+
+            '<div style="font-size:20px;font-weight:800;color:var(--gray-900);line-height:1.3;margin-bottom:6px">'+marketEsc(r['상품명']||'-')+'</div>'+
+            '<div style="display:flex;gap:18px;font-variant-numeric:tabular-nums">'+
+              '<div><span style="font-size:11px;color:var(--text-tertiary);font-weight:700">PRICE</span> <strong style="color:var(--gray-900)">'+marketEsc(r['PRICE']||'-')+'</strong><span style="font-size:11px;color:var(--text-tertiary)"> 만원</span></div>'+
+              '<div><span style="font-size:11px;color:var(--text-tertiary);font-weight:700">SALE</span> <strong style="color:#0e7490">'+marketEsc(r['SALE']||'-')+'</strong><span style="font-size:11px;color:var(--text-tertiary)"> 만원</span></div>'+
+            '</div>'+
+          '</div>'+
+        '</div>'+
+        '<div class="form-row">'+
+          '<div class="form-group"><label class="form-label">재고수량</label><div style="padding:8px 0;font-weight:600">'+text(r['재고수량'])+'</div></div>'+
+          '<div class="form-group"><label class="form-label">재고 위치</label><div style="padding:8px 0;font-weight:600">'+text(r['재고 위치'])+'</div></div>'+
+        '</div>'+
+        '<div class="form-group"><label class="form-label">상품 설명</label><div style="padding:8px 0;line-height:1.5">'+text(r['상품 설명'])+'</div></div>'+
+        '<div class="form-group"><label class="form-label">구성품</label><div style="padding:8px 0;line-height:1.5">'+text(r['구성품'])+'</div></div>'+
+        '<div class="form-group"><label class="form-label">판매 페이지</label><div style="padding:8px 0">'+urlHtml+'</div></div>'+
+        '<div class="form-group"><label class="form-label">담당자별 업로드 현황</label><div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">'+peopleHtml+'</div></div>'+
+        '<div style="display:flex;gap:8px;margin-top:18px">'+
+          '<button class="form-submit" style="flex:1;background:var(--gray-200);color:var(--gray-800)" onclick="closeMarketModal()">닫기</button>'+
+          '<button class="form-submit" style="flex:2" onclick="openMarketModal(\''+cat+'\','+idx+')">✏️ 편집</button>'+
+        '</div>';
+    document.getElementById('marketModalOverlay').classList.add('show');
+}
+
 async function openMarketModal(cat, idx) {
     if (!marketdbCanAccess()) return;
     if (!MARKETDB) await loadMarketdbFromDb();
