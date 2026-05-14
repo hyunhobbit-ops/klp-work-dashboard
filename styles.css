@@ -2716,6 +2716,89 @@ body {
   .market-sales-panel .market-sales-cards { grid-template-columns: 1fr; }
 }
 
+/* ===== 상품 상세 모달 (보기 전용, 표 형식) ===== */
+.mdetail-hero {
+  display: flex; gap: 16px; align-items: flex-start;
+  padding: 16px; margin-bottom: 16px;
+  background: var(--gray-50); border-radius: 12px; border: 1px solid var(--gray-200);
+}
+.mdetail-thumb {
+  width: 130px; height: 130px; flex-shrink: 0;
+  border-radius: 10px; overflow: hidden; background: var(--white);
+  border: 1px solid var(--gray-200);
+  display: flex; align-items: center; justify-content: center;
+}
+.mdetail-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.mdetail-thumb-placeholder { font-size: 36px; color: var(--gray-400); }
+.mdetail-hero-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.mdetail-badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.mdetail-cat {
+  padding: 4px 12px; border-radius: 12px;
+  font-size: 11px; font-weight: 800; letter-spacing: .3px;
+  background: var(--gray-900); color: #fff;
+}
+.mdetail-title {
+  font-size: 22px; font-weight: 900; color: var(--gray-900); line-height: 1.3;
+  letter-spacing: -.3px; word-break: keep-all;
+}
+
+.mdetail-table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  border: 1px solid var(--gray-200); border-radius: 10px; overflow: hidden;
+  margin-bottom: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.mdetail-table tr:not(:last-child) th,
+.mdetail-table tr:not(:last-child) td { border-bottom: 1px solid var(--gray-200); }
+.mdetail-table th.mdetail-label {
+  width: 130px; padding: 12px 14px;
+  background: var(--gray-100); color: var(--gray-700);
+  font-size: 12px; font-weight: 800; letter-spacing: .3px;
+  text-align: left; vertical-align: top; white-space: nowrap;
+}
+.mdetail-table td.mdetail-value {
+  padding: 12px 16px; background: var(--white);
+  font-size: 14px; font-weight: 600; color: var(--gray-900);
+  line-height: 1.5; word-break: break-word;
+}
+.mdetail-table td.mdetail-value a { color: var(--blue); font-weight: 700; }
+
+.mdetail-num { font-size: 18px; font-weight: 900; color: var(--gray-900); }
+.mdetail-num.mdetail-sale { color: #0e7490; }
+.mdetail-unit { font-size: 11px; color: var(--gray-500); font-weight: 600; margin-left: 2px; }
+.mdetail-sep { color: var(--gray-300); margin: 0 10px; font-weight: 400; }
+.mdetail-num-label { font-size: 11px; font-weight: 800; color: var(--gray-500); letter-spacing: .5px; margin-right: 4px; }
+
+.mdetail-section-title {
+  font-size: 12px; font-weight: 800; color: var(--gray-700);
+  letter-spacing: .3px; margin: 8px 0 8px 2px;
+}
+.mdetail-people { display: flex; flex-direction: column; gap: 6px; }
+
+/* 다크 모드 */
+[data-theme="dark"] .mdetail-hero {
+  background: var(--gray-50); border-color: var(--gray-200);
+}
+[data-theme="dark"] .mdetail-thumb { background: var(--gray-100); border-color: var(--gray-300); }
+[data-theme="dark"] .mdetail-title { color: #f2f4f6; }
+[data-theme="dark"] .mdetail-cat { background: #f2f4f6; color: #0d1117; }
+[data-theme="dark"] .mdetail-table { border-color: var(--gray-200); }
+[data-theme="dark"] .mdetail-table tr:not(:last-child) th,
+[data-theme="dark"] .mdetail-table tr:not(:last-child) td { border-bottom-color: var(--gray-200); }
+[data-theme="dark"] .mdetail-table th.mdetail-label {
+  background: rgba(255,255,255,.04); color: #cbd5e1;
+}
+[data-theme="dark"] .mdetail-table td.mdetail-value {
+  background: rgba(255,255,255,.015); color: #f2f4f6;
+}
+[data-theme="dark"] .mdetail-table td.mdetail-value a { color: #93c5fd; }
+[data-theme="dark"] .mdetail-num { color: #f2f4f6; }
+[data-theme="dark"] .mdetail-num.mdetail-sale { color: #67e8f9; }
+[data-theme="dark"] .mdetail-unit { color: #9ca3af; }
+[data-theme="dark"] .mdetail-sep { color: var(--gray-300); }
+[data-theme="dark"] .mdetail-num-label { color: #9ca3af; }
+[data-theme="dark"] .mdetail-section-title { color: #cbd5e1; }
+
 /* 상품 상세 모달 — 담당자 카드 다크모드 */
 [data-theme="dark"] .market-detail-ceo { background: #3a2818 !important; }
 [data-theme="dark"] .market-detail-ceo strong { color: #fcd34d !important; }

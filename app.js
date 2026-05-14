@@ -9060,32 +9060,51 @@ async function openMarketDetail(cat, idx) {
         return '<div class="market-detail-person market-detail-'+p.key+'" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;background:'+p.bg+'"><strong style="min-width:62px;color:'+p.color+'">'+p.name+'</strong><div style="display:flex;gap:6px;flex-wrap:wrap">'+chips+'</div></div>';
     }).join('');
 
+    // 표 행 한 줄 — 라벨/값을 강하게 구분
+    const trow = (label, valueHtml) => ''
+        + '<tr>'
+        +   '<th class="mdetail-label">'+label+'</th>'
+        +   '<td class="mdetail-value">'+valueHtml+'</td>'
+        + '</tr>';
+    const priceRow = ''
+        + '<span class="mdetail-num-label">PRICE</span> '
+        + '<span class="mdetail-num">'+marketEsc(r['PRICE']||'-')+'</span>'
+        + '<span class="mdetail-unit"> 만원</span>'
+        + '<span class="mdetail-sep">·</span>'
+        + '<span class="mdetail-num-label">SALE</span> '
+        + '<span class="mdetail-num mdetail-sale">'+marketEsc(r['SALE']||'-')+'</span>'
+        + '<span class="mdetail-unit"> 만원</span>';
+
     title.textContent = '상품 상세';
     body.innerHTML =
-        '<div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:16px">'+
-          '<div style="width:140px;height:140px;border-radius:10px;border:1px solid var(--gray-200);background:var(--gray-50);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">'+
-            (r.image ? '<img src="'+marketEsc(r.image)+'" style="width:100%;height:100%;object-fit:cover">' : '<span style="color:var(--text-tertiary);font-size:32px">📦</span>')+
+        // ─── 헤더 (이미지 + 제목 + 카테고리/상태) ───
+        '<div class="mdetail-hero">'+
+          '<div class="mdetail-thumb">'+
+            (r.image ? '<img src="'+marketEsc(r.image)+'" alt="">' : '<span class="mdetail-thumb-placeholder">📦</span>')+
           '</div>'+
-          '<div style="flex:1;min-width:0">'+
-            '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">'+
-              '<span style="padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;background:var(--gray-100);color:var(--gray-700)">'+catLabel+'</span>'+
+          '<div class="mdetail-hero-info">'+
+            '<div class="mdetail-badges">'+
+              '<span class="mdetail-cat">'+catLabel+'</span>'+
               statusBadge+
             '</div>'+
-            '<div style="font-size:20px;font-weight:800;color:var(--gray-900);line-height:1.3;margin-bottom:6px">'+marketEsc(r['상품명']||'-')+'</div>'+
-            '<div style="display:flex;gap:18px;font-variant-numeric:tabular-nums">'+
-              '<div><span style="font-size:11px;color:var(--text-tertiary);font-weight:700">PRICE</span> <strong style="color:var(--gray-900)">'+marketEsc(r['PRICE']||'-')+'</strong><span style="font-size:11px;color:var(--text-tertiary)"> 만원</span></div>'+
-              '<div><span style="font-size:11px;color:var(--text-tertiary);font-weight:700">SALE</span> <strong style="color:#0e7490">'+marketEsc(r['SALE']||'-')+'</strong><span style="font-size:11px;color:var(--text-tertiary)"> 만원</span></div>'+
-            '</div>'+
+            '<div class="mdetail-title">'+marketEsc(r['상품명']||'-')+'</div>'+
           '</div>'+
         '</div>'+
-        '<div class="form-row">'+
-          '<div class="form-group"><label class="form-label">재고수량</label><div style="padding:8px 0;font-weight:600">'+text(r['재고수량'])+'</div></div>'+
-          '<div class="form-group"><label class="form-label">재고 위치</label><div style="padding:8px 0;font-weight:600">'+text(r['재고 위치'])+'</div></div>'+
-        '</div>'+
-        '<div class="form-group"><label class="form-label">상품 설명</label><div style="padding:8px 0;line-height:1.5">'+text(r['상품 설명'])+'</div></div>'+
-        '<div class="form-group"><label class="form-label">구성품</label><div style="padding:8px 0;line-height:1.5">'+text(r['구성품'])+'</div></div>'+
-        '<div class="form-group"><label class="form-label">판매 페이지</label><div style="padding:8px 0">'+urlHtml+'</div></div>'+
-        '<div class="form-group"><label class="form-label">담당자별 업로드 현황</label><div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">'+peopleHtml+'</div></div>'+
+        // ─── 상세 정보 (표) ───
+        '<table class="mdetail-table">'+
+          '<tbody>'+
+            trow('PRICE / SALE', priceRow)+
+            trow('재고수량', text(r['재고수량']))+
+            trow('재고 위치', text(r['재고 위치']))+
+            trow('구성품', text(r['구성품']))+
+            trow('상품 설명', text(r['상품 설명']))+
+            trow('판매 페이지', urlHtml)+
+          '</tbody>'+
+        '</table>'+
+        // ─── 담당자별 업로드 현황 ───
+        '<div class="mdetail-section-title">담당자별 업로드 현황</div>'+
+        '<div class="mdetail-people">'+peopleHtml+'</div>'+
+        // ─── 버튼 ───
         '<div style="display:flex;gap:8px;margin-top:18px">'+
           '<button class="form-submit" style="flex:1;background:var(--gray-200);color:var(--gray-800)" onclick="closeMarketModal()">닫기</button>'+
           '<button class="form-submit" style="flex:2" onclick="openMarketModal(\''+cat+'\','+idx+')">✏️ 편집</button>'+
