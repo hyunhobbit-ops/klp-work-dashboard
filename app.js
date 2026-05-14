@@ -8555,6 +8555,7 @@ async function loadMarketdbFromDb() {
             });
             MARKETDB = buckets;
             subscribeMarketRealtime();
+            hookMarketdbVisibilityRefresh();
         } catch (err) {
             console.error('중고마켓DB 로드 실패:', err);
             showToast('중고마켓DB 로드 실패: ' + (err.message || err));
@@ -8564,6 +8565,37 @@ async function loadMarketdbFromDb() {
         }
     })();
     return _marketdbLoading;
+}
+
+// 중고마켓DB 전체 삭제 — supabase 클라이언트로 행 단위 DELETE
+// (truncate와 달리 Realtime DELETE 이벤트가 발사되어 모든 접속자 화면이 동기 갱신됨)
+async function deleteAllMarketdb() {
+    if (!marketdbCanAccess()) { showToast('권한이 없습니다'); return; }
+    const total = MARKETDB ? (MARKETDB.watch.length + MARKETDB.goods.length + MARKETDB.misc.length) : 0;
+    if (total === 0) { showToast('이미 비어있습니다'); return; }
+    const msg = '중고마켓DB의 모든 상품 ' + total + '건을 삭제합니다.\n\n다른 접속자의 화면에서도 즉시 사라집니다.\n계속하시겠습니까?';
+    if (!confirm(msg)) return;
+    const phrase = prompt('정말 삭제하려면 "전체삭제" 라고 입력해주세요');
+    if (phrase !== '전체삭제') { showToast('취소되었습니다'); return; }
+    const btn = document.getElementById('marketdbDeleteAllBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '삭제 중...'; }
+    try {
+        // gte('id', 0) — 전체 행 매칭 (Postgres bigserial은 항상 양수)
+        const { error } = await sb.from('market_db').delete().gte('id', 0);
+        if (error) throw error;
+        // 본인 메모리도 즉시 비우기 (Realtime 이벤트도 오겠지만 즉시성 확보)
+        MARKETDB = { watch: [], goods: [], misc: [] };
+        renderMarketdb();
+        showToast(total + '건 삭제 완료 — 다른 접속자에게도 동기화됩니다');
+    } catch (e) {
+        console.error('중고마켓DB 전체 삭제 실패', e);
+        showToast('삭제 실패: ' + (e.message || e));
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>전체 삭제';
+        }
+    }
 }
 
 async function dbMarketInsert(item, cat) {
@@ -8633,6 +8665,29 @@ async function uploadMarketImage(file) {
 
 // ---- Realtime 구독: 3명이 동시 작업 시 실시간 동기화 ----
 let _marketRealtimeChannel = null;
+let _marketdbVisibilityHooked = false;
+
+// 페이지 복귀(다른 탭 → 돌아옴, 창 포커스) 시 DB에서 최신 데이터 강제 재조회
+// Supabase Realtime은 truncate / 대량 변경을 항상 잡지 못하므로, 안전망으로 동작
+function hookMarketdbVisibilityRefresh() {
+    if (_marketdbVisibilityHooked) return;
+    _marketdbVisibilityHooked = true;
+    const refresh = async () => {
+        if (typeof document === 'undefined') return;
+        if (document.hidden) return;
+        if (!marketdbCanAccess || !marketdbCanAccess()) return;
+        const tab = document.getElementById('tab-marketdb');
+        if (!tab || !tab.classList.contains('active')) return;
+        try {
+            MARKETDB = null;
+            await loadMarketdbFromDb();
+            renderMarketdb();
+        } catch (e) { console.warn('marketdb visibility refresh failed', e); }
+    };
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+}
+
 function subscribeMarketRealtime() {
     if (_marketRealtimeChannel || !sb || !sb.channel) return;
     try {
@@ -8799,6 +8854,9 @@ async function renderMarketdb() {
     updateMarketStatus(items);
     updateMarketCounts();
     renderMarketSalesPanel();
+    // 전체 삭제 버튼은 권한자(김관택/이현주/김현호)에게만 노출
+    const delBtn = document.getElementById('marketdbDeleteAllBtn');
+    if (delBtn) delBtn.style.display = marketdbCanAccess() ? '' : 'none';
 
     const catClass = {'시계':'watch','굿즈':'goods','기타잡화':'misc'};
     const catIcon = {'시계':'⌚','굿즈':'🎁','기타잡화':'📦'};

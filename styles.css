@@ -1943,6 +1943,20 @@ body {
 
 .btn-primary:hover { background: var(--blue-dark); }
 
+.btn-danger-outline {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 16px;
+    border: 1.5px solid #ef4444;
+    border-radius: var(--radius-xs);
+    background: transparent; color: #ef4444;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    font-family: inherit; transition: all var(--transition);
+    white-space: nowrap;
+}
+.btn-danger-outline:hover { background: #ef4444; color: #fff; }
+[data-theme="dark"] .btn-danger-outline { border-color: #f87171; color: #f87171; }
+[data-theme="dark"] .btn-danger-outline:hover { background: #ef4444; border-color: #ef4444; color: #fff; }
+
 /* ========== Filter ========== */
 .filter-bar {
     display: flex;
