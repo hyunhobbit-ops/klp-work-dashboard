@@ -8717,12 +8717,14 @@ function marketGetFiltered() {
     return items;
 }
 
-// 중고마켓 판매금액 — 연도별 베이스 금액 (2025년 마감값, 2026년 시작값)
-// 2026년은 베이스 + 택배관리 작성자별 판매가 합산
+// 중고마켓 판매금액 — 연도별 베이스 금액 + 합산 규칙
+// sumMode:
+//   'after_today' → 베이스에 "오늘 다음날 이후" 작성된 택배 판매가만 추가 합산 (대표님·이현주)
+//   'year2026'    → 베이스에 "2026년 전체" 작성된 택배 판매가 합산 (김현호)
 const MARKET_SALES_BASE = {
-    '대표님':  { 2025: 15492530, 2026: 3685980 },
-    '이현주':  { 2025: 3842250,  2026: 1598780 },
-    '김현호':  { 2025: 12929000, 2026: 0 }
+    '대표님':  { 2025: 15492530, 2026: 3685980, sumMode: 'after_today' },
+    '이현주':  { 2025: 3842250,  2026: 1598780, sumMode: 'after_today' },
+    '김현호':  { 2025: 12929000, 2026: 0,       sumMode: 'year2026' }
 };
 const MARKET_SALES_PEOPLE = [
     { key: 'ceo', name: '대표님' },
@@ -8730,15 +8732,31 @@ const MARKET_SALES_PEOPLE = [
     { key: 'khh', name: '김현호' }
 ];
 
-function marketSalesSumDeliveries(name, yearStr) {
+function marketSalesTodayStr() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + dd;
+}
+
+function marketSalesSumDeliveries(name, mode) {
     if (!Array.isArray(deliveries) || deliveries.length === 0) return 0;
+    const today = marketSalesTodayStr();
     let sum = 0;
     for (const d of deliveries) {
         if (!d) continue;
         if (d.author !== name) continue;
-        if (!d.date || !d.date.startsWith(yearStr + '-')) continue;
-        const p = Number(d.price) || 0;
-        sum += p;
+        if (!d.date) continue;
+        if (mode === 'after_today') {
+            // 오늘 이후 (오늘 제외, 내일부터)
+            if (d.date <= today) continue;
+        } else if (mode === 'year2026') {
+            if (!d.date.startsWith('2026-')) continue;
+        } else {
+            continue;
+        }
+        sum += Number(d.price) || 0;
     }
     return sum;
 }
@@ -8748,9 +8766,9 @@ function renderMarketSalesPanel() {
     if (!grid) return;
     const fmt = n => (Number(n) || 0).toLocaleString('ko-KR') + '원';
     const html = MARKET_SALES_PEOPLE.map(p => {
-        const base = MARKET_SALES_BASE[p.name] || { 2025: 0, 2026: 0 };
+        const base = MARKET_SALES_BASE[p.name] || { 2025: 0, 2026: 0, sumMode: null };
         const amt2025 = base[2025] || 0;
-        const amt2026 = (base[2026] || 0) + marketSalesSumDeliveries(p.name, '2026');
+        const amt2026 = (base[2026] || 0) + marketSalesSumDeliveries(p.name, base.sumMode);
         return ''
             + '<div class="market-sales-card ' + p.key + '">'
             +   '<div class="who">' + p.name + '</div>'

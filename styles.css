@@ -2669,20 +2669,25 @@ body {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
 }
 .market-sales-card {
-  border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 12px;
+  border-radius: 10px; padding: 14px 18px; display: flex; align-items: stretch; gap: 14px;
 }
 .market-sales-card .who {
-  font-size: 14px; font-weight: 800; white-space: nowrap; padding-right: 12px;
+  font-size: 15px; font-weight: 800; white-space: nowrap; padding-right: 14px;
   border-right: 1.5px solid rgba(0,0,0,.1); min-width: 78px;
+  display: flex; align-items: center;
 }
-.market-sales-card .years { display: flex; gap: 8px; flex: 1; }
+.market-sales-card .years { display: flex; gap: 10px; flex: 1; min-width: 0; }
 .market-sales-card .year-cell {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 8px 10px; background: rgba(255,255,255,.7); border-radius: 8px;
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px;
+  padding: 10px 14px; background: rgba(255,255,255,.7); border-radius: 8px;
   font-variant-numeric: tabular-nums;
 }
-.market-sales-card .year-cell .yr { font-size: 10px; font-weight: 700; color: var(--gray-500); letter-spacing: .5px; }
-.market-sales-card .year-cell .amt { font-size: 15px; font-weight: 900; color: var(--gray-900); line-height: 1.2; }
+.market-sales-card .year-cell .yr { font-size: 11px; font-weight: 700; color: var(--gray-500); letter-spacing: .5px; }
+.market-sales-card .year-cell .amt {
+  font-size: 17px; font-weight: 900; color: var(--gray-900); line-height: 1.2;
+  white-space: nowrap; letter-spacing: -.2px;
+}
 .market-sales-card .year-cell.current { background: #ecfeff; }
 .market-sales-card .year-cell.current .amt { color: #0e7490; }
 .market-sales-card.ceo { background: #fef3c7; }
@@ -2694,6 +2699,19 @@ body {
 @media (max-width: 900px) {
   .market-sales-panel .market-sales-cards { grid-template-columns: 1fr; }
 }
+
+/* 판매금액 패널 — 다크모드 */
+[data-theme="dark"] .market-sales-card.ceo { background: #3a2818; }
+[data-theme="dark"] .market-sales-card.ceo .who { color: #fcd34d; border-color: #78350f; }
+[data-theme="dark"] .market-sales-card.iyj { background: #1a2f4d; }
+[data-theme="dark"] .market-sales-card.iyj .who { color: #93c5fd; border-color: #1e3a8a; }
+[data-theme="dark"] .market-sales-card.khh { background: #15302a; }
+[data-theme="dark"] .market-sales-card.khh .who { color: #6ee7b7; border-color: #065f46; }
+[data-theme="dark"] .market-sales-card .year-cell { background: rgba(255,255,255,.06); }
+[data-theme="dark"] .market-sales-card .year-cell .yr { color: #9ca3af; }
+[data-theme="dark"] .market-sales-card .year-cell .amt { color: #f2f4f6; }
+[data-theme="dark"] .market-sales-card .year-cell.current { background: rgba(34, 211, 238, 0.14); }
+[data-theme="dark"] .market-sales-card .year-cell.current .amt { color: #67e8f9; }
 
 .market-cnt {
   display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px;
