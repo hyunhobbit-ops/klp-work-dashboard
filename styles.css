@@ -2754,7 +2754,7 @@ body {
   width: 130px; padding: 12px 14px;
   background: var(--gray-100); color: var(--gray-700);
   font-size: 12px; font-weight: 800; letter-spacing: .3px;
-  text-align: left; vertical-align: top; white-space: nowrap;
+  text-align: center; vertical-align: middle; white-space: nowrap;
 }
 .mdetail-table td.mdetail-value {
   padding: 12px 16px; background: var(--white);
