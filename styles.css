@@ -2665,8 +2665,10 @@ body {
 .market-person-card.nko .who { color: #5b21b6; border-color: #c4b5fd; }
 
 /* 판매금액 패널 — 연도별 금액 카드 */
+.market-sales-panel #marketSalesGrid { display: block; }
 .market-sales-panel .market-sales-cards {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  width: 100%;
 }
 .market-sales-card {
   border-radius: 10px; padding: 14px 18px; display: flex; align-items: stretch; gap: 14px;
