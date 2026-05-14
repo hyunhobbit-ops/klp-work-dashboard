@@ -9093,11 +9093,11 @@ async function openMarketDetail(cat, idx) {
         // ─── 상세 정보 (표) ───
         '<table class="mdetail-table">'+
           '<tbody>'+
-            trow('PRICE / SALE', priceRow)+
+            trow('가격', priceRow)+
+            trow('상품 설명', text(r['상품 설명']))+
+            trow('구성품', text(r['구성품']))+
             trow('재고수량', text(r['재고수량']))+
             trow('재고 위치', text(r['재고 위치']))+
-            trow('구성품', text(r['구성품']))+
-            trow('상품 설명', text(r['상품 설명']))+
             trow('판매 페이지', urlHtml)+
           '</tbody>'+
         '</table>'+
