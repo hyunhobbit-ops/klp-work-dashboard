@@ -2662,6 +2662,9 @@ function renderDeliveries() {
 
     document.getElementById('deliveryTableBody').innerHTML = tableHtml;
     document.getElementById('deliveryCardGrid').innerHTML = cardHtml;
+
+    // 택배 데이터 변경 시 중고마켓DB 판매금액 패널도 자동 갱신
+    try { if (typeof renderMarketSalesPanel === 'function') renderMarketSalesPanel(); } catch (_) {}
 }
 
 function renderDateFilter() {
@@ -8714,6 +8717,52 @@ function marketGetFiltered() {
     return items;
 }
 
+// 중고마켓 판매금액 — 연도별 베이스 금액 (2025년 마감값, 2026년 시작값)
+// 2026년은 베이스 + 택배관리 작성자별 판매가 합산
+const MARKET_SALES_BASE = {
+    '대표님':  { 2025: 15492530, 2026: 3685980 },
+    '이현주':  { 2025: 3842250,  2026: 1598780 },
+    '김현호':  { 2025: 12929000, 2026: 0 }
+};
+const MARKET_SALES_PEOPLE = [
+    { key: 'ceo', name: '대표님' },
+    { key: 'iyj', name: '이현주' },
+    { key: 'khh', name: '김현호' }
+];
+
+function marketSalesSumDeliveries(name, yearStr) {
+    if (!Array.isArray(deliveries) || deliveries.length === 0) return 0;
+    let sum = 0;
+    for (const d of deliveries) {
+        if (!d) continue;
+        if (d.author !== name) continue;
+        if (!d.date || !d.date.startsWith(yearStr + '-')) continue;
+        const p = Number(d.price) || 0;
+        sum += p;
+    }
+    return sum;
+}
+
+function renderMarketSalesPanel() {
+    const grid = document.getElementById('marketSalesGrid');
+    if (!grid) return;
+    const fmt = n => (Number(n) || 0).toLocaleString('ko-KR') + '원';
+    const html = MARKET_SALES_PEOPLE.map(p => {
+        const base = MARKET_SALES_BASE[p.name] || { 2025: 0, 2026: 0 };
+        const amt2025 = base[2025] || 0;
+        const amt2026 = (base[2026] || 0) + marketSalesSumDeliveries(p.name, '2026');
+        return ''
+            + '<div class="market-sales-card ' + p.key + '">'
+            +   '<div class="who">' + p.name + '</div>'
+            +   '<div class="years">'
+            +     '<div class="year-cell"><div class="yr">2025년</div><div class="amt">' + fmt(amt2025) + '</div></div>'
+            +     '<div class="year-cell current"><div class="yr">2026년</div><div class="amt">' + fmt(amt2026) + '</div></div>'
+            +   '</div>'
+            + '</div>';
+    }).join('');
+    grid.innerHTML = '<div class="market-sales-cards">' + html + '</div>';
+}
+
 async function renderMarketdb() {
     const tb = document.getElementById('marketTbody');
     if (!tb) return;
@@ -8731,6 +8780,7 @@ async function renderMarketdb() {
 
     updateMarketStatus(items);
     updateMarketCounts();
+    renderMarketSalesPanel();
 
     const catClass = {'시계':'watch','굿즈':'goods','기타잡화':'misc'};
     const catIcon = {'시계':'⌚','굿즈':'🎁','기타잡화':'📦'};
