@@ -441,6 +441,54 @@ async function sbFetch(path, method, body){
   return res.json();
 }
 
+/* === FIX #8 (Phase 3): doc_number 동시성 안전 저장 헬퍼 ===
+ * 두 사용자가 같은 docNum으로 동시 INSERT 시 UNIQUE 제약(008)이 두 번째 시도를
+ * 23505로 거부한다. 이 헬퍼는 23505/409를 잡고 getNextSeq()를 다시 호출해
+ * 새 docNum으로 재시도한다. 최대 3회.
+ *
+ * 정상 UPDATE 흐름(사용자가 의도적으로 같은 docNum 재저장)은 그대로 동작.
+ */
+async function saveConfirmationWithRetry(docNum, data, maxRetries) {
+  maxRetries = maxRetries || 3;
+  for (var attempt = 0; attempt < maxRetries; attempt++) {
+    // 1) 기존 행 확인
+    var existing = await sbFetch(
+      'confirmations?doc_number=eq.' + encodeURIComponent(docNum) + '&select=id',
+      'GET'
+    );
+
+    if (existing && existing.length > 0) {
+      // 정상 UPDATE 흐름
+      await sbFetch('confirmations?id=eq.' + existing[0].id, 'PATCH',
+                    Object.assign({}, data, { doc_number: docNum }));
+      return docNum;
+    }
+
+    // 2) 신규 INSERT 시도
+    try {
+      await sbFetch('confirmations', 'POST',
+                    Object.assign({}, data, { doc_number: docNum }));
+      return docNum;
+    } catch (e) {
+      var isConflict = (e.statusCode === 409)
+                    || (e.code === '23505')
+                    || (e.message && e.message.toLowerCase().indexOf('duplicate') >= 0)
+                    || (e.message && e.message.toLowerCase().indexOf('unique') >= 0);
+      if (!isConflict) throw e;
+
+      // 다른 사용자가 docNum을 먼저 잡음 → 새 번호로 재시도
+      var nextSeq = await getNextSeq();
+      docNum = Y + '_' + String(nextSeq).padStart(4, '0');
+      var seqInput = document.getElementById('docSeq');
+      if (seqInput) {
+        seqInput.value = nextSeq;
+        if (typeof updateDocNum === 'function') updateDocNum();
+      }
+    }
+  }
+  throw new Error('문서번호 할당 실패 — 동시 저장이 너무 잦습니다. 잠시 후 다시 시도해주세요.');
+}
+
 /* === 고객사 datalist 로드 (clients 테이블) === */
 async function loadClientsDatalist(){
   try{
@@ -1288,16 +1336,12 @@ async function saveToDb(){if(!validate())return;var e=window._est;var seq=Math.m
   var docNum=Y+'_'+String(seq).padStart(4,'0');
   var data={doc_number:docNum,doc_date:val('date')||null,company_name:val('companyName'),contact_person:val('contactPerson'),title:val('title'),manager:val('manager'),product_name:val('productName'),quantity:toNum(val('quantity')),unit:val('unit'),unit_price:toNum(val('unitPrice')),unit_price_vat:val('unitPriceVat'),color:val('color'),print_color_size:val('printColorSize'),print_method:valField('printMethod'),print_fee:toNum(val('printFee'))||0,print_fee_vat:val('printFeeVat'),print_fee_apply:val('printFeeApply'),packaging:valField('packaging'),packaging_fee:toNum(val('packagingFee'))||0,packaging_fee_vat:val('packagingFeeVat'),packaging_fee_apply:val('packagingFeeApply'),shipping_type:val('shippingType')||'',shipping_cost:getDcShipCost()||0,shipping_cost_per_box:toNum(val('shippingPerBox'))||0,shipping_boxes:toNum(val('shippingBoxes'))||0,shipping_vat:val('shippingVat')||'VAT 별도',delivery_date:val('deliveryDate')||null,delivery_address:val('dcRecipient')+' / '+val('dcPhone')+' / '+val('dcAddress'),show_payment_notice:document.getElementById('showPaymentNotice').checked,total_amount:e?e.grand:0,status:'작성중',images_data:imgData};
   try{
-    /* 같은 문서번호 존재 여부 확인 */
-    var existing=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(docNum)+'&select=id','GET');
-    if(existing&&existing.length>0){
-      /* 덮어쓰기 (UPDATE) */
-      await sbFetch('confirmations?id=eq.'+existing[0].id,'PATCH',data);
-      showMsg('✅ 업데이트 완료! ('+docNum+')');
-    }else{
-      /* 신규 저장 (INSERT) */
-      await sbFetch('confirmations','POST',data);
-      showMsg('✅ 저장 완료! ('+docNum+')');
+    var savedDocNum = await saveConfirmationWithRetry(docNum, data);
+    if (savedDocNum !== docNum) {
+      showMsg('✅ 저장 완료 — 다른 사용자가 같은 번호를 먼저 사용해 ' + savedDocNum + ' 로 자동 변경되었습니다.');
+      docNum = savedDocNum;
+    } else {
+      showMsg('✅ 저장 완료! (' + docNum + ')');
     }
     /* 프로젝트에서 넘어온 경우: source_doc_number 자동 연결 */
     if(window._fromProjectId){
@@ -1349,13 +1393,12 @@ async function saveWrToDb(){
     images_data:imgData
   };
   try{
-    var existing=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(docNum)+'&select=id','GET');
-    if(existing&&existing.length>0){
-      await sbFetch('confirmations?id=eq.'+existing[0].id,'PATCH',data);
-      showMsg('✅ 작업요청서 업데이트 완료! ('+docNum+')');
-    }else{
-      await sbFetch('confirmations','POST',data);
-      showMsg('✅ 작업요청서 저장 완료! ('+docNum+')');
+    var savedDocNum = await saveConfirmationWithRetry(docNum, data);
+    if (savedDocNum !== docNum) {
+      showMsg('✅ 작업요청서 저장 완료 — 다른 사용자가 같은 번호를 먼저 사용해 ' + savedDocNum + ' 로 자동 변경되었습니다.');
+      docNum = savedDocNum;
+    } else {
+      showMsg('✅ 작업요청서 저장 완료! (' + docNum + ')');
     }
     /* 프로젝트에서 넘어온 경우: 돌아가기 안내 */
     if(window._fromProjectIdWr){
