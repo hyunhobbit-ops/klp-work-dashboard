@@ -9578,7 +9578,11 @@ async function saveMarketItem() {
         '재고수량': document.getElementById('mMQty').value.trim(),
         '재고 위치': document.getElementById('mMLoc').value.trim(),
         '판매 페이지': document.getElementById('mMUrl').value.trim(),
-        image: document.getElementById('mMImage').value
+        image: document.getElementById('mMImage').value,
+        extra_images: (function(){
+            try { return JSON.parse(document.getElementById('mMExtraImages').value || '[]'); }
+            catch (_) { return []; }
+        })()
     };
     if (_marketEditCtx) {
         const old = MARKETDB[_marketEditCtx.cat][_marketEditCtx.idx];
