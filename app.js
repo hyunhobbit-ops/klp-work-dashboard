@@ -9098,19 +9098,23 @@ function marketParseStatus(s) {
 
 function marketGetFiltered() {
     if (!MARKETDB) return [];
+    // 통합 NO: 카테고리 무관, 전체에서 id 오름차순(=등록 순서)으로 1, 2, 3, ... 매김.
+    // 가장 오래된 항목 = NO 1, 가장 최근 등록 = NO N.
+    const idToNo = new Map();
+    [...MARKETDB.watch, ...MARKETDB.goods, ...MARKETDB.misc]
+        .slice()
+        .sort((a, b) => (a.id || 0) - (b.id || 0))
+        .forEach((r, i) => idToNo.set(r.id, i + 1));
     let items = [];
-    // NO는 카테고리 내 등록순(오래된=1, 최신=length). 화면은 desc(최신이 위)이므로 reverse index 사용.
-    const wLen = MARKETDB.watch.length, gLen = MARKETDB.goods.length, mLen = MARKETDB.misc.length;
     if (marketCurrentCat === 'all') {
         items = [].concat(
-            MARKETDB.watch.map((x,i) => Object.assign({}, x, {_cat:'시계', _catKey:'watch', _idx:i, _no: wLen - i})),
-            MARKETDB.goods.map((x,i) => Object.assign({}, x, {_cat:'굿즈', _catKey:'goods', _idx:i, _no: gLen - i})),
-            MARKETDB.misc.map((x,i) => Object.assign({}, x, {_cat:'기타잡화', _catKey:'misc', _idx:i, _no: mLen - i}))
+            MARKETDB.watch.map((x,i) => Object.assign({}, x, {_cat:'시계', _catKey:'watch', _idx:i, _no: idToNo.get(x.id)})),
+            MARKETDB.goods.map((x,i) => Object.assign({}, x, {_cat:'굿즈', _catKey:'goods', _idx:i, _no: idToNo.get(x.id)})),
+            MARKETDB.misc.map((x,i) => Object.assign({}, x, {_cat:'기타잡화', _catKey:'misc', _idx:i, _no: idToNo.get(x.id)}))
         );
     } else {
         const catName = marketCurrentCat==='watch'?'시계':marketCurrentCat==='goods'?'굿즈':'기타잡화';
-        const len = MARKETDB[marketCurrentCat].length;
-        items = MARKETDB[marketCurrentCat].map((x,i) => Object.assign({}, x, {_cat:catName, _catKey:marketCurrentCat, _idx:i, _no: len - i}));
+        items = MARKETDB[marketCurrentCat].map((x,i) => Object.assign({}, x, {_cat:catName, _catKey:marketCurrentCat, _idx:i, _no: idToNo.get(x.id)}));
     }
     const q = (marketSearchQuery||'').toLowerCase();
     if (q) {
