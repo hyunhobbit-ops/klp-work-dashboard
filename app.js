@@ -9496,6 +9496,44 @@ function renderMarketExtraImgGrid(urls) {
     }
     grid.innerHTML = html;
 }
+async function handleMarketExtraImgUpload(slotIdx, ev) {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    if (!f.type.startsWith('image/')) { showToast('이미지 파일만 업로드 가능합니다'); return; }
+    if (f.size > 8*1024*1024) { showToast('8MB 이하만 업로드 가능합니다'); return; }
+    ev.target.value = '';
+
+    const hidden = document.getElementById('mMExtraImages');
+    let urls = [];
+    try { urls = JSON.parse(hidden.value || '[]'); } catch (_) { urls = []; }
+    if (urls.length >= 5) { showToast('추가 이미지는 최대 5장입니다'); return; }
+
+    // 슬롯에 임시 로딩 표시
+    const grid = document.getElementById('mMExtraImgGrid');
+    if (grid && grid.children[slotIdx]) {
+        grid.children[slotIdx].innerHTML = '<span style="font-size:10px;color:var(--text-tertiary)">업로드 중</span>';
+    }
+
+    try {
+        const url = await uploadMarketImage(f);
+        urls[slotIdx] = url;
+        renderMarketExtraImgGrid(urls);
+        showToast('추가 이미지 업로드 완료');
+    } catch (err) {
+        console.error('extra image upload failed', err);
+        showToast('업로드 실패: ' + (err.message || err));
+        renderMarketExtraImgGrid(urls); // 원상 복귀
+    }
+}
+
+function removeMarketExtraImg(slotIdx) {
+    const hidden = document.getElementById('mMExtraImages');
+    let urls = [];
+    try { urls = JSON.parse(hidden.value || '[]'); } catch (_) { urls = []; }
+    // 해당 슬롯 제거 후 뒤 슬롯들이 앞으로 당겨짐 (sparse 배열 만들지 않음)
+    urls.splice(slotIdx, 1);
+    renderMarketExtraImgGrid(urls);
+}
 function closeMarketModal() {
     document.getElementById('marketModalOverlay').classList.remove('show');
 }
