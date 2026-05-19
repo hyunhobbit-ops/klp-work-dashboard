@@ -78,6 +78,15 @@ const SUPABASE_URL = 'https://vtulmuxkriklpiibiues.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// XSS escape — &, <, >, " 4글자
+function escHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 // ===== 포맷터 =====
 const formatKRW = (n) => {
     const v = Number(n) || 0;
@@ -201,17 +210,17 @@ function render() {
         const packs = Array.isArray(p.packagings) ? p.packagings : [];
         const labels = Array.isArray(p.labels) ? p.labels : [];
         const printRow = prints.length === 0 ? '' : prints.map(o =>
-            `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">${_optDisplayType(o)}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`
+            `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">${escHtml(_optDisplayType(o))}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`
         ).join('');
         const packRow = packs.length === 0 ? '' : packs.map(o =>
-            `<div class="pp-opt-row"><span class="pp-opt-label">포장</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">${_optDisplayType(o)}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`
+            `<div class="pp-opt-row"><span class="pp-opt-label">포장</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">${escHtml(_optDisplayType(o))}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`
         ).join('');
         const labelRow = labels.length === 0 ? '' : labels.map(o =>
-            `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">부착 가능${o.note ? ' · ' + o.note : ''}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`
+            `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">부착 가능${o.note ? ' · ' + escHtml(o.note) : ''}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`
         ).join('');
 
         const imgHtml = p.image
-            ? `<img src="${p.image}" alt="${p.name}">`
+            ? `<img src="${escHtml(p.image)}" alt="${escHtml(p.name || '')}">`
             : `<svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
 
         const bulks = Array.isArray(p.bulkPrices) ? p.bulkPrices.filter(b => (b.minQty || b.maxQty) && b.price) : [];
@@ -234,8 +243,8 @@ function render() {
         return `<div class="pp-card">
             <div class="pp-card-img">${imgHtml}${badgeHtml}</div>
             <div class="pp-card-body">
-                <div class="pp-card-name">${p.name}</div>
-                ${p.description ? `<div class="pp-card-desc">${p.description}</div>` : ''}
+                <div class="pp-card-name">${escHtml(p.name)}</div>
+                ${p.description ? `<div class="pp-card-desc">${escHtml(p.description).replace(/\n/g, '<br>')}</div>` : ''}
                 <div class="pp-card-price">${priceLine}</div>
                 ${bulkHtml}
                 <div class="pp-card-opts">${printRow}${packRow}${labelRow}</div>
@@ -248,8 +257,8 @@ function render() {
             <div class="pp-hero">
                 <div class="pp-hero-circle3"></div>
                 <div class="pp-hero-left">
-                    <div class="pp-hero-title">${ep.title || '제안서 제목'}</div>
-                    <div class="pp-hero-sub">${ep.clientName || '거래처'}${ep.clientContact ? ' · ' + ep.clientContact + ' 님' : ''}</div>
+                    <div class="pp-hero-title">${escHtml(ep.title || '제안서 제목')}</div>
+                    <div class="pp-hero-sub">${escHtml(ep.clientName || '거래처')}${ep.clientContact ? ' · ' + escHtml(ep.clientContact) + ' 님' : ''}</div>
                     <div class="pp-hero-date">작성일 ${(ep.createdAt || '').substring(0, 10).replace(/-/g, '.')}</div>
                 </div>
                 <div class="pp-hero-right">
@@ -260,17 +269,17 @@ function render() {
             <div class="pp-info-row">
                 <div class="pp-info-card">
                     <div class="pp-info-title">제안 안내</div>
-                    <div class="pp-info-desc">${(ep.description || '본 제안서는 아래 상품 구성을 기반으로 작성되었습니다.').replace(/\n/g, '<br>')}</div>
+                    <div class="pp-info-desc">${escHtml(ep.description || '본 제안서는 아래 상품 구성을 기반으로 작성되었습니다.').replace(/\n/g, '<br>')}</div>
                     <div style="margin-top:14px;font-size:13px;color:var(--gray-600);font-weight:700">${validHtml}</div>
                 </div>
                 <div class="pp-info-card">
                     <div class="pp-info-title">담당자 정보</div>
                     <div class="pp-mgr-row">
-                        <div class="pp-mgr-name">${ep.assignee || 'KLP 담당자'}${_assigneeRoleTitle(ep.assignee) ? ` <span style="font-size:17px;font-weight:600;color:#000;margin-left:6px">${_assigneeRoleTitle(ep.assignee)}</span>` : ''}</div>
+                        <div class="pp-mgr-name">${escHtml(ep.assignee || 'KLP 담당자')}${_assigneeRoleTitle(ep.assignee) ? ` <span style="font-size:17px;font-weight:600;color:#000;margin-left:6px">${_assigneeRoleTitle(ep.assignee)}</span>` : ''}</div>
                     </div>
                     <div class="pp-mgr-contact">
-                        <div>📧 ${ep.assigneeEmail || 'klpkorea@agift.kr'}</div>
-                        <div>📱 ${ep.assigneePhone || '02-2103-5757'}</div>
+                        <div>📧 ${escHtml(ep.assigneeEmail || 'klpkorea@agift.kr')}</div>
+                        <div>📱 ${escHtml(ep.assigneePhone || '02-2103-5757')}</div>
                     </div>
                 </div>
             </div>
