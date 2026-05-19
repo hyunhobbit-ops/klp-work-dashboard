@@ -37,7 +37,7 @@ CREATE POLICY products_auth_all ON products
 -- DELETE FROM products;              -- expect: permission denied
 
 -- ROLLBACK ----------------------------------
--- DROP POLICY proposals_anon_read ON proposals;
--- DROP POLICY proposals_auth_all ON proposals;
+-- DROP POLICY IF EXISTS proposals_anon_read ON proposals;
+-- DROP POLICY IF EXISTS proposals_auth_all ON proposals;
 -- CREATE POLICY proposals_all ON proposals FOR ALL USING (true) WITH CHECK (true);
--- (products도 동일 패턴)
+-- (products도 동일 패턴, DROP POLICY 에 IF EXISTS 사용)

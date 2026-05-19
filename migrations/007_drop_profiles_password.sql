@@ -8,6 +8,15 @@
 -- 실행 전 마지막 확인:
 -- SELECT name, email, auth_user_id FROM profiles WHERE auth_user_id IS NULL;
 -- → 위가 0행이어야만 실행할 것 (한 명이라도 NULL이면 로그인 불가능)
+-- 아래 DO 블록이 자동으로 한 번 더 검증해 0행이 아니면 실행을 중단시킨다.
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM profiles WHERE auth_user_id IS NULL) THEN
+        RAISE EXCEPTION 'password 컬럼 제거 거부 — auth_user_id가 NULL인 profile 행이 % 개 있음. 먼저 003 마이그레이션 검증 통과 필요.',
+            (SELECT COUNT(*) FROM profiles WHERE auth_user_id IS NULL);
+    END IF;
+END $$;
 
 ALTER TABLE profiles DROP COLUMN IF EXISTS password;
 

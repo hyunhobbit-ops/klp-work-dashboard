@@ -5,11 +5,11 @@
 -- 주의: 김현호는 실제 이메일 (기존 Supabase Auth 계정 재활용)
 -- ==========================================
 
-UPDATE profiles SET email = 'leehyunju@klp.local'    WHERE name = '이현주';
-UPDATE profiles SET email = 'hyunhobbit@naver.com'   WHERE name = '김현호';
-UPDATE profiles SET email = 'yujieun@klp.local'      WHERE name = '유지은';
-UPDATE profiles SET email = 'kujungdoo@klp.local'    WHERE name = '구정두';
-UPDATE profiles SET email = 'kimkwantaek@klp.local'  WHERE name = '김관택';
+UPDATE profiles SET email = 'leehyunju@klp.local'    WHERE name = '이현주'  AND email IS NULL;
+UPDATE profiles SET email = 'hyunhobbit@naver.com'   WHERE name = '김현호'  AND email IS NULL;
+UPDATE profiles SET email = 'yujieun@klp.local'      WHERE name = '유지은'  AND email IS NULL;
+UPDATE profiles SET email = 'kujungdoo@klp.local'    WHERE name = '구정두'  AND email IS NULL;
+UPDATE profiles SET email = 'kimkwantaek@klp.local'  WHERE name = '김관택'  AND email IS NULL;
 
 -- VERIFICATION ------------------------------
 -- 다음 쿼리 결과: 5행, email IS NULL인 행이 0개여야 함

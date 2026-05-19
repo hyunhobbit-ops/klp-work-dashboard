@@ -39,5 +39,5 @@ CREATE POLICY "market-db auth delete" ON storage.objects
 -- DROP POLICY "market-db auth update" ON storage.objects;
 -- DROP POLICY "market-db auth delete" ON storage.objects;
 -- CREATE POLICY "market-db anon write" ON storage.objects
---   FOR INSERT TO anon WITH CHECK (bucket_id = 'market-db');
--- (update, delete 동일 패턴)
+--   FOR INSERT TO anon, authenticated WITH CHECK (bucket_id = 'market-db');
+-- (update, delete 동일 패턴 — TO anon, authenticated 로 권한 양쪽 다 복원)
