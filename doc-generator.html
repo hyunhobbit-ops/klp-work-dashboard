@@ -477,12 +477,24 @@ async function saveConfirmationWithRetry(docNum, data, maxRetries) {
       if (!isConflict) throw e;
 
       // 다른 사용자가 docNum을 먼저 잡음 → 새 번호로 재시도
-      var nextSeq = await getNextSeq();
-      docNum = Y + '_' + String(nextSeq).padStart(4, '0');
-      var seqInput = document.getElementById('docSeq');
-      if (seqInput) {
-        seqInput.value = nextSeq;
-        if (typeof updateDocNum === 'function') updateDocNum();
+      // WR(작업요청서) 형식: YYMM_NNNN_K (parent DC + suffix). 충돌 시 K만 증가.
+      // DC 형식: YYMM_NNNN. 충돌 시 NNNN을 getNextSeq()로 재할당.
+      var parts = docNum.split('_');
+      if (parts.length >= 3) {
+        // WR: 마지막 part(suffix)만 증가시켜 parent DC 연결 유지
+        var lastIdx = parts.length - 1;
+        var nextSuffix = (parseInt(parts[lastIdx], 10) || 0) + 1;
+        parts[lastIdx] = String(nextSuffix);
+        docNum = parts.join('_');
+      } else {
+        // DC: getNextSeq()로 다음 시퀀스 번호 받아 docSeq input도 갱신
+        var nextSeq = await getNextSeq();
+        docNum = Y + '_' + String(nextSeq).padStart(4, '0');
+        var seqInput = document.getElementById('docSeq');
+        if (seqInput) {
+          seqInput.value = nextSeq;
+          if (typeof updateDocNum === 'function') updateDocNum();
+        }
       }
     }
   }
