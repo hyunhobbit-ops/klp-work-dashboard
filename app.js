@@ -9159,11 +9159,19 @@ async function renderMarketdb() {
         const tcls = catClass[r._cat]||'misc';
         const ticon = catIcon[r._cat]||'📦';
         const hasImg = !!r.image;
-        const thumbInner = hasImg
+        const extraCount = (r.extra_images && r.extra_images.length) ? r.extra_images.length : 0;
+        const badgeHtml = extraCount > 0
+            ? '<span onclick="event.stopPropagation();openMarketGalleryLightbox(' + r.id + ')" '
+              + 'style="position:absolute;top:-4px;right:-4px;background:rgba(15,23,42,0.85);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;cursor:pointer;line-height:1.2;z-index:2">'
+              + '+' + extraCount
+              + '</span>'
+            : '';
+        const thumbInner = (hasImg
             ? '<img src="'+r.image+'" style="width:100%;height:100%;object-fit:cover;border-radius:6px">'
-            : ticon;
+            : ticon) + badgeHtml;
         const thumbCls = 'mthumb '+(hasImg?'':tcls);
-        const thumbStyle = hasImg?'padding:0;overflow:hidden;background:#fff':'';
+        const thumbBaseStyle = hasImg?'padding:0;overflow:visible;background:#fff':'';
+        const thumbStyle = 'position:relative;' + thumbBaseStyle;
         const dataImg = hasImg?(' data-img="'+marketEsc(r.image)+'"'):'';
         const chk = (k,color) => '<div class="mchk '+color+(r[k]?' yes':'')+'" data-cat="'+r._catKey+'" data-idx="'+r._idx+'" data-key="'+k+'" onclick="marketToggleChk(event,this)"></div>';
         const noprop = ' onclick="event.stopPropagation()"';
