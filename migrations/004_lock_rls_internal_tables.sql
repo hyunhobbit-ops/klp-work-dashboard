@@ -5,8 +5,17 @@
 -- ==========================================
 
 -- ===== profiles =====
+-- handleLogin이 인증 전에 name→email 매핑을 조회하므로 anon SELECT 허용 필수.
+-- 5명 직원의 name/email/role이 anon에 노출되지만, 이미 app.js에 하드코딩된
+-- 이름들이고 .local synthetic email은 공격 가치가 없음. 진짜 보호 대상인
+-- password 컬럼은 007에서 제거되며 가장 중요한 인증 게이트는 Supabase Auth(JWT).
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS profiles_auth_all ON profiles;
+DROP POLICY IF EXISTS profiles_anon_login_lookup ON profiles;
+
+CREATE POLICY profiles_anon_login_lookup ON profiles
+  FOR SELECT TO anon USING (true);
+
 CREATE POLICY profiles_auth_all ON profiles
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
@@ -126,9 +135,10 @@ CREATE POLICY planning_posts_auth_all ON planning_posts
 --                     'projects_temp','planning_projects','planning_posts');
 -- expect: 16 rows, rowsecurity = true 전부
 --
--- 2) anon 권한으로 (대시보드 SQL Editor의 Run as → anon) 다음 시도가 거부되어야 함:
+-- 2) anon 권한으로 (대시보드 SQL Editor의 Run as → anon) 다음 시도:
 -- SELECT * FROM projects_domestic LIMIT 1;  -- expect: empty (RLS 차단)
 -- INSERT INTO daily_tasks (id) VALUES (gen_random_uuid()); -- expect: permission denied
+-- SELECT name, email FROM profiles LIMIT 5; -- expect: 5 rows (anon SELECT 의도적 허용)
 
 -- ROLLBACK ----------------------------------
 -- 응급 시: 아래를 각 테이블에 실행하면 즉시 anon에게도 다시 열림 (단, 보안 손상)
