@@ -49,6 +49,9 @@ async function checkAuth() {
         return;
     }
     if (!session) {
+        // 세션이 사라졌다면 localStorage 캐시도 함께 정리
+        // (doc-generator.html이 klp_user를 읽는 데 사용하므로 stale 상태 방지)
+        localStorage.removeItem('klp_user');
         showLogin();
         return;
     }
@@ -105,6 +108,7 @@ function updateSidebarUser() {
 
 async function handleLogin() {
     const name = document.getElementById('loginName').value.trim();
+    // password는 trim 금지 — 비밀번호에 의도된 앞뒤 공백이 있을 수 있어 silent 변형 방지
     const password = document.getElementById('loginPassword').value;
     const errorEl = document.getElementById('loginError');
     const btn = document.getElementById('loginBtn');
@@ -400,7 +404,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    checkAuth();
+    checkAuth().catch(e => {
+        console.error('checkAuth failed:', e);
+        showLogin();
+    });
 });
 
 // 드래그 중 뷰포트(또는 스크롤 가능한 컨테이너) 상/하 가장자리에 가까워지면
