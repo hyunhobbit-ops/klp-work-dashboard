@@ -179,7 +179,7 @@ async function load() {
 }
 
 function showError(msg) {
-    document.getElementById('pvRoot').innerHTML = `<div class="pv-error">${msg}</div>`;
+    document.getElementById('pvRoot').innerHTML = `<div class="pv-error">${escHtml(msg)}</div>`;
 }
 
 function _collectProducts(ep) {
