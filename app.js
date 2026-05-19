@@ -8909,15 +8909,13 @@ async function deleteAllMarketdb() {
 
 async function dbMarketInsert(item, cat) {
     const row = marketRowToDb(item, cat);
-    // 기존 카테고리의 최솟값보다 작게 지정해 맨 위에 노출
-    const existing = (MARKETDB && MARKETDB[cat]) || [];
-    let minSort = 0;
-    // DB에 sort_order가 남아 있을 수 있으므로 실제 값을 조회해 -1
+    // 기존 카테고리의 최댓값 +1로 지정해 맨 뒤에 추가 (NO 번호가 이어지도록)
+    let maxSort = 0;
     try {
-        const res = await sb.from('market_db').select('sort_order').eq('category', cat).order('sort_order', { ascending: true }).limit(1);
-        if (res && res.data && res.data.length > 0) minSort = (res.data[0].sort_order || 0) - 1;
+        const res = await sb.from('market_db').select('sort_order').eq('category', cat).order('sort_order', { ascending: false }).limit(1);
+        if (res && res.data && res.data.length > 0) maxSort = (res.data[0].sort_order || 0) + 1;
     } catch (e) {}
-    row.sort_order = minSort;
+    row.sort_order = maxSort;
     const { data, error } = await sb.from('market_db').insert(row).select().single();
     if (error) { showToast('추가 실패: ' + error.message); return null; }
     return marketRowFromDb(data);
@@ -8933,33 +8931,6 @@ async function dbMarketDelete(id) {
     const { error } = await sb.from('market_db').delete().eq('id', id);
     if (error) { showToast('삭제 실패: ' + error.message); return false; }
     return true;
-}
-
-// 같은 카테고리 내에서 위/아래로 이동 (sort_order swap)
-async function moveMarketItem(ev, cat, idx, dir) {
-    ev.stopPropagation();
-    if (!MARKETDB || !MARKETDB[cat]) return;
-    const list = MARKETDB[cat];
-    const targetIdx = idx + dir;
-    if (targetIdx < 0 || targetIdx >= list.length) return;
-    const a = list[idx], b = list[targetIdx];
-    // 순서를 뒤집기 위해 임시로 로컬 스왑
-    list[idx] = b;
-    list[targetIdx] = a;
-    // DB는 sort_order 필드를 쓰는 게 깔끔하지만, 현재 seed sort_order=idx이므로 두 행의 sort_order를 교환
-    // 안정적으로 하려면 전체 카테고리를 재번호화하는 것이 안전 (충돌 방지)
-    const updates = list.map((r, i) => ({ id: r.id, sort_order: i }));
-    // 개별 update 병렬 수행
-    try {
-        await Promise.all(updates.map(u => sb.from('market_db').update({ sort_order: u.sort_order }).eq('id', u.id)));
-    } catch (err) {
-        console.error('sort update failed', err);
-        showToast('순서 변경 실패');
-        // 롤백
-        list[idx] = a;
-        list[targetIdx] = b;
-    }
-    renderMarketdb();
 }
 
 // ---- Storage: 상품 이미지 업로드 ----
@@ -9079,7 +9050,7 @@ function handleMarketRealtimePayload(payload) {
     if (eventType === 'INSERT' && newRow) {
         const cat = newRow.category;
         if (MARKETDB[cat] && !MARKETDB[cat].find(x => x.id === newRow.id)) {
-            MARKETDB[cat].unshift(marketRowFromDb(newRow));
+            MARKETDB[cat].push(marketRowFromDb(newRow));
         }
     } else if (eventType === 'UPDATE' && newRow) {
         const targetCat = newRow.category;
@@ -9096,7 +9067,7 @@ function handleMarketRealtimePayload(payload) {
             }
         });
         if (moved && MARKETDB[targetCat]) {
-            MARKETDB[targetCat].unshift(marketRowFromDb(newRow));
+            MARKETDB[targetCat].push(marketRowFromDb(newRow));
         }
     } else if (eventType === 'DELETE' && oldRow) {
         ['watch','goods','misc'].forEach(c => {
@@ -9213,7 +9184,7 @@ async function renderMarketdb() {
     const tb = document.getElementById('marketTbody');
     if (!tb) return;
     if (!MARKETDB) {
-        tb.innerHTML = '<tr><td colspan="22" style="text-align:center;padding:60px 20px;color:var(--text-tertiary)">불러오는 중...</td></tr>';
+        tb.innerHTML = '<tr><td colspan="21" style="text-align:center;padding:60px 20px;color:var(--text-tertiary)">불러오는 중...</td></tr>';
         await loadMarketdbFromDb();
     }
     const items = marketGetFiltered();
@@ -9235,7 +9206,7 @@ async function renderMarketdb() {
     const catIcon = {'시계':'⌚','굿즈':'🎁','기타잡화':'📦'};
 
     if (pageItems.length === 0) {
-        tb.innerHTML = '<tr><td colspan="22" style="text-align:center;padding:60px 20px;color:var(--text-tertiary)">상품이 없습니다</td></tr>';
+        tb.innerHTML = '<tr><td colspan="21" style="text-align:center;padding:60px 20px;color:var(--text-tertiary)">상품이 없습니다</td></tr>';
         renderMarketPagination(0);
         return;
     }
@@ -9285,10 +9256,6 @@ async function renderMarketdb() {
             '<td class="khh-cell mcell-last"'+noprop+'>'+chk('khh_danggeun','khh')+'</td>'+
             '<td class="nko-cell"'+noprop+'>'+chk('nko_junggo','nko')+'</td>'+
             '<td class="nko-cell mcell-last"'+noprop+'>'+chk('nko_bungae','nko')+'</td>'+
-            '<td'+noprop+'><div class="market-sort-btns">'+
-                '<button class="market-sort-btn" onclick="moveMarketItem(event,\''+r._catKey+'\','+r._idx+',-1)" title="위로">▲</button>'+
-                '<button class="market-sort-btn" onclick="moveMarketItem(event,\''+r._catKey+'\','+r._idx+',1)" title="아래로">▼</button>'+
-            '</div></td>'+
         '</tr>';
     }).join('');
     renderMarketPagination(totalPages);
