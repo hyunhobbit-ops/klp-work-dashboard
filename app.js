@@ -13396,7 +13396,8 @@ function escHtml(s) {
 
 // URL 스키마 검증 — http/https/mailto/tel 또는 상대 경로만 허용 (#5 XSS 봉합)
 function isSafeUrl(url) {
-    const s = String(url || '').trim();
+    // C0 control chars (\t \n \r 등) strip — 브라우저 URL parser가 strip하므로 같이 strip해야 우회 차단
+    const s = String(url || '').replace(/[\x00-\x1F\x7F]/g, '').trim();
     if (!s) return false;
     // 상대경로/앵커/쿼리는 허용 (scheme 없음)
     if (s.startsWith('/') || s.startsWith('#') || s.startsWith('?')) return true;
