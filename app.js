@@ -716,12 +716,24 @@ async function loadUrlShortcuts() {
     }
 }
 
+// nav-external 클릭 위임 핸들러 — data-url/data-title 에서 안전하게 값 추출 (#5 XSS 봉합)
+function _urlShortcutClickHandler(ev) {
+    const a = ev.target.closest('.nav-external');
+    if (!a) return;
+    const url = a.dataset.url || '';
+    const title = a.dataset.title || '';
+    if (typeof copyLittlyLink === 'function') copyLittlyLink(url, title);
+}
+
 function urlShortcutItemHtml(s) {
-    const url = (s.url || '').replace(/"/g, '&quot;');
-    const title = escHtml(s.title || '');
+    const rawUrl = String(s.url || '');
+    const safeUrl = isSafeUrl(rawUrl) ? rawUrl : '#';
+    const urlAttr = escHtml(safeUrl);
+    const titleAttr = escHtml(s.title || '');
+    const titleText = escHtml(s.title || '');
     return `<div class="url-user-row">
-        <a class="nav-item nav-sub-item nav-external" href="${url}" target="_blank" rel="noopener" onclick="copyLittlyLink('${url.replace(/'/g, '\\\'')}','${(s.title || '').replace(/'/g, '\\\'')}')">
-            <span>${title}</span>
+        <a class="nav-item nav-sub-item nav-external" href="${urlAttr}" target="_blank" rel="noopener" data-url="${urlAttr}" data-title="${titleAttr}">
+            <span>${titleText}</span>
             <svg class="external-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg>
         </a>
         <button class="url-edit-btn" onclick="event.stopPropagation();openUrlShortcutModal(${s.id})" title="편집">✏️</button>
@@ -773,6 +785,13 @@ function renderUrlShortcuts() {
 
     // 5. 열림 상태 복원
     applyUrlCategoryOpenState();
+
+    // 위임 클릭 리스너 1회만 등록 (재렌더 시 중복 방지)
+    const _urlGroup = document.getElementById('urlShortcutsGroup');
+    if (_urlGroup && !_urlGroup._urlClickHooked) {
+        _urlGroup.addEventListener('click', _urlShortcutClickHandler);
+        _urlGroup._urlClickHooked = true;
+    }
 }
 
 function openUrlShortcutModal(id) {
@@ -821,6 +840,10 @@ async function saveUrlShortcut(id) {
     if (!url) { showToast('URL을 입력하세요'); return; }
     if (!category) { showToast('카테고리를 입력하세요'); return; }
     const payload = { title, url, category };
+    if (!isSafeUrl(payload.url)) {
+        showToast('허용되지 않는 URL 형식입니다 (http/https/mailto/tel만 가능)');
+        return;
+    }
     try {
         if (id) {
             const { data, error } = await sb.from('url_shortcuts').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', id).select().single();
@@ -13369,6 +13392,17 @@ function renderQuotes() {
 
 function escHtml(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// URL 스키마 검증 — http/https/mailto/tel 또는 상대 경로만 허용 (#5 XSS 봉합)
+function isSafeUrl(url) {
+    const s = String(url || '').trim();
+    if (!s) return false;
+    // 상대경로/앵커/쿼리는 허용 (scheme 없음)
+    if (s.startsWith('/') || s.startsWith('#') || s.startsWith('?')) return true;
+    const match = s.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
+    if (!match) return true; // scheme 없음 → 상대경로로 간주
+    return ['http', 'https', 'mailto', 'tel'].includes(match[1].toLowerCase());
 }
 
 // ===== 견적서 입력 모달 (국내 프로젝트 스타일 재사용, 다중 품목 + 선택적 부가비용) =====
