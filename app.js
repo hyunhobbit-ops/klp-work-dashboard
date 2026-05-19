@@ -122,6 +122,24 @@ function renderLoadMoreButton(container, pageState, onAfterLoad) {
     container.appendChild(btn);
 }
 
+// === Phase 3 #10: per-table pagination state ===
+// 각 select('*') 로드 사이트에 대응. renderXxx 함수가 "더 보기" 버튼을 부착할 때 참조.
+let _urlShortcutsPagination = null;
+let _projectsDomesticPagination = null;
+let _dailyTasksPagination = null;
+let _deliveriesPagination = null;
+let _clientsPagination = null;
+let _clientsOverseasPagination = null;
+let _marketingCampaignsPagination = null;
+let _productsPagination = null;
+let _proposalsPagination = null;
+let _marketDbPagination = null;
+let _projectsTempPagination = null;
+let _planningProjectsPagination = null;
+let _planningPostsPagination = null;
+let _quotesPagination = null;
+let _marginSimulationsPagination = null;
+
 // ===== Auth =====
 // 표시 이름 매핑 (김관택 → 대표님)
 const DISPLAY_NAME_MAP = { '김관택': '대표님' };
@@ -686,9 +704,12 @@ function toggleUrlCategoryGroup(labelEl) {
 
 async function loadUrlShortcuts() {
     try {
-        const { data, error } = await sb.from('url_shortcuts').select('*').order('sort_order', { ascending: true }).order('id', { ascending: true });
-        if (error) throw error;
-        urlShortcuts = data || [];
+        _urlShortcutsPagination = await paginatedLoad('url_shortcuts', {
+            pageSize: 200,
+            orderBy: 'sort_order', orderDir: 'asc',
+            secondaryOrderBy: 'id', secondaryOrderDir: 'asc'
+        });
+        urlShortcuts = _urlShortcutsPagination.data || [];
         renderUrlShortcuts();
     } catch (err) {
         console.warn('URL 바로가기 로드 실패 (테이블 없음?):', err.message);
@@ -1744,6 +1765,12 @@ function toggleProjectExpand(id) {
 
 function renderDomesticProjects() {
     renderProjectList(domesticProjects, currentDomesticFilter, 'domesticProjectTableBody', 'domesticProjectCardGrid');
+    // Phase 3 #10: 더 보기 버튼 (페이지네이션 state 가 hasMore 인 경우에만)
+    const _container = document.getElementById('tab-projects-domestic');
+    renderLoadMoreButton(_container, _projectsDomesticPagination, () => {
+        _rebuildDomesticProjectsFromPagination();
+        renderDomesticProjects();
+    });
 }
 
 function renderOverseasProjects() {
@@ -4800,82 +4827,93 @@ async function addProject(type) {
     showToast('프로젝트가 추가되었습니다');
 }
 
+// projects_domestic row → 도메인 객체 매퍼 (Phase 3 #10 더보기 콜백에서도 재사용)
+function _projectsDomesticRowToObj(r) {
+    return {
+        id: r.id,
+        name: r.product_name || '',
+        client: r.client || '',
+        contactPerson: r.contact_person || '',
+        title: r.title || '',
+        manager: r.manager || '',
+        supplier: r.supplier || '',
+        supplierContact: r.supplier_contact || '',
+        status: r.status || '시작 전',
+        priority: r.priority || '🟢 보통',
+        category: r.category || '국내 주문',
+        assignees: r.assignees || [],
+        unitPrice: r.unit_price || 0,
+        qty: r.quantity || 0,
+        unit: r.unit || '개',
+        vat: r.unit_price_vat === 'VAT 포함' ? 'include' : 'exclude',
+        revenue: r.revenue || 0,
+        color: r.color || '',
+        printColorSize: r.print_color_size || '',
+        printMethod: r.print_method || '',
+        printFee: r.print_fee || 0,
+        printFeeVat: r.print_fee_vat || 'VAT 별도',
+        printFeeApply: r.print_fee_apply || '1개당',
+        packaging: r.packaging || '',
+        packagingFee: r.packaging_fee || 0,
+        packagingFeeVat: r.packaging_fee_vat || 'VAT 별도',
+        packagingFeeApply: r.packaging_fee_apply || '1개당',
+        // 매입처 상세 (통합 모델)
+        supplierUnitPrice: r.supplier_unit_price || 0,
+        supplierUnitPriceVat: r.supplier_unit_price_vat || 'VAT 별도',
+        supplierVat: r.supplier_unit_price_vat === 'VAT 포함' ? 'include' : 'exclude',
+        supplierPrintFee: r.supplier_print_fee || 0,
+        supplierPrintFeeVat: r.supplier_print_fee_vat || 'VAT 별도',
+        supplierPrintFeeApply: r.supplier_print_fee_apply || '1개당',
+        supplierPackagingFee: r.supplier_packaging_fee || 0,
+        supplierPackagingFeeVat: r.supplier_packaging_fee_vat || 'VAT 별도',
+        supplierPackagingFeeApply: r.supplier_packaging_fee_apply || '1개당',
+        supplierRevenue: r.supplier_revenue || 0,
+        supplierShippingType: r.supplier_shipping_type || '',
+        supplierShippingVat: r.supplier_shipping_vat || 'VAT 별도',
+        supplierShippingCostPerBox: r.supplier_shipping_cost_per_box || 0,
+        supplierShippingBoxes: r.supplier_shipping_boxes || 0,
+        supplierShippingCost: r.supplier_shipping_cost || 0,
+        printCost: r.print_fee || 0,
+        packCost: r.packaging_fee || 0,
+        shipCost: r.shipping_cost || 0,
+        shippingType: r.shipping_type || '',
+        shippingVat: r.shipping_vat || 'VAT 별도',
+        shippingCostPerBox: r.shipping_cost_per_box || 0,
+        shippingBoxes: r.shipping_boxes || 0,
+        shippingCost: r.shipping_cost || 0,
+        startDate: r.start_date || '',
+        deadline: r.delivery_date || '',
+        recipient: r.recipient || '',
+        phone: r.phone || '',
+        address: r.address || '',
+        checks: r.checks || { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
+        memo: r.memo || '',
+        sourceDocNumber: r.source_doc_number || ''
+    };
+}
+
+// pageState.data 를 기준으로 domesticProjects/projects 를 다시 빌드 (캐시도 갱신)
+function _rebuildDomesticProjectsFromPagination() {
+    if (!_projectsDomesticPagination) return;
+    domesticProjects.length = 0;
+    (_projectsDomesticPagination.data || []).forEach(r => {
+        domesticProjects.push(_projectsDomesticRowToObj(r));
+    });
+    // projects 전체 재구성
+    projects.length = 0;
+    domesticProjects.forEach(p => projects.push(p));
+    overseasProjects.forEach(p => projects.push(p));
+    cacheWrite('domesticProjects', domesticProjects);
+}
+
 // Supabase에서 국내 프로젝트 로드
 async function loadDomesticProjectsFromDb() {
     try {
-        const { data, error } = await sb.from('projects_domestic').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        if (!data) return;
-        // DB 데이터로 치환
-        domesticProjects.length = 0;
-        data.forEach(r => {
-            domesticProjects.push({
-                id: r.id,
-                name: r.product_name || '',
-                client: r.client || '',
-                contactPerson: r.contact_person || '',
-                title: r.title || '',
-                manager: r.manager || '',
-                supplier: r.supplier || '',
-                supplierContact: r.supplier_contact || '',
-                status: r.status || '시작 전',
-                priority: r.priority || '🟢 보통',
-                category: r.category || '국내 주문',
-                assignees: r.assignees || [],
-                unitPrice: r.unit_price || 0,
-                qty: r.quantity || 0,
-                unit: r.unit || '개',
-                vat: r.unit_price_vat === 'VAT 포함' ? 'include' : 'exclude',
-                revenue: r.revenue || 0,
-                color: r.color || '',
-                printColorSize: r.print_color_size || '',
-                printMethod: r.print_method || '',
-                printFee: r.print_fee || 0,
-                printFeeVat: r.print_fee_vat || 'VAT 별도',
-                printFeeApply: r.print_fee_apply || '1개당',
-                packaging: r.packaging || '',
-                packagingFee: r.packaging_fee || 0,
-                packagingFeeVat: r.packaging_fee_vat || 'VAT 별도',
-                packagingFeeApply: r.packaging_fee_apply || '1개당',
-                // 매입처 상세 (통합 모델)
-                supplierUnitPrice: r.supplier_unit_price || 0,
-                supplierUnitPriceVat: r.supplier_unit_price_vat || 'VAT 별도',
-                supplierVat: r.supplier_unit_price_vat === 'VAT 포함' ? 'include' : 'exclude',
-                supplierPrintFee: r.supplier_print_fee || 0,
-                supplierPrintFeeVat: r.supplier_print_fee_vat || 'VAT 별도',
-                supplierPrintFeeApply: r.supplier_print_fee_apply || '1개당',
-                supplierPackagingFee: r.supplier_packaging_fee || 0,
-                supplierPackagingFeeVat: r.supplier_packaging_fee_vat || 'VAT 별도',
-                supplierPackagingFeeApply: r.supplier_packaging_fee_apply || '1개당',
-                supplierRevenue: r.supplier_revenue || 0,
-                supplierShippingType: r.supplier_shipping_type || '',
-                supplierShippingVat: r.supplier_shipping_vat || 'VAT 별도',
-                supplierShippingCostPerBox: r.supplier_shipping_cost_per_box || 0,
-                supplierShippingBoxes: r.supplier_shipping_boxes || 0,
-                supplierShippingCost: r.supplier_shipping_cost || 0,
-                printCost: r.print_fee || 0,
-                packCost: r.packaging_fee || 0,
-                shipCost: r.shipping_cost || 0,
-                shippingType: r.shipping_type || '',
-                shippingVat: r.shipping_vat || 'VAT 별도',
-                shippingCostPerBox: r.shipping_cost_per_box || 0,
-                shippingBoxes: r.shipping_boxes || 0,
-                shippingCost: r.shipping_cost || 0,
-                startDate: r.start_date || '',
-                deadline: r.delivery_date || '',
-                recipient: r.recipient || '',
-                phone: r.phone || '',
-                address: r.address || '',
-                checks: r.checks || { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
-                memo: r.memo || '',
-                sourceDocNumber: r.source_doc_number || ''
-            });
+        _projectsDomesticPagination = await paginatedLoad('projects_domestic', {
+            pageSize: 200,
+            orderBy: 'created_at', orderDir: 'desc'
         });
-        // projects 전체 재구성
-        projects.length = 0;
-        domesticProjects.forEach(p => projects.push(p));
-        overseasProjects.forEach(p => projects.push(p));
-        cacheWrite('domesticProjects', domesticProjects);
+        _rebuildDomesticProjectsFromPagination();
     } catch (err) {
         console.error('국내 프로젝트 로드 실패 (테이블 미생성?):', err.message);
     }
@@ -12870,10 +12908,13 @@ function quoteToDb(q) {
 
 async function loadQuotesFromDb() {
     try {
-        const { data, error } = await sb.from('quotes').select('*').order('doc_date', { ascending: false }).order('id', { ascending: false });
-        if (error) throw error;
+        _quotesPagination = await paginatedLoad('quotes', {
+            pageSize: 200,
+            orderBy: 'doc_date', orderDir: 'desc',
+            secondaryOrderBy: 'id', secondaryOrderDir: 'desc'
+        });
         quotes.length = 0;
-        (data || []).forEach(r => quotes.push(quoteFromDb(r)));
+        _quotesPagination.data.forEach(r => quotes.push(quoteFromDb(r)));
     } catch (err) {
         console.error('견적서 로드 실패:', err.message);
         showToast('견적서 로드 실패: ' + err.message);
@@ -13043,6 +13084,13 @@ function renderQuotes() {
     if (tbody) tbody.innerHTML = tableHtml || `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400)">견적서가 없습니다. 우측 상단 <b>새 견적서 만들기</b> 버튼을 눌러 작성하세요.</td></tr>`;
     const cards = document.getElementById('quotesCardGrid');
     if (cards) cards.innerHTML = cardHtml;
+    // Phase 3 #10: 더 보기 버튼
+    const _qContainer = document.getElementById('tab-quotes');
+    renderLoadMoreButton(_qContainer, _quotesPagination, () => {
+        quotes.length = 0;
+        _quotesPagination.data.forEach(r => quotes.push(quoteFromDb(r)));
+        renderQuotes();
+    });
 }
 
 function escHtml(s) {
