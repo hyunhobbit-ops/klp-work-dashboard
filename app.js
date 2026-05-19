@@ -4545,6 +4545,7 @@ async function addProject(type) {
             if (supVatVal === 'exclude') supProductTotal = Math.round(supProductTotal * 1.1);
             const supPrintTotal = _feeComponent('newProjectSupPrintFee','newProjectSupPrintFeeVat','newProjectSupPrintFeeApply',newProject.qty);
             const supPackTotal = _feeComponent('newProjectSupPackFee','newProjectSupPackFeeVat','newProjectSupPackFeeApply',newProject.qty);
+            const supShipTotal = _shippingComponent('newProjectSupShippingType','newProjectSupShippingVat','newProjectSupShippingCost','newProjectSupShipPerBox','newProjectSupShipBoxes');
             Object.assign(newProject, {
                 supplierUnitPrice: supUnit,
                 supplierUnitPriceVat: supVatLabel,
@@ -4555,7 +4556,12 @@ async function addProject(type) {
                 supplierPackagingFee: getInt('newProjectSupPackFee'),
                 supplierPackagingFeeVat: getVal('newProjectSupPackFeeVat') || 'VAT 별도',
                 supplierPackagingFeeApply: getVal('newProjectSupPackFeeApply') || '1개당',
-                supplierRevenue: supProductTotal + supPrintTotal + supPackTotal
+                supplierShippingType: getVal('newProjectSupShippingType'),
+                supplierShippingVat: getVal('newProjectSupShippingVat') || 'VAT 별도',
+                supplierShippingCostPerBox: readProjectNumber('newProjectSupShipPerBox'),
+                supplierShippingBoxes: readProjectNumber('newProjectSupShipBoxes'),
+                supplierShippingCost: getShippingCost('newProjectSup'),
+                supplierRevenue: supProductTotal + supPrintTotal + supPackTotal + supShipTotal
             });
         }
     }
@@ -4605,6 +4611,11 @@ async function addProject(type) {
                 supplier_packaging_fee_vat: newProject.supplierPackagingFeeVat || 'VAT 별도',
                 supplier_packaging_fee_apply: newProject.supplierPackagingFeeApply || '1개당',
                 supplier_revenue: newProject.supplierRevenue || 0,
+                supplier_shipping_type: newProject.supplierShippingType || '',
+                supplier_shipping_vat: newProject.supplierShippingVat || 'VAT 별도',
+                supplier_shipping_cost_per_box: newProject.supplierShippingCostPerBox || 0,
+                supplier_shipping_boxes: newProject.supplierShippingBoxes || 0,
+                supplier_shipping_cost: newProject.supplierShippingCost || 0,
                 shipping_type: newProject.shippingType || '',
                 shipping_vat: newProject.shippingVat || 'VAT 별도',
                 shipping_cost_per_box: newProject.shippingCostPerBox || 0,
