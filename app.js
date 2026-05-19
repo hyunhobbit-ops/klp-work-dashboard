@@ -36,6 +36,92 @@ function cacheWrite(name, data) {
     } catch (_) { /* QuotaExceeded 등은 무시 */ }
 }
 
+// =====================================
+// 🔢 paginatedLoad — 큰 테이블 단계적 로드 헬퍼 (Phase 3 #10)
+// =====================================
+// 사용 예:
+//   const page = await paginatedLoad('deliveries', {
+//       pageSize: 200,
+//       orderBy: 'date', orderDir: 'desc',
+//       secondaryOrderBy: 'id', secondaryOrderDir: 'desc',
+//       select: '*'
+//   });
+//   page.data           // 첫 페이지 결과 배열
+//   page.total          // 서버상 총 행 수 (count: 'exact')
+//   page.hasMore        // page.data.length < page.total
+//   page.loadMore()     // 다음 페이지를 fetch해서 page.data에 append, hasMore 갱신
+async function paginatedLoad(table, options) {
+    options = options || {};
+    const pageSize = options.pageSize || 200;
+    const orderBy = options.orderBy || 'id';
+    const orderDir = options.orderDir || 'desc';
+    const secondaryOrderBy = options.secondaryOrderBy || null;
+    const secondaryOrderDir = options.secondaryOrderDir || 'asc';
+    const selectClause = options.select || '*';
+    const filters = options.filters || []; // [{col, op, val}]
+
+    function buildQuery(start, end) {
+        let q = sb.from(table)
+            .select(selectClause, { count: 'exact' })
+            .order(orderBy, { ascending: orderDir === 'asc' });
+        if (secondaryOrderBy) {
+            q = q.order(secondaryOrderBy, { ascending: secondaryOrderDir === 'asc' });
+        }
+        filters.forEach(f => { q = q[f.op](f.col, f.val); });
+        q = q.range(start, end);
+        return q;
+    }
+
+    const first = await buildQuery(0, pageSize - 1);
+    if (first.error) throw first.error;
+
+    const state = {
+        data: first.data || [],
+        total: typeof first.count === 'number' ? first.count : (first.data ? first.data.length : 0),
+        pageSize: pageSize,
+        get hasMore() { return this.data.length < this.total; },
+        loadMore: async function () {
+            if (!this.hasMore) return this;
+            const start = this.data.length;
+            const end = start + this.pageSize - 1;
+            const next = await buildQuery(start, end);
+            if (next.error) throw next.error;
+            (next.data || []).forEach(r => this.data.push(r));
+            if (typeof next.count === 'number') this.total = next.count;
+            return this;
+        }
+    };
+    return state;
+}
+
+// "남은 N건 더 보기" 버튼을 컨테이너 하단에 부착. (Phase 3 #10)
+// 이미 동일 컨테이너에 버튼이 있으면 먼저 제거 후 새로 그림 (재렌더 안전).
+function renderLoadMoreButton(container, pageState, onAfterLoad) {
+    if (!container) return;
+    const existing = container.querySelector(':scope > .load-more-btn');
+    if (existing) existing.remove();
+    if (!pageState || !pageState.hasMore) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'load-more-btn';
+    btn.style.cssText = 'display:block;margin:12px auto;padding:8px 24px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;cursor:pointer;font-size:14px;color:#334155;';
+    btn.textContent = '남은 ' + (pageState.total - pageState.data.length) + '건 더 보기';
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = '로딩 중...';
+        try {
+            await pageState.loadMore();
+            if (typeof onAfterLoad === 'function') onAfterLoad();
+        } catch (e) {
+            console.error('renderLoadMoreButton loadMore failed:', e);
+            if (typeof showToast === 'function') showToast('추가 로드 실패: ' + (e.message || e));
+            btn.disabled = false;
+            btn.textContent = '남은 ' + (pageState.total - pageState.data.length) + '건 더 보기';
+        }
+    });
+    container.appendChild(btn);
+}
+
 // ===== Auth =====
 // 표시 이름 매핑 (김관택 → 대표님)
 const DISPLAY_NAME_MAP = { '김관택': '대표님' };
