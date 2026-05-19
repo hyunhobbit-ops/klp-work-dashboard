@@ -91,29 +91,51 @@ async function handleLogin() {
     btn.textContent = '로그인 중...';
     errorEl.textContent = '';
 
-    const { data, error } = await sb
+    // 1) name → email 매핑 조회
+    const { data: prof, error: profErr } = await sb
         .from('profiles')
-        .select('id, name, password, role')
+        .select('id, name, role, email, auth_user_id')
         .eq('name', name)
         .single();
 
-    if (error || !data) {
-        console.error('Login error:', error);
-        errorEl.textContent = error ? `오류: ${error.message}` : '등록되지 않은 이름입니다';
+    if (profErr || !prof || !prof.email) {
+        console.error('Login profile lookup error:', profErr);
+        errorEl.textContent = '등록되지 않은 이름입니다';
         btn.disabled = false;
         btn.textContent = '로그인';
         return;
     }
 
-    if (data.password !== password) {
-        errorEl.textContent = '비밀번호가 올바르지 않습니다';
+    // 2) Supabase Auth 정식 로그인
+    const { data: authData, error: authErr } = await sb.auth.signInWithPassword({
+        email: prof.email,
+        password: password,
+    });
+
+    if (authErr) {
+        console.error('Auth signIn error:', authErr);
+        if (authErr.message && authErr.message.toLowerCase().includes('invalid login credentials')) {
+            errorEl.textContent = '비밀번호가 올바르지 않습니다';
+        } else if (authErr.message && authErr.message.toLowerCase().includes('email not confirmed')) {
+            errorEl.textContent = '계정이 활성화되지 않았습니다 (관리자 문의)';
+        } else {
+            errorEl.textContent = `로그인 오류: ${authErr.message}`;
+        }
         btn.disabled = false;
         btn.textContent = '로그인';
         return;
     }
 
-    const displayName = DISPLAY_NAME_MAP[data.name] || data.name;
-    currentUser = { id: data.id, name: displayName, loginName: data.name, role: data.role };
+    // 3) currentUser 구성 (기존 구조 호환)
+    const displayName = DISPLAY_NAME_MAP[prof.name] || prof.name;
+    currentUser = {
+        id: prof.id,
+        name: displayName,
+        loginName: prof.name,
+        role: prof.role,
+        email: prof.email,
+        authUserId: authData.user.id,
+    };
     localStorage.setItem('klp_user', JSON.stringify(currentUser));
     updateSidebarUser();
     showApp();
