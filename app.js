@@ -8782,7 +8782,8 @@ function marketRowFromDb(r) {
         '재고수량': r.qty || '',
         '재고 위치': r.location || '',
         '판매 페이지': r.page_url || '',
-        image: r.image || ''
+        image: r.image || '',
+        extra_images: Array.isArray(r.extra_images) ? r.extra_images.slice() : [],
     };
     MARKETDB_CHECK_FIELDS.forEach(k => { o[k] = !!r[k]; });
     return o;
@@ -8800,7 +8801,8 @@ function marketRowToDb(r, cat) {
         qty: r['재고수량'] || '',
         location: r['재고 위치'] || '',
         page_url: r['판매 페이지'] || '',
-        image: r.image || ''
+        image: r.image || '',
+        extra_images: Array.isArray(r.extra_images) ? r.extra_images : [],
     };
     MARKETDB_CHECK_FIELDS.forEach(k => { o[k] = !!r[k]; });
     return o;
