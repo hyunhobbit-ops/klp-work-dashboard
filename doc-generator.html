@@ -408,7 +408,38 @@ function fmtComma(el,cb){
   el.value=n.toLocaleString();
   if(cb)cb();
 }
-async function sbFetch(path,method,body){await _authReady;var opts={method:method||'GET',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+_currentAccessToken,'Content-Type':'application/json','Prefer':'return=representation'}};if(body)opts.body=JSON.stringify(body);var res=await fetch(SB_URL+'/rest/v1/'+path,opts);return res.json()}
+async function sbFetch(path, method, body){
+  await _authReady;
+  var opts = {
+    method: method || 'GET',
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer ' + _currentAccessToken,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  var res = await fetch(SB_URL + '/rest/v1/' + path, opts);
+
+  // 204 No Content (DELETE / return=minimal) → 빈 응답
+  if (res.status === 204) return null;
+
+  // HTTP 오류 → throw
+  if (!res.ok) {
+    var errBody;
+    try { errBody = await res.json(); } catch (_) {
+      try { errBody = { message: await res.text() }; } catch (__) { errBody = {}; }
+    }
+    var err = new Error(errBody.message || errBody.error || ('HTTP ' + res.status));
+    err.statusCode = res.status;
+    err.code = errBody.code;
+    err.details = errBody;
+    throw err;
+  }
+
+  return res.json();
+}
 
 /* === 고객사 datalist 로드 (clients 테이블) === */
 async function loadClientsDatalist(){
