@@ -8949,6 +8949,69 @@ async function uploadMarketImage(file) {
     return data.publicUrl;
 }
 
+// ---- 중고마켓DB 라이트박스 갤러리 ----
+let _marketGalleryState = { urls: [], idx: 0 };
+
+function openMarketGalleryLightbox(itemId) {
+    if (!MARKETDB) return;
+    let item = null;
+    ['watch','goods','misc'].forEach(c => {
+        if (!MARKETDB[c]) return;
+        const found = MARKETDB[c].find(x => x.id === itemId);
+        if (found) item = found;
+    });
+    if (!item) return;
+    const all = [];
+    if (item.image) all.push(item.image);
+    (item.extra_images || []).forEach(u => { if (u) all.push(u); });
+    if (all.length === 0) return;
+
+    _marketGalleryState = { urls: all, idx: 0 };
+    const overlay = document.getElementById('marketGalleryOverlay');
+    if (overlay) overlay.style.display = 'flex';
+    document.addEventListener('keydown', _marketGalleryKeyHandler);
+    _renderMarketGallery();
+}
+
+function _renderMarketGallery() {
+    const { urls, idx } = _marketGalleryState;
+    const img = document.getElementById('marketGalleryImg');
+    if (img) img.src = urls[idx] || '';
+    const dots = document.getElementById('marketGalleryDots');
+    if (dots) {
+        dots.innerHTML = urls.map((_, i) =>
+            '<span style="width:8px;height:8px;border-radius:50%;background:' +
+            (i === idx ? '#fff' : 'rgba(255,255,255,0.35)') + '"></span>'
+        ).join('');
+    }
+}
+
+function marketGalleryNext() {
+    const { urls } = _marketGalleryState;
+    if (!urls || urls.length === 0) return;
+    _marketGalleryState.idx = (_marketGalleryState.idx + 1) % urls.length;
+    _renderMarketGallery();
+}
+
+function marketGalleryPrev() {
+    const { urls } = _marketGalleryState;
+    if (!urls || urls.length === 0) return;
+    _marketGalleryState.idx = (_marketGalleryState.idx - 1 + urls.length) % urls.length;
+    _renderMarketGallery();
+}
+
+function closeMarketGallery() {
+    const overlay = document.getElementById('marketGalleryOverlay');
+    if (overlay) overlay.style.display = 'none';
+    document.removeEventListener('keydown', _marketGalleryKeyHandler);
+}
+
+function _marketGalleryKeyHandler(e) {
+    if (e.key === 'Escape') closeMarketGallery();
+    else if (e.key === 'ArrowLeft') marketGalleryPrev();
+    else if (e.key === 'ArrowRight') marketGalleryNext();
+}
+
 // ---- Realtime 구독: 3명이 동시 작업 시 실시간 동기화 ----
 let _marketRealtimeChannel = null;
 let _marketdbVisibilityHooked = false;
