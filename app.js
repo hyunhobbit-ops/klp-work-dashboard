@@ -7215,12 +7215,12 @@ function productToDb(p) {
 }
 async function loadProductsFromDb() {
     try {
-        const { data, error } = await sb.from('products')
-            .select('*')
-            .order('created_at', { ascending: false });
-        if (error) throw error;
+        _productsPagination = await paginatedLoad('products', {
+            pageSize: 500,
+            orderBy: 'created_at', orderDir: 'desc'
+        });
         productsDB.length = 0;
-        (data || []).forEach(r => productsDB.push(productFromDb(r)));
+        _productsPagination.data.forEach(r => productsDB.push(productFromDb(r)));
         cacheWrite('productsDB', productsDB);
     } catch (err) {
         console.error('상품 DB 로드 실패:', err.message);
@@ -7323,12 +7323,12 @@ function proposalToDb(p) {
 }
 async function loadProposalsFromDb() {
     try {
-        const { data, error } = await sb.from('proposals')
-            .select('*')
-            .order('created_at', { ascending: false });
-        if (error) throw error;
+        _proposalsPagination = await paginatedLoad('proposals', {
+            pageSize: 200,
+            orderBy: 'created_at', orderDir: 'desc'
+        });
         proposals.length = 0;
-        (data || []).forEach(r => proposals.push(proposalFromDb(r)));
+        _proposalsPagination.data.forEach(r => proposals.push(proposalFromDb(r)));
         cacheWrite('proposals', proposals);
     } catch (err) {
         console.error('제안서 로드 실패:', err.message);
@@ -7463,6 +7463,14 @@ function renderProductDB() {
     }
     document.getElementById('productTableBody').innerHTML = tableHtml;
     document.getElementById('productCardGrid').innerHTML = cardHtml;
+
+    // Phase 3 #10: 더 보기 버튼
+    const _pContainer = document.getElementById('tab-product-db');
+    renderLoadMoreButton(_pContainer, _productsPagination, () => {
+        productsDB.length = 0;
+        _productsPagination.data.forEach(r => productsDB.push(productFromDb(r)));
+        renderProductDB();
+    });
 }
 
 // 상품 등록/편집 모달
@@ -7949,6 +7957,14 @@ function renderProposals() {
     }
     document.getElementById('proposalTableBody').innerHTML = tableHtml;
     document.getElementById('proposalCardGrid').innerHTML = cardHtml;
+
+    // Phase 3 #10: 더 보기 버튼
+    const _prContainer = document.getElementById('tab-proposals');
+    renderLoadMoreButton(_prContainer, _proposalsPagination, () => {
+        proposals.length = 0;
+        _proposalsPagination.data.forEach(r => proposals.push(proposalFromDb(r)));
+        renderProposals();
+    });
 }
 
 function copyProposalLink(id) {
@@ -8789,22 +8805,28 @@ function marketRowToDb(r, cat) {
     return o;
 }
 
+// market_db pageState 의 data 로부터 MARKETDB 버킷을 다시 빌드 (더보기 콜백 재사용)
+function _rebuildMarketdbFromPagination() {
+    if (!_marketDbPagination) return;
+    const buckets = { watch: [], goods: [], misc: [] };
+    (_marketDbPagination.data || []).forEach(r => {
+        const cat = buckets[r.category] ? r.category : 'misc';
+        buckets[cat].push(marketRowFromDb(r));
+    });
+    MARKETDB = buckets;
+}
+
 async function loadMarketdbFromDb() {
     if (_marketdbLoading) return _marketdbLoading;
     _marketdbLoading = (async () => {
         try {
-            let { data, error } = await sb.from('market_db')
-                .select('*')
-                .order('category', { ascending: true })
-                .order('sort_order', { ascending: true })
-                .order('id', { ascending: true });
-            if (error) throw error;
-            const buckets = { watch: [], goods: [], misc: [] };
-            (data || []).forEach(r => {
-                const cat = buckets[r.category] ? r.category : 'misc';
-                buckets[cat].push(marketRowFromDb(r));
+            _marketDbPagination = await paginatedLoad('market_db', {
+                pageSize: 500,
+                orderBy: 'category', orderDir: 'asc',
+                secondaryOrderBy: 'sort_order', secondaryOrderDir: 'asc'
+                // 3차 정렬(id)은 paginatedLoad가 secondary 1개만 지원 — sort_order 가 동률일 가능성 매우 낮음
             });
-            MARKETDB = buckets;
+            _rebuildMarketdbFromPagination();
             subscribeMarketRealtime();
             hookMarketdbVisibilityRefresh();
         } catch (err) {
@@ -9171,6 +9193,13 @@ async function renderMarketdb() {
     }).join('');
     renderMarketPagination(totalPages);
     bindMarketThumbHovers();
+
+    // Phase 3 #10: 더 보기 버튼 (서버 페이지네이션 — 클라이언트 측 MARKET_PER_PAGE 와 별개)
+    const _mdContainer = document.getElementById('tab-marketdb');
+    renderLoadMoreButton(_mdContainer, _marketDbPagination, () => {
+        _rebuildMarketdbFromPagination();
+        renderMarketdb();
+    });
 }
 
 function updateMarketCounts() {
@@ -9554,58 +9583,70 @@ document.addEventListener('keydown', e => {
 let tempGroups = [];
 const tempProjects = [];
 
+// projects_temp row → 도메인 객체 매퍼 (더보기 콜백 재사용)
+function _projectsTempRowToObj(r) {
+    return {
+        id: r.id,
+        date: r.date || '',
+        client: r.client || '',
+        clientContact: r.client_contact || '',
+        supplier: r.supplier || '',
+        supplierContact: r.supplier_contact || '',
+        item: r.item || '',
+        unitPrice: r.unit_price || 0,
+        unitPriceVat: r.unit_price_vat || 'VAT 별도',
+        supplierUnitPrice: r.supplier_unit_price || 0,
+        supplierUnitPriceVat: r.supplier_unit_price_vat || 'VAT 별도',
+        qty: r.qty || 0,
+        revenue: r.revenue || 0,
+        supplierRevenue: r.supplier_revenue || 0,
+        printMethod: r.print_method || '없음',
+        printFee: r.print_fee || 0,
+        printFeeApply: r.print_fee_apply || '1개당',
+        printFeeVat: r.print_fee_vat || 'VAT 별도',
+        packMethod: r.pack_method || '기본박스',
+        packagingFee: r.packaging_fee || 0,
+        packagingFeeApply: r.packaging_fee_apply || '일괄',
+        packagingFeeVat: r.packaging_fee_vat || 'VAT 별도',
+        labelFee: r.label_fee || 0,
+        labelFeeApply: r.label_fee_apply || '1개당',
+        labelFeeVat: r.label_fee_vat || 'VAT 별도',
+        shippingBoxes: r.shipping_boxes || 0,
+        shippingFee: r.shipping_fee || 0,
+        shippingFeeVat: r.shipping_fee_vat || 'VAT 별도',
+        supPrintMethod: r.sup_print_method || '없음',
+        supPrintFee: r.sup_print_fee || 0,
+        supPrintFeeApply: r.sup_print_fee_apply || '1개당',
+        supPrintFeeVat: r.sup_print_fee_vat || 'VAT 별도',
+        supPackMethod: r.sup_pack_method || '기본박스',
+        supPackagingFee: r.sup_packaging_fee || 0,
+        supPackagingFeeApply: r.sup_packaging_fee_apply || '일괄',
+        supPackagingFeeVat: r.sup_packaging_fee_vat || 'VAT 별도',
+        supLabelFee: r.sup_label_fee || 0,
+        supLabelFeeApply: r.sup_label_fee_apply || '1개당',
+        supLabelFeeVat: r.sup_label_fee_vat || 'VAT 별도',
+        supShippingBoxes: r.sup_shipping_boxes || 0,
+        supShippingFee: r.sup_shipping_fee || 0,
+        supShippingFeeVat: r.sup_shipping_fee_vat || 'VAT 별도',
+        quoteNote: r.quote_note || ''
+    };
+}
+
+function _rebuildTempProjectsFromPagination() {
+    if (!_projectsTempPagination) return;
+    tempProjects.length = 0;
+    (_projectsTempPagination.data || []).forEach(r => {
+        tempProjects.push(_projectsTempRowToObj(r));
+    });
+}
+
 async function loadTempProjects() {
     try {
-        const { data, error } = await sb.from('projects_temp').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        tempProjects.length = 0;
-        (data || []).forEach(r => {
-            tempProjects.push({
-                id: r.id,
-                date: r.date || '',
-                client: r.client || '',
-                clientContact: r.client_contact || '',
-                supplier: r.supplier || '',
-                supplierContact: r.supplier_contact || '',
-                item: r.item || '',
-                unitPrice: r.unit_price || 0,
-                unitPriceVat: r.unit_price_vat || 'VAT 별도',
-                supplierUnitPrice: r.supplier_unit_price || 0,
-                supplierUnitPriceVat: r.supplier_unit_price_vat || 'VAT 별도',
-                qty: r.qty || 0,
-                revenue: r.revenue || 0,
-                supplierRevenue: r.supplier_revenue || 0,
-                printMethod: r.print_method || '없음',
-                printFee: r.print_fee || 0,
-                printFeeApply: r.print_fee_apply || '1개당',
-                printFeeVat: r.print_fee_vat || 'VAT 별도',
-                packMethod: r.pack_method || '기본박스',
-                packagingFee: r.packaging_fee || 0,
-                packagingFeeApply: r.packaging_fee_apply || '일괄',
-                packagingFeeVat: r.packaging_fee_vat || 'VAT 별도',
-                labelFee: r.label_fee || 0,
-                labelFeeApply: r.label_fee_apply || '1개당',
-                labelFeeVat: r.label_fee_vat || 'VAT 별도',
-                shippingBoxes: r.shipping_boxes || 0,
-                shippingFee: r.shipping_fee || 0,
-                shippingFeeVat: r.shipping_fee_vat || 'VAT 별도',
-                supPrintMethod: r.sup_print_method || '없음',
-                supPrintFee: r.sup_print_fee || 0,
-                supPrintFeeApply: r.sup_print_fee_apply || '1개당',
-                supPrintFeeVat: r.sup_print_fee_vat || 'VAT 별도',
-                supPackMethod: r.sup_pack_method || '기본박스',
-                supPackagingFee: r.sup_packaging_fee || 0,
-                supPackagingFeeApply: r.sup_packaging_fee_apply || '일괄',
-                supPackagingFeeVat: r.sup_packaging_fee_vat || 'VAT 별도',
-                supLabelFee: r.sup_label_fee || 0,
-                supLabelFeeApply: r.sup_label_fee_apply || '1개당',
-                supLabelFeeVat: r.sup_label_fee_vat || 'VAT 별도',
-                supShippingBoxes: r.sup_shipping_boxes || 0,
-                supShippingFee: r.sup_shipping_fee || 0,
-                supShippingFeeVat: r.sup_shipping_fee_vat || 'VAT 별도',
-                quoteNote: r.quote_note || ''
-            });
+        _projectsTempPagination = await paginatedLoad('projects_temp', {
+            pageSize: 200,
+            orderBy: 'created_at', orderDir: 'desc'
         });
+        _rebuildTempProjectsFromPagination();
     } catch (err) {
         console.error('임시 프로젝트 로드 실패:', err.message);
     }
@@ -9752,6 +9793,13 @@ function renderTempProjects() {
     }
     tbody.innerHTML = rowHtml;
     if (cardGrid) cardGrid.innerHTML = cardHtml;
+
+    // Phase 3 #10: 더 보기 버튼
+    const _tpContainer = document.getElementById('tab-projects-temp');
+    renderLoadMoreButton(_tpContainer, _projectsTempPagination, () => {
+        _rebuildTempProjectsFromPagination();
+        renderTempProjects();
+    });
 }
 
 function getTodayStr() {
@@ -10814,18 +10862,35 @@ function planningIsSortOrderSchemaError(err) {
 
 async function loadPlanningProjects() {
     try {
-        const [projRes, postRes] = await Promise.all([
-            sb.from('planning_projects').select('*').order('created_at', { ascending: false }),
-            sb.from('planning_posts').select('*').order('created_at', { ascending: true })
+        // 두 테이블을 병렬로 paginatedLoad — projects/posts 관계가 있어 일부 페이지만 로드하면
+        // 데이터 정합성이 깨지므로 hasMore 가 false 가 될 때까지 자동으로 loadMore.
+        // safety cap: projects 2000 / posts 10000
+        const [projPage, postPage] = await Promise.all([
+            paginatedLoad('planning_projects', {
+                pageSize: 100,
+                orderBy: 'created_at', orderDir: 'desc'
+            }),
+            paginatedLoad('planning_posts', {
+                pageSize: 300,
+                orderBy: 'created_at', orderDir: 'asc'
+            })
         ]);
-        if (projRes.error) throw projRes.error;
-        if (postRes.error) throw postRes.error;
+        _planningProjectsPagination = projPage;
+        _planningPostsPagination = postPage;
+        const PROJECTS_CAP = 2000;
+        const POSTS_CAP = 10000;
+        while (_planningProjectsPagination.hasMore && _planningProjectsPagination.data.length < PROJECTS_CAP) {
+            await _planningProjectsPagination.loadMore();
+        }
+        while (_planningPostsPagination.hasMore && _planningPostsPagination.data.length < POSTS_CAP) {
+            await _planningPostsPagination.loadMore();
+        }
         const postsByProject = {};
-        for (const row of (postRes.data || [])) {
+        for (const row of (_planningPostsPagination.data || [])) {
             const post = planningPostFromDb(row);
             (postsByProject[post.projectId] = postsByProject[post.projectId] || []).push(post);
         }
-        planningProjects = (projRes.data || []).map(row => {
+        planningProjects = (_planningProjectsPagination.data || []).map(row => {
             const proj = planningProjectFromDb(row);
             proj.posts = postsByProject[proj.id] || [];
             return proj;
