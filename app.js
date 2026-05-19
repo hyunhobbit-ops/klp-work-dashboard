@@ -9050,7 +9050,7 @@ function handleMarketRealtimePayload(payload) {
     if (eventType === 'INSERT' && newRow) {
         const cat = newRow.category;
         if (MARKETDB[cat] && !MARKETDB[cat].find(x => x.id === newRow.id)) {
-            MARKETDB[cat].push(marketRowFromDb(newRow));
+            MARKETDB[cat].unshift(marketRowFromDb(newRow));
         }
     } else if (eventType === 'UPDATE' && newRow) {
         const targetCat = newRow.category;
@@ -9067,7 +9067,7 @@ function handleMarketRealtimePayload(payload) {
             }
         });
         if (moved && MARKETDB[targetCat]) {
-            MARKETDB[targetCat].push(marketRowFromDb(newRow));
+            MARKETDB[targetCat].unshift(marketRowFromDb(newRow));
         }
     } else if (eventType === 'DELETE' && oldRow) {
         ['watch','goods','misc'].forEach(c => {
@@ -9099,15 +9099,18 @@ function marketParseStatus(s) {
 function marketGetFiltered() {
     if (!MARKETDB) return [];
     let items = [];
+    // NO는 카테고리 내 등록순(오래된=1, 최신=length). 화면은 desc(최신이 위)이므로 reverse index 사용.
+    const wLen = MARKETDB.watch.length, gLen = MARKETDB.goods.length, mLen = MARKETDB.misc.length;
     if (marketCurrentCat === 'all') {
         items = [].concat(
-            MARKETDB.watch.map((x,i) => Object.assign({}, x, {_cat:'시계', _catKey:'watch', _idx:i})),
-            MARKETDB.goods.map((x,i) => Object.assign({}, x, {_cat:'굿즈', _catKey:'goods', _idx:i})),
-            MARKETDB.misc.map((x,i) => Object.assign({}, x, {_cat:'기타잡화', _catKey:'misc', _idx:i}))
+            MARKETDB.watch.map((x,i) => Object.assign({}, x, {_cat:'시계', _catKey:'watch', _idx:i, _no: wLen - i})),
+            MARKETDB.goods.map((x,i) => Object.assign({}, x, {_cat:'굿즈', _catKey:'goods', _idx:i, _no: gLen - i})),
+            MARKETDB.misc.map((x,i) => Object.assign({}, x, {_cat:'기타잡화', _catKey:'misc', _idx:i, _no: mLen - i}))
         );
     } else {
         const catName = marketCurrentCat==='watch'?'시계':marketCurrentCat==='goods'?'굿즈':'기타잡화';
-        items = MARKETDB[marketCurrentCat].map((x,i) => Object.assign({}, x, {_cat:catName, _catKey:marketCurrentCat, _idx:i}));
+        const len = MARKETDB[marketCurrentCat].length;
+        items = MARKETDB[marketCurrentCat].map((x,i) => Object.assign({}, x, {_cat:catName, _catKey:marketCurrentCat, _idx:i, _no: len - i}));
     }
     const q = (marketSearchQuery||'').toLowerCase();
     if (q) {
@@ -9212,7 +9215,7 @@ async function renderMarketdb() {
     }
 
     tb.innerHTML = pageItems.map((r, i) => {
-        const rowNo = start + i + 1;
+        const rowNo = r._no;
         const pageUrl = r['판매 페이지'];
         const pageHtml = pageUrl ? '<a href="'+marketEsc(pageUrl)+'" target="_blank" onclick="event.stopPropagation()">바로가기 ↗</a>' : '-';
         const tcls = catClass[r._cat]||'misc';
@@ -9673,22 +9676,15 @@ async function saveMarketItem() {
         if (_marketEditCtx.cat === newCat) {
             MARKETDB[_marketEditCtx.cat][_marketEditCtx.idx] = updated;
         } else {
-            // 카테고리 변경 시 새 카테고리의 맨 뒤로 들어가도록 sort_order도 재할당
-            let maxSort = 0;
-            try {
-                const res = await sb.from('market_db').select('sort_order').eq('category', newCat).order('sort_order', { ascending: false }).limit(1);
-                if (res && res.data && res.data.length > 0) maxSort = (res.data[0].sort_order || 0) + 1;
-            } catch (e) {}
-            await dbMarketUpdate(old.id, { sort_order: maxSort });
             MARKETDB[_marketEditCtx.cat].splice(_marketEditCtx.idx, 1);
-            MARKETDB[newCat].push(updated);
+            MARKETDB[newCat].unshift(updated);
         }
         showToast('상품이 수정되었습니다');
     } else {
         MARKETDB_CHECK_FIELDS.forEach(k => { base[k] = false; });
         const saved = await dbMarketInsert(base, newCat);
         if (!saved) return;
-        MARKETDB[newCat].push(saved);
+        MARKETDB[newCat].unshift(saved);
         showToast('상품이 추가되었습니다');
     }
     closeMarketModal();
