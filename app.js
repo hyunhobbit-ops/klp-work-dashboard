@@ -2851,6 +2851,14 @@ function renderDeliveries() {
     document.getElementById('deliveryTableBody').innerHTML = tableHtml;
     document.getElementById('deliveryCardGrid').innerHTML = cardHtml;
 
+    // Phase 3 #10: 더 보기 버튼
+    const _dContainer = document.getElementById('tab-delivery');
+    renderLoadMoreButton(_dContainer, _deliveriesPagination, () => {
+        deliveries.length = 0;
+        _deliveriesPagination.data.forEach(r => deliveries.push(deliveryFromDb(r)));
+        renderDeliveries();
+    });
+
     // 택배 데이터 변경 시 중고마켓DB 판매금액 패널도 자동 갱신
     try { if (typeof renderMarketSalesPanel === 'function') renderMarketSalesPanel(); } catch (_) {}
 }
@@ -4957,10 +4965,18 @@ function taskFromDb(r) {
 }
 async function loadDailyTasksFromDb() {
     try {
-        const { data, error } = await sb.from('daily_tasks').select('*').order('id', { ascending: true });
-        if (error) throw error;
+        // 일일계획은 kanban/캘린더 렌더라 "더 보기" 버튼이 부적절.
+        // pageSize 100 으로 단계 로드 후, 남은 페이지를 자동 fetch (1500 행 safety cap)
+        _dailyTasksPagination = await paginatedLoad('daily_tasks', {
+            pageSize: 100,
+            orderBy: 'id', orderDir: 'asc'
+        });
+        const SAFETY_CAP = 1500;
+        while (_dailyTasksPagination.hasMore && _dailyTasksPagination.data.length < SAFETY_CAP) {
+            await _dailyTasksPagination.loadMore();
+        }
         dailyTasks.length = 0;
-        (data || []).forEach(r => dailyTasks.push(taskFromDb(r)));
+        _dailyTasksPagination.data.forEach(r => dailyTasks.push(taskFromDb(r)));
         cacheWrite('dailyTasks', dailyTasks);
     } catch (err) {
         console.error('일일계획 로드 실패:', err.message);
@@ -5237,16 +5253,20 @@ function deliveryFromDb(r) {
 let deliveriesFullLoaded = false;
 async function loadDeliveriesFromDb({ full = false } = {}) {
     try {
-        let query = sb.from('deliveries').select('*').order('date', { ascending: false }).order('id', { ascending: false });
+        const filters = [];
         if (!full) {
             const d = new Date();
             d.setMonth(d.getMonth() - 6);
-            query = query.gte('date', d.toISOString().slice(0, 10));
+            filters.push({ col: 'date', op: 'gte', val: d.toISOString().slice(0, 10) });
         }
-        const { data, error } = await query;
-        if (error) throw error;
+        _deliveriesPagination = await paginatedLoad('deliveries', {
+            pageSize: 200,
+            orderBy: 'date', orderDir: 'desc',
+            secondaryOrderBy: 'id', secondaryOrderDir: 'desc',
+            filters
+        });
         deliveries.length = 0;
-        (data || []).forEach(r => deliveries.push(deliveryFromDb(r)));
+        _deliveriesPagination.data.forEach(r => deliveries.push(deliveryFromDb(r)));
         if (full) {
             deliveriesFullLoaded = true;
             // 전체 데이터는 양이 커서 캐시하지 않음 (다음 init은 다시 6개월부터)
@@ -5327,22 +5347,12 @@ function clientFromDb(r) {
 }
 async function loadClientsFromDb() {
     try {
-        const all = [];
-        let from = 0;
-        const size = 1000;
-        while (true) {
-            const { data, error } = await sb.from('clients')
-                .select('*')
-                .order('company_name', { ascending: true })
-                .range(from, from + size - 1);
-            if (error) throw error;
-            if (!data || data.length === 0) break;
-            data.forEach(r => all.push(clientFromDb(r)));
-            if (data.length < size) break;
-            from += size;
-        }
+        _clientsPagination = await paginatedLoad('clients', {
+            pageSize: 500,
+            orderBy: 'company_name', orderDir: 'asc'
+        });
         clients.length = 0;
-        all.forEach(c => clients.push(c));
+        _clientsPagination.data.forEach(r => clients.push(clientFromDb(r)));
         cacheWrite('clients', clients);
     } catch (err) {
         console.error('고객사 로드 실패:', err.message);
@@ -5646,6 +5656,14 @@ function renderClients() {
 
     // 정렬 화살표 상태 반영
     updateClientSortArrows();
+
+    // Phase 3 #10: 더 보기 버튼 (서버 페이지네이션 — 클라이언트 측 페이지와 별개)
+    const _cContainer = document.getElementById('tab-clients');
+    renderLoadMoreButton(_cContainer, _clientsPagination, () => {
+        clients.length = 0;
+        _clientsPagination.data.forEach(r => clients.push(clientFromDb(r)));
+        renderClients();
+    });
 }
 
 function gotoClientPage(p) {
@@ -5914,12 +5932,12 @@ function clientOverseasFromDb(r) {
 }
 async function loadClientsOverseasFromDb() {
     try {
-        const { data, error } = await sb.from('clients_overseas')
-            .select('*')
-            .order('company_name', { ascending: true });
-        if (error) throw error;
+        _clientsOverseasPagination = await paginatedLoad('clients_overseas', {
+            pageSize: 500,
+            orderBy: 'company_name', orderDir: 'asc'
+        });
         clientsOverseas.length = 0;
-        (data || []).forEach(r => clientsOverseas.push(clientOverseasFromDb(r)));
+        _clientsOverseasPagination.data.forEach(r => clientsOverseas.push(clientOverseasFromDb(r)));
         cacheWrite('clientsOverseas', clientsOverseas);
     } catch (err) {
         console.error('해외 거래처 로드 실패:', err.message);
@@ -6010,6 +6028,14 @@ function renderClientsOverseas() {
             <td><button class="edit-btn" onclick="event.stopPropagation();openEditClientOverseas(${c.id})">편집</button></td>
         </tr>`;
     }).join('') || `<tr><td colspan="12" style="text-align:center;padding:40px;color:var(--text-tertiary)">해외 거래처가 없습니다</td></tr>`;
+
+    // Phase 3 #10: 더 보기 버튼
+    const _coContainer = document.getElementById('tab-clients-overseas');
+    renderLoadMoreButton(_coContainer, _clientsOverseasPagination, () => {
+        clientsOverseas.length = 0;
+        _clientsOverseasPagination.data.forEach(r => clientsOverseas.push(clientOverseasFromDb(r)));
+        renderClientsOverseas();
+    });
 }
 
 function openClientOverseasModal(existing) {
@@ -6207,12 +6233,12 @@ function marketingToDb(c) {
 
 async function loadMarketingCampaignsFromDb() {
     try {
-        const { data, error } = await sb.from('marketing_campaigns')
-            .select('*')
-            .order('created_at', { ascending: false });
-        if (error) throw error;
+        _marketingCampaignsPagination = await paginatedLoad('marketing_campaigns', {
+            pageSize: 200,
+            orderBy: 'created_at', orderDir: 'desc'
+        });
         marketingCampaigns.length = 0;
-        (data || []).forEach(r => marketingCampaigns.push(marketingFromDb(r)));
+        _marketingCampaignsPagination.data.forEach(r => marketingCampaigns.push(marketingFromDb(r)));
         cacheWrite('marketingCampaigns', marketingCampaigns);
     } catch (err) {
         console.error('마케팅 로드 실패:', err.message);
@@ -6244,6 +6270,13 @@ function renderMarketing() {
 
     if (list.length === 0) {
         grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--text-tertiary)">등록된 마케팅 캠페인이 없습니다</div>`;
+        // Phase 3 #10: 검색 결과 0 인 경우에도 더 보기 버튼은 노출 (남은 페이지 fetch 기회)
+        const _mEmpty = document.getElementById('tab-marketing');
+        renderLoadMoreButton(_mEmpty, _marketingCampaignsPagination, () => {
+            marketingCampaigns.length = 0;
+            _marketingCampaignsPagination.data.forEach(r => marketingCampaigns.push(marketingFromDb(r)));
+            renderMarketing();
+        });
         return;
     }
 
@@ -6294,6 +6327,14 @@ function renderMarketing() {
             <div class="marketing-distrib">${rows}</div>
         </div>`;
     }).join('');
+
+    // Phase 3 #10: 더 보기 버튼
+    const _mContainer = document.getElementById('tab-marketing');
+    renderLoadMoreButton(_mContainer, _marketingCampaignsPagination, () => {
+        marketingCampaigns.length = 0;
+        _marketingCampaignsPagination.data.forEach(r => marketingCampaigns.push(marketingFromDb(r)));
+        renderMarketing();
+    });
 }
 
 function toggleMarketingContent(id, btn) {
