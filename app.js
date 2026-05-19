@@ -386,6 +386,20 @@ document.addEventListener('DOMContentLoaded', () => {
     setupMarketdbHandlers();
     setupNavTooltips();
     setupDragAutoScroll();
+
+    // ===== 세션 만료/변경 자동 처리 =====
+    sb.auth.onAuthStateChange((event, session) => {
+        if ((event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') && !session) {
+            // 세션이 사라지거나 refresh 실패 → 로그인 화면으로
+            currentUser = null;
+            localStorage.removeItem('klp_user');
+            showLogin();
+            if (typeof showToast === 'function') {
+                showToast('세션이 만료되었습니다. 다시 로그인해주세요.');
+            }
+        }
+    });
+
     checkAuth();
 });
 
