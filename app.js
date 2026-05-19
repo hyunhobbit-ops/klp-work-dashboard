@@ -9213,7 +9213,7 @@ async function renderMarketdb() {
     const tb = document.getElementById('marketTbody');
     if (!tb) return;
     if (!MARKETDB) {
-        tb.innerHTML = '<tr><td colspan="20" style="text-align:center;padding:60px 20px;color:var(--text-tertiary)">불러오는 중...</td></tr>';
+        tb.innerHTML = '<tr><td colspan="22" style="text-align:center;padding:60px 20px;color:var(--text-tertiary)">불러오는 중...</td></tr>';
         await loadMarketdbFromDb();
     }
     const items = marketGetFiltered();
@@ -9235,12 +9235,13 @@ async function renderMarketdb() {
     const catIcon = {'시계':'⌚','굿즈':'🎁','기타잡화':'📦'};
 
     if (pageItems.length === 0) {
-        tb.innerHTML = '<tr><td colspan="21" style="text-align:center;padding:60px 20px;color:var(--text-tertiary)">상품이 없습니다</td></tr>';
+        tb.innerHTML = '<tr><td colspan="22" style="text-align:center;padding:60px 20px;color:var(--text-tertiary)">상품이 없습니다</td></tr>';
         renderMarketPagination(0);
         return;
     }
 
-    tb.innerHTML = pageItems.map(r => {
+    tb.innerHTML = pageItems.map((r, i) => {
+        const rowNo = start + i + 1;
         const pageUrl = r['판매 페이지'];
         const pageHtml = pageUrl ? '<a href="'+marketEsc(pageUrl)+'" target="_blank" onclick="event.stopPropagation()">바로가기 ↗</a>' : '-';
         const tcls = catClass[r._cat]||'misc';
@@ -9263,6 +9264,7 @@ async function renderMarketdb() {
         const chk = (k,color) => '<div class="mchk '+color+(r[k]?' yes':'')+'" data-cat="'+r._catKey+'" data-idx="'+r._idx+'" data-key="'+k+'" onclick="marketToggleChk(event,this)"></div>';
         const noprop = ' onclick="event.stopPropagation()"';
         return '<tr onclick="openMarketDetail(\''+r._catKey+'\','+r._idx+')">'+
+            '<td style="text-align:center;color:var(--text-tertiary);font-variant-numeric:tabular-nums">'+rowNo+'</td>'+
             '<td><div class="'+thumbCls+'" data-icon="'+ticon+'" data-cls="'+tcls+'"'+dataImg+' style="'+thumbStyle+'">'+thumbInner+'</div></td>'+
             '<td>'+marketParseStatus(r['상태'])+'</td>'+
             '<td class="market-name"><div>'+marketEsc(r['상품명']||'-')+' <span style="font-size:10px;color:var(--text-tertiary);font-weight:500">· '+r._cat+'</span></div>'+(r['상품 설명']?'<div class="desc">'+marketEsc(r['상품 설명']).replace(/\n/g,' ')+'</div>':'')+'</td>'+
