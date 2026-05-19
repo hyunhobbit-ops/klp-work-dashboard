@@ -2046,8 +2046,11 @@ body {
     background: var(--white);
     border-radius: var(--radius);
     box-shadow: var(--shadow-xs);
-    overflow: hidden;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
+
+#tab-delivery .data-table { min-width: 1500px; }
 
 .data-table {
     width: 100%;
