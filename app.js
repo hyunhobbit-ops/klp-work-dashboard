@@ -8666,13 +8666,23 @@ async function deleteAllMarketdb() {
     const btn = document.getElementById('marketdbDeleteAllBtn');
     if (btn) { btn.disabled = true; btn.textContent = '삭제 중...'; }
     try {
-        // gte('id', 0) — 전체 행 매칭 (Postgres bigserial은 항상 양수)
-        const { error } = await sb.from('market_db').delete().gte('id', 0);
-        if (error) throw error;
+        // RPC 함수로 이전 (Phase 3 #9) — 함수 내부에서 권한 체크(이현주/김현호/김관택만 실행 가능)
+        const { data, error } = await sb.rpc('delete_all_marketdb');
+        if (error) {
+            // 권한 에러를 한국어로 매핑
+            if (error.message && error.message.indexOf('NOT_AUTHORIZED') >= 0) {
+                throw new Error('이 계정에는 전체 삭제 권한이 없습니다.');
+            }
+            if (error.message && error.message.indexOf('NOT_AUTHENTICATED') >= 0) {
+                throw new Error('세션이 만료되었습니다. 다시 로그인해주세요.');
+            }
+            throw error;
+        }
+        const deletedCount = data || 0;
         // 본인 메모리도 즉시 비우기 (Realtime 이벤트도 오겠지만 즉시성 확보)
         MARKETDB = { watch: [], goods: [], misc: [] };
         renderMarketdb();
-        showToast(total + '건 삭제 완료 — 다른 접속자에게도 동기화됩니다');
+        showToast(deletedCount + '건 삭제 완료');
     } catch (e) {
         console.error('중고마켓DB 전체 삭제 실패', e);
         showToast('삭제 실패: ' + (e.message || e));
