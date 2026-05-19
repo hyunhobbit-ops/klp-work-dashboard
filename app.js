@@ -168,7 +168,12 @@ async function handleLogin() {
     showApp();
 }
 
-function handleLogout() {
+async function handleLogout() {
+    try {
+        await sb.auth.signOut();
+    } catch (e) {
+        console.error('signOut error:', e);
+    }
     localStorage.removeItem('klp_user');
     currentUser = null;
     showLogin();
