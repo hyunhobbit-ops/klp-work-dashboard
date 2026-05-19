@@ -498,6 +498,7 @@ async function loadClientsDatalist(){
     while(true){
       await _authReady;
       var res=await fetch(SB_URL+'/rest/v1/clients?select=company_name&order=company_name.asc',{headers:{'apikey':SB_KEY,'Authorization':'Bearer '+_currentAccessToken,'Range':from+'-'+(from+size-1)}});
+      if(!res.ok){console.error('loadClientsDatalist: HTTP '+res.status); break;}
       var data=await res.json();
       if(!data||data.length===0)break;
       data.forEach(function(r){if(r.company_name)all.push(r.company_name);});
