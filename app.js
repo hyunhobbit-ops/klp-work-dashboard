@@ -9435,6 +9435,11 @@ async function openMarketModal(cat, idx) {
             '<input type="hidden" id="mMImage" value="'+(r.image||'')+'">'+
           '</div>'+
         '</div>'+
+        '<div class="form-group">'+
+          '<label class="form-label">추가 이미지 <span style="font-weight:400;font-size:11px;color:var(--text-tertiary)">(최대 5장)</span></label>'+
+          '<div id="mMExtraImgGrid" style="display:grid;grid-template-columns:repeat(5,60px);gap:8px"></div>'+
+          '<input type="hidden" id="mMExtraImages" value="[]">'+
+        '</div>'+
         '<div class="form-row">'+
           '<div class="form-group"><label class="form-label">카테고리 *</label><select class="form-select" id="mMCat">'+catOpts+'</select></div>'+
           '<div class="form-group"><label class="form-label">상태</label><select class="form-select" id="mMStatus">'+statusOpts+'</select></div>'+
@@ -9457,7 +9462,39 @@ async function openMarketModal(cat, idx) {
           '<button class="form-submit" style="flex:2" onclick="saveMarketItem()">💾 '+(isEdit?'저장':'추가')+'</button>'+
         '</div>';
     document.getElementById('marketModalOverlay').classList.add('show');
+    renderMarketExtraImgGrid(r.extra_images || []);
     setTimeout(() => { const el = document.getElementById('mMName'); if (el) el.focus(); }, 50);
+}
+// ---- 중고마켓DB 추가 이미지 그리드 ----
+function renderMarketExtraImgGrid(urls) {
+    urls = Array.isArray(urls) ? urls.slice(0, 5) : [];
+    const grid = document.getElementById('mMExtraImgGrid');
+    const hidden = document.getElementById('mMExtraImages');
+    if (!grid || !hidden) return;
+    hidden.value = JSON.stringify(urls);
+
+    let html = '';
+    for (let i = 0; i < 5; i++) {
+        const url = urls[i];
+        if (url) {
+            // 채워진 칸: 이미지 + 우상단 × 제거 버튼
+            html += '<div style="position:relative;width:60px;height:60px;border-radius:6px;overflow:hidden;border:1px solid var(--gray-200);background:var(--gray-50)">'+
+                '<img src="' + url + '" style="width:100%;height:100%;object-fit:cover">'+
+                '<button type="button" onclick="removeMarketExtraImg(' + i + ')" '+
+                  'style="position:absolute;top:2px;right:2px;width:18px;height:18px;border:none;border-radius:50%;background:rgba(15,23,42,0.85);color:#fff;font-size:11px;line-height:1;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center">×</button>'+
+            '</div>';
+        } else if (i === urls.length) {
+            // 다음 빈 슬롯: + 추가 버튼 (파일 input wrap)
+            html += '<label style="display:flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:6px;border:1.5px dashed var(--gray-300);background:var(--gray-50);cursor:pointer;color:var(--text-tertiary);font-size:20px">'+
+                '+'+
+                '<input type="file" accept="image/*" onchange="handleMarketExtraImgUpload(' + i + ', event)" style="display:none">'+
+            '</label>';
+        } else {
+            // 그 외 빈 슬롯: 비활성 placeholder
+            html += '<div style="width:60px;height:60px;border-radius:6px;border:1px dashed var(--gray-200);background:var(--gray-50);opacity:0.4"></div>';
+        }
+    }
+    grid.innerHTML = html;
 }
 function closeMarketModal() {
     document.getElementById('marketModalOverlay').classList.remove('show');
