@@ -120,3 +120,12 @@
 - 새 기능 추가 시 기존 패턴 따름 (renderXxx, openModal, openEditXxx 등)
 - CDN으로 외부 라이브러리 로드 (Supabase, SheetJS)
 - 함수명: camelCase, 한국어 주석
+
+## XSS 봉합 (2026-05-19 Phase 2 완료)
+- **escape 헬퍼**: 사용자 입력을 `innerHTML`에 출력할 때는 반드시 escape
+  - `app.js`: `escHtml(s)` (line 13370) — `&<>"` 4글자
+  - `doc-generator.html`: `esc(s)` (line 400) — 동일 패턴
+  - `proposal-view.html`: `escHtml(s)` (line 82) — 동일 패턴
+- **escape + `\n→<br>`**: escape 먼저, 그 다음 newline 치환 (`escHtml(text).replace(/\n/g,'<br>')`). 순서 반대면 `<br>`까지 escape됨
+- **URL 검증** (`app.js:isSafeUrl`): http/https/mailto/tel 또는 상대 경로만 허용. URL 입력 받는 새 기능 추가 시 저장+렌더 양쪽에서 호출
+- **inline onclick 지양**: 사용자 입력 문자열을 인자로 받는 inline `onclick="fn('${userInput}')"` 패턴은 escape fragile (backslash 우회). data-* + 위임 리스너로 전환 (`app.js:_urlShortcutClickHandler` 참조)
