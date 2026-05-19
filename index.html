@@ -1482,6 +1482,14 @@
         <svg class="icon-moon" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
         <svg class="icon-sun" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
     </button>
+    <!-- 중고마켓DB 라이트박스 갤러리 (Phase: marketdb multi-image) -->
+    <div id="marketGalleryOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);align-items:center;justify-content:center" onclick="if(event.target===this)closeMarketGallery()">
+      <button onclick="closeMarketGallery()" aria-label="닫기" style="position:absolute;top:20px;right:20px;width:40px;height:40px;border:none;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;font-size:24px;cursor:pointer">×</button>
+      <button onclick="marketGalleryPrev()" aria-label="이전" style="position:absolute;left:40px;top:50%;transform:translateY(-50%);width:48px;height:48px;border:none;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;font-size:24px;cursor:pointer">◀</button>
+      <img id="marketGalleryImg" src="" alt="" style="max-width:90vw;max-height:80vh;object-fit:contain;border-radius:8px">
+      <button onclick="marketGalleryNext()" aria-label="다음" style="position:absolute;right:40px;top:50%;transform:translateY(-50%);width:48px;height:48px;border:none;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;font-size:24px;cursor:pointer">▶</button>
+      <div id="marketGalleryDots" style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:8px"></div>
+    </div>
     <script src="klp-assets.js"></script>
     <script src="app.js?v=20260507b"></script>
 </body>
