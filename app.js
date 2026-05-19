@@ -3380,7 +3380,8 @@ async function showProjectDetail(id) {
             const { data: wrData, error: wrErr } = await sb.from('confirmations')
                 .select('*')
                 .like('doc_number', prefix + '%')
-                .order('doc_number', { ascending: true });
+                .order('doc_number', { ascending: true })
+                .limit(200); // Phase 3 #10: safety cap (한 프로젝트에 WR 200건은 비현실적)
             const wrEl = document.getElementById('wrDocArea');
             if (wrEl) {
                 if (wrErr) {
@@ -14687,9 +14688,11 @@ function escapeHtml(s) {
 // ===== Supabase 연동 =====
 async function loadMarginSimulationsFromDb() {
     try {
-        const { data, error } = await sb.from('margin_simulations').select('*').order('updated_at', { ascending: false });
-        if (error) throw error;
-        marginSimulations = (data || []).map(marginSimFromDb);
+        _marginSimulationsPagination = await paginatedLoad('margin_simulations', {
+            pageSize: 100,
+            orderBy: 'updated_at', orderDir: 'desc'
+        });
+        marginSimulations = _marginSimulationsPagination.data.map(marginSimFromDb);
     } catch (err) {
         console.error('마진계산기 시뮬레이션 로드 실패:', err.message);
         // 테이블 없을 때 안내 (한 번만)
@@ -15057,6 +15060,13 @@ function renderMarginListCards() {
             </div>
         `;
     }).join('');
+
+    // Phase 3 #10: 더 보기 버튼 (marginListView 컨테이너 — 검색 결과 표시 영역 바로 아래)
+    const _mgContainer = document.getElementById('marginListView');
+    renderLoadMoreButton(_mgContainer, _marginSimulationsPagination, () => {
+        marginSimulations = (_marginSimulationsPagination.data || []).map(marginSimFromDb);
+        renderMarginListCards();
+    });
 }
 
 // ===== 예시 시뮬레이션 자동 시드 =====
