@@ -41,20 +41,47 @@ function cacheWrite(name, data) {
 const DISPLAY_NAME_MAP = { '김관택': '대표님' };
 
 async function checkAuth() {
-    const saved = localStorage.getItem('klp_user');
-    if (saved) {
-        currentUser = JSON.parse(saved);
-        // 기존 세션에서도 표시 이름 매핑 적용
-        if (DISPLAY_NAME_MAP[currentUser.name]) {
-            currentUser.loginName = currentUser.name;
-            currentUser.name = DISPLAY_NAME_MAP[currentUser.name];
-            localStorage.setItem('klp_user', JSON.stringify(currentUser));
-        }
-        updateSidebarUser();
-        showApp();
-    } else {
+    // 1) Supabase 정식 세션 확인 (localStorage는 보조 캐시일 뿐)
+    const { data: { session }, error: sessErr } = await sb.auth.getSession();
+    if (sessErr) {
+        console.error('getSession error:', sessErr);
         showLogin();
+        return;
     }
+    if (!session) {
+        showLogin();
+        return;
+    }
+
+    // 2) profiles에서 최신 정보 가져옴 (auth_user_id로 매칭)
+    const { data: prof, error: profErr } = await sb
+        .from('profiles')
+        .select('id, name, role, email, auth_user_id')
+        .eq('auth_user_id', session.user.id)
+        .single();
+
+    if (profErr || !prof) {
+        // 세션은 있는데 profiles에 매핑이 없음 → 비정상, 강제 로그아웃
+        console.error('Session valid but no profile match:', profErr);
+        await sb.auth.signOut();
+        localStorage.removeItem('klp_user');
+        showLogin();
+        return;
+    }
+
+    // 3) currentUser 구성 (DISPLAY_NAME_MAP 적용)
+    const displayName = DISPLAY_NAME_MAP[prof.name] || prof.name;
+    currentUser = {
+        id: prof.id,
+        name: displayName,
+        loginName: prof.name,
+        role: prof.role,
+        email: prof.email,
+        authUserId: prof.auth_user_id,
+    };
+    localStorage.setItem('klp_user', JSON.stringify(currentUser));
+    updateSidebarUser();
+    showApp();
 }
 
 const DELIVERY_PRICE_ALLOWED = ['김관택','이현주','김현호'];
