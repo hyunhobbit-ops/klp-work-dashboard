@@ -8849,8 +8849,8 @@ async function loadMarketdbFromDb() {
             _marketDbPagination = await paginatedLoad('market_db', {
                 pageSize: 500,
                 orderBy: 'category', orderDir: 'asc',
-                secondaryOrderBy: 'sort_order', secondaryOrderDir: 'asc'
-                // 3차 정렬(id)은 paginatedLoad가 secondary 1개만 지원 — sort_order 가 동률일 가능성 매우 낮음
+                secondaryOrderBy: 'id', secondaryOrderDir: 'desc'
+                // 카테고리별 id desc(최신 등록이 먼저) — NO는 카테고리 내 등록순(오래된=1, 최신=length)
             });
             _rebuildMarketdbFromPagination();
             subscribeMarketRealtime();
