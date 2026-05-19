@@ -8952,7 +8952,7 @@ async function uploadMarketImage(file) {
 // ---- 중고마켓DB 라이트박스 갤러리 ----
 let _marketGalleryState = { urls: [], idx: 0 };
 
-function openMarketGalleryLightbox(itemId) {
+function openMarketGalleryLightbox(itemId, startIdx) {
     if (!MARKETDB) return;
     let item = null;
     ['watch','goods','misc'].forEach(c => {
@@ -8966,7 +8966,8 @@ function openMarketGalleryLightbox(itemId) {
     (item.extra_images || []).forEach(u => { if (u) all.push(u); });
     if (all.length === 0) return;
 
-    _marketGalleryState = { urls: all, idx: 0 };
+    const idx = Math.min(Math.max(0, parseInt(startIdx) || 0), all.length - 1);
+    _marketGalleryState = { urls: all, idx };
     const overlay = document.getElementById('marketGalleryOverlay');
     if (overlay) overlay.style.display = 'flex';
     document.addEventListener('keydown', _marketGalleryKeyHandler);
@@ -9440,10 +9441,12 @@ async function openMarketDetail(cat, idx) {
         + '<span class="mdetail-unit"> 만원</span>';
 
     title.textContent = '상품 상세';
+    // 라이트박스 진입 가능 여부 (메인 또는 추가 이미지가 1개 이상이면 클릭으로 갤러리 열기)
+    const hasGallery = !!(r.image || (r.extra_images && r.extra_images.length > 0));
     body.innerHTML =
         // ─── 헤더 (이미지 + 제목 + 카테고리/상태) ───
         '<div class="mdetail-hero">'+
-          '<div class="mdetail-thumb">'+
+          '<div class="mdetail-thumb"'+(hasGallery && r.image ? ' onclick="openMarketGalleryLightbox('+r.id+',0)" style="cursor:pointer"' : '')+'>'+
             (r.image ? '<img src="'+marketEsc(r.image)+'" alt="">' : '<span class="mdetail-thumb-placeholder">📦</span>')+
           '</div>'+
           '<div class="mdetail-hero-info">'+
@@ -9454,6 +9457,15 @@ async function openMarketDetail(cat, idx) {
             '<div class="mdetail-title">'+marketEsc(r['상품명']||'-')+'</div>'+
           '</div>'+
         '</div>'+
+        // ─── 추가 이미지 (있을 때만) ───
+        ((r.extra_images && r.extra_images.length > 0)
+            ? '<div class="mdetail-section-title">추가 이미지</div>'+
+              '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">'+
+                r.extra_images.filter(Boolean).map((url, i) =>
+                    '<img src="'+marketEsc(url)+'" alt="" onclick="openMarketGalleryLightbox('+r.id+','+(i+1)+')" style="width:100%;border-radius:8px;border:1px solid var(--gray-200);object-fit:contain;cursor:pointer;background:var(--gray-50)">'
+                ).join('')+
+              '</div>'
+            : '')+
         // ─── 상세 정보 (표) ───
         '<table class="mdetail-table">'+
           '<tbody>'+
