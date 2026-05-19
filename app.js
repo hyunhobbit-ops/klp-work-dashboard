@@ -9452,12 +9452,12 @@ async function openMarketDetail(cat, idx) {
             ? '<img src="'+marketEsc(r.image)+'" alt="" style="width:100%;max-height:420px;object-fit:contain;display:block">'
             : '<span style="font-size:48px;color:var(--gray-400)">📦</span>')+
         '</div>'+
-        // ─── 추가 이미지 (작은 가로 썸네일, 있을 때만) ───
+        // ─── 추가 이미지 (메인 너비 5등분, 있을 때만) ───
         ((r.extra_images && r.extra_images.length > 0)
             ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'+
                 r.extra_images.filter(Boolean).map((url, i) =>
                     '<img src="'+marketEsc(url)+'" alt="" onclick="openMarketGalleryLightbox('+r.id+','+(i+1)+')" '+
-                    'style="width:70px;height:70px;border-radius:6px;border:1px solid var(--gray-200);object-fit:cover;cursor:pointer;background:var(--gray-50)">'
+                    'style="flex:1 1 0;min-width:0;max-width:calc((100% - 32px) / 5);aspect-ratio:1/1;border-radius:8px;border:1px solid var(--gray-200);object-fit:cover;cursor:pointer;background:var(--gray-50)">'
                 ).join('')+
               '</div>'
             : '')+
