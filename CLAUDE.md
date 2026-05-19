@@ -50,7 +50,11 @@
 
 ## Supabase 연동
 - URL: `vtulmuxkriklpiibiues.supabase.co`
-- `profiles` 테이블: id, name, password, role
+- 인증: **Supabase Auth (signInWithPassword)** — 2026-05-19 Phase 1 보안 이전 완료
+  - 사용자 입력 UX는 그대로 (이름 + 비번) — 내부적으로 name→email 매핑 후 Auth
+  - 5명 직원의 email: 김현호는 `hyunhobbit@naver.com` (실제), 나머지는 `<로그인이름>@klp.local` (synthetic)
+  - 비번은 Supabase Auth에서 bcrypt 해싱 보관, 평문 컬럼 없음
+- `profiles` 테이블: id, name, role, email, auth_user_id (password 컬럼 제거됨)
 - `quotes` 테이블: 단독 견적서 (DC와 무관하게 작성). `quotes.sql` 참조. 스키마는 DC 필드 축약본 + `note` 비고 + 시안 이미지 없음
 - `projects_domestic` 테이블: 국내 프로젝트. **매출 + 매입 통합 단일 행 모델** (부모/자식 구조 아님)
   - 매출: `unit_price`, `unit_price_vat`, `print_fee`, `packaging_fee`, `revenue` 등
@@ -58,8 +62,9 @@
   - `parent_project_id`는 레거시이며 더 이상 사용하지 않음
   - `source_doc_number`: 연결된 디자인확인서 `doc_number` (DC 저장 시 자동 업데이트)
 - `confirmations` 테이블: DC/WR 문서 저장 (`doc-generator.html` 전용)
-- RLS 정책: 전체 조회 허용
-- 로그인 시 localStorage에 사용자 정보 저장 (`klp_user`)
+- RLS 정책: **단순 모델** — `authenticated` = 모든 내부 18개 테이블 풀 액세스. `proposals`/`products`는 anon SELECT 허용(거래처 공유 링크용). `profiles`는 anon SELECT 허용(handleLogin의 name→email 매핑용). 새 테이블 추가 시 동일 패턴 따를 것 (`migrations/` 폴더 참조).
+- 세션 관리: Supabase가 JWT를 자동 관리, `localStorage.klp_user`는 display name 캐시 + `doc-generator.html` 호환용 보조. 정식 인증은 `sb.auth.getSession()`
+- `doc-generator.html`은 SDK가 아닌 hand-rolled `sbFetch` 사용 — bootstrapAuthSession에서 access_token 추출 후 Bearer 자동 첨부 (RLS 잠금 대응)
 
 ## 프로젝트 진행사항 (국내)
 - **매출/매입 통합 단일 행**: 매출처 정보 + 매입처 상세(작업요청서용)를 한 프로젝트 행에 함께 저장
