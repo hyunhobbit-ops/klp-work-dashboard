@@ -9673,15 +9673,22 @@ async function saveMarketItem() {
         if (_marketEditCtx.cat === newCat) {
             MARKETDB[_marketEditCtx.cat][_marketEditCtx.idx] = updated;
         } else {
+            // 카테고리 변경 시 새 카테고리의 맨 뒤로 들어가도록 sort_order도 재할당
+            let maxSort = 0;
+            try {
+                const res = await sb.from('market_db').select('sort_order').eq('category', newCat).order('sort_order', { ascending: false }).limit(1);
+                if (res && res.data && res.data.length > 0) maxSort = (res.data[0].sort_order || 0) + 1;
+            } catch (e) {}
+            await dbMarketUpdate(old.id, { sort_order: maxSort });
             MARKETDB[_marketEditCtx.cat].splice(_marketEditCtx.idx, 1);
-            MARKETDB[newCat].unshift(updated);
+            MARKETDB[newCat].push(updated);
         }
         showToast('상품이 수정되었습니다');
     } else {
         MARKETDB_CHECK_FIELDS.forEach(k => { base[k] = false; });
         const saved = await dbMarketInsert(base, newCat);
         if (!saved) return;
-        MARKETDB[newCat].unshift(saved);
+        MARKETDB[newCat].push(saved);
         showToast('상품이 추가되었습니다');
     }
     closeMarketModal();
