@@ -397,7 +397,7 @@ function toNum(v){var n=parseInt(String(v).replace(/\D/g,''));return isNaN(n)?0:
 function fmtDate(d){if(!d)return'';var o=new Date(d);return o.getFullYear()+'년 '+(o.getMonth()+1)+'월 '+o.getDate()+'일'}
 function fmtN(n){return n.toLocaleString()+'원'}
 function fmtP(v){var n=toNum(v);return n===0?'':n.toLocaleString()+'원'}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function updateDocNum(){var s=Math.max(1,parseInt(document.getElementById('docSeq').value)||1);document.getElementById('docNumPreview').textContent=Y+'_'+String(s).padStart(4,'0')}
 function showMsg(t,e){var el=document.getElementById('saveMsg');el.textContent=t;el.style.background=e?'#c41e3a':'#1F85FF';el.style.color='#fff';el.classList.remove('hidden');setTimeout(function(){el.classList.add('hidden')},3000)}
 /* FIX #13: 금액 입력 시 자동 콤마 */
@@ -2030,7 +2030,7 @@ window.klpEmbedDownload=async function(fmt){
   document.body.classList.add('view-mode');
   try{
     var res=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(docNum),'GET');
-    if(!res||res.length===0){document.body.innerHTML='<div style="padding:20px;color:#888;font-size:13px;text-align:center;font-family:sans-serif">문서를 찾을 수 없습니다: '+docNum+'</div>';return;}
+    if(!res||res.length===0){document.body.innerHTML='<div style="padding:20px;color:#888;font-size:13px;text-align:center;font-family:sans-serif">문서를 찾을 수 없습니다: '+esc(docNum)+'</div>';return;}
     var r=res[0];
     await loadRecord(r.id);
     await new Promise(function(resolve){setTimeout(resolve,300);});
@@ -2040,7 +2040,7 @@ window.klpEmbedDownload=async function(fmt){
     setTimeout(fitEmbedToViewport,200);
     setTimeout(fitEmbedToViewport,700);
     window.addEventListener('resize',fitEmbedToViewport);
-  }catch(e){console.error('view load failed',e);document.body.innerHTML='<div style="padding:20px;color:#c00;font-size:13px;font-family:sans-serif">로드 실패: '+e.message+'</div>';}
+  }catch(e){console.error('view load failed',e);document.body.innerHTML='<div style="padding:20px;color:#c00;font-size:13px;font-family:sans-serif">로드 실패: '+esc(e.message)+'</div>';}
 })();
 
 function fitEmbedToViewport(){
