@@ -1,3 +1,24 @@
+/* ============================================================
+ * ⚠️ Phase 1 이후 (2026-05-19~) 동작 안 함
+ * ============================================================
+ * 이 스크립트는 anon key Bearer로 Supabase REST에 직접 접근한다.
+ * 2026-05-19 보안 마이그레이션(Phase 1)에서 모든 내부 테이블의 RLS가
+ * `TO authenticated`로 잠겼기 때문에, 현재 상태로 실행하면 401/403만
+ * 떨어진다.
+ *
+ * 재사용하려면 다음 중 하나 필요:
+ *   1) (권장) SUPABASE_SERVICE_ROLE_KEY 환경변수로 service_role 키 주입
+ *      → const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+ *      → const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+ *      service_role 키는 RLS를 우회하므로 절대 클라이언트/리포지토리에
+ *      커밋하면 안 된다. 실행 시점에만 환경변수로 주입.
+ *   2) 사장님 본인 계정으로 sb.auth.signInWithPassword 후 운영 (느림,
+ *      대량 작업엔 부적합).
+ *
+ * 참고 문서:
+ *   docs/superpowers/specs/2026-05-19-phase1-auth-rls-design.md §7.5
+ * ============================================================ */
+
 // 국내 거래처 DB 전체 교체 스크립트 (ESA001M.xlsx 기준)
 // 실행: node scripts/replace-clients.js
 // 주의: clients 테이블 데이터를 전부 삭제하고 엑셀 내용으로 다시 채움
