@@ -9444,28 +9444,31 @@ async function openMarketDetail(cat, idx) {
     // 라이트박스 진입 가능 여부 (메인 또는 추가 이미지가 1개 이상이면 클릭으로 갤러리 열기)
     const hasGallery = !!(r.image || (r.extra_images && r.extra_images.length > 0));
     body.innerHTML =
-        // ─── 헤더 (이미지 + 제목 + 카테고리/상태) ───
-        '<div class="mdetail-hero">'+
-          '<div class="mdetail-thumb"'+(hasGallery && r.image ? ' onclick="openMarketGalleryLightbox('+r.id+',0)" style="cursor:pointer"' : '')+'>'+
-            (r.image ? '<img src="'+marketEsc(r.image)+'" alt="">' : '<span class="mdetail-thumb-placeholder">📦</span>')+
-          '</div>'+
-          '<div class="mdetail-hero-info">'+
-            '<div class="mdetail-badges">'+
-              '<span class="mdetail-cat">'+catLabel+'</span>'+
-              statusBadge+
-            '</div>'+
-            '<div class="mdetail-title">'+marketEsc(r['상품명']||'-')+'</div>'+
-          '</div>'+
+        // ─── 메인 이미지 (크게, 풀-width) ───
+        '<div'+(hasGallery && r.image ? ' onclick="openMarketGalleryLightbox('+r.id+',0)"' : '')+
+          ' style="width:100%;background:var(--gray-50);border:1px solid var(--gray-200);border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center;'+
+          'min-height:240px;max-height:420px;margin-bottom:8px;'+(hasGallery && r.image ? 'cursor:pointer;' : '')+'">'+
+          (r.image
+            ? '<img src="'+marketEsc(r.image)+'" alt="" style="width:100%;max-height:420px;object-fit:contain;display:block">'
+            : '<span style="font-size:48px;color:var(--gray-400)">📦</span>')+
         '</div>'+
-        // ─── 추가 이미지 (있을 때만) ───
+        // ─── 추가 이미지 (작은 가로 썸네일, 있을 때만) ───
         ((r.extra_images && r.extra_images.length > 0)
-            ? '<div class="mdetail-section-title">추가 이미지</div>'+
-              '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">'+
+            ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'+
                 r.extra_images.filter(Boolean).map((url, i) =>
-                    '<img src="'+marketEsc(url)+'" alt="" onclick="openMarketGalleryLightbox('+r.id+','+(i+1)+')" style="width:100%;border-radius:8px;border:1px solid var(--gray-200);object-fit:contain;cursor:pointer;background:var(--gray-50)">'
+                    '<img src="'+marketEsc(url)+'" alt="" onclick="openMarketGalleryLightbox('+r.id+','+(i+1)+')" '+
+                    'style="width:70px;height:70px;border-radius:6px;border:1px solid var(--gray-200);object-fit:cover;cursor:pointer;background:var(--gray-50)">'
                 ).join('')+
               '</div>'
             : '')+
+        // ─── 카테고리·상태 + 상품명 ───
+        '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">'+
+          '<div class="mdetail-badges">'+
+            '<span class="mdetail-cat">'+catLabel+'</span>'+
+            statusBadge+
+          '</div>'+
+          '<div class="mdetail-title">'+marketEsc(r['상품명']||'-')+'</div>'+
+        '</div>'+
         // ─── 상세 정보 (표) ───
         '<table class="mdetail-table">'+
           '<tbody>'+
