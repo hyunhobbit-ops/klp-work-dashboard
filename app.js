@@ -10602,7 +10602,7 @@ function numToKoreanAmountTemp(n) {
     if (!n || n <= 0) return '';
     const units = ['', '만', '억', '조'];
     const digits = ['', '일', '이', '삼', '사', '오', '육', '칠', '팔', '구'];
-    const subs = ['', '천', '백', '십'];
+    const subs = ['', '십', '백', '천'];
     let result = '', num = Math.floor(n);
     for (let i = 0; num > 0 && i < units.length; i++) {
         const part = num % 10000; num = Math.floor(num / 10000);
