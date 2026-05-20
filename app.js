@@ -10682,7 +10682,11 @@ async function transferGroupToDomestic(gi) {
         recipient: '',
         phone: '',
         address: '',
-        revenue: p.revenue || 0,
+        // 매출/매입 합계는 temp 저장값이 (단가×수량) raw 라 도메스틱 모델과 불일치.
+        // 도메스틱은 부대비용+VAT 포함 총액을 저장하므로 transfer 시점에 다시 계산.
+        // calcTempRevenueWithVat 가 (단가+인쇄+포장+라벨+택배)×VAT 보정 합산을 처리.
+        // ※ 도메스틱에는 라벨비 컬럼이 없어 라벨비는 revenue 합계에만 반영되고 항목으로는 사라짐.
+        revenue: calcTempRevenueWithVat(p),
         status: '시작 전',
         priority: '🟢 보통',
         category: '국내 주문',
@@ -10700,7 +10704,7 @@ async function transferGroupToDomestic(gi) {
         supplier_packaging_fee: p.supPackagingFee || 0,
         supplier_packaging_fee_vat: p.supPackagingFeeVat || 'VAT 별도',
         supplier_packaging_fee_apply: p.supPackagingFeeApply || '1개당',
-        supplier_revenue: p.supplierRevenue || 0,
+        supplier_revenue: calcTempSupRevenueWithVat(p),
         // 견적 의뢰는 매출/매입에 라벨/택배 컬럼명이 달라 — 매핑 가능한 것만 옮김
         shipping_cost_per_box: p.shippingFee || 0,
         shipping_boxes: p.shippingBoxes || 0,
