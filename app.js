@@ -9914,7 +9914,7 @@ function renderTempProjects() {
                 ${pi === 0 ? `<button class="edit-btn" onclick="openTempGroupEdit(${gi})" style="color:#1B64DA;margin-right:4px">편집</button>` : ''}
                 ${pi === 0 ? `<button class="edit-btn" onclick="openTempQuote(${gi})" style="color:#16A34A;margin-right:4px">견적서</button>` : ''}
                 ${pi === 0 ? (g.items.some(it => it.transferredAt)
-                    ? `<span style="display:inline-block;padding:4px 8px;border-radius:6px;background:#E8F8EF;color:#12B76A;font-weight:700;font-size:11px;margin-right:4px" title="${(g.items.find(it=>it.transferredAt)?.transferredAt || '').slice(0,10)} 등록">✓ 등록 완료</span>`
+                    ? `<button class="edit-btn" onclick="transferGroupToDomestic(${gi})" style="color:#12B76A;margin-right:4px" title="${(g.items.find(it=>it.transferredAt)?.transferredAt || '').slice(0,10)} 등록 — 다시 누르면 추가 등록">✓ 등록 완료</button>`
                     : `<button class="edit-btn" onclick="transferGroupToDomestic(${gi})" style="color:#7C3AED;margin-right:4px">📥 국내 등록</button>`) : ''}
                 <button class="edit-btn" onclick="deleteTempProject(${p.id})" style="color:var(--toss-red)">삭제</button>
             </td></tr>`;
@@ -10646,15 +10646,14 @@ async function transferGroupToDomestic(gi) {
     const g = tempGroups[gi];
     if (!g || !g.items.length) return;
 
-    // 이미 등록된 그룹은 차단 (그룹 내 어느 행이라도 transferred_at 가 있으면 등록 완료로 간주)
-    if (g.items.some(p => p.transferredAt)) {
-        showToast('이미 국내 프로젝트로 등록된 견적입니다.');
-        return;
-    }
-
+    // 이미 등록된 그룹이면 중복 생성 경고 (차단은 안 함 — 한번 더 등록 가능)
+    const alreadyTransferred = g.items.some(p => p.transferredAt);
     const itemCount = g.items.length;
-    const ok = confirm(`이 견적을 국내 프로젝트로 등록할까요?\n\n거래처: ${g.client || '-'}\n품목: ${itemCount}건\n\n견적 의뢰 데이터는 그대로 유지되고 '등록 완료' 로 표시됩니다.`);
-    if (!ok) return;
+    const baseMsg = `거래처: ${g.client || '-'}\n품목: ${itemCount}건`;
+    const msg = alreadyTransferred
+        ? `⚠️ 이미 국내 프로젝트로 등록된 견적입니다.\n\n${baseMsg}\n\n다시 등록하면 국내 메뉴에 ${itemCount}건이 추가로 더 생성됩니다.\n그래도 진행할까요?`
+        : `이 견적을 국내 프로젝트로 등록할까요?\n\n${baseMsg}\n\n견적 의뢰 데이터는 그대로 유지되고 '등록 완료' 로 표시됩니다.`;
+    if (!confirm(msg)) return;
 
     const managerName = currentUser ? currentUser.name : '';
 
