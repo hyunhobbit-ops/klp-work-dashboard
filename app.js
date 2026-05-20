@@ -208,6 +208,7 @@ function updateSidebarUser() {
     try { applyMarketdbPermission(); } catch (e) {}
     try { applyPlanningPermission(); } catch (e) {}
     try { applyDeliveryPricePermission(); } catch (e) {}
+    try { applyCashPermission(); } catch (e) {}
 }
 
 async function handleLogin() {
@@ -990,6 +991,15 @@ function switchTab(tabId, fromHistory = false) {
     if (tabId === 'marketdb' && !marketdbCanAccess()) {
         showToast('접근 권한이 없습니다');
         tabId = 'home';
+    }
+    // 자금확인 권한 체크
+    if (tabId === 'cash' && !cashCanAccess()) {
+        showToast('접근 권한이 없습니다');
+        tabId = 'home';
+    }
+    // 자금확인 진입 시 데이터 로드
+    if (tabId === 'cash' && cashCanAccess()) {
+        loadCashDashboard();
     }
     // 프로젝트(협업) 권한 체크
     if (planningSubMode && !planningCanAccessMode(planningSubMode)) {
@@ -15465,3 +15475,325 @@ async function seedExampleMarginSimulations() {
         }
     }
 }
+
+// ============================================================
+// 자금확인 (Cash Dashboard) — 김관택/이현주/김현호 전용
+// 카테고리 5종: 예금/대출/외화/퇴직연금/페이오니아
+// ============================================================
+const CASH_ALLOWED = ['김관택', '이현주', '김현호'];
+function cashCanAccess() {
+    if (!currentUser) return false;
+    const login = currentUser.loginName || currentUser.name;
+    return CASH_ALLOWED.includes(login);
+}
+function applyCashPermission() {
+    const nav = document.getElementById('navCash');
+    if (nav) nav.style.display = cashCanAccess() ? '' : 'none';
+}
+
+const CASH_CATEGORIES = [
+    { id: 'deposit',  label: '예금',       icon: '💰', hint: '입출식·저축성 예금 잔액' },
+    { id: 'loan',     label: '대출',       icon: '🏦', hint: '대출잔액·한도·만기' },
+    { id: 'foreign',  label: '외화',       icon: '🌐', hint: '외화예금 잔액 (USD)' },
+    { id: 'pension',  label: '퇴직연금',   icon: '🎯', hint: 'DC형 퇴직연금 잔액' },
+    { id: 'payoneer', label: '페이오니아', icon: '💳', hint: 'Payoneer 잔액 (USD)' }
+];
+
+let cashAccounts = [];           // cash_accounts rows
+let cashLatestByAccount = {};    // account_id → latest snapshot
+
+async function loadCashDashboard() {
+    if (!cashCanAccess()) return;
+    try {
+        const [aRes, sRes] = await Promise.all([
+            sb.from('cash_accounts').select('*').eq('active', true).order('category').order('sort_order'),
+            // 최신 스냅샷만 필요 — 우선 전체 가져와서 클라이언트에서 reduce
+            sb.from('cash_snapshots').select('*').order('snapshot_date', { ascending: false }).order('created_at', { ascending: false })
+        ]);
+        if (aRes.error) throw aRes.error;
+        if (sRes.error) throw sRes.error;
+        cashAccounts = aRes.data || [];
+        cashLatestByAccount = {};
+        (sRes.data || []).forEach(s => {
+            if (!cashLatestByAccount[s.account_id]) cashLatestByAccount[s.account_id] = s;
+        });
+        // 이력은 별도 변수로 보관 (계좌별)
+        window._cashAllSnapshots = sRes.data || [];
+        renderCashDashboard();
+    } catch (err) {
+        console.error('자금확인 로드 실패:', err);
+        showToast('자금확인 로드 실패: ' + (err.message || err));
+    }
+}
+
+function _fmtCurrency(amount, currency) {
+    const n = Number(amount) || 0;
+    if (currency === 'KRW') {
+        return n.toLocaleString('ko-KR', { maximumFractionDigits: 0 }) + '원';
+    }
+    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currency;
+}
+
+function _categoryTotal(catId) {
+    // 통화별 합계 — 같은 카테고리 안에서 통화가 섞일 수 있어 객체 반환
+    const totals = {};
+    cashAccounts.filter(a => a.category === catId).forEach(a => {
+        const latest = cashLatestByAccount[a.id];
+        const bal = latest ? Number(latest.balance) || 0 : 0;
+        totals[a.currency] = (totals[a.currency] || 0) + bal;
+    });
+    return totals;
+}
+
+function renderCashDashboard() {
+    const summary = document.getElementById('cashSummaryPanel');
+    const sections = document.getElementById('cashSections');
+    if (!summary || !sections) return;
+
+    // 요약: 카테고리별 합계 카드
+    summary.innerHTML = CASH_CATEGORIES.map(cat => {
+        const totals = _categoryTotal(cat.id);
+        const display = Object.keys(totals).length
+            ? Object.entries(totals).map(([cur, v]) => _fmtCurrency(v, cur)).join(' / ')
+            : '<span style="color:var(--text-tertiary)">데이터 없음</span>';
+        const isNeg = Object.values(totals).some(v => v < 0);
+        return `<div style="flex:1;min-width:180px;padding:14px 16px;background:var(--gray-50);border-radius:12px;border:1px solid var(--gray-100)">
+            <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:4px">${cat.icon} ${cat.label}</div>
+            <div style="font-size:16px;font-weight:800;color:${isNeg ? '#E03131' : 'var(--text-primary)'};letter-spacing:-.3px">${display}</div>
+        </div>`;
+    }).join('');
+
+    // 섹션: 카테고리별 계좌 카드 그리드
+    sections.innerHTML = CASH_CATEGORIES.map(cat => {
+        const list = cashAccounts.filter(a => a.category === cat.id);
+        if (!list.length) {
+            return `<div style="background:var(--white);border-radius:14px;border:1px solid var(--gray-100);padding:18px 20px">
+                <div style="font-size:15px;font-weight:800;margin-bottom:4px">${cat.icon} ${cat.label}</div>
+                <div style="color:var(--text-tertiary);font-size:13px">등록된 계좌가 없습니다</div>
+            </div>`;
+        }
+        const rows = list.map(a => {
+            const latest = cashLatestByAccount[a.id];
+            const bal = latest ? Number(latest.balance) || 0 : 0;
+            const balStr = _fmtCurrency(bal, a.currency);
+            const dateStr = latest ? (latest.snapshot_date || '').slice(0, 10) : '미등록';
+            const isNeg = bal < 0;
+            const sourceBadge = latest && latest.source === 'image'
+                ? '<span style="display:inline-block;padding:2px 6px;border-radius:4px;background:#E8F4FD;color:#1B64DA;font-size:10px;font-weight:700;margin-left:6px">📷 이미지</span>'
+                : '';
+            const nick = a.nickname ? `<span style="color:var(--text-tertiary);font-size:12px;margin-left:6px">${escHtml(a.nickname)}</span>` : '';
+            return `<div onclick="openCashHistoryModal(${a.id})" style="cursor:pointer;padding:14px 16px;background:var(--white);border:1px solid var(--gray-100);border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;transition:border-color .15s" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-100)'">
+                <div style="min-width:0;flex:1">
+                    <div style="font-size:14px;font-weight:700;color:var(--text-primary)">${escHtml(a.label)}${nick}</div>
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">${escHtml(a.account_number || '계좌번호 없음')} · 최근 ${dateStr}${sourceBadge}</div>
+                </div>
+                <div style="font-size:16px;font-weight:800;color:${isNeg ? '#E03131' : 'var(--text-primary)'};letter-spacing:-.3px;white-space:nowrap">${balStr}</div>
+            </div>`;
+        }).join('');
+
+        return `<div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                <div style="font-size:16px;font-weight:800">${cat.icon} ${cat.label}</div>
+                <div style="font-size:12px;color:var(--text-tertiary)">${cat.hint}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">${rows}</div>
+        </div>`;
+    }).join('');
+}
+
+// --- 잔액 업데이트 모달 ---
+function openCashSnapshotModal(accountId) {
+    if (!cashCanAccess()) { showToast('권한이 없습니다'); return; }
+    const sel = document.getElementById('cashSnapAccount');
+    if (!sel) return;
+    sel.innerHTML = cashAccounts.map(a => {
+        const cat = CASH_CATEGORIES.find(c => c.id === a.category);
+        const catLabel = cat ? cat.label : a.category;
+        const nick = a.nickname ? ` (${a.nickname})` : '';
+        return `<option value="${a.id}" data-currency="${a.currency}">[${catLabel}] ${escHtml(a.label)}${escHtml(nick)} — ${a.currency}</option>`;
+    }).join('');
+    if (accountId) sel.value = accountId;
+    document.getElementById('cashSnapDate').value = getTodayStr();
+    document.getElementById('cashSnapBalance').value = '';
+    document.getElementById('cashSnapImage').value = '';
+    document.getElementById('cashSnapImagePreview').innerHTML = '';
+    document.getElementById('cashSnapNote').value = '';
+    document.getElementById('cashSnapshotOverlay').style.display = 'block';
+
+    // 이미지 미리보기
+    const fileInput = document.getElementById('cashSnapImage');
+    fileInput.onchange = e => {
+        const f = e.target.files && e.target.files[0];
+        const prev = document.getElementById('cashSnapImagePreview');
+        if (!f) { prev.innerHTML = ''; return; }
+        const url = URL.createObjectURL(f);
+        prev.innerHTML = `<img src="${url}" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--gray-200)">`;
+    };
+
+    // 잔액 콤마 자동
+    const balInput = document.getElementById('cashSnapBalance');
+    balInput.oninput = () => {
+        // 통화에 따라 다르게 — USD/EUR/GBP 는 소수점 허용, KRW 는 정수
+        const opt = sel.options[sel.selectedIndex];
+        const cur = opt ? opt.getAttribute('data-currency') : 'KRW';
+        const raw = balInput.value.replace(/,/g, '');
+        if (cur === 'KRW') {
+            const n = raw.replace(/[^\-0-9]/g, '');
+            balInput.value = n ? (Number(n)).toLocaleString() : '';
+        } else {
+            // 소수점 허용
+            const m = raw.match(/^-?\d*(\.\d{0,2})?/);
+            const v = m ? m[0] : '';
+            if (!v) { balInput.value = ''; return; }
+            const [int, dec] = v.split('.');
+            const intFmt = int.replace(/[^\-0-9]/g, '');
+            const n = intFmt ? Number(intFmt).toLocaleString() : '';
+            balInput.value = dec !== undefined ? (n + '.' + dec) : n;
+        }
+    };
+}
+
+function closeCashSnapshotModal() {
+    document.getElementById('cashSnapshotOverlay').style.display = 'none';
+}
+
+async function saveCashSnapshot() {
+    if (!cashCanAccess()) { showToast('권한이 없습니다'); return; }
+    const accountId = Number(document.getElementById('cashSnapAccount').value);
+    const dateStr = document.getElementById('cashSnapDate').value;
+    const balRaw = (document.getElementById('cashSnapBalance').value || '').replace(/,/g, '').trim();
+    const note = (document.getElementById('cashSnapNote').value || '').trim();
+    const fileInput = document.getElementById('cashSnapImage');
+    const file = fileInput && fileInput.files && fileInput.files[0];
+
+    if (!accountId) { showToast('계좌를 선택하세요'); return; }
+    if (!dateStr) { showToast('날짜를 입력하세요'); return; }
+    if (!balRaw && !file) { showToast('잔액 또는 이미지 중 하나는 입력하세요'); return; }
+
+    const balance = balRaw ? Number(balRaw) : 0;
+    if (balRaw && !Number.isFinite(balance)) { showToast('잔액 형식이 올바르지 않습니다'); return; }
+
+    let imageUrl = '';
+    let source = 'manual';
+    if (file) {
+        try {
+            imageUrl = await uploadCashImage(file);
+            source = 'image';
+        } catch (err) {
+            console.error('이미지 업로드 실패:', err);
+            showToast('이미지 업로드 실패: ' + (err.message || err));
+            return;
+        }
+    }
+
+    const row = {
+        account_id: accountId,
+        snapshot_date: dateStr,
+        balance: balance,
+        source: source,
+        image_url: imageUrl,
+        note: note,
+        recorded_by: currentUser ? currentUser.name : ''
+    };
+
+    try {
+        const { error } = await sb.from('cash_snapshots').insert(row);
+        if (error) throw error;
+        showToast('잔액이 등록되었습니다');
+        closeCashSnapshotModal();
+        await loadCashDashboard();
+    } catch (err) {
+        console.error('잔액 등록 실패:', err);
+        showToast('잔액 등록 실패: ' + (err.message || err));
+    }
+}
+
+async function uploadCashImage(file) {
+    const ext = ((file.name || '').split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const path = 'snapshots/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+    const { error } = await sb.storage.from('cash-images').upload(path, file, { cacheControl: '3600', upsert: false });
+    if (error) throw error;
+    const { data } = sb.storage.from('cash-images').getPublicUrl(path);
+    return data.publicUrl;
+}
+
+// --- 계좌 이력 모달 ---
+function openCashHistoryModal(accountId) {
+    if (!cashCanAccess()) return;
+    const account = cashAccounts.find(a => a.id === accountId);
+    if (!account) return;
+    const all = (window._cashAllSnapshots || []).filter(s => s.account_id === accountId);
+    const title = document.getElementById('cashHistoryTitle');
+    const body = document.getElementById('cashHistoryBody');
+    const cat = CASH_CATEGORIES.find(c => c.id === account.category);
+    title.innerHTML = `${cat ? cat.icon : ''} ${escHtml(account.label)} <span style="color:var(--text-tertiary);font-size:13px;font-weight:600;margin-left:6px">${escHtml(account.account_number || '')}</span>`;
+
+    const updateBtn = `<button onclick="closeCashHistoryModal();openCashSnapshotModal(${accountId})" class="btn-primary" style="padding:8px 14px;font-size:13px;font-family:inherit">＋ 새 잔액 등록</button>`;
+
+    if (!all.length) {
+        body.innerHTML = `<div style="display:flex;justify-content:space-between;margin-bottom:12px">${updateBtn}</div><div style="color:var(--text-tertiary);text-align:center;padding:40px">등록된 잔액이 없습니다</div>`;
+    } else {
+        const rows = all.map(s => {
+            const bal = _fmtCurrency(Number(s.balance) || 0, account.currency);
+            const isNeg = Number(s.balance) < 0;
+            const img = s.image_url
+                ? `<a href="${escHtml(s.image_url)}" target="_blank" rel="noopener" style="color:#1B64DA;font-size:11px;text-decoration:underline">증빙 이미지</a>`
+                : '<span style="color:var(--text-tertiary);font-size:11px">-</span>';
+            const noteHtml = s.note ? `<div style="margin-top:4px;font-size:11px;color:var(--text-tertiary)">${escHtml(s.note)}</div>` : '';
+            return `<tr>
+                <td style="padding:8px 10px;border-bottom:1px solid var(--gray-100);white-space:nowrap;font-size:13px">${(s.snapshot_date || '').slice(0,10)}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid var(--gray-100);text-align:right;font-weight:700;color:${isNeg ? '#E03131' : 'var(--text-primary)'};font-size:14px">${bal}${noteHtml}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid var(--gray-100);text-align:center">${img}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid var(--gray-100);font-size:12px;color:var(--text-tertiary);white-space:nowrap">${escHtml(s.recorded_by || '')}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid var(--gray-100);text-align:right;white-space:nowrap"><button class="edit-btn" onclick="deleteCashSnapshot(${s.id})" style="color:var(--toss-red);font-size:12px">삭제</button></td>
+            </tr>`;
+        }).join('');
+        body.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div style="font-size:13px;color:var(--text-tertiary)">총 ${all.length}건</div>
+            ${updateBtn}
+        </div>
+        <div style="border:1px solid var(--gray-100);border-radius:10px;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse">
+                <thead>
+                    <tr style="background:var(--gray-50)">
+                        <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text-tertiary);font-weight:700">날짜</th>
+                        <th style="padding:8px 10px;text-align:right;font-size:11px;color:var(--text-tertiary);font-weight:700">잔액</th>
+                        <th style="padding:8px 10px;text-align:center;font-size:11px;color:var(--text-tertiary);font-weight:700">증빙</th>
+                        <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text-tertiary);font-weight:700">등록자</th>
+                        <th style="padding:8px 10px;text-align:right;font-size:11px;color:var(--text-tertiary);font-weight:700"></th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    }
+    document.getElementById('cashHistoryOverlay').style.display = 'block';
+}
+
+function closeCashHistoryModal() {
+    document.getElementById('cashHistoryOverlay').style.display = 'none';
+}
+
+async function deleteCashSnapshot(id) {
+    if (!cashCanAccess()) { showToast('권한이 없습니다'); return; }
+    if (!confirm('이 잔액 기록을 삭제할까요?')) return;
+    try {
+        const { error } = await sb.from('cash_snapshots').delete().eq('id', id);
+        if (error) throw error;
+        showToast('삭제되었습니다');
+        closeCashHistoryModal();
+        await loadCashDashboard();
+    } catch (err) {
+        console.error('삭제 실패:', err);
+        showToast('삭제 실패: ' + (err.message || err));
+    }
+}
+
+document.addEventListener('keydown', e => {
+    const snapOv = document.getElementById('cashSnapshotOverlay');
+    const histOv = document.getElementById('cashHistoryOverlay');
+    if (e.key === 'Escape') {
+        if (snapOv && snapOv.style.display !== 'none') closeCashSnapshotModal();
+        else if (histOv && histOv.style.display !== 'none') closeCashHistoryModal();
+    }
+});
