@@ -9795,7 +9795,9 @@ function _projectsTempRowToObj(r) {
         supShippingBoxes: r.sup_shipping_boxes || 0,
         supShippingFee: r.sup_shipping_fee || 0,
         supShippingFeeVat: r.sup_shipping_fee_vat || 'VAT 별도',
-        quoteNote: r.quote_note || ''
+        quoteNote: r.quote_note || '',
+        transferredAt: r.transferred_at || '',
+        transferredProjectIds: r.transferred_project_ids || []
     };
 }
 
@@ -9911,6 +9913,9 @@ function renderTempProjects() {
             <td style="white-space:nowrap">
                 ${pi === 0 ? `<button class="edit-btn" onclick="openTempGroupEdit(${gi})" style="color:#1B64DA;margin-right:4px">편집</button>` : ''}
                 ${pi === 0 ? `<button class="edit-btn" onclick="openTempQuote(${gi})" style="color:#16A34A;margin-right:4px">견적서</button>` : ''}
+                ${pi === 0 ? (g.items.some(it => it.transferredAt)
+                    ? `<span style="display:inline-block;padding:4px 8px;border-radius:6px;background:#E8F8EF;color:#12B76A;font-weight:700;font-size:11px;margin-right:4px" title="${(g.items.find(it=>it.transferredAt)?.transferredAt || '').slice(0,10)} 등록">✓ 등록 완료</span>`
+                    : `<button class="edit-btn" onclick="transferGroupToDomestic(${gi})" style="color:#7C3AED;margin-right:4px">📥 국내 등록</button>`) : ''}
                 <button class="edit-btn" onclick="deleteTempProject(${p.id})" style="color:var(--toss-red)">삭제</button>
             </td></tr>`;
         });
@@ -9937,6 +9942,7 @@ function renderTempProjects() {
         const totalSup = g.items.reduce((s, p) => s + calcTempSupRevenueWithVat(p), 0);
         const totalMargin = totalRev - totalSup;
         const totalMarginPct = totalRev > 0 ? Math.round((totalMargin / totalRev) * 100) : 0;
+        const isTransferred = g.items.some(it => it.transferredAt);
         cardHtml += `<div class="resp-card" onclick="openTempProjectModal(${g.items[0].id})">
             <div class="resp-card-top">
                 <div class="resp-card-title">${g.client || '-'}${g.clientContact ? ' · ' + g.clientContact : ''}</div>
@@ -9950,6 +9956,7 @@ function renderTempProjects() {
                     ${totalSup > 0 ? (totalMargin >= 0
                         ? pill('#E8F8EF', '#12B76A', totalMargin.toLocaleString() + '원 (' + totalMarginPct + '%)')
                         : pill('#FEECEC', '#E03131', totalMargin.toLocaleString() + '원 (' + totalMarginPct + '%)')) : ''}
+                    ${isTransferred ? pill('#E8F8EF', '#12B76A', '✓ 등록 완료') : ''}
                 </div>
             </div>
         </div>`;
@@ -10630,6 +10637,112 @@ function openTempQuote(gi) {
 function closeTempQuote() {
     document.getElementById('tempQuoteOverlay').style.display = 'none';
     _tempQuoteGroup = null;
+}
+
+// 견적 의뢰 그룹 → 국내 프로젝트로 일괄 등록 (그룹의 N개 품목 = 프로젝트 N건)
+// 컨펌된 견적을 국내 메뉴로 옮기는 진입점. 원본 견적 의뢰는 그대로 두고
+// projects_temp.transferred_at / transferred_project_ids 만 기록해 "등록 완료" 로 표시.
+async function transferGroupToDomestic(gi) {
+    const g = tempGroups[gi];
+    if (!g || !g.items.length) return;
+
+    // 이미 등록된 그룹은 차단 (그룹 내 어느 행이라도 transferred_at 가 있으면 등록 완료로 간주)
+    if (g.items.some(p => p.transferredAt)) {
+        showToast('이미 국내 프로젝트로 등록된 견적입니다.');
+        return;
+    }
+
+    const itemCount = g.items.length;
+    const ok = confirm(`이 견적을 국내 프로젝트로 등록할까요?\n\n거래처: ${g.client || '-'}\n품목: ${itemCount}건\n\n견적 의뢰 데이터는 그대로 유지되고 '등록 완료' 로 표시됩니다.`);
+    if (!ok) return;
+
+    const managerName = currentUser ? currentUser.name : '';
+
+    // temp item 한 건 → projects_domestic insert row 매핑
+    const buildRow = p => ({
+        client: p.client || '',
+        contact_person: p.clientContact || '',
+        title: '',
+        manager: managerName,
+        product_name: p.item || '',
+        quantity: p.qty || 0,
+        unit: '개',
+        unit_price: p.unitPrice || 0,
+        unit_price_vat: p.unitPriceVat || 'VAT 별도',
+        color: '',
+        print_color_size: '',
+        print_method: p.printMethod || '',
+        print_fee: p.printFee || 0,
+        print_fee_vat: p.printFeeVat || 'VAT 별도',
+        print_fee_apply: p.printFeeApply || '1개당',
+        packaging: p.packMethod || '',
+        packaging_fee: p.packagingFee || 0,
+        packaging_fee_vat: p.packagingFeeVat || 'VAT 별도',
+        packaging_fee_apply: p.packagingFeeApply || '일괄',
+        delivery_date: null,
+        recipient: '',
+        phone: '',
+        address: '',
+        revenue: p.revenue || 0,
+        status: '시작 전',
+        priority: '🟢 보통',
+        category: '국내 주문',
+        assignees: [],
+        start_date: null,
+        checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
+        memo: '',
+        supplier: p.supplier || '',
+        supplier_contact: p.supplierContact || '',
+        supplier_unit_price: p.supplierUnitPrice || 0,
+        supplier_unit_price_vat: p.supplierUnitPriceVat || 'VAT 별도',
+        supplier_print_fee: p.supPrintFee || 0,
+        supplier_print_fee_vat: p.supPrintFeeVat || 'VAT 별도',
+        supplier_print_fee_apply: p.supPrintFeeApply || '1개당',
+        supplier_packaging_fee: p.supPackagingFee || 0,
+        supplier_packaging_fee_vat: p.supPackagingFeeVat || 'VAT 별도',
+        supplier_packaging_fee_apply: p.supPackagingFeeApply || '1개당',
+        supplier_revenue: p.supplierRevenue || 0,
+        // 견적 의뢰는 매출/매입에 라벨/택배 컬럼명이 달라 — 매핑 가능한 것만 옮김
+        shipping_cost_per_box: p.shippingFee || 0,
+        shipping_boxes: p.shippingBoxes || 0,
+        shipping_cost: (p.shippingFee || 0) * (p.shippingBoxes || 0),
+        shipping_vat: p.shippingFeeVat || 'VAT 별도',
+        supplier_shipping_cost_per_box: p.supShippingFee || 0,
+        supplier_shipping_boxes: p.supShippingBoxes || 0,
+        supplier_shipping_cost: (p.supShippingFee || 0) * (p.supShippingBoxes || 0),
+        supplier_shipping_vat: p.supShippingFeeVat || 'VAT 별도'
+    });
+
+    const rows = g.items.map(buildRow);
+
+    try {
+        // 1) 국내 프로젝트 일괄 insert
+        const { data: inserted, error: insErr } = await sb
+            .from('projects_domestic')
+            .insert(rows)
+            .select('id');
+        if (insErr) throw insErr;
+        const newIds = (inserted || []).map(r => r.id);
+        if (!newIds.length) throw new Error('insert 후 id 를 받지 못했습니다');
+
+        // 2) 견적 의뢰 그룹 내 모든 행에 등록 정보 기록
+        const now = new Date().toISOString();
+        const tempIds = g.items.map(p => p.id);
+        const { error: updErr } = await sb
+            .from('projects_temp')
+            .update({ transferred_at: now, transferred_project_ids: newIds })
+            .in('id', tempIds);
+        if (updErr) throw updErr;
+
+        // 3) 로컬 상태 갱신 + 두 화면 동시 리로드
+        showToast(`국내 프로젝트로 ${newIds.length}건 등록되었습니다`);
+        await Promise.all([loadTempProjects(), loadDomesticProjectsFromDb()]);
+        renderProjects();
+        renderHome();
+    } catch (err) {
+        console.error('국내 등록 실패:', err);
+        showToast('국내 등록 실패: ' + (err.message || '알 수 없는 오류'));
+    }
 }
 
 document.addEventListener('keydown', e => {
