@@ -501,6 +501,17 @@
             <!-- ===== Projects (매입매출) ===== -->
             <!-- ===== 임시 프로젝트 ===== -->
             <main class="content" id="tab-projects-temp">
+                <div class="content-toolbar">
+                    <div class="toolbar-left">
+                        <div style="font-size:14px;color:var(--text-tertiary)">아래 입력행에 빠르게 추가하거나, 자세한 항목까지 입력하려면 새로 작성을 누르세요</div>
+                    </div>
+                    <div class="toolbar-buttons">
+                        <button class="btn-primary" onclick="openTempProjectModal()" title="새 견적 의뢰 (상세 입력)">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                            새로 작성
+                        </button>
+                    </div>
+                </div>
                 <div class="table-wrap">
                     <table class="data-table" id="tempProjectTable">
                         <thead>
@@ -520,9 +531,8 @@
                                 <th></th>
                             </tr>
                         </thead>
-                        <tbody id="tempProjectTableBody"></tbody>
-                        <tfoot>
-                            <tr id="tempInlineRow" style="background:var(--gray-50)">
+                        <tbody>
+                            <tr id="tempInlineRow" style="background:var(--gray-50);border-bottom:2px solid var(--blue)">
                                 <td><input type="date" id="tempInDate" style="padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%;background:var(--white);font-family:inherit;color:var(--gray-900)"></td>
                                 <td><input id="tempInClient" list="tempClientList" placeholder="매출처" autocomplete="off" style="padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%;background:var(--white);font-family:inherit;color:var(--gray-900)"></td>
                                 <td><input id="tempInClientContact" placeholder="담당자" style="padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:8px;font-size:13px;width:100%;background:var(--white);font-family:inherit;color:var(--gray-900)"></td>
@@ -537,7 +547,8 @@
                                 <td><span id="tempInMargin" style="font-size:13px;color:var(--text-tertiary)">-</span></td>
                                 <td><button class="btn-primary" onclick="saveTempInline()" style="padding:6px 14px;font-size:13px;white-space:nowrap">추가</button></td>
                             </tr>
-                        </tfoot>
+                        </tbody>
+                        <tbody id="tempProjectTableBody"></tbody>
                     </table>
                 </div>
                 <div class="card-grid" id="tempProjectCardGrid"></div>
