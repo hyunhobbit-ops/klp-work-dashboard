@@ -1313,27 +1313,28 @@
                         </div>
                         <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
                             <div class="field">
-                                <label>계좌</label>
-                                <select id="cashSnapAccount" style="padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:14px;width:100%;background:var(--white);font-family:inherit"></select>
+                                <label style="color:var(--gray-900)">계좌</label>
+                                <select id="cashSnapAccount" style="padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:14px;width:100%;background:var(--white);color:var(--gray-900);font-family:inherit"></select>
                             </div>
                             <div style="display:flex;gap:10px">
                                 <div class="field" style="flex:1">
-                                    <label>등록 날짜</label>
-                                    <input type="date" id="cashSnapDate" style="padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:14px;width:100%;background:var(--white);font-family:inherit">
+                                    <label style="color:var(--gray-900)">등록 날짜</label>
+                                    <input type="date" id="cashSnapDate" style="padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:14px;width:100%;background:var(--white);color:var(--gray-900);font-family:inherit">
                                 </div>
                                 <div class="field" style="flex:1">
-                                    <label>잔액</label>
-                                    <input id="cashSnapBalance" placeholder="예: 11,000,000" inputmode="decimal" style="padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:14px;width:100%;background:var(--white);font-family:inherit;text-align:right">
+                                    <label style="color:var(--gray-900)">잔액</label>
+                                    <input id="cashSnapBalance" placeholder="예: 11,000,000" inputmode="decimal" style="padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:14px;width:100%;background:var(--white);color:var(--gray-900);font-family:inherit;text-align:right">
                                 </div>
                             </div>
                             <div class="field">
-                                <label>증빙 이미지 (선택)</label>
-                                <input type="file" id="cashSnapImage" accept="image/*" style="padding:8px;border:1.5px dashed var(--gray-300);border-radius:10px;font-size:13px;width:100%;background:var(--gray-50);font-family:inherit">
+                                <label style="color:var(--gray-900)">증빙 이미지 (선택) <span style="font-weight:400;color:var(--text-tertiary);font-size:11px">— 업로드하면 OCR로 잔액 자동 추출</span></label>
+                                <input type="file" id="cashSnapImage" accept="image/*" style="padding:8px;border:1.5px dashed var(--gray-300);border-radius:10px;font-size:13px;width:100%;background:var(--gray-50);color:var(--gray-900);font-family:inherit">
+                                <div id="cashSnapOcrStatus" style="margin-top:6px;font-size:12px;color:var(--text-tertiary)"></div>
                                 <div id="cashSnapImagePreview" style="margin-top:8px"></div>
                             </div>
                             <div class="field">
-                                <label>메모 (선택)</label>
-                                <textarea id="cashSnapNote" rows="2" placeholder="비고" style="padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:14px;width:100%;background:var(--white);font-family:inherit;resize:vertical"></textarea>
+                                <label style="color:var(--gray-900)">메모 (선택)</label>
+                                <textarea id="cashSnapNote" rows="2" placeholder="비고" style="padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:14px;width:100%;background:var(--white);color:var(--gray-900);font-family:inherit;resize:vertical"></textarea>
                             </div>
                         </div>
                         <div style="padding:14px 20px;border-top:1px solid var(--gray-100);display:flex;gap:10px;justify-content:flex-end">

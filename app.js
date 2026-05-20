@@ -15534,12 +15534,19 @@ function _fmtCurrency(amount, currency) {
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currency;
 }
 
+// 대출은 부채 — 항상 음수로 표시 (저장은 양수 그대로)
+function _displayBalance(category, balance) {
+    const n = Number(balance) || 0;
+    if (category === 'loan') return -Math.abs(n);
+    return n;
+}
+
 function _categoryTotal(catId) {
     // 통화별 합계 — 같은 카테고리 안에서 통화가 섞일 수 있어 객체 반환
     const totals = {};
     cashAccounts.filter(a => a.category === catId).forEach(a => {
         const latest = cashLatestByAccount[a.id];
-        const bal = latest ? Number(latest.balance) || 0 : 0;
+        const bal = latest ? _displayBalance(catId, latest.balance) : 0;
         totals[a.currency] = (totals[a.currency] || 0) + bal;
     });
     return totals;
@@ -15574,7 +15581,7 @@ function renderCashDashboard() {
         }
         const rows = list.map(a => {
             const latest = cashLatestByAccount[a.id];
-            const bal = latest ? Number(latest.balance) || 0 : 0;
+            const bal = latest ? _displayBalance(a.category, latest.balance) : 0;
             const balStr = _fmtCurrency(bal, a.currency);
             const dateStr = latest ? (latest.snapshot_date || '').slice(0, 10) : '미등록';
             const isNeg = bal < 0;
@@ -15620,14 +15627,45 @@ function openCashSnapshotModal(accountId) {
     document.getElementById('cashSnapNote').value = '';
     document.getElementById('cashSnapshotOverlay').style.display = 'block';
 
-    // 이미지 미리보기
+    // 이미지 미리보기 + OCR 자동 추출
     const fileInput = document.getElementById('cashSnapImage');
-    fileInput.onchange = e => {
+    fileInput.onchange = async e => {
         const f = e.target.files && e.target.files[0];
         const prev = document.getElementById('cashSnapImagePreview');
-        if (!f) { prev.innerHTML = ''; return; }
+        const status = document.getElementById('cashSnapOcrStatus');
+        if (!f) { prev.innerHTML = ''; status.innerHTML = ''; return; }
         const url = URL.createObjectURL(f);
         prev.innerHTML = `<img src="${url}" style="max-width:100%;max-height:200px;border-radius:8px;border:1px solid var(--gray-200)">`;
+
+        // 선택된 계좌의 통화 추출
+        const opt = sel.options[sel.selectedIndex];
+        const currency = opt ? opt.getAttribute('data-currency') : 'KRW';
+
+        status.innerHTML = '🔍 이미지 분석 중...';
+        status.style.color = '#1B64DA';
+        try {
+            const found = await ocrExtractBalance(f, currency);
+            if (found === null) {
+                status.innerHTML = '⚠️ 잔액을 자동으로 찾지 못했습니다. 수기 입력해주세요.';
+                status.style.color = '#E67E22';
+                return;
+            }
+            // 잔액 input에 채움 (통화별 포맷 적용)
+            const balInput = document.getElementById('cashSnapBalance');
+            if (currency === 'KRW') {
+                balInput.value = Math.round(found).toLocaleString();
+            } else {
+                const fixed = Number(found).toFixed(2);
+                const [intPart, decPart] = fixed.split('.');
+                balInput.value = Number(intPart).toLocaleString() + '.' + decPart;
+            }
+            status.innerHTML = `✓ 자동 추출: <b>${_fmtCurrency(found, currency)}</b> — 확인 후 수정 가능`;
+            status.style.color = '#12B76A';
+        } catch (err) {
+            console.error('OCR 실패:', err);
+            status.innerHTML = '⚠️ OCR 실패: ' + (err.message || err) + ' — 수기 입력해주세요.';
+            status.style.color = '#E03131';
+        }
     };
 
     // 잔액 콤마 자동
@@ -15708,6 +15746,77 @@ async function saveCashSnapshot() {
     }
 }
 
+// --- OCR: Tesseract.js on-demand 로드 + 잔액 추출 ---
+let _tesseractLoading = null;
+async function ensureTesseract() {
+    if (window.Tesseract) return window.Tesseract;
+    if (_tesseractLoading) return _tesseractLoading;
+    _tesseractLoading = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        s.onload = () => resolve(window.Tesseract);
+        s.onerror = () => { _tesseractLoading = null; reject(new Error('OCR 엔진 로드 실패')); };
+        document.head.appendChild(s);
+    });
+    return _tesseractLoading;
+}
+
+// 텍스트에서 가장 가능성 높은 잔액 숫자 추출
+// 우선순위: 음수 > (KRW면 큰 정수 / USD면 소수점 2자리) > 최대 절대값
+function extractBalanceFromText(text, currency) {
+    // 음수 매칭(앞에 -, ⁻, − 등 다양한 minus 부호 + 공백 허용) 또는 양수
+    const matches = text.match(/[-−⁻]\s?[\d,]+(?:\.\d{1,2})?|[\d,]+(?:\.\d{1,2})?/g) || [];
+    const numbers = [];
+    matches.forEach(m => {
+        // 통일된 마이너스 처리
+        const normalized = m.replace(/[−⁻]/g, '-').replace(/\s/g, '');
+        const cleaned = normalized.replace(/[^\-\d.]/g, '');
+        if (!cleaned || cleaned === '-' || cleaned === '.' || cleaned === '-.') return;
+        const n = Number(cleaned);
+        if (!Number.isFinite(n)) return;
+        // 작은 수 필터 (KRW=1원 미만, 외화=0.01 미만 제외)
+        const min = currency === 'KRW' ? 1 : 0.01;
+        if (Math.abs(n) < min) return;
+        // KRW는 천 단위 콤마 형식만 신뢰 (random 0.00 값 노이즈 제외)
+        if (currency === 'KRW' && Math.abs(n) < 1000 && !/,/.test(m)) return;
+        numbers.push(n);
+    });
+    if (!numbers.length) return null;
+
+    // 1) 음수 잔액 우선 (가장 큰 절대값)
+    const negatives = numbers.filter(n => n < 0);
+    if (negatives.length) {
+        negatives.sort((a, b) => Math.abs(b) - Math.abs(a));
+        return negatives[0];
+    }
+    // 2) KRW면 정수 중 최대
+    if (currency === 'KRW') {
+        const ints = numbers.filter(n => Number.isInteger(n) && Math.abs(n) >= 1000);
+        if (ints.length) {
+            ints.sort((a, b) => Math.abs(b) - Math.abs(a));
+            return ints[0];
+        }
+    } else {
+        // 3) USD/EUR/GBP면 소수점 있는 숫자 우선 (잔액은 보통 소수 2자리)
+        const decimals = numbers.filter(n => !Number.isInteger(n));
+        if (decimals.length) {
+            decimals.sort((a, b) => Math.abs(b) - Math.abs(a));
+            return decimals[0];
+        }
+    }
+    // 4) fallback — 최대 절대값
+    numbers.sort((a, b) => Math.abs(b) - Math.abs(a));
+    return numbers[0];
+}
+
+async function ocrExtractBalance(file, currency) {
+    const Tesseract = await ensureTesseract();
+    // 영어만 사용 — 숫자/콤마/마이너스 추출이 목적이라 한국어 traineddata 불필요 (빠름)
+    const result = await Tesseract.recognize(file, 'eng');
+    const text = (result && result.data && result.data.text) || '';
+    return extractBalanceFromText(text, currency);
+}
+
 async function uploadCashImage(file) {
     const ext = ((file.name || '').split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
     const path = 'snapshots/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
@@ -15734,8 +15843,9 @@ function openCashHistoryModal(accountId) {
         body.innerHTML = `<div style="display:flex;justify-content:space-between;margin-bottom:12px">${updateBtn}</div><div style="color:var(--text-tertiary);text-align:center;padding:40px">등록된 잔액이 없습니다</div>`;
     } else {
         const rows = all.map(s => {
-            const bal = _fmtCurrency(Number(s.balance) || 0, account.currency);
-            const isNeg = Number(s.balance) < 0;
+            const displayed = _displayBalance(account.category, s.balance);
+            const bal = _fmtCurrency(displayed, account.currency);
+            const isNeg = displayed < 0;
             const img = s.image_url
                 ? `<a href="${escHtml(s.image_url)}" target="_blank" rel="noopener" style="color:#1B64DA;font-size:11px;text-decoration:underline">증빙 이미지</a>`
                 : '<span style="color:var(--text-tertiary);font-size:11px">-</span>';
