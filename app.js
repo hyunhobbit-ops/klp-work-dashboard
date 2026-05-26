@@ -15496,7 +15496,8 @@ const CASH_CATEGORIES = [
     { id: 'loan',     label: '대출',       icon: '🏦', hint: '대출잔액·한도·만기' },
     { id: 'foreign',  label: '외화',       icon: '🌐', hint: '외화예금 잔액 (USD)' },
     { id: 'pension',  label: '퇴직연금',   icon: '🎯', hint: 'DC형 퇴직연금 잔액' },
-    { id: 'payoneer', label: '페이오니아', icon: '💳', hint: 'Payoneer 잔액 (USD)' }
+    { id: 'payoneer', label: '페이오니아', icon: '💳', hint: 'Payoneer 잔액 (USD)' },
+    { id: 'shopify',  label: '쇼피파이',   icon: '🛍️', hint: 'Shopify 정산 잔액 (USD)' }
 ];
 
 let cashAccounts = [];           // cash_accounts rows
@@ -15512,7 +15513,10 @@ async function loadCashDashboard() {
         ]);
         if (aRes.error) throw aRes.error;
         if (sRes.error) throw sRes.error;
-        cashAccounts = aRes.data || [];
+        // Shopify는 DB CHECK 제약상 category='foreign'으로 저장되지만 UI에선 별도 카테고리로 표시
+        cashAccounts = (aRes.data || []).map(a =>
+            (a.label === 'Shopify USD' || a.nickname === '쇼피파이') ? { ...a, category: 'shopify' } : a
+        );
         cashLatestByAccount = {};
         (sRes.data || []).forEach(s => {
             if (!cashLatestByAccount[s.account_id]) cashLatestByAccount[s.account_id] = s;
