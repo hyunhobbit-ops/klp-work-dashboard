@@ -9121,7 +9121,7 @@ function marketGetFiltered() {
             MARKETDB.watch.map((x,i) => Object.assign({}, x, {_cat:'시계', _catKey:'watch', _idx:i, _no: idToNo.get(x.id)})),
             MARKETDB.goods.map((x,i) => Object.assign({}, x, {_cat:'굿즈', _catKey:'goods', _idx:i, _no: idToNo.get(x.id)})),
             MARKETDB.misc.map((x,i) => Object.assign({}, x, {_cat:'기타잡화', _catKey:'misc', _idx:i, _no: idToNo.get(x.id)}))
-        );
+        ).sort((a, b) => (b._no || 0) - (a._no || 0));
     } else {
         const catName = marketCurrentCat==='watch'?'시계':marketCurrentCat==='goods'?'굿즈':'기타잡화';
         items = MARKETDB[marketCurrentCat].map((x,i) => Object.assign({}, x, {_cat:catName, _catKey:marketCurrentCat, _idx:i, _no: idToNo.get(x.id)}));
