@@ -15513,10 +15513,7 @@ async function loadCashDashboard() {
         ]);
         if (aRes.error) throw aRes.error;
         if (sRes.error) throw sRes.error;
-        // Shopify는 DB CHECK 제약상 category='foreign'으로 저장되지만 UI에선 별도 카테고리로 표시
-        cashAccounts = (aRes.data || []).map(a =>
-            (a.label === 'Shopify USD' || a.nickname === '쇼피파이') ? { ...a, category: 'shopify' } : a
-        );
+        cashAccounts = aRes.data || [];
         cashLatestByAccount = {};
         (sRes.data || []).forEach(s => {
             if (!cashLatestByAccount[s.account_id]) cashLatestByAccount[s.account_id] = s;
