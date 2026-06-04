@@ -1559,6 +1559,76 @@ body {
 .pp-info-title { color: var(--klp-brand) !important; }
 .pp-cta-btn.primary { background: var(--klp-brand) !important; border-color: var(--klp-brand) !important; }
 
+/* ============================================================
+   제안서 PDF — A4 페이지 단위 레이아웃
+   (헤더 상단 고정 · 푸터 하단 고정 · 상품이 넘치면 자동으로 다음 장)
+   화면 표시에는 영향 없음 — PDF 생성 시에만 오프스크린(.pp-pdf-host)으로 사용.
+   ============================================================ */
+.pp-pdf-host { position: fixed; left: -99999px; top: 0; width: 794px; background: #fff; }
+.pp-pdf-page {
+    width: 794px;                /* A4 @96dpi */
+    height: 1123px;
+    background: #fff;
+    box-sizing: border-box;
+    padding: 40px 44px 28px;
+    display: flex;
+    flex-direction: column;      /* 헤더(위) · 상품(가운데 신축) · 푸터(아래) */
+    overflow: hidden;
+    color: var(--gray-900);
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    --klp-brand: #1E83FF; --klp-brand-dark: #0F6CD9; --klp-brand-light: #E6F0FF;
+    --blue: #1E83FF; --blue-dark: #0F6CD9; --blue-light: #E6F0FF;
+}
+.pp-pdf-page .pp-hero { flex-shrink: 0; flex-direction: row; align-items: flex-end; margin-bottom: 20px; padding: 6px 0 18px; }
+.pp-pdf-page .pp-info-row { flex-shrink: 0; grid-template-columns: 1.5fr 1fr; margin-bottom: 18px; }
+/* 본문: 남는 세로 공간을 모두 차지(푸터를 아래로 밀어 고정). 안의 그리드는 자동 높이로
+   자라며, 그리드 높이가 본문 높이를 넘으면 그 카드를 다음 장으로 넘긴다(측정 기반 분할). */
+.pp-pdf-page .pp-pdf-body { flex: 1 1 0; min-height: 0; overflow: hidden; }
+.pp-pdf-page .pp-grid {
+    grid-template-columns: repeat(3, 1fr) !important;   /* 3열 고정 (페이지당 최대 3×2=6칸) */
+    gap: 16px;
+    margin: 0;
+    align-content: start;
+}
+.pp-pdf-page .pp-footer { flex-shrink: 0; margin-top: 14px; padding: 14px 0 0; }
+/* 2페이지 이후 상단 컴팩트 헤더 (제목 + 로고) */
+.pp-pdf-head-compact {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 3px solid var(--klp-brand);
+    padding-bottom: 14px;
+    margin-bottom: 22px;
+}
+.pp-pdf-head-compact .pp-pdf-head-title { font-size: 28px; font-weight: 900; color: #000; letter-spacing: -0.5px; }
+.pp-pdf-head-compact img { max-height: 46px; max-width: 180px; width: auto; object-fit: contain; }
+
+/* PDF 전용 컴팩트 스케일 — 헤더/카드를 줄여 A4 한 장에 보기 좋게 담는다.
+   (화면 미리보기/공유링크 웹화면에는 영향 없음 — .pp-pdf-page 안에서만 적용) */
+.pp-pdf-page .pp-hero { margin-bottom: 14px; padding: 4px 0 14px; }
+.pp-pdf-page .pp-hero-title { font-size: 34px !important; margin-bottom: 6px; }
+.pp-pdf-page .pp-hero-sub { font-size: 19px !important; }
+.pp-pdf-page .pp-hero-date { font-size: 15px !important; margin-top: 5px; }
+.pp-pdf-page .pp-hero-logo { max-height: 62px; max-width: 210px; }
+.pp-pdf-page .pp-info-row { margin-bottom: 14px; gap: 14px; }
+.pp-pdf-page .pp-info-card { padding: 14px 16px; }
+.pp-pdf-page .pp-info-title { font-size: 14px; margin-bottom: 8px; }
+.pp-pdf-page .pp-info-desc { font-size: 14px !important; line-height: 1.5; }
+.pp-pdf-page .pp-mgr-row { margin-bottom: 8px; }
+.pp-pdf-page .pp-mgr-name { font-size: 18px !important; }
+.pp-pdf-page .pp-mgr-contact { font-size: 14px !important; }
+.pp-pdf-page .pp-mgr-contact div { padding: 3px 0; }
+/* 상품 이미지는 정사각형 비율 그대로(왜곡·크롭 없음). 카드 글씨만 살짝 줄여 카드 높이를
+   낮춰, 한 페이지(2번째 장부터)에 3×2=6개가 들어가도록 한다. */
+.pp-pdf-page .pp-card-body { padding: 13px 15px; }
+.pp-pdf-page .pp-card-name { font-size: 16px !important; }
+.pp-pdf-page .pp-card-desc { font-size: 12px !important; margin-top: 3px; }
+.pp-pdf-page .pp-card-price { font-size: 21px !important; margin-top: 6px; }
+.pp-pdf-page .pp-card-price small { font-size: 12px !important; }
+.pp-pdf-page .pp-card-opts { font-size: 13px !important; margin-top: 8px; padding-top: 8px; gap: 4px; }
+.pp-pdf-page .pp-footer { font-size: 15px !important; line-height: 1.6; margin-top: 12px; padding: 14px 0 0; }
+
 /* ============================
    THEME TOGGLE BUTTON (우측 하단)
    ============================ */

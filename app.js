@@ -8401,69 +8401,116 @@ function requestQuoteEmail() {
     window.open(KAKAO_CHAT_URL, '_blank', 'noopener,noreferrer');
 }
 
-// 제안서 미리보기 컨테이너(.pp-wrap)를 캡처해 A4 멀티페이지 PDF 로 저장.
-// 라이트 모드 강제(data-theme=dark 일시 제거), 비율 유지, 페이지 단위 슬라이스.
+// 제안서 PDF 저장 (A4 페이지 분할: 헤더 상단 고정·푸터 하단 고정, 상품 자동 다음장).
+// 미리보기(.pp-wrap)에 렌더된 헤더/푸터/상품카드를 그대로 복제 → A4 페이지에 채워 분할.
 async function downloadProposalPdf(btn) {
     if (!editingProposal) return;
-    // 미리보기가 열려있지 않으면 먼저 띄움 (이미 열려있다면 그대로)
-    let opened = false;
-    if (!document.getElementById('proposalPreviewOverlay') ||
-        !document.getElementById('proposalPreviewOverlay').classList.contains('show')) {
-        openProposalPreview();
-        opened = true;
-        // 렌더 끝나길 한 프레임 대기
-        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    syncProposalEditorFromDom();
+    // 미리보기 오버레이를 확보 (없으면 임시 생성). 전체/갤러리 뷰로 강제해 모든 상품 카드 확보.
+    let overlay = document.getElementById('proposalPreviewOverlay');
+    let createdOverlay = false;
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'proposalPreviewOverlay';
+        overlay.className = 'proposal-preview-overlay';
+        document.body.appendChild(overlay);
+        createdOverlay = true;
     }
-    const wrap = document.querySelector('#proposalPreviewOverlay .pp-wrap');
-    if (!wrap) { showToast('미리보기 화면을 찾을 수 없습니다'); return; }
+    const prevFilter = currentPreviewFilter, prevView = currentPreviewView;
+    currentPreviewFilter = 'all';
+    currentPreviewView = 'gallery';
+    renderProposalPreview();
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     const origLabel = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'PDF 생성 중...'; }
-    // 라이트 모드 강제 — 다크 테마 일시 해제
+    // 라이트 모드 강제 — 다크 테마 일시 해제 (PDF 가독성)
     const docEl = document.documentElement;
     const wasDark = docEl.getAttribute('data-theme') === 'dark';
     if (wasDark) docEl.removeAttribute('data-theme');
-    // PDF 출력에 불필요한 인터랙션 영역(필터 칩·뷰 토글, 하단 CTA) 캡처 중 일시 숨김
-    const hideEls = wrap.querySelectorAll('.pp-cta, .pp-filter-bar');
-    const hidePrev = [];
-    hideEls.forEach(el => { hidePrev.push(el.style.display); el.style.display = 'none'; });
-    // 여백 압축 클래스 적용 — 캔버스 비율을 A4 에 가깝게 만들어 가장자리 빈 공간 최소화
-    wrap.classList.add('pp-pdf-tight');
     try {
-        const canvas = await html2canvas(wrap, {
-            scale: 2,                          // 해상도
-            backgroundColor: '#ffffff',
-            useCORS: true,
-            logging: false,
-            windowWidth: wrap.scrollWidth,
-            windowHeight: wrap.scrollHeight,
-        });
-        const imgData = canvas.toDataURL('image/jpeg', 0.92);
-        const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const pw = pdf.internal.pageSize.getWidth();      // 210
-        const ph = pdf.internal.pageSize.getHeight();     // 297
-        // A4 한 페이지에 비율 유지하며 fit. 가장자리 여백 최소(2mm) 만 남김.
-        const margin = 2;
-        const innerW = pw - margin * 2;
-        const innerH = ph - margin * 2;
-        const ratio = Math.min(innerW / canvas.width, innerH / canvas.height);
-        const finalW = canvas.width * ratio;
-        const finalH = canvas.height * ratio;
-        const x = (pw - finalW) / 2;
-        const y = (ph - finalH) / 2;
-        pdf.addImage(imgData, 'JPEG', x, y, finalW, finalH);
-        const safeName = ((editingProposal.title || '제안서') + '_' + (editingProposal.clientName || '')).replace(/[\\/:*?"<>|]/g, '_');
-        pdf.save(safeName + '.pdf');
+        const wrap = overlay.querySelector('.pp-wrap');
+        if (!wrap) { showToast('미리보기 화면을 찾을 수 없습니다'); return; }
+        const heroHtml = (wrap.querySelector('.pp-hero') || {}).outerHTML || '';
+        const infoRowHtml = (wrap.querySelector('.pp-info-row') || {}).outerHTML || '';
+        const footerHtml = (wrap.querySelector('.pp-footer') || {}).outerHTML || '';
+        const cardHtmls = Array.from(wrap.querySelectorAll('.pp-grid .pp-card')).map(el => el.outerHTML);
+        const titleName = editingProposal.title || 'KLP 제안서';
+        const fileName = ((editingProposal.title || '제안서') + '_' + (editingProposal.clientName || ''))
+            .replace(/[\\/:*?"<>|]/g, '_') + '.pdf';
+        await _ppRenderPdf({ titleName, fileName, heroHtml, infoRowHtml, footerHtml, cardHtmls, logoSrc: 'logo.png' });
     } catch (err) {
         console.error('PDF 생성 실패:', err);
         showToast('PDF 생성 실패: ' + (err.message || ''));
     } finally {
-        // 숨겼던 영역 + 압축 클래스 복원
-        hideEls.forEach((el, i) => { el.style.display = hidePrev[i] || ''; });
-        wrap.classList.remove('pp-pdf-tight');
         if (wasDark) docEl.setAttribute('data-theme', 'dark');
+        currentPreviewFilter = prevFilter;
+        currentPreviewView = prevView;
+        if (createdOverlay) {
+            overlay.remove();
+        } else if (overlay.classList.contains('show')) {
+            renderProposalPreview();   // 열려 있던 미리보기 화면 원상 복구
+        }
         if (btn) { btn.disabled = false; btn.textContent = origLabel; }
-        if (opened) closeProposalPreview();
+    }
+}
+
+// 공통 PDF 엔진 — 헤더/푸터/상품카드 HTML 을 받아 A4 페이지 단위로 분할 후 저장.
+// 측정 기반 분할: 상품 그리드(.pp-grid)가 페이지 남은 높이를 넘어가면 다음 장으로 넘긴다.
+async function _ppRenderPdf({ titleName, fileName, heroHtml, infoRowHtml, footerHtml, cardHtmls, logoSrc }) {
+    const host = document.createElement('div');
+    host.className = 'pp-pdf-host';
+    document.body.appendChild(host);
+    const firstHeaderHtml = (heroHtml || '') + (infoRowHtml || '');
+    const compactHeaderHtml =
+        '<div class="pp-pdf-head-compact"><div class="pp-pdf-head-title">' +
+        (titleName || '') + '</div><img src="' + (logoSrc || 'logo.png') + '" alt="KLP KOREA"></div>';
+    try {
+        const total = cardHtmls.length;
+        const pages = [];
+        let i = 0;
+        do {
+            const page = document.createElement('div');
+            page.className = 'pp-pdf-page';
+            page.innerHTML =
+                (pages.length === 0 ? firstHeaderHtml : compactHeaderHtml) +
+                '<div class="pp-pdf-body"><div class="pp-grid"></div></div>' +
+                (footerHtml || '');
+            host.appendChild(page);
+            const body = page.querySelector('.pp-pdf-body');
+            const grid = page.querySelector('.pp-grid');
+            const avail = body.clientHeight;                          // 이 페이지에서 상품이 쓸 수 있는 높이
+            let placed = 0;
+            while (i < total) {
+                grid.insertAdjacentHTML('beforeend', cardHtmls[i]);
+                if (grid.offsetHeight > avail + 1) {                  // 그리드(자동 높이)가 본문을 넘침
+                    if (placed === 0) { i++; }                        // 한 페이지보다 큰 단일 카드는 그대로 둠
+                    else { grid.removeChild(grid.lastElementChild); } // 넘치면 마지막 카드를 다음 장으로
+                    break;
+                }
+                i++; placed++;
+            }
+            pages.push(page);
+        } while (i < total);
+
+        // 이미지 로드 대기 (캡처 전 깨짐 방지)
+        const imgs = Array.from(host.querySelectorAll('img'));
+        await Promise.all(imgs.map(img => (img.complete && img.naturalWidth)
+            ? Promise.resolve()
+            : new Promise(res => { img.onload = img.onerror = res; setTimeout(res, 4000); })));
+
+        const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        for (let p = 0; p < pages.length; p++) {
+            if (p > 0) pdf.addPage();
+            const canvas = await html2canvas(pages[p], {
+                scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
+                width: 794, height: 1123, windowWidth: 794, windowHeight: 1123,
+            });
+            pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297);
+        }
+        pdf.save(fileName);
+    } finally {
+        host.remove();
     }
 }
 
