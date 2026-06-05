@@ -14097,7 +14097,7 @@ function renderQuotePreviewDoc(q) {
         const qty = Number(it.quantity) || 0;
         const up = Number(it.unitPrice) || 0;
         let rows = `<tr>
-            <td style="padding:10px 12px;border-bottom:1px solid #eef0f5;font-weight:700;color:#1a1d29;font-size:11px">${esc(it.productName || '')}${it.unitPriceVat === 'VAT 포함' ? ' <span style="font-size:9px;color:#888">(VAT포함)</span>' : ''}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid #eef0f5;font-weight:700;color:#1a1d29;font-size:11px">${esc(it.productName || '')}</td>
             <td style="${itemCell}">${qty}</td>
             <td style="${itemCell}">${fmtN(up)}</td>
             <td style="${itemCell}">${fmtN(ei.prodT || 0)}</td>
@@ -14105,7 +14105,7 @@ function renderQuotePreviewDoc(q) {
         </tr>`;
         if (ei.hasPr) {
             rows += `<tr>
-                <td style="padding:6px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10px">　└ 인쇄비 (${esc(it.printMethod || '')}) <span style="font-size:9px;color:#888">${esc(it.printFeeApply)} / ${esc(it.printFeeVat)}</span></td>
+                <td style="padding:6px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10px">　└ 인쇄비 (${esc(it.printMethod || '')}) <span style="font-size:9px;color:#888">${esc(it.printFeeApply)}</span></td>
                 <td style="${subCell}">${it.printFeeApply === '1개당' ? qty : 1}</td>
                 <td style="${subCell}">${fmtN(Number(it.printFee) || 0)}</td>
                 <td style="${subCell}">${fmtN(ei.prT || 0)}</td>
@@ -14114,7 +14114,7 @@ function renderQuotePreviewDoc(q) {
         }
         if (ei.hasPk) {
             rows += `<tr>
-                <td style="padding:6px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10px">　└ 포장비 (${esc(it.packaging || '')}) <span style="font-size:9px;color:#888">${esc(it.packagingFeeApply)} / ${esc(it.packagingFeeVat)}</span></td>
+                <td style="padding:6px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10px">　└ 포장비 (${esc(it.packaging || '')}) <span style="font-size:9px;color:#888">${esc(it.packagingFeeApply)}</span></td>
                 <td style="${subCell}">${it.packagingFeeApply === '1개당' ? qty : 1}</td>
                 <td style="${subCell}">${fmtN(Number(it.packagingFee) || 0)}</td>
                 <td style="${subCell}">${fmtN(ei.pkT || 0)}</td>
@@ -14123,7 +14123,7 @@ function renderQuotePreviewDoc(q) {
         }
         if (ei.hasMold) {
             rows += `<tr>
-                <td style="padding:6px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10px">　└ 금형비 <span style="font-size:9px;color:#888">${esc(it.moldFeeApply || '일괄')} / ${esc(it.moldFeeVat || 'VAT 별도')}</span></td>
+                <td style="padding:6px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10px">　└ 금형비 <span style="font-size:9px;color:#888">${esc(it.moldFeeApply || '일괄')}</span></td>
                 <td style="${subCell}">${it.moldFeeApply === '1개당' ? qty : 1}</td>
                 <td style="${subCell}">${fmtN(Number(it.moldFee) || 0)}</td>
                 <td style="${subCell}">${fmtN(ei.mT || 0)}</td>
@@ -14132,7 +14132,7 @@ function renderQuotePreviewDoc(q) {
         }
         if (ei.hasSample) {
             rows += `<tr>
-                <td style="padding:6px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10px">　└ 샘플비 <span style="font-size:9px;color:#888">${esc(it.sampleFeeApply || '일괄')} / ${esc(it.sampleFeeVat || 'VAT 별도')}</span></td>
+                <td style="padding:6px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10px">　└ 샘플비 <span style="font-size:9px;color:#888">${esc(it.sampleFeeApply || '일괄')}</span></td>
                 <td style="${subCell}">${it.sampleFeeApply === '1개당' ? qty : 1}</td>
                 <td style="${subCell}">${fmtN(Number(it.sampleFee) || 0)}</td>
                 <td style="${subCell}">${fmtN(ei.sT || 0)}</td>
