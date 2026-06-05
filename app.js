@@ -10833,7 +10833,7 @@ function renderTempQuoteDoc(g) {
         totalVat += prodV;
 
         let rows = `<tr>
-            <td style="padding:10px 12px;border-bottom:1px solid #eef0f5;font-weight:700;color:#1a1d29;font-size:11px">${esc(p.item || '')}${p.unitPriceVat === 'VAT 포함' ? ' <span style="font-size:9px;color:#888">(VAT포함)</span>' : ''}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid #eef0f5;font-weight:700;color:#1a1d29;font-size:11px">${esc(p.item || '')}</td>
             <td style="${ic}">${fmtNTemp(p.qty || 0)}</td>
             <td style="${ic}">${fmtNTemp(p.unitPrice || 0)}</td>
             <td style="${ic}">${fmtNTemp(prodT)}</td>
@@ -10870,7 +10870,7 @@ function renderTempQuoteDoc(g) {
             // 택배의 '박스' 단위만 유지 (수량 단위가 개와 다르므로 명시 필요)
             const applyLabel = f.apply === '박스' ? ' <span style="font-size:9px;color:#888">' + fQty + '박스</span>' : '';
             rows += `<tr>
-                <td style="${icSub}">　└ ${f.name}${applyLabel}${f.vat === 'VAT 포함' ? ' <span style="color:#E67E22">(포함)</span>' : ''}</td>
+                <td style="${icSub}">　└ ${f.name}${applyLabel}</td>
                 <td style="${icSub};text-align:right">${fQty}</td>
                 <td style="${icSub};text-align:right">${fmtNTemp(f.unitVal)}</td>
                 <td style="${icSub};text-align:right">${fmtNTemp(fSup)}</td>
