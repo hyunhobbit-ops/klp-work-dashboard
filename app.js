@@ -483,7 +483,32 @@ const pageTitles = {
 };
 
 // ===== Init =====
+// 저장 함수 연타(중복 등록) 방지 — 각 저장 함수가 끝날 때까지(특히 DB INSERT 대기 중)
+// 같은 함수의 재호출을 무시한다. inline onclick="saveX()" 은 window.saveX 를 호출하므로
+// window 의 해당 함수를 한 번 래핑해두면 모든 저장 버튼에 한꺼번에 적용된다.
+function installSaveGuards() {
+    const names = [
+        'saveProposal', 'saveProduct', 'saveQuoteAndPreview',
+        'saveTempInline', 'saveTempProject', 'saveTempGroupItem', 'saveTempGroupEdit',
+        'saveMarketItem', 'savePlanningProject', 'savePlanningProjectEdit',
+        'saveFundingPlanningProject', 'saveEditDelivery', 'saveEditTask', 'saveUrlShortcut'
+    ];
+    names.forEach(n => {
+        const orig = window[n];
+        if (typeof orig !== 'function' || orig.__saveGuarded) return;
+        const wrapped = async function (...args) {
+            if (wrapped.__busy) return;        // 이미 처리 중이면 무시
+            wrapped.__busy = true;
+            try { return await orig.apply(this, args); }
+            finally { wrapped.__busy = false; }
+        };
+        wrapped.__saveGuarded = true;
+        window[n] = wrapped;
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    installSaveGuards();
     setupTheme();
     setupTopbar();
     setupSidebar();
@@ -2800,13 +2825,13 @@ function renderDeliveries() {
         ? deliveries
         : deliveries.filter(d => d.type === currentDeliveryTypeFilter);
 
-    // 연도/월 필터
+    // 연도/월 필터 (날짜 비어있는 행 방어)
     if (currentDeliveryYear !== 'all') {
-        filtered = filtered.filter(d => d.date.startsWith(currentDeliveryYear));
+        filtered = filtered.filter(d => (d.date || '').startsWith(currentDeliveryYear));
     }
     if (currentDeliveryMonth !== 'all') {
         filtered = filtered.filter(d => {
-            const m = d.date.split('-')[1];
+            const m = (d.date || '').split('-')[1];
             return m === currentDeliveryMonth;
         });
     }
@@ -2901,7 +2926,7 @@ function renderDateFilter() {
     if (!container) return;
 
     // 연도 목록 추출
-    const years = [...new Set(deliveries.map(d => d.date.split('-')[0]))].sort().reverse();
+    const years = [...new Set(deliveries.map(d => (d.date || '').split('-')[0]).filter(Boolean))].sort().reverse();
 
     let html = `<select class="date-filter-select" id="deliveryYearSelect" onchange="setDeliveryYear(this.value)">
         <option value="all" ${currentDeliveryYear === 'all' ? 'selected' : ''}>전체 연도</option>
@@ -10416,7 +10441,7 @@ async function saveTempInline() {
 document.addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.closest('#tempInlineRow')) {
         e.preventDefault();
-        saveTempInline();
+        (window.saveTempInline || saveTempInline)();   // 연타 방지 래퍼(window) 경유
     }
 });
 
@@ -10962,15 +10987,8 @@ function renderTempQuoteDoc(g) {
     const ic = 'padding:10px 12px;border-bottom:1px solid #eef0f5;text-align:right;color:#0B4F8F;font-weight:700';
     const icSub = 'padding:6px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10px';
     const itemRows = items.map(p => {
-        const rawProd = (p.unitPrice || 0) * (p.qty || 0);
-        let prodT, prodV;
-        if (p.unitPriceVat === 'VAT 포함') {
-            prodT = Math.round(rawProd / 1.1);
-            prodV = rawProd - prodT;
-        } else {
-            prodT = rawProd;
-            prodV = Math.round(prodT * 0.1);
-        }
+        const _prodSplit = vatSplit((p.unitPrice || 0) * (p.qty || 0), p.unitPriceVat);
+        const prodT = _prodSplit.supply, prodV = _prodSplit.vat;
         totalSup += prodT;
         totalVat += prodV;
 
@@ -10997,15 +11015,8 @@ function renderTempQuoteDoc(g) {
 
         fees.forEach(f => {
             const fQty = f.fQtyOverride !== undefined ? f.fQtyOverride : (f.apply === '1개당' ? qty : 1);
-            const fTotal = f.unitVal * fQty;
-            let fSup, fV;
-            if (f.vat === 'VAT 포함') {
-                fSup = Math.round(fTotal / 1.1);
-                fV = fTotal - fSup;
-            } else {
-                fSup = fTotal;
-                fV = Math.round(fTotal * 0.1);
-            }
+            const _fSplit = vatSplit(f.unitVal * fQty, f.vat);
+            const fSup = _fSplit.supply, fV = _fSplit.vat;
             totalSup += fSup;
             totalVat += fV;
             // 견적서에는 '1개당' / '일괄' 라벨 숨김 — 수량 컬럼으로 충분히 파악 가능
@@ -13530,40 +13541,58 @@ async function dbDeleteQuote(id) {
 // 견적 계산 — 다중 품목 지원
 // 반환: { items: [{prodT, prodV, prT, prV, pkT, pkV, hasPr, hasPk}, ...],
 //          shT, shV, hasSh, sup, vat, grand }
+// ===== 견적서 공통 VAT 분리 =====
+// 금액(gross)을 공급가액(VAT 제외)과 부가세로 나눈다. 모든 견적서가 같은 식을 쓰도록 단일화.
+//  - 'VAT 포함': gross 안에 VAT가 들어있음 → 공급가액 = gross/1.1, 부가세 = 나머지
+//  - 'VAT 별도'(기본): gross가 공급가액 → 부가세 = 10% 추가
+// 어느 경우든 공급가액 + 부가세 = 고객이 실제 내는 합계.
+function vatSplit(gross, vatLabel) {
+    gross = Number(gross) || 0;
+    if (vatLabel === 'VAT 포함') {
+        const supply = Math.round(gross / 1.1);
+        return { supply, vat: gross - supply };
+    }
+    return { supply: gross, vat: Math.round(gross * 0.1) };
+}
+
 function calcQuoteFromFields(q) {
     const items = Array.isArray(q.items) ? q.items : [];
     let sup = 0, vat = 0;
     const perItem = items.map(it => {
         const qty = Number(it.quantity) || 0;
         const up = Number(it.unitPrice) || 0;
-        const prodT = up * qty;
-        const prodV = it.unitPriceVat === 'VAT 별도' ? Math.round(prodT * 0.1) : 0;
+        const prod = vatSplit(up * qty, it.unitPriceVat);
+        const prodT = prod.supply, prodV = prod.vat;
         const pf = Number(it.printFee) || 0;
         const hasPr = pf > 0 || (it.printMethod && it.printMethod !== '없음');
-        const prT = pf > 0 ? (it.printFeeApply === '1개당' ? pf * qty : pf) : 0;
-        const prV = (it.printFeeVat === 'VAT 별도') ? Math.round(prT * 0.1) : 0;
+        const prGross = pf > 0 ? (it.printFeeApply === '1개당' ? pf * qty : pf) : 0;
+        const prS = vatSplit(prGross, it.printFeeVat);
+        const prT = prS.supply, prV = prS.vat;
         const pkf = Number(it.packagingFee) || 0;
         const hasPk = pkf > 0;
-        const pkT = hasPk ? (it.packagingFeeApply === '1개당' ? pkf * qty : pkf) : 0;
-        const pkV = (it.packagingFeeVat === 'VAT 별도') ? Math.round(pkT * 0.1) : 0;
+        const pkGross = hasPk ? (it.packagingFeeApply === '1개당' ? pkf * qty : pkf) : 0;
+        const pkS = vatSplit(pkGross, it.packagingFeeVat);
+        const pkT = pkS.supply, pkV = pkS.vat;
         const mf = Number(it.moldFee) || 0;
         const hasMold = mf > 0;
-        const mT = hasMold ? (it.moldFeeApply === '1개당' ? mf * qty : mf) : 0;
-        const mV = (it.moldFeeVat === 'VAT 별도') ? Math.round(mT * 0.1) : 0;
+        const mGross = hasMold ? (it.moldFeeApply === '1개당' ? mf * qty : mf) : 0;
+        const mS = vatSplit(mGross, it.moldFeeVat);
+        const mT = mS.supply, mV = mS.vat;
         const sf = Number(it.sampleFee) || 0;
         const hasSample = sf > 0;
-        const sT = hasSample ? (it.sampleFeeApply === '1개당' ? sf * qty : sf) : 0;
-        const sV = (it.sampleFeeVat === 'VAT 별도') ? Math.round(sT * 0.1) : 0;
+        const sGross = hasSample ? (it.sampleFeeApply === '1개당' ? sf * qty : sf) : 0;
+        const sS = vatSplit(sGross, it.sampleFeeVat);
+        const sT = sS.supply, sV = sS.vat;
         sup += prodT + prT + pkT + mT + sT;
         vat += prodV + prV + pkV + mV + sV;
         return { prodT, prodV, prT, prV, pkT, pkV, mT, mV, sT, sV, hasPr, hasPk, hasMold, hasSample };
     });
-    const shT = Number(q.shippingCost) || 0;
-    const hasSh = shT > 0;
-    const shV = (hasSh && q.shippingVat === 'VAT 별도') ? Math.round(shT * 0.1) : 0;
-    sup += shT;
-    vat += shV;
-    return { items: perItem, shT, shV, hasSh, sup, vat, grand: sup + vat };
+    const shGross = Number(q.shippingCost) || 0;
+    const hasSh = shGross > 0;
+    const shS = vatSplit(shGross, q.shippingVat);
+    sup += shS.supply;
+    vat += shS.vat;
+    return { items: perItem, shT: shS.supply, shV: shS.vat, hasSh, sup, vat, grand: sup + vat };
 }
 
 // ===== 리스트 뷰 =====
