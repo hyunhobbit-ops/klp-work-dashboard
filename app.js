@@ -7263,7 +7263,7 @@ function formatKRW(n) {
 
 function productThumb(p) {
     if (p.image) {
-        return `<img src="${p.image}" alt="${p.name}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--gray-200)">`;
+        return `<img src="${escHtml(p.image)}" alt="${escHtml(p.name)}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--gray-200)">`;
     }
     return `<div style="width:44px;height:44px;border-radius:8px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;color:var(--gray-400)"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>`;
 }
@@ -7557,21 +7557,21 @@ function renderProductDB() {
         if (!arr || !arr.length) return `<span style="color:var(--gray-400);font-weight:600">-</span>`;
         return arr.map(o => {
             const fee = o.fee ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">₩${(o.fee||0).toLocaleString()} ${feeUnit(o.feeApply)}</div>` : '';
-            return `<div style="margin-bottom:4px"><span class="badge" style="background:#FAECE7;color:#712B13;font-weight:700">${_optDisplayType(o)}</span>${fee}</div>`;
+            return `<div style="margin-bottom:4px"><span class="badge" style="background:#FAECE7;color:#712B13;font-weight:700">${escHtml(_optDisplayType(o))}</span>${fee}</div>`;
         }).join('');
     };
     const packsCell = (arr) => {
         if (!arr || !arr.length) return `<span style="color:var(--gray-400)">-</span>`;
         return arr.map(o => {
             const fee = o.fee ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">₩${(o.fee||0).toLocaleString()} ${feeUnit(o.feeApply)}</div>` : '';
-            return `<div style="margin-bottom:4px"><span class="badge badge-green">${_optDisplayType(o)}</span>${fee}</div>`;
+            return `<div style="margin-bottom:4px"><span class="badge badge-green">${escHtml(_optDisplayType(o))}</span>${fee}</div>`;
         }).join('');
     };
     const labelsCell = (arr) => {
         if (!arr || !arr.length) return `<span class="badge badge-red">불가</span>`;
         return arr.map(o => {
             const fee = o.fee ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">₩${(o.fee||0).toLocaleString()} ${feeUnit(o.feeApply)}</div>` : '';
-            const note = o.note ? ` ${o.note}` : '';
+            const note = o.note ? ` ${escHtml(o.note)}` : '';
             return `<div style="margin-bottom:4px"><span class="badge badge-green">가능${note}</span>${fee}</div>`;
         }).join('');
     };
@@ -7579,7 +7579,7 @@ function renderProductDB() {
         if (!arr || !arr.length) return `<div class="resp-card-row">${label}: -</div>`;
         const txt = arr.map(o => {
             // 라벨은 note 가 자유텍스트, 인쇄/포장은 type(+customType)
-            const main = (o.note != null && !o.type) ? (o.note || '부착') : _optDisplayType(o);
+            const main = escHtml((o.note != null && !o.type) ? (o.note || '부착') : _optDisplayType(o));
             const fee = o.fee ? ` ₩${(o.fee||0).toLocaleString()} ${feeUnit(o.feeApply)}` : '';
             return `${main}${fee}`;
         }).join(' / ');
@@ -7594,10 +7594,10 @@ function renderProductDB() {
         tableHtml += `<tr onclick="openProductDBModal(${p.id})" style="cursor:pointer">
             <td>${productThumb(p)}</td>
             <td>
-                <div style="font-weight:700;color:var(--gray-900)">${p.name}</div>
-                <div style="font-size:12px;color:var(--gray-500);font-weight:500;margin-top:2px">${p.description || ''}</div>
+                <div style="font-weight:700;color:var(--gray-900)">${escHtml(p.name)}</div>
+                <div style="font-size:12px;color:var(--gray-500);font-weight:500;margin-top:2px">${escHtml(p.description || '')}</div>
             </td>
-            <td><span class="badge badge-gray">${p.category}</span></td>
+            <td><span class="badge badge-gray">${escHtml(p.category)}</span></td>
             <td style="font-weight:700">${priceStr}</td>
             <td>${printsCell(prints)}</td>
             <td>${packsCell(packs)}</td>
@@ -7616,14 +7616,14 @@ function renderProductDB() {
                 <div style="display:flex;gap:12px;align-items:center">
                     ${productThumb(p)}
                     <div>
-                        <div class="resp-card-title">${p.name}</div>
-                        <div style="font-size:12px;color:var(--gray-500)">${p.description || ''}</div>
+                        <div class="resp-card-title">${escHtml(p.name)}</div>
+                        <div style="font-size:12px;color:var(--gray-500)">${escHtml(p.description || '')}</div>
                     </div>
                 </div>
                 <span class="badge ${productStatusBadge(p.status)}">${p.status}</span>
             </div>
             <div class="resp-card-meta">
-                <div class="resp-card-row"><span class="badge badge-gray">${p.category}</span> <strong>${priceStr}</strong></div>
+                <div class="resp-card-row"><span class="badge badge-gray">${escHtml(p.category)}</span> <strong>${priceStr}</strong></div>
                 ${summaryRow('인쇄', prints)}
                 ${summaryRow('포장', packs)}
                 ${summaryRow('라벨', labels)}
@@ -7828,6 +7828,10 @@ async function openProductDBModal(editId) {
     const title = document.getElementById('modalTitle');
     const body = document.getElementById('modalBody');
     const p = editId ? productsDB.find(x => x.id === editId) : null;
+    // 이미지 로드 실패(네트워크 등)로 아직 미확보면 사용자에게 알림 — 저장 시 기존 이미지는 보존됨(saveProduct 가드)
+    if (p && p.image === undefined) {
+        showToast('이미지를 불러오지 못했습니다. 기존 이미지는 그대로 유지됩니다.');
+    }
     title.textContent = p ? '상품 편집' : '상품 등록';
     // 옵션 state 초기화 (편집이면 기존 배열 깊은 복사, 신규면 빈 배열)
     editingProduct = {
@@ -7954,11 +7958,11 @@ async function saveProduct() {
     if (!name) { showToast('상품명을 입력해주세요'); return; }
     syncProductOptionsFromDom();                       // 옵션 행 입력값 → editingProduct
     syncProductBulkFromDom();                          // 수량별 단가 행 입력값 → editingProduct
+    const imgInput = document.getElementById('productImage').value.trim();
     const data = {
         name,
         description: document.getElementById('productDescription').value.trim(),
         category: document.getElementById('productCategory').value,
-        image: document.getElementById('productImage').value.trim(),
         unitPrice: readProjectNumber('productUnitPrice'),
         vatIncluded: document.getElementById('productVatIncluded').checked,
         prints: editingProduct.prints || [],
@@ -7967,6 +7971,14 @@ async function saveProduct() {
         bulkPrices: editingProduct.bulkPrices || [],
         status: document.getElementById('productStatus').value,
     };
+    // 이미지 보존 가드: 편집 중인데 원본 이미지가 아직 메모리에 없고(지연로드 미완/실패)
+    // 사용자가 새 이미지를 올리지도 않았다면 image 키를 보내지 않아 DB의 기존 이미지를 보존한다.
+    // (보내면 productToDb가 ''로 덮어 기존 이미지가 사라짐)
+    const _orig = editId ? productsDB.find(p => p.id === editId) : null;
+    const _imageUnloaded = !!(_orig && _orig.image === undefined);
+    if (!(_imageUnloaded && imgInput === '')) {
+        data.image = imgInput;
+    }
     if (editId) {
         const updated = await dbUpdateProduct(editId, data);
         if (!updated) return;                          // DB 실패 시 모달 유지
@@ -7997,6 +8009,7 @@ async function deleteProduct(id) {
 
 // 상품 복제 — 기존 상품의 모든 필드를 그대로 복사 + 이름에 "(사본)" 추가, id/createdAt 은 새로
 async function duplicateProduct(id) {
+    await ensureProductImages();   // 복제본에 이미지가 빠지지 않도록 원본 이미지 확보 후 복사
     const src = productsDB.find(x => x.id === id);
     if (!src) return;
     const copy = JSON.parse(JSON.stringify(src));
@@ -8021,22 +8034,22 @@ function showProductDetail(id) {
     document.getElementById('detailPanelTitle').textContent = p.name;
     const row = (label, val) => `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-100)"><span style="color:var(--gray-500);font-weight:600">${label}</span><span style="color:var(--gray-900);font-weight:700">${val}</span></div>`;
     const imgHtml = p.image
-        ? `<img src="${p.image}" style="width:100%;max-height:260px;object-fit:cover;border-radius:12px;border:1px solid var(--gray-200);margin-bottom:16px">`
+        ? `<img src="${escHtml(p.image)}" style="width:100%;max-height:260px;object-fit:cover;border-radius:12px;border:1px solid var(--gray-200);margin-bottom:16px">`
         : `<div style="width:100%;height:180px;border-radius:12px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;color:var(--gray-400);margin-bottom:16px"><svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>`;
     document.getElementById('detailContent').innerHTML = `
         ${imgHtml}
         <div style="margin-bottom:16px">
-            <span class="badge badge-gray">${p.category}</span>
+            <span class="badge badge-gray">${escHtml(p.category)}</span>
             <span class="badge ${productStatusBadge(p.status)}" style="margin-left:6px">${p.status}</span>
         </div>
-        <div style="color:var(--gray-600);font-size:13px;margin-bottom:16px">${p.description || '-'}</div>
+        <div style="color:var(--gray-600);font-size:13px;margin-bottom:16px">${escHtml(p.description || '-')}</div>
         ${row('단가', `${formatKRW(p.unitPrice)} <span style="font-size:11px;color:var(--gray-500);font-weight:500">(${p.vatIncluded ? 'VAT 포함' : 'VAT 별도'})</span>`)}
         ${(() => {
             const fu = a => a === '일괄' ? '일괄' : '개당';
             const fmtArr = (arr, kind) => {
                 if (!arr || !arr.length) return '-';
                 return arr.map(o => {
-                    const main = kind === 'label' ? (o.note || '부착') : _optDisplayType(o);
+                    const main = escHtml(kind === 'label' ? (o.note || '부착') : _optDisplayType(o));
                     const fee = o.fee ? ` · ₩${(o.fee||0).toLocaleString()} ${fu(o.feeApply)}` : '';
                     return `${main}${fee}`;
                 }).join('<br>');
@@ -8238,12 +8251,12 @@ function renderProposalEditor() {
                 style="display:grid;grid-template-columns:24px 56px 1fr 160px 120px 140px 40px;gap:12px;align-items:center;padding:12px;border-bottom:1px solid var(--gray-100);transition:background .12s">
                 <div style="cursor:grab;user-select:none;color:var(--gray-400);font-size:18px;line-height:1;text-align:center" title="드래그하여 순서 변경">⋮⋮</div>
                 ${p.image
-                    ? `<img src="${p.image}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--gray-200)">`
+                    ? `<img src="${escHtml(p.image)}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--gray-200)">`
                     : `<div style="width:56px;height:56px;border-radius:8px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;color:var(--gray-400)"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>`}
                 <div style="min-width:0">
-                    <div style="font-weight:700;color:var(--gray-900);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>
-                    <div style="font-size:12px;color:var(--gray-500);margin-top:2px">${p.description || ''}</div>
-                    <span class="badge badge-gray" style="margin-top:4px">${p.category}</span>
+                    <div style="font-weight:700;color:var(--gray-900);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</div>
+                    <div style="font-size:12px;color:var(--gray-500);margin-top:2px">${escHtml(p.description || '')}</div>
+                    <span class="badge badge-gray" style="margin-top:4px">${escHtml(p.category)}</span>
                 </div>
                 <div style="text-align:right;font-weight:700">${formatKRW(p.unitPrice)}<div style="font-size:11px;color:var(--gray-500);font-weight:500">${vatLabel}</div></div>
                 <div><input type="number" min="1" class="form-input" style="text-align:right" value="${it.quantity}" onchange="updateProposalItemQty(${idx}, this.value)"></div>
@@ -8472,12 +8485,12 @@ async function openProductPicker() {
                 return `<label style="display:grid;grid-template-columns:24px 56px 1fr auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--gray-200);border-radius:8px;cursor:${already ? 'not-allowed' : 'pointer'};opacity:${already ? '0.5' : '1'}">
                     <input type="checkbox" class="product-picker-check" data-id="${p.id}" ${already ? 'checked disabled' : ''}>
                     ${p.image
-                        ? `<img src="${p.image}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--gray-200)">`
+                        ? `<img src="${escHtml(p.image)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--gray-200)">`
                         : `<div style="width:48px;height:48px;border-radius:6px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;color:var(--gray-400)"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16"/></svg></div>`}
                     <div style="min-width:0">
-                        <div style="font-weight:700;color:var(--gray-900)">${p.name}</div>
-                        <div style="font-size:11px;color:var(--gray-500);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.description || ''}</div>
-                        <span class="badge badge-gray" style="margin-top:2px">${p.category}</span>
+                        <div style="font-weight:700;color:var(--gray-900)">${escHtml(p.name)}</div>
+                        <div style="font-size:11px;color:var(--gray-500);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.description || '')}</div>
+                        <span class="badge badge-gray" style="margin-top:2px">${escHtml(p.category)}</span>
                     </div>
                     <div style="font-weight:800;color:var(--blue);white-space:nowrap">${formatKRW(p.unitPrice)}</div>
                 </label>`;
