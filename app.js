@@ -5035,15 +5035,72 @@ function scheduleRerender(fn, delay = 200) {
     t.set(fn, setTimeout(() => { t.delete(fn); fn(); }, delay));
 }
 
+// 실시간 변경 1행을 페이지네이션 원본(raw rows)에 직접 반영 — 전체 재다운로드 방지 (Egress 절감).
+// 반영 성공 시 true. 페이지네이션이 아직 없으면 false → 호출부에서 전체 로드로 폴백.
+function _mergeRealtimeRow(pagination, payload, sortFn) {
+    if (!pagination || !Array.isArray(pagination.data)) return false;
+    const type = payload && payload.eventType;
+    const newRow = payload && payload.new;
+    const oldRow = payload && payload.old;
+    const arr = pagination.data;
+    if (type === 'INSERT' && newRow && newRow.id != null) {
+        if (!arr.find(r => r.id === newRow.id)) {
+            arr.unshift(newRow);
+            if (typeof pagination.total === 'number') pagination.total++;
+        }
+    } else if (type === 'UPDATE' && newRow && newRow.id != null) {
+        const i = arr.findIndex(r => r.id === newRow.id);
+        if (i >= 0) arr[i] = newRow;
+        else {
+            arr.unshift(newRow);
+            if (typeof pagination.total === 'number') pagination.total++;
+        }
+    } else if (type === 'DELETE' && oldRow && oldRow.id != null) {
+        const i = arr.findIndex(r => r.id === oldRow.id);
+        if (i >= 0) {
+            arr.splice(i, 1);
+            if (typeof pagination.total === 'number') pagination.total = Math.max(0, pagination.total - 1);
+        }
+    } else {
+        return false;
+    }
+    if (sortFn) arr.sort(sortFn);
+    return true;
+}
+
+function _rebuildDeliveriesFromPagination() {
+    if (!_deliveriesPagination) return;
+    deliveries.length = 0;
+    (_deliveriesPagination.data || []).forEach(r => deliveries.push(deliveryFromDb(r)));
+    cacheWrite('deliveries', deliveries);
+}
+
+function _rebuildClientsFromPagination() {
+    if (!_clientsPagination) return;
+    clients.length = 0;
+    (_clientsPagination.data || []).forEach(r => clients.push(clientFromDb(r)));
+    cacheWrite('clients', clients);
+}
+
 function subscribeDomesticProjectsRealtime() {
     if (_domesticRealtimeChannel) { sb.removeChannel(_domesticRealtimeChannel); _domesticRealtimeChannel = null; }
     _domesticRealtimeChannel = sb.channel('projects_domestic_realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'projects_domestic' }, () => {
-            scheduleRerender(async () => {
-                await loadDomesticProjectsFromDb();
-                try { renderProjects(); } catch (_) {}
-                try { renderHome(); } catch (_) {}
-            });
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'projects_domestic' }, (payload) => {
+            const merged = _mergeRealtimeRow(_projectsDomesticPagination, payload,
+                (a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+            if (merged) {
+                _rebuildDomesticProjectsFromPagination();
+                scheduleRerender(() => {
+                    try { renderProjects(); } catch (_) {}
+                    try { renderHome(); } catch (_) {}
+                });
+            } else {
+                scheduleRerender(async () => {
+                    await loadDomesticProjectsFromDb();
+                    try { renderProjects(); } catch (_) {}
+                    try { renderHome(); } catch (_) {}
+                });
+            }
         })
         .subscribe();
 }
@@ -5051,10 +5108,17 @@ function subscribeDomesticProjectsRealtime() {
 function subscribeTempProjectsRealtime() {
     if (_tempRealtimeChannel) { sb.removeChannel(_tempRealtimeChannel); _tempRealtimeChannel = null; }
     _tempRealtimeChannel = sb.channel('projects_temp_realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'projects_temp' }, () => {
-            scheduleRerender(async () => {
-                try { await loadTempProjects(); } catch (_) {}
-            });
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'projects_temp' }, (payload) => {
+            const merged = _mergeRealtimeRow(_projectsTempPagination, payload,
+                (a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+            if (merged) {
+                _rebuildTempProjectsFromPagination();
+                scheduleRerender(() => { try { renderTempProjects(); } catch (_) {} });
+            } else {
+                scheduleRerender(async () => {
+                    try { await loadTempProjects(); } catch (_) {}
+                });
+            }
         })
         .subscribe();
 }
@@ -5062,12 +5126,22 @@ function subscribeTempProjectsRealtime() {
 function subscribeDeliveriesRealtime() {
     if (_deliveriesRealtimeChannel) { sb.removeChannel(_deliveriesRealtimeChannel); _deliveriesRealtimeChannel = null; }
     _deliveriesRealtimeChannel = sb.channel('deliveries_realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'deliveries' }, () => {
-            scheduleRerender(async () => {
-                await loadDeliveriesFromDb();
-                try { renderDeliveries(); } catch (_) {}
-                try { renderHome(); } catch (_) {}
-            });
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'deliveries' }, (payload) => {
+            const merged = _mergeRealtimeRow(_deliveriesPagination, payload,
+                (a, b) => String(b.date || '').localeCompare(String(a.date || '')) || ((b.id || 0) - (a.id || 0)));
+            if (merged) {
+                _rebuildDeliveriesFromPagination();
+                scheduleRerender(() => {
+                    try { renderDeliveries(); } catch (_) {}
+                    try { renderHome(); } catch (_) {}
+                });
+            } else {
+                scheduleRerender(async () => {
+                    await loadDeliveriesFromDb();
+                    try { renderDeliveries(); } catch (_) {}
+                    try { renderHome(); } catch (_) {}
+                });
+            }
         })
         .subscribe();
 }
@@ -5075,11 +5149,18 @@ function subscribeDeliveriesRealtime() {
 function subscribeClientsRealtime() {
     if (_clientsRealtimeChannel) { sb.removeChannel(_clientsRealtimeChannel); _clientsRealtimeChannel = null; }
     _clientsRealtimeChannel = sb.channel('clients_realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => {
-            scheduleRerender(async () => {
-                await loadClientsFromDb();
-                try { renderClients(); } catch (_) {}
-            });
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, (payload) => {
+            const merged = _mergeRealtimeRow(_clientsPagination, payload,
+                (a, b) => String(a.company_name || '').localeCompare(String(b.company_name || '')));
+            if (merged) {
+                _rebuildClientsFromPagination();
+                scheduleRerender(() => { try { renderClients(); } catch (_) {} });
+            } else {
+                scheduleRerender(async () => {
+                    await loadClientsFromDb();
+                    try { renderClients(); } catch (_) {}
+                });
+            }
         })
         .subscribe();
 }
@@ -5087,12 +5168,13 @@ function subscribeClientsRealtime() {
 function subscribePlanningRealtime() {
     if (_planningRealtimeChannel) { sb.removeChannel(_planningRealtimeChannel); _planningRealtimeChannel = null; }
     const onAnyChange = () => {
+        // 기획 데이터(특히 posts 본문 HTML)는 용량이 커서, 기획 탭을 보고 있을 때만 재로드.
+        // 탭이 닫혀 있으면 스킵 — 기획 탭 진입 시 renderPlanning()이 어차피 DB에서 새로 로드한다.
+        const tab = document.getElementById('tab-planning');
+        if (!tab || !tab.classList.contains('active')) return;
         scheduleRerender(async () => {
             await loadPlanningProjects();
-            const tab = document.getElementById('tab-planning');
-            if (tab && tab.classList.contains('active')) {
-                try { await renderPlanning({ skipLoad: true }); } catch (_) {}
-            }
+            try { await renderPlanning({ skipLoad: true }); } catch (_) {}
             try { renderPlanningHomeSection(); } catch (_) {}
         });
     };
@@ -7210,7 +7292,9 @@ function productFromDb(r) {
         name: r.name || '',
         description: r.description || '',
         category: r.category || '기타',
-        image: r.image || '',
+        // image 컬럼은 base64 라 매우 큼 — 목록 로드(select 제외) 시 undefined 유지.
+        // undefined = "아직 안 받음" (ensureProductImages 로 필요 시 로드), '' = "이미지 없음"
+        image: r.image !== undefined ? (r.image || '') : undefined,
         unitPrice: r.unit_price || 0,
         vatIncluded: r.vat_included !== false,
         prints: Array.isArray(r.prints) ? r.prints.map(_normPrintRow) : [],
@@ -7226,11 +7310,10 @@ function productToDb(p) {
     const packagings = (p.packagings || []).map(_normPackRow);
     const labels = (p.labels || []).map(_normLabelRow);
     const bulk_prices = (p.bulkPrices || []).map(_normBulkPriceRow);
-    return {
+    const row = {
         name: p.name || '',
         description: p.description || '',
         category: p.category || '기타',
-        image: p.image || '',
         unit_price: Number(p.unitPrice) || 0,
         vat_included: !!p.vatIncluded,
         prints, packagings, labels, bulk_prices,
@@ -7246,15 +7329,47 @@ function productToDb(p) {
         label_fee_apply: labels[0] ? labels[0].feeApply : '1개당',
         status: p.status || '판매 중',
     };
+    // 이미지를 아직 안 받은 상태(undefined)로 저장하면 DB의 기존 이미지가 ''로 덮여 사라짐.
+    // image 키 자체를 빼면 Supabase가 해당 컬럼을 건드리지 않는다.
+    if (p.image !== undefined) row.image = p.image || '';
+    return row;
 }
+// 목록 로드 시 image(base64, 매우 큼) 컬럼 제외 — Egress 절감의 핵심
+const PRODUCT_LIST_COLUMNS = 'id,name,description,category,unit_price,vat_included,prints,packagings,labels,bulk_prices,status,created_at';
+
+// 상품 이미지 지연 로드 — 이미지가 실제로 보이는 화면(상품DB/상세/픽커/제안서 미리보기)
+// 에서만 id,image 만 별도로 받아 메모리에 합친다. 세션당 1회.
+let _productImagesLoaded = false;
+let _productImagesPromise = null;
+async function ensureProductImages() {
+    if (_productImagesLoaded) return;
+    if (_productImagesPromise) return _productImagesPromise;
+    _productImagesPromise = (async () => {
+        try {
+            const page = await paginatedLoad('products', { pageSize: 500, select: 'id,image' });
+            while (page.hasMore) await page.loadMore();
+            const byId = new Map(page.data.map(r => [r.id, r.image || '']));
+            productsDB.forEach(p => { if (byId.has(p.id)) p.image = byId.get(p.id); });
+            _productImagesLoaded = true;
+        } catch (e) {
+            console.warn('상품 이미지 로드 실패:', e && e.message);
+        } finally {
+            _productImagesPromise = null;
+        }
+    })();
+    return _productImagesPromise;
+}
+
 async function loadProductsFromDb() {
     try {
         _productsPagination = await paginatedLoad('products', {
             pageSize: 500,
-            orderBy: 'created_at', orderDir: 'desc'
+            orderBy: 'created_at', orderDir: 'desc',
+            select: PRODUCT_LIST_COLUMNS
         });
         productsDB.length = 0;
         _productsPagination.data.forEach(r => productsDB.push(productFromDb(r)));
+        _productImagesLoaded = false;   // 새로 로드했으니 이미지는 다시 "미로드" 상태
         cacheWrite('productsDB', productsDB);
     } catch (err) {
         console.error('상품 DB 로드 실패:', err.message);
@@ -7333,6 +7448,7 @@ function proposalFromDb(r) {
         totalAmount: r.total_amount || 0,
         sentDate: r.sent_date || '',
         shareLink: r.share_link || '',
+        shareToken: r.share_token || '',   // 공유 링크용 추측 불가 토큰 (proposalToDb 에는 절대 포함하지 않음 — DB가 관리)
         createdAt: r.created_at || new Date().toISOString(),
     };
 }
@@ -7388,6 +7504,8 @@ async function dbDeleteProposal(id) {
 }
 
 function renderProductDB() {
+    // 이미지는 지연 로드 — 도착하면 한 번 더 그려서 채움
+    if (!_productImagesLoaded) ensureProductImages().then(() => { try { renderProductDB(); } catch (_) {} });
     // 요약 카드
     document.getElementById('pdbTotal').textContent = productsDB.length;
     document.getElementById('pdbActive').textContent = productsDB.filter(p => p.status === '판매 중').length;
@@ -7677,7 +7795,10 @@ function removeBulkPrice(idx) {
     renderProductBulkSection();
 }
 
-function openProductDBModal(editId) {
+async function openProductDBModal(editId) {
+    // 편집 시 이미지가 메모리에 없으면(지연 로드) 저장할 때 기존 이미지가 지워질 수 있으므로
+    // 모달을 열기 전에 반드시 이미지를 확보한다.
+    if (editId) await ensureProductImages();
     const overlay = document.getElementById('modalOverlay');
     const title = document.getElementById('modalTitle');
     const body = document.getElementById('modalBody');
@@ -7867,6 +7988,11 @@ async function duplicateProduct(id) {
 function showProductDetail(id) {
     const p = productsDB.find(x => x.id === id);
     if (!p) return;
+    // 이미지 지연 로드 — 도착 시 같은 상품 패널이 아직 열려 있으면 다시 그림
+    if (!_productImagesLoaded) ensureProductImages().then(() => {
+        const t = document.getElementById('detailPanelTitle');
+        if (t && t.textContent === p.name) { try { showProductDetail(id); } catch (_) {} }
+    });
     document.getElementById('detailPanelTitle').textContent = p.name;
     const row = (label, val) => `<div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-100)"><span style="color:var(--gray-500);font-weight:600">${label}</span><span style="color:var(--gray-900);font-weight:700">${val}</span></div>`;
     const imgHtml = p.image
@@ -7958,12 +8084,12 @@ function renderProposals() {
 
         tableHtml += `<tr onclick="openProposalEditor(${p.id})" style="cursor:pointer">
             <td>
-                <div style="font-weight:700;color:var(--gray-900)">${p.title}</div>
+                <div style="font-weight:700;color:var(--gray-900)">${escHtml(p.title)}</div>
                 <div style="font-size:11px;color:var(--gray-500);margin-top:2px">${(p.items || []).length}개 상품</div>
             </td>
             <td>
-                <div style="font-weight:600">${p.clientName || '-'}</div>
-                ${p.clientContact ? `<div style="font-size:11px;color:var(--gray-500)">${p.clientContact}</div>` : ''}
+                <div style="font-weight:600">${escHtml(p.clientName) || '-'}</div>
+                ${p.clientContact ? `<div style="font-size:11px;color:var(--gray-500)">${escHtml(p.clientContact)}</div>` : ''}
             </td>
             <td style="font-weight:800;color:var(--blue)">${formatKRW(p.totalAmount)}</td>
             <td><span class="badge ${proposalStatusBadge(p.status)}">${p.status}</span></td>
@@ -7974,13 +8100,13 @@ function renderProposals() {
 
         cardHtml += `<div class="resp-card" onclick="openProposalEditor(${p.id})">
             <div class="resp-card-top">
-                <div class="resp-card-title">${p.title}</div>
+                <div class="resp-card-title">${escHtml(p.title)}</div>
                 <span class="badge ${proposalStatusBadge(p.status)}">${p.status}</span>
             </div>
             <div class="resp-card-meta">
-                <div class="resp-card-row"><strong>${p.clientName || '-'}</strong>${p.clientContact ? ` · ${p.clientContact}` : ''}</div>
+                <div class="resp-card-row"><strong>${escHtml(p.clientName) || '-'}</strong>${p.clientContact ? ` · ${escHtml(p.clientContact)}` : ''}</div>
                 <div class="resp-card-row" style="color:var(--blue);font-weight:800">${formatKRW(p.totalAmount)}</div>
-                <div class="resp-card-row">${(p.items || []).length}개 상품 · ${p.assignee || '-'}</div>
+                <div class="resp-card-row">${(p.items || []).length}개 상품 · ${escHtml(p.assignee) || '-'}</div>
                 <div class="resp-card-row">${p.sentDate ? '발송 ' + fmtDisplay(p.sentDate) : '미발송'}</div>
             </div>
         </div>`;
@@ -8023,6 +8149,8 @@ function _defaultAssignee() {
 }
 
 function openProposalEditor(id) {
+    // 담긴 상품 썸네일용 이미지 지연 로드 (입력 상태 보존을 위해 재렌더는 안 함 — 픽커/미리보기에서 채워짐)
+    if (!_productImagesLoaded) ensureProductImages();
     const existing = id ? proposals.find(p => p.id === id) : null;
     if (existing) {
         editingProposal = JSON.parse(JSON.stringify(existing));
@@ -8180,7 +8308,7 @@ function renderProposalEditor() {
                 <button class="panel-link" style="padding:10px 16px;border:1px solid var(--gray-200);border-radius:8px;background:var(--white);color:var(--gray-700);font-weight:700" onclick="downloadProposalPdf(this)">📄 PDF 다운로드</button>
                 <button class="btn-primary" onclick="generateShareLink()">🔗 링크 생성 및 공유</button>
             </div>
-            ${ep.shareLink ? `<div style="margin-top:12px;padding:10px 14px;background:var(--blue-light);border-radius:8px;font-size:12px;color:var(--blue);font-weight:600;word-break:break-all">공유 링크: ${ep.shareLink}</div>` : ''}
+            ${ep.shareLink ? `<div style="margin-top:12px;padding:10px 14px;background:var(--blue-light);border-radius:8px;font-size:12px;color:var(--blue);font-weight:600;word-break:break-all">공유 링크: ${escHtml(ep.shareLink)}</div>` : ''}
         </div>
     `;
 }
@@ -8302,8 +8430,9 @@ function addProductToProposal(productId) {
 }
 
 // 상품 선택 모달 — 상품 DB에서 판매 중 상품만 체크박스로
-function openProductPicker() {
+async function openProductPicker() {
     if (!editingProposal) return;
+    await ensureProductImages();   // 썸네일 표시용 (세션당 1회만 실제 다운로드)
     const overlay = document.getElementById('modalOverlay');
     const title = document.getElementById('modalTitle');
     const body = document.getElementById('modalBody');
@@ -8360,6 +8489,7 @@ async function _ensureProposalSaved() {
         if (!updated) return false;
         const idx = proposals.findIndex(p => p.id === editingProposal.id);
         if (idx >= 0) proposals[idx] = updated;
+        editingProposal.shareToken = updated.shareToken || editingProposal.shareToken || '';
         return true;
     }
     // 신규 — 필수값 체크 후 INSERT
@@ -8374,6 +8504,7 @@ async function _ensureProposalSaved() {
     if (!inserted) return false;
     editingProposal.id = inserted.id;
     editingProposal.createdAt = inserted.createdAt;
+    editingProposal.shareToken = inserted.shareToken || '';
     proposals.unshift(inserted);
     return true;
 }
@@ -8382,7 +8513,12 @@ async function generateShareLink() {
     if (!editingProposal) return;
     const ok = await _ensureProposalSaved();
     if (!ok) return;
-    const url = `${location.origin}/proposal-view.html?id=${editingProposal.id}`;
+    // 순차 번호(?id=) 대신 추측 불가 토큰(?key=) 사용 — 다른 제안서 열람(열거) 차단
+    if (!editingProposal.shareToken) {
+        showToast('공유 토큰이 없습니다. 새로고침 후 다시 시도해주세요');
+        return;
+    }
+    const url = `${location.origin}/proposal-view.html?key=${editingProposal.shareToken}`;
     editingProposal.shareLink = url;
     // 링크를 DB 에 저장 (다음에 열어도 같은 링크 유지)
     await dbUpdateProposal(editingProposal.id, editingProposal);
@@ -8419,6 +8555,7 @@ async function downloadProposalPdf(btn) {
     const prevFilter = currentPreviewFilter, prevView = currentPreviewView;
     currentPreviewFilter = 'all';
     currentPreviewView = 'gallery';
+    await ensureProductImages();   // PDF에 상품 이미지가 빠지지 않도록 캡처 전에 확보
     renderProposalPreview();
     await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
@@ -8566,6 +8703,11 @@ function openProposalPreview() {
     currentPreviewFilter = 'all';
     currentPreviewView = 'gallery';
     renderProposalPreview();
+    // 이미지 지연 로드 — 도착하면 미리보기가 아직 열려 있을 때만 다시 그림
+    if (!_productImagesLoaded) ensureProductImages().then(() => {
+        const ov = document.getElementById('proposalPreviewOverlay');
+        if (ov && ov.classList.contains('show')) { try { renderProposalPreview(); } catch (_) {} }
+    });
     overlay.classList.add('show');
     document.body.style.overflow = 'hidden';
     document.addEventListener('keydown', _proposalPreviewEscHandler);
@@ -8625,18 +8767,18 @@ function renderProposalPreview() {
         const labels = Array.isArray(p.labels) ? p.labels : [];
         const printRow = prints.length === 0
             ? ''
-            : prints.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">${_optDisplayType(o)}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`).join('');
+            : prints.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">인쇄</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">${escHtml(_optDisplayType(o))}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`).join('');
         const printFeeRow = '';
         const packRow = packs.length === 0
             ? ''
-            : packs.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">포장</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">${_optDisplayType(o)}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`).join('');
+            : packs.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">포장</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">${escHtml(_optDisplayType(o))}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`).join('');
         const packFeeRow = '';
         const labelRow = labels.length === 0
             ? ''
-            : labels.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">부착 가능${o.note ? ' · ' + o.note : ''}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`).join('');
+            : labels.map(o => `<div class="pp-opt-row"><span class="pp-opt-label">라벨</span><span class="pp-opt-value"><span style="font-weight:600;color:#000">부착 가능${o.note ? ' · ' + escHtml(o.note) : ''}</span> <span style="color:#000;font-size:14px">${feeText(o)}</span></span></div>`).join('');
 
         const imgHtml = p.image
-            ? `<img src="${p.image}" alt="${p.name}">`
+            ? `<img src="${escHtml(p.image)}" alt="${escHtml(p.name)}">`
             : `<svg width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
 
         // 수량별 단가 (있을 때만 단가 라인 아래에 작은 표 형태로)
@@ -8659,8 +8801,8 @@ function renderProposalPreview() {
                 ${badgeHtml}
             </div>
             <div class="pp-card-body">
-                <div class="pp-card-name">${p.name}</div>
-                ${p.description ? `<div class="pp-card-desc">${p.description}</div>` : ''}
+                <div class="pp-card-name">${escHtml(p.name)}</div>
+                ${p.description ? `<div class="pp-card-desc">${escHtml(p.description).replace(/\n/g, '<br>')}</div>` : ''}
                 <div class="pp-card-price">${(Number(p.unitPrice) || 0) > 0 ? `₩${Number(p.unitPrice).toLocaleString()} <small>(${vatLabel})</small>` : '포함'}</div>
                 ${bulkHtml}
                 <div class="pp-card-opts">
@@ -8686,13 +8828,13 @@ function renderProposalPreview() {
         const labels2 = Array.isArray(p.labels) ? p.labels : [];
         const printCell = prints2.length === 0
             ? '-'
-            : prints2.map(o => `<div><span style="font-weight:600">${_optDisplayType(o)}</span> <span style="color:var(--gray-500)">${feeText2(o)}</span></div>`).join('');
+            : prints2.map(o => `<div><span style="font-weight:600">${escHtml(_optDisplayType(o))}</span> <span style="color:var(--gray-500)">${feeText2(o)}</span></div>`).join('');
         const packCell = packs2.length === 0
             ? '-'
-            : packs2.map(o => `<div><span style="font-weight:600">${_optDisplayType(o)}</span> <span style="color:var(--gray-500)">${feeText2(o)}</span></div>`).join('');
+            : packs2.map(o => `<div><span style="font-weight:600">${escHtml(_optDisplayType(o))}</span> <span style="color:var(--gray-500)">${feeText2(o)}</span></div>`).join('');
         const labelCell = labels2.length === 0
             ? '-'
-            : labels2.map(o => `<div><span style="font-weight:600">가능${o.note ? ' · ' + o.note : ''}</span> <span style="color:var(--gray-500)">${feeText2(o)}</span></div>`).join('');
+            : labels2.map(o => `<div><span style="font-weight:600">가능${o.note ? ' · ' + escHtml(o.note) : ''}</span> <span style="color:var(--gray-500)">${feeText2(o)}</span></div>`).join('');
         const bulks = Array.isArray(p.bulkPrices) ? p.bulkPrices.filter(b => (b.minQty || b.maxQty) && b.price) : [];
         const bulkLabel = (b) => {
             if (b.minQty && b.maxQty) return `${b.minQty.toLocaleString()}~${b.maxQty.toLocaleString()}개`;
@@ -8702,8 +8844,8 @@ function renderProposalPreview() {
         };
         const bulkInline = bulks.length === 0 ? '' : `<div style="margin-top:4px;font-size:11px;color:var(--gray-600)">${bulks.map(b => `${bulkLabel(b)} <strong style="color:var(--gray-900)">₩${(b.price||0).toLocaleString()}</strong>`).join(' · ')}</div>`;
         return `<tr>
-            <td><strong>${p.name}</strong>${p.description ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">${p.description}</div>` : ''}</td>
-            <td><span class="badge badge-gray">${p.category}</span></td>
+            <td><strong>${escHtml(p.name)}</strong>${p.description ? `<div style="font-size:11px;color:var(--gray-500);margin-top:2px">${escHtml(p.description)}</div>` : ''}</td>
+            <td><span class="badge badge-gray">${escHtml(p.category)}</span></td>
             <td>${(Number(p.unitPrice) || 0) > 0 ? `<strong>₩${Number(p.unitPrice).toLocaleString()}</strong> <span style="color:var(--gray-500);font-size:11px">${vatLabel}</span>` : `<strong>포함</strong>`}${bulkInline}</td>
             <td>${printCell}</td>
             <td>${packCell}</td>
@@ -8724,8 +8866,8 @@ function renderProposalPreview() {
             <div class="pp-hero">
                 <div class="pp-hero-circle3"></div>
                 <div class="pp-hero-left">
-                    <div class="pp-hero-title">${ep.title || '제안서 제목'}</div>
-                    <div class="pp-hero-sub">${ep.clientName || '거래처'}${ep.clientContact ? ' · ' + ep.clientContact + ' 님' : ''}</div>
+                    <div class="pp-hero-title">${escHtml(ep.title || '제안서 제목')}</div>
+                    <div class="pp-hero-sub">${escHtml(ep.clientName || '거래처')}${ep.clientContact ? ' · ' + escHtml(ep.clientContact) + ' 님' : ''}</div>
                     <div class="pp-hero-date">작성일 ${(ep.createdAt || '').substring(0, 10).replace(/-/g, '.')}</div>
                 </div>
                 <div class="pp-hero-right">
@@ -8737,17 +8879,17 @@ function renderProposalPreview() {
             <div class="pp-info-row">
                 <div class="pp-info-card">
                     <div class="pp-info-title">제안 안내</div>
-                    <div class="pp-info-desc">${(ep.description || '본 제안서는 아래 상품 구성을 기반으로 작성되었습니다.').replace(/\n/g, '<br>')}</div>
+                    <div class="pp-info-desc">${escHtml(ep.description || '본 제안서는 아래 상품 구성을 기반으로 작성되었습니다.').replace(/\n/g, '<br>')}</div>
                     <div style="margin-top:14px;font-size:13px;color:var(--gray-600);font-weight:700">${validHtml}</div>
                 </div>
                 <div class="pp-info-card">
                     <div class="pp-info-title">담당자 정보</div>
                     <div class="pp-mgr-row">
-                        <div class="pp-mgr-name">${ep.assignee || 'KLP 담당자'}${_assigneeRoleTitle(ep.assignee) ? ` <span style="font-size:17px;font-weight:600;color:#000;margin-left:6px">${_assigneeRoleTitle(ep.assignee)}</span>` : ''}</div>
+                        <div class="pp-mgr-name">${escHtml(ep.assignee || 'KLP 담당자')}${_assigneeRoleTitle(ep.assignee) ? ` <span style="font-size:17px;font-weight:600;color:#000;margin-left:6px">${_assigneeRoleTitle(ep.assignee)}</span>` : ''}</div>
                     </div>
                     <div class="pp-mgr-contact">
-                        <div>📧 ${ep.assigneeEmail || 'klpkorea@agift.kr'}</div>
-                        <div>📱 ${ep.assigneePhone || '02-2103-5757'}</div>
+                        <div>📧 ${escHtml(ep.assigneeEmail || 'klpkorea@agift.kr')}</div>
+                        <div>📱 ${escHtml(ep.assigneePhone || '02-2103-5757')}</div>
                     </div>
                 </div>
             </div>
