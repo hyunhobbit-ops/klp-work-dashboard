@@ -1661,17 +1661,37 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
         });
         sections.forEach(sec => {
             const group = buckets[sec.key];
-            tableHtml += `<tr class="section-divider"><td colspan="${colspan}" style="padding:14px 0 6px 0;border:none;background:var(--white)"><div style="display:inline-flex;align-items:center;gap:10px;background:${sec.bg};color:${sec.color};font-weight:700;font-size:14px;padding:8px 16px;border-radius:8px;border:1px solid ${sec.color}55"><span>${sec.key}</span><span style="color:${sec.color};opacity:.8;font-weight:700">${group.length}</span></div></td></tr>`;
+            const active = sec.key === '진행 중';   // 제일 중요한 섹션 — 강조
+
+            // ===== 테이블 헤더 =====
+            const tableHeader = active
+                ? `<div style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#1F85FF,#0F6CD9);color:#fff;font-weight:800;font-size:16px;padding:13px 20px;border-radius:10px;box-shadow:0 4px 14px rgba(31,133,255,.35)"><span style="letter-spacing:.3px">▶ 진행 중</span><span style="background:rgba(255,255,255,.25);color:#fff;font-weight:800;border-radius:999px;padding:2px 13px;font-size:15px">${group.length}</span><span style="font-size:12px;font-weight:600;color:rgba(255,255,255,.85);margin-left:auto">지금 작업 중인 건</span></div>`
+                : `<div style="display:inline-flex;align-items:center;gap:10px;background:${sec.bg};color:${sec.color};font-weight:700;font-size:14px;padding:8px 16px;border-radius:8px;border:1px solid ${sec.color}55"><span>${sec.key}</span><span style="color:${sec.color};opacity:.8;font-weight:700">${group.length}</span></div>`;
+            tableHtml += `<tr class="section-divider"><td colspan="${colspan}" style="padding:${active ? '20px 0 9px 0' : '14px 0 6px 0'};border:none;background:var(--white)">${tableHeader}</td></tr>`;
             if (group.length === 0) {
                 tableHtml += `<tr class="section-empty"><td colspan="${colspan}" style="color:var(--text-tertiary);font-size:12px;padding:14px;text-align:center;background:var(--white)">해당 상태의 프로젝트가 없습니다</td></tr>`;
             } else {
-                group.forEach(p => { tableHtml += rowHtmlById.get(p.id); });
+                group.forEach(p => {
+                    let rh = rowHtmlById.get(p.id);
+                    // 진행 중 행 강조 — 반투명 파랑(라이트/다크 공용) + 왼쪽 액센트 바
+                    if (active) rh = rh.replace('style="cursor:pointer"', 'style="cursor:pointer;background:rgba(31,133,255,.10);box-shadow:inset 4px 0 0 #1F85FF"');
+                    tableHtml += rh;
+                });
             }
-            cardHtml += `<div class="card-section-header" style="grid-column:1/-1;margin-top:10px"><div style="display:inline-flex;align-items:center;gap:10px;background:${sec.bg};color:${sec.color};font-weight:700;font-size:14px;padding:8px 16px;border-radius:8px;border:1px solid ${sec.color}55"><span>${sec.key}</span><span style="color:${sec.color};opacity:.8">${group.length}</span></div></div>`;
+
+            // ===== 카드(모바일) 헤더 =====
+            const cardHeader = active
+                ? `<div style="display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,#1F85FF,#0F6CD9);color:#fff;font-weight:800;font-size:15px;padding:12px 18px;border-radius:10px;box-shadow:0 4px 14px rgba(31,133,255,.35)"><span>▶ 진행 중</span><span style="background:rgba(255,255,255,.25);border-radius:999px;padding:2px 12px">${group.length}</span></div>`
+                : `<div style="display:inline-flex;align-items:center;gap:10px;background:${sec.bg};color:${sec.color};font-weight:700;font-size:14px;padding:8px 16px;border-radius:8px;border:1px solid ${sec.color}55"><span>${sec.key}</span><span style="color:${sec.color};opacity:.8">${group.length}</span></div>`;
+            cardHtml += `<div class="card-section-header" style="grid-column:1/-1;margin-top:${active ? '16px' : '10px'}">${cardHeader}</div>`;
             if (group.length === 0) {
                 cardHtml += `<div style="grid-column:1/-1;color:var(--text-tertiary);font-size:12px;padding:8px 14px">해당 상태의 프로젝트가 없습니다</div>`;
             } else {
-                group.forEach(p => { cardHtml += cardHtmlById.get(p.id); });
+                group.forEach(p => {
+                    let ch = cardHtmlById.get(p.id);
+                    if (active) ch = ch.replace('class="resp-card"', 'class="resp-card" style="border-left:4px solid #1F85FF;box-shadow:0 2px 10px rgba(31,133,255,.18)"');
+                    cardHtml += ch;
+                });
             }
         });
     } else {
