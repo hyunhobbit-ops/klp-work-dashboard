@@ -104,14 +104,22 @@ module.exports = async (req, res) => {
 
         const block = (j.content || []).find(b => b.type === 'tool_use');
         const out = (block && block.input) || {};
+        // 모델이 못 읽었을 때 넣는 placeholder(<UNKNOWN>, N/A, 없음 등)를 빈 문자열로 정리 —
+        // 폼에 쓰레기 값이 들어가지 않도록.
+        const clean = (v) => {
+            const s = String(v == null ? '' : v).trim();
+            if (!s) return '';
+            if (/^[<\[(]?\s*(unknown|n\/?a|없음|알\s*수\s*없[음다]|미상|해당\s*없음|미상|null|none|undefined|[-_.])\s*[>\])]?$/i.test(s)) return '';
+            return s;
+        };
         res.status(200).json({
-            recipient: out.recipient || '',
-            phone: out.phone || '',
-            zipcode: out.zipcode || '',
-            address: out.address || '',
-            product: out.product || '',
-            type: out.delivery_type || '',
-            price: out.price || ''
+            recipient: clean(out.recipient),
+            phone: clean(out.phone),
+            zipcode: clean(out.zipcode),
+            address: clean(out.address),
+            product: clean(out.product),
+            type: clean(out.delivery_type),
+            price: clean(out.price)
         });
     } catch (err) {
         res.status(502).json({ error: '이미지 분석 서버 오류', detail: (err && err.message) || '' });
