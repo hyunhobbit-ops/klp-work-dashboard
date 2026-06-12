@@ -4521,6 +4521,11 @@ function openModal(type) {
     } else if (type === 'delivery') {
         title.textContent = '새 택배';
         body.innerHTML = `
+            <div style="margin-bottom:14px">
+                <button type="button" id="delImgBtn" class="form-submit" style="background:linear-gradient(135deg,#6b3fd4,#8b5cf6);width:100%" onclick="document.getElementById('delImgFile').click()">📷 이미지로 자동입력</button>
+                <input type="file" id="delImgFile" accept="image/*" style="display:none" onchange="analyzeDeliveryImage(this)">
+                <div style="font-size:11px;color:var(--gray-500);margin-top:5px;line-height:1.5">번개장터·당근 주문 캡처, 카톡 주문 대화, 주문서 이미지를 올리면 <b>받는이·연락처·우편번호·주소·품목</b>을 자동으로 채웁니다. (확인 후 저장)</div>
+            </div>
             <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="newDelDate" value="${fmtDate(new Date())}"></div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">받는이</label><input type="text" class="form-input" id="newDelRecipient" placeholder="받는이"></div>
@@ -6884,6 +6889,73 @@ async function addDailyTask() {
     dailyTasks.push(saved);
     closeModal(); renderDaily(); renderHome();
     showToast('할 일이 추가되었습니다');
+}
+
+// 이미지 → 캔버스 리사이즈(최대 maxDim) → JPEG data URL (전송량·비용 절감, alpha는 흰색으로 평탄화)
+function _resizeImageToDataUrl(file, maxDim, quality) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+            if (Math.max(w, h) > maxDim) {
+                const s = maxDim / Math.max(w, h);
+                w = Math.round(w * s); h = Math.round(h * s);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', quality || 0.8));
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지를 읽을 수 없습니다')); };
+        img.src = url;
+    });
+}
+
+// 택배 이미지 자동입력 — 이미지 선택 → 서버(/api/analyze-delivery) → 받는이·연락처·우편번호·주소·품목 자동 채움
+async function analyzeDeliveryImage(fileInput) {
+    const file = fileInput && fileInput.files && fileInput.files[0];
+    if (!file) return;
+    const btn = document.getElementById('delImgBtn');
+    const orig = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '🔍 분석 중...'; }
+    try {
+        const dataUrl = await _resizeImageToDataUrl(file, 1568, 0.8);
+        let token = '';
+        try { const { data } = await sb.auth.getSession(); token = data && data.session && data.session.access_token; } catch (_) {}
+        if (!token) { showToast('로그인이 필요합니다. 다시 로그인해주세요'); return; }
+
+        const resp = await fetch('/api/analyze-delivery', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ image: dataUrl })
+        });
+        const out = await resp.json().catch(() => ({}));
+        if (!resp.ok) { showToast(out.error || '이미지 분석에 실패했습니다'); return; }
+
+        const setVal = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+        setVal('newDelRecipient', out.recipient);
+        setVal('newDelAddress', out.address);
+        setVal('newDelProduct', out.product);
+        const zip = (out.zipcode || '').replace(/[^0-9]/g, '').slice(0, 5);
+        setVal('newDelZipcode', zip);
+        const phoneEl = document.getElementById('newDelPhone');
+        if (phoneEl && out.phone) {
+            phoneEl.value = out.phone;
+            phoneEl.dispatchEvent(new Event('input'));   // 기존 자동 하이픈(formatPhoneInput) 적용
+        }
+        const n = [out.recipient, out.phone, out.zipcode, out.address, out.product].filter(Boolean).length;
+        showToast(n > 0 ? `자동입력 완료 (${n}개 항목) — 내용 확인 후 저장하세요` : '인식된 정보가 없어요. 직접 입력해주세요');
+    } catch (e) {
+        console.error('이미지 자동입력 실패:', e);
+        showToast('이미지 분석 실패: ' + (e.message || ''));
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = orig; }
+        if (fileInput) fileInput.value = '';   // 같은 파일 다시 선택 가능하도록 리셋
+    }
 }
 
 async function addDelivery() {
