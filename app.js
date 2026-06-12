@@ -4524,7 +4524,7 @@ function openModal(type) {
             <div style="margin-bottom:14px">
                 <button type="button" id="delImgBtn" class="form-submit" style="background:linear-gradient(135deg,#6b3fd4,#8b5cf6);width:100%" onclick="document.getElementById('delImgFile').click()">📷 이미지로 자동입력</button>
                 <input type="file" id="delImgFile" accept="image/*" style="display:none" onchange="analyzeDeliveryImage(this)">
-                <div style="font-size:11px;color:var(--gray-500);margin-top:5px;line-height:1.5">번개장터·당근 주문 캡처, 카톡 주문 대화, 주문서 이미지를 올리면 <b>받는이·연락처·우편번호·주소·품목</b>을 자동으로 채웁니다. (확인 후 저장)</div>
+                <div style="font-size:11px;color:var(--gray-500);margin-top:5px;line-height:1.5">번개장터·당근 주문 캡처, 카톡 주문 대화, 주문서 이미지를 올리면 <b>받는이·연락처·우편번호·주소·품목·종류·판매가</b>를 자동으로 채웁니다. (확인 후 저장)</div>
             </div>
             <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="newDelDate" value="${fmtDate(new Date())}"></div>
             <div class="form-row">
@@ -6947,7 +6947,18 @@ async function analyzeDeliveryImage(fileInput) {
             phoneEl.value = out.phone;
             phoneEl.dispatchEvent(new Event('input'));   // 기존 자동 하이픈(formatPhoneInput) 적용
         }
-        const n = [out.recipient, out.phone, out.zipcode, out.address, out.product].filter(Boolean).length;
+        // 종류 — 정해진 옵션과 일치할 때만 설정 (change 이벤트로 판매가 칸 표시 토글)
+        const KNOWN_DEL_TYPES = ['일반', '중고', '번개', '당근', 'GS반택', 'ETSY'];
+        const typeEl = document.getElementById('newDelType');
+        if (typeEl && out.type && KNOWN_DEL_TYPES.includes(out.type)) {
+            typeEl.value = out.type;
+            typeEl.dispatchEvent(new Event('change'));   // 판매가 칸 표시 여부 갱신
+        }
+        // 판매가 — 종류가 가격 표시 종류(중고/번개/당근/GS반택)면 칸이 보임. 숫자만 입력.
+        const priceEl = document.getElementById('newDelPrice');
+        const priceNum = String(out.price || '').replace(/[^0-9]/g, '');
+        if (priceEl && priceNum) priceEl.value = priceNum;
+        const n = [out.recipient, out.phone, out.zipcode, out.address, out.product, out.type, priceNum].filter(Boolean).length;
         showToast(n > 0 ? `자동입력 완료 (${n}개 항목) — 내용 확인 후 저장하세요` : '인식된 정보가 없어요. 직접 입력해주세요');
     } catch (e) {
         console.error('이미지 자동입력 실패:', e);

@@ -54,15 +54,18 @@ module.exports = async (req, res) => {
                 phone: { type: 'string', description: '받는 사람 휴대폰 번호. 없으면 빈 문자열' },
                 zipcode: { type: 'string', description: '우편번호(숫자 5자리). 없으면 빈 문자열' },
                 address: { type: 'string', description: '배송 주소 전체. 동/호수까지 포함. 없으면 빈 문자열' },
-                product: { type: 'string', description: '상품명/품목. 없으면 빈 문자열' }
+                product: { type: 'string', description: '상품명/품목. 없으면 빈 문자열' },
+                delivery_type: { type: 'string', description: '거래 플랫폼/종류. 반드시 다음 중 하나로만: 일반, 중고, 번개, 당근, GS반택, ETSY. 번개장터=번개, 당근마켓=당근, 중고나라=중고, GS편의점반품택배=GS반택, Etsy=ETSY. 판단 불가하면 빈 문자열' },
+                price: { type: 'string', description: '판매가(상품금액, 숫자만). 수수료 차감 전 상품 판매 금액. 번개장터의 "상품금액", 당근의 거래금액 등. 입금예정금액(수수료 차감 후)이 아니라 상품금액. 없으면 빈 문자열' }
             },
-            required: ['recipient', 'phone', 'zipcode', 'address', 'product']
+            required: ['recipient', 'phone', 'zipcode', 'address', 'product', 'delivery_type', 'price']
         }
     };
 
     const prompt = '이 이미지는 택배 발송용 주문 정보입니다(번개장터/당근 주문 상세, 카톡·문자 주문 대화, 또는 주문서/송장). ' +
-        '받는 사람의 이름·휴대폰번호·우편번호·주소(동/호수 포함)·품목을 이미지에 적힌 그대로 정확히 추출해 fill_delivery 도구로 채워주세요. ' +
-        '보내는 사람(판매자)이 아니라 받는 사람 정보를 추출하세요. 보이지 않는 항목은 빈 문자열로. 우편번호는 숫자 5자리만. 추측 금지.';
+        '받는 사람의 이름·휴대폰번호·우편번호·주소(동/호수 포함)·품목, 그리고 거래 종류(플랫폼)와 판매가를 이미지에 적힌 그대로 정확히 추출해 fill_delivery 도구로 채워주세요. ' +
+        '보내는 사람(판매자)이 아니라 받는 사람 정보를 추출하세요. 종류는 정해진 6개 값 중 하나로만(번개장터→번개 등). ' +
+        '판매가는 상품금액(수수료 차감 전, 숫자만). 보이지 않는 항목은 빈 문자열로. 우편번호는 숫자 5자리만. 추측 금지.';
 
     try {
         const ares = await fetch('https://api.anthropic.com/v1/messages', {
@@ -106,7 +109,9 @@ module.exports = async (req, res) => {
             phone: out.phone || '',
             zipcode: out.zipcode || '',
             address: out.address || '',
-            product: out.product || ''
+            product: out.product || '',
+            type: out.delivery_type || '',
+            price: out.price || ''
         });
     } catch (err) {
         res.status(502).json({ error: '이미지 분석 서버 오류', detail: (err && err.message) || '' });
