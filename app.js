@@ -4522,9 +4522,12 @@ function openModal(type) {
         title.textContent = '새 택배';
         body.innerHTML = `
             <div style="margin-bottom:14px">
-                <button type="button" id="delImgBtn" class="form-submit" style="background:linear-gradient(135deg,#6b3fd4,#8b5cf6);width:100%" onclick="document.getElementById('delImgFile').click()">📷 이미지로 자동입력</button>
+                <div style="display:flex;gap:8px">
+                    <button type="button" id="delImgBtn" class="form-submit" style="background:linear-gradient(135deg,#6b3fd4,#8b5cf6);flex:1" onclick="document.getElementById('delImgFile').click()">📷 이미지 선택</button>
+                    <button type="button" id="delPasteBtn" class="form-submit" style="background:linear-gradient(135deg,#3b82f6,#2563eb);flex:1" onclick="pasteDeliveryImage()">📋 붙여넣기</button>
+                </div>
                 <input type="file" id="delImgFile" accept="image/*" style="display:none" onchange="analyzeDeliveryImage(this)">
-                <div style="font-size:11px;color:var(--gray-500);margin-top:5px;line-height:1.5">번개장터·당근 주문 캡처, 카톡 주문 대화, 주문서 이미지를 올리면 <b>받는이·연락처·우편번호·주소·품목·종류·판매가</b>를 자동으로 채웁니다. (확인 후 저장)</div>
+                <div style="font-size:11px;color:var(--gray-500);margin-top:5px;line-height:1.5">번개장터·당근 주문 캡처 등을 <b>파일 선택</b>하거나, 캡처를 복사한 뒤 <b>Ctrl+V(붙여넣기)</b> 또는 <b>📋 붙여넣기</b> 버튼을 누르면 <b>받는이·연락처·우편번호·주소·품목·종류·판매가</b>를 자동으로 채웁니다. (확인 후 저장)</div>
             </div>
             <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="newDelDate" value="${fmtDate(new Date())}"></div>
             <div class="form-row">
@@ -6916,12 +6919,18 @@ function _resizeImageToDataUrl(file, maxDim, quality) {
 }
 
 // 택배 이미지 자동입력 — 이미지 선택 → 서버(/api/analyze-delivery) → 받는이·연락처·우편번호·주소·품목 자동 채움
-async function analyzeDeliveryImage(fileInput) {
-    const file = fileInput && fileInput.files && fileInput.files[0];
+// 핵심: 이미지 파일/Blob 1개를 받아 분석 → 택배 폼 자동 채움. (파일선택·붙여넣기·Ctrl+V 공용)
+let _delAnalyzing = false;
+async function analyzeDeliveryImageFile(file) {
     if (!file) return;
-    const btn = document.getElementById('delImgBtn');
-    const orig = btn ? btn.textContent : '';
-    if (btn) { btn.disabled = true; btn.textContent = '🔍 분석 중...'; }
+    if (_delAnalyzing) { showToast('분석 중입니다. 잠시만요...'); return; }
+    if (!document.getElementById('newDelRecipient')) return;   // 택배 모달이 아니면 무시
+    _delAnalyzing = true;
+    const btns = ['delImgBtn', 'delPasteBtn'].map(id => document.getElementById(id)).filter(Boolean);
+    const mainBtn = document.getElementById('delImgBtn');
+    const orig = mainBtn ? mainBtn.textContent : '';
+    btns.forEach(b => b.disabled = true);
+    if (mainBtn) mainBtn.textContent = '🔍 분석 중...';
     try {
         const dataUrl = await _resizeImageToDataUrl(file, 1568, 0.8);
         let token = '';
@@ -6964,10 +6973,51 @@ async function analyzeDeliveryImage(fileInput) {
         console.error('이미지 자동입력 실패:', e);
         showToast('이미지 분석 실패: ' + (e.message || ''));
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = orig; }
-        if (fileInput) fileInput.value = '';   // 같은 파일 다시 선택 가능하도록 리셋
+        _delAnalyzing = false;
+        btns.forEach(b => b.disabled = false);
+        if (mainBtn) mainBtn.textContent = orig;
     }
 }
+
+// 파일 선택(onchange) → 핵심 함수 호출
+async function analyzeDeliveryImage(fileInput) {
+    const file = fileInput && fileInput.files && fileInput.files[0];
+    if (!file) return;
+    try { await analyzeDeliveryImageFile(file); }
+    finally { if (fileInput) fileInput.value = ''; }   // 같은 파일 다시 선택 가능하도록 리셋
+}
+
+// 📋 붙여넣기 버튼 → 클립보드에서 이미지 읽기 (navigator.clipboard.read, HTTPS+사용자클릭 필요)
+async function pasteDeliveryImage() {
+    try {
+        if (!navigator.clipboard || !navigator.clipboard.read) {
+            showToast('이 브라우저는 붙여넣기 버튼을 지원하지 않아요. 입력칸에서 Ctrl+V를 눌러주세요');
+            return;
+        }
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+            const imgType = item.types.find(t => t.startsWith('image/'));
+            if (imgType) { const blob = await item.getType(imgType); await analyzeDeliveryImageFile(blob); return; }
+        }
+        showToast('클립보드에 이미지가 없어요. 캡처(예: Win+Shift+S) 후 다시 시도해주세요');
+    } catch (e) {
+        showToast('붙여넣기 권한이 필요해요. 권한 허용 후 다시 시도하거나, 입력칸에서 Ctrl+V를 사용해주세요');
+    }
+}
+
+// Ctrl+V — 새 택배 모달이 열려 있을 때 클립보드 이미지를 붙여넣으면 바로 분석
+document.addEventListener('paste', (e) => {
+    const ov = document.getElementById('modalOverlay');
+    const deliveryOpen = ov && ov.classList.contains('show') && document.getElementById('newDelRecipient');
+    if (!deliveryOpen) return;
+    const items = (e.clipboardData && e.clipboardData.items) || [];
+    for (const it of items) {
+        if (it.type && it.type.indexOf('image') === 0) {
+            const blob = it.getAsFile();
+            if (blob) { e.preventDefault(); analyzeDeliveryImageFile(blob); return; }
+        }
+    }
+});
 
 async function addDelivery() {
     const recipient = document.getElementById('newDelRecipient').value.trim();
