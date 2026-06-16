@@ -721,7 +721,7 @@ function calcEst(){
   h+='<tr class="sep"><td colspan="3"></td></tr><tr><td class="lbl">공급가액</td><td></td><td class="val">'+fmtN(sup)+'</td></tr>';
   if(vat>0)h+='<tr><td class="lbl">VAT</td><td></td><td class="val">'+fmtN(vat)+'</td></tr>';
   h+='<tr class="sep2"><td colspan="3"></td></tr><tr class="total"><td class="lbl">합 계</td><td></td><td class="val">'+fmtN(grand)+'</td></tr>';
-  body.innerHTML=h;window._est={prodT:prodT,prT:prT,pkT:pkT,shT:shT,sup:sup,vat:vat,grand:grand,hasPr:hasPr,hasPk:hasPk,hasSh:hasSh};
+  body.innerHTML=h;window._est={prodT:prodT,prT:prT,pkT:pkT,shT:shT,prodV:prodV,prV:prV,pkV:pkV,shV:shV,sup:sup,vat:vat,grand:grand,hasPr:hasPr,hasPk:hasPk,hasSh:hasSh};
 }
 
 /* === WR ESTIMATE + MARGIN (FIX #5: 적용방식 반영) === */
@@ -782,7 +782,7 @@ function calcWrEst(){
   if(wrVat>0)h+='<tr><td class="lbl">VAT</td><td></td><td class="val">'+fmtN(wrVat)+'</td></tr>';
   h+='<tr class="sep2"><td colspan="3"></td></tr><tr class="total"><td class="lbl">매입 합계</td><td></td><td class="val">'+fmtN(wrGrand)+'</td></tr>';
   body.innerHTML=h;
-  window._wrEst={prodT:prodT,prT:prT,pkT:pkT,shT:shT,sup:wrSup,vat:wrVat,grand:wrGrand,hasPr:hasPr,hasPk:hasPk,hasSh:hasSh};
+  window._wrEst={prodT:prodT,prT:prT,pkT:pkT,shT:shT,prodV:prodV,prV:prV,pkV:pkV,shV:shV,sup:wrSup,vat:wrVat,grand:wrGrand,hasPr:hasPr,hasPk:hasPk,hasSh:hasSh};
 
   /* Margin card (화면에서만 보임, 서류에는 안 들어감 - FIX #6) */
   if(linkedDC && linkedDC.total_amount>0){
@@ -1281,28 +1281,28 @@ function renderQuoteDoc(d){
             '<td style="'+itemCell+'">'+qty+'</td>'+
             '<td style="'+itemCell+'">'+fmtN(up)+'</td>'+
             '<td style="'+itemCell+'">'+fmtN(e.prodT||0)+'</td>'+
-            '<td style="'+itemCell+'">'+fmtN((d.unitPriceVat==='VAT 별도')?Math.round((e.prodT||0)*.1):0)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN(e.prodV!=null?e.prodV:((d.unitPriceVat==='VAT 별도')?Math.round((e.prodT||0)*.1):0))+'</td>'+
           '</tr>'+
           (e.hasPr?'<tr>'+
             '<td style="padding:8px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10.5px">인쇄비 ('+esc(d.printMethod||'')+') <span style="font-size:9px;color:#888">'+esc(d.printFeeApply||'1개당')+' / '+esc(d.printFeeVat||'VAT 별도')+'</span></td>'+
             '<td style="'+itemCell+'">'+(d.printFeeApply==='1개당'?qty:1)+'</td>'+
             '<td style="'+itemCell+'">'+fmtN(toNum(d.printFee)||0)+'</td>'+
             '<td style="'+itemCell+'">'+fmtN(e.prT||0)+'</td>'+
-            '<td style="'+itemCell+'">'+fmtN((d.printFeeVat==='VAT 별도')?Math.round((e.prT||0)*.1):0)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN(e.prV!=null?e.prV:((d.printFeeVat==='VAT 별도')?Math.round((e.prT||0)*.1):0))+'</td>'+
           '</tr>':'')+
           (e.hasPk?'<tr>'+
             '<td style="padding:8px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10.5px">포장비 ('+esc(d.packaging||'')+') <span style="font-size:9px;color:#888">'+esc(d.packagingFeeApply||'1개당')+' / '+esc(d.packagingFeeVat||'VAT 별도')+'</span></td>'+
             '<td style="'+itemCell+'">'+(d.packagingFeeApply==='1개당'?qty:1)+'</td>'+
             '<td style="'+itemCell+'">'+fmtN(toNum(d.packagingFee)||0)+'</td>'+
             '<td style="'+itemCell+'">'+fmtN(e.pkT||0)+'</td>'+
-            '<td style="'+itemCell+'">'+fmtN((d.packagingFeeVat==='VAT 별도')?Math.round((e.pkT||0)*.1):0)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN(e.pkV!=null?e.pkV:((d.packagingFeeVat==='VAT 별도')?Math.round((e.pkT||0)*.1):0))+'</td>'+
           '</tr>':'')+
           (e.hasSh?'<tr>'+
             '<td style="padding:8px 12px;border-bottom:1px solid #eef0f5;color:#4a5568;font-size:10.5px">배송비 ('+(d.shippingType||'')+')<span style="font-size:9px;color:#888"> / '+esc(d.shippingVat||'VAT 별도')+'</span></td>'+
             '<td style="'+itemCell+'">1</td>'+
             '<td style="'+itemCell+'">'+fmtN(d.shippingCost||0)+'</td>'+
             '<td style="'+itemCell+'">'+fmtN(e.shT||0)+'</td>'+
-            '<td style="'+itemCell+'">'+fmtN((d.shippingVat==='VAT 별도')?Math.round((e.shT||0)*.1):0)+'</td>'+
+            '<td style="'+itemCell+'">'+fmtN(e.shV!=null?e.shV:((d.shippingVat==='VAT 별도')?Math.round((e.shT||0)*.1):0))+'</td>'+
           '</tr>':'')+
           '<tr><td colspan="5" style="padding:0;vertical-align:middle;text-align:center;border-bottom:1px solid #eef0f5">'+imgCellContent+'</td></tr>'+
           '<tr><td colspan="5" style="background:#f5f7fa;text-align:center;font-weight:700;color:#4a5568;font-size:10.5px;padding:6px">- 이 하 여 백 -</td></tr>'+
