@@ -707,21 +707,21 @@ function calcEst(){
   var qty=toNum(val('quantity')),up=toNum(val('unitPrice')),pf=toNum(val('printFee')),pkf=toNum(val('packagingFee'));
   var card=document.getElementById('estCard'),body=document.getElementById('estBody');
   if(qty===0||up===0){card.classList.add('hidden');return}card.classList.remove('hidden');
-  var prodT=up*qty,prodV=val('unitPriceVat')==='VAT 별도'?Math.round(prodT*.1):0;
-  var hasPr=val('printMethod')!=='없음'&&pf>0;var prT=0;if(hasPr)prT=val('printFeeApply')==='1개당'?pf*qty:pf;
-  var prV=val('printFeeVat')==='VAT 별도'?Math.round(prT*.1):0;
-  var hasPk=pkf>0;var pkT=0;if(hasPk)pkT=val('packagingFeeApply')==='1개당'?pkf*qty:pkf;
-  var pkV=val('packagingFeeVat')==='VAT 별도'?Math.round(pkT*.1):0;
-  var shf=getDcShipCost();var hasSh=shf>0;var shV=(hasSh&&val('shippingVat')==='VAT 별도')?Math.round(shf*.1):0;
-  var sup=prodT+prT+pkT+shf,vat=prodV+prV+pkV+shV,grand=sup+vat;
+  // VAT 분해: 'VAT 포함'이면 공급가=금액/1.1, 부가세=나머지 / 'VAT 별도'면 공급가=금액, 부가세=금액*0.1
+  var splitVat=function(a,lbl){ if(!a)return {sup:0,vat:0}; if(lbl==='VAT 포함'){var s=Math.round(a/1.1);return {sup:s,vat:a-s};} return {sup:a,vat:Math.round(a*.1)}; };
+  var _p=splitVat(up*qty,val('unitPriceVat')); var prodT=_p.sup,prodV=_p.vat;
+  var hasPr=val('printMethod')!=='없음'&&pf>0; var prRaw=hasPr?(val('printFeeApply')==='1개당'?pf*qty:pf):0; var _pr=splitVat(prRaw,val('printFeeVat')); var prT=_pr.sup,prV=_pr.vat;
+  var hasPk=pkf>0; var pkRaw=hasPk?(val('packagingFeeApply')==='1개당'?pkf*qty:pkf):0; var _pk=splitVat(pkRaw,val('packagingFeeVat')); var pkT=_pk.sup,pkV=_pk.vat;
+  var shRaw=getDcShipCost();var hasSh=shRaw>0; var _sh=splitVat(shRaw,val('shippingVat')); var shT=_sh.sup,shV=_sh.vat;
+  var sup=prodT+prT+pkT+shT,vat=prodV+prV+pkV+shV,grand=sup+vat;
   var h='<tr><td class="lbl">제품 금액</td><td class="desc">('+fmtN(up)+' × '+qty+')</td><td class="val">'+fmtN(prodT)+'</td></tr>';
   if(hasPr)h+='<tr><td class="lbl">인쇄비</td><td class="desc">('+(val('printFeeApply')==='1개당'?'1개당 × '+qty:'일괄')+')</td><td class="val">'+fmtN(prT)+'</td></tr>';
   if(hasPk)h+='<tr><td class="lbl">포장비</td><td class="desc">('+(val('packagingFeeApply')==='1개당'?'1개당 × '+qty:'일괄')+')</td><td class="val">'+fmtN(pkT)+'</td></tr>';
-  if(hasSh)h+='<tr><td class="lbl">배송비</td><td class="desc">('+val('shippingType')+')</td><td class="val">'+fmtN(shf)+'</td></tr>';
+  if(hasSh)h+='<tr><td class="lbl">배송비</td><td class="desc">('+val('shippingType')+')</td><td class="val">'+fmtN(shT)+'</td></tr>';
   h+='<tr class="sep"><td colspan="3"></td></tr><tr><td class="lbl">공급가액</td><td></td><td class="val">'+fmtN(sup)+'</td></tr>';
   if(vat>0)h+='<tr><td class="lbl">VAT</td><td></td><td class="val">'+fmtN(vat)+'</td></tr>';
   h+='<tr class="sep2"><td colspan="3"></td></tr><tr class="total"><td class="lbl">합 계</td><td></td><td class="val">'+fmtN(grand)+'</td></tr>';
-  body.innerHTML=h;window._est={prodT:prodT,prT:prT,pkT:pkT,shT:shf,sup:sup,vat:vat,grand:grand,hasPr:hasPr,hasPk:hasPk,hasSh:hasSh};
+  body.innerHTML=h;window._est={prodT:prodT,prT:prT,pkT:pkT,shT:shT,sup:sup,vat:vat,grand:grand,hasPr:hasPr,hasPk:hasPk,hasSh:hasSh};
 }
 
 /* === WR ESTIMATE + MARGIN (FIX #5: 적용방식 반영) === */
@@ -767,23 +767,22 @@ function calcWrEst(){
   if(qty===0||up===0){card.classList.add('hidden');mcard.classList.add('hidden');return}
   card.classList.remove('hidden');
 
-  var prodT=up*qty;var prodV=val('wrUnitPriceVat')==='VAT 별도'?Math.round(prodT*.1):0;
-  var hasPr=val('wrPrintMethod')!=='없음'&&pf>0;var prT=0;if(hasPr)prT=val('wrPrintFeeApply')==='1개당'?pf*qty:pf;
-  var prV=(hasPr&&val('wrPrintFeeVat')==='VAT 별도')?Math.round(prT*.1):0;
-  var hasPk=pkf>0;var pkT=0;if(hasPk)pkT=val('wrPkgFeeApply')==='1개당'?pkf*qty:pkf;
-  var pkV=(hasPk&&val('wrPkgFeeVat')==='VAT 별도')?Math.round(pkT*.1):0;
-  var shf=getWrShipCost();var hasSh=shf>0;var shV=(hasSh&&val('wrShippingVat')==='VAT 별도')?Math.round(shf*.1):0;
-  var wrSup=prodT+prT+pkT+shf,wrVat=prodV+prV+pkV+shV,wrGrand=wrSup+wrVat;
+  var splitVat=function(a,lbl){ if(!a)return {sup:0,vat:0}; if(lbl==='VAT 포함'){var s=Math.round(a/1.1);return {sup:s,vat:a-s};} return {sup:a,vat:Math.round(a*.1)}; };
+  var _p=splitVat(up*qty,val('wrUnitPriceVat')); var prodT=_p.sup,prodV=_p.vat;
+  var hasPr=val('wrPrintMethod')!=='없음'&&pf>0; var prRaw=hasPr?(val('wrPrintFeeApply')==='1개당'?pf*qty:pf):0; var _pr=splitVat(prRaw,val('wrPrintFeeVat')); var prT=_pr.sup,prV=_pr.vat;
+  var hasPk=pkf>0; var pkRaw=hasPk?(val('wrPkgFeeApply')==='1개당'?pkf*qty:pkf):0; var _pk=splitVat(pkRaw,val('wrPkgFeeVat')); var pkT=_pk.sup,pkV=_pk.vat;
+  var shRaw=getWrShipCost();var hasSh=shRaw>0; var _sh=splitVat(shRaw,val('wrShippingVat')); var shT=_sh.sup,shV=_sh.vat;
+  var wrSup=prodT+prT+pkT+shT,wrVat=prodV+prV+pkV+shV,wrGrand=wrSup+wrVat;
 
   var h='<tr><td class="lbl">제품 금액</td><td class="desc">('+fmtN(up)+' × '+qty+')</td><td class="val">'+fmtN(prodT)+'</td></tr>';
   if(hasPr)h+='<tr><td class="lbl">인쇄비</td><td class="desc">('+(val('wrPrintFeeApply')==='1개당'?fmtN(pf)+' × '+qty:'일괄')+')</td><td class="val">'+fmtN(prT)+'</td></tr>';
   if(hasPk)h+='<tr><td class="lbl">포장비</td><td class="desc">('+(val('wrPkgFeeApply')==='1개당'?fmtN(pkf)+' × '+qty:'일괄')+')</td><td class="val">'+fmtN(pkT)+'</td></tr>';
-  if(hasSh)h+='<tr><td class="lbl">배송비</td><td class="desc">('+val('wrShippingType')+')</td><td class="val">'+fmtN(shf)+'</td></tr>';
+  if(hasSh)h+='<tr><td class="lbl">배송비</td><td class="desc">('+val('wrShippingType')+')</td><td class="val">'+fmtN(shT)+'</td></tr>';
   h+='<tr class="sep"><td colspan="3"></td></tr><tr><td class="lbl">공급가액</td><td></td><td class="val">'+fmtN(wrSup)+'</td></tr>';
   if(wrVat>0)h+='<tr><td class="lbl">VAT</td><td></td><td class="val">'+fmtN(wrVat)+'</td></tr>';
   h+='<tr class="sep2"><td colspan="3"></td></tr><tr class="total"><td class="lbl">매입 합계</td><td></td><td class="val">'+fmtN(wrGrand)+'</td></tr>';
   body.innerHTML=h;
-  window._wrEst={prodT:prodT,prT:prT,pkT:pkT,shT:shf,sup:wrSup,vat:wrVat,grand:wrGrand,hasPr:hasPr,hasPk:hasPk,hasSh:hasSh};
+  window._wrEst={prodT:prodT,prT:prT,pkT:pkT,shT:shT,sup:wrSup,vat:wrVat,grand:wrGrand,hasPr:hasPr,hasPk:hasPk,hasSh:hasSh};
 
   /* Margin card (화면에서만 보임, 서류에는 안 들어감 - FIX #6) */
   if(linkedDC && linkedDC.total_amount>0){
