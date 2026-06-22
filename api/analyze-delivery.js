@@ -4,14 +4,14 @@
 //
 // 환경변수:
 //   ANTHROPIC_API_KEY (필수) — Anthropic API 키. 서버에만 보관(브라우저 노출 없음).
-//   ANTHROPIC_MODEL   (선택) — 기본 'claude-haiku-4-5'. 정확도가 부족하면 더 좋은 모델로 교체.
+//   ANTHROPIC_MODEL   (선택) — 기본 'claude-sonnet-4-6'(이름 등 인식 정확도 우선). 비용 절감하려면 'claude-haiku-4-5'.
 //   SUPABASE_URL / SUPABASE_ANON_KEY (선택) — 미설정 시 아래 기본값(이미 공개된 anon 정보) 사용.
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vtulmuxkriklpiibiues.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
 
-const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5';
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
 module.exports = async (req, res) => {
     if (req.method !== 'POST') { res.status(405).json({ error: 'POST 요청만 허용됩니다.' }); return; }
