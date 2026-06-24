@@ -860,11 +860,11 @@ async function selectLinkedDC(id){
   document.getElementById('wrPackaging').value=r.packaging||'개별박스';
   document.getElementById('wrDeliveryDate').value=r.delivery_date||'';
 
-  /* 배송 정보 연동: "수령인 / 폰 / 주소" 파싱 */
-  var shipParts=(r.delivery_address||'').split(' / ');
-  document.getElementById('wrRecipient').value=shipParts[0]||'';
-  document.getElementById('wrPhone').value=shipParts[1]||'';
-  document.getElementById('wrAddress').value=shipParts[2]||shipParts.join(' ');
+  /* 배송 정보 연동 (JSON/구버전 호환 복원) */
+  var shipParts=unpackShip(r.delivery_address);
+  document.getElementById('wrRecipient').value=shipParts[0];
+  document.getElementById('wrPhone').value=shipParts[1];
+  document.getElementById('wrAddress').value=shipParts[2];
 
   /* 이미지 복사: DB에 저장된 이미지(images_data)를 최우선, 없으면 현재 DC 메모리 사용 */
   var dcMain=null,dcSubs=[];
@@ -905,6 +905,18 @@ function shipBlockH(r,p,a){
   }
   var extra=(lines(r)-1)+(lines(p)-1)+(lines(a)-1);
   return 96+extra*16; /* 제목+3행 기본 96px + 줄바꿈 추가분(행당 16px) */
+}
+
+/* 배송 정보(수령인/연락처/주소)를 delivery_address 한 컬럼에 안전하게 저장/복원.
+   기존엔 "수령인 / 폰 / 주소"로 ' / ' 결합해 저장했는데, 값 자체에 ' / '가 들어가면
+   (예: "구로 : … / 성북 : …") 불러올 때 칸이 밀려 어긋났다.
+   → JSON 배열로 저장해 구분자 충돌을 원천 차단. 구버전(' / ' 결합) 레코드도 호환. */
+function packShip(r,p,a){return JSON.stringify([r||'',p||'',a||'']);}
+function unpackShip(s){
+  s=String(s==null?'':s);
+  if(s.charAt(0)==='['){try{var arr=JSON.parse(s);if(Array.isArray(arr))return[arr[0]||'',arr[1]||'',arr[2]||''];}catch(e){}}
+  var parts=s.split(' / '); /* 구버전 호환: 주소에 ' / '가 있으면 3번째부터 다시 합침 */
+  return[parts[0]||'',parts[1]||'',parts.slice(2).join(' / ')];
 }
 
 /* === BUILD DC DOC (기존과 동일) === */
@@ -1113,7 +1125,7 @@ function openQuoteFromRecord(r){
   if(r.images_data){
     try{var imgs=unpackImages(r.images_data);if(imgs.main)mi={url:imgs.main.url};if(imgs.subs&&imgs.subs.length)si=imgs.subs.map(function(im){return{url:im.url}})}catch(e){}
   }
-  var shipParts=(r.delivery_address||'').split(' / ');
+  var shipParts=unpackShip(r.delivery_address);
   var dateStr=r.doc_date||(r.created_at?r.created_at.substring(0,10):new Date().toISOString().substring(0,10));
   _quoteData={
     docNumber:r.doc_number||'',
@@ -1142,9 +1154,9 @@ function openQuoteFromRecord(r){
     shippingCost:shf,
     shippingVat:r.shipping_vat||'VAT 별도',
     deliveryDate:r.delivery_date||'',
-    recipient:shipParts[0]||'',
-    phone:shipParts[1]||'',
-    address:shipParts[2]||shipParts.join(' '),
+    recipient:shipParts[0],
+    phone:shipParts[1],
+    address:shipParts[2],
     mainImg:mi,
     subImgs:si,
     est:est
@@ -1362,7 +1374,7 @@ async function dlQuote(type){
 async function saveToDb(){if(!validate())return;var e=window._est;var seq=Math.max(1,parseInt(document.getElementById('docSeq').value)||1);
   var imgData=await packImages(mainImg,subImgs,400,400);
   var docNum=Y+'_'+String(seq).padStart(4,'0');
-  var data={doc_number:docNum,doc_date:val('date')||null,company_name:val('companyName'),contact_person:val('contactPerson'),title:val('title'),manager:val('manager'),product_name:val('productName'),quantity:toNum(val('quantity')),unit:val('unit'),unit_price:toNum(val('unitPrice')),unit_price_vat:val('unitPriceVat'),color:val('color'),print_color_size:val('printColorSize'),print_method:valField('printMethod'),print_fee:toNum(val('printFee'))||0,print_fee_vat:val('printFeeVat'),print_fee_apply:val('printFeeApply'),packaging:valField('packaging'),packaging_fee:toNum(val('packagingFee'))||0,packaging_fee_vat:val('packagingFeeVat'),packaging_fee_apply:val('packagingFeeApply'),shipping_type:val('shippingType')||'',shipping_cost:getDcShipCost()||0,shipping_cost_per_box:toNum(val('shippingPerBox'))||0,shipping_boxes:toNum(val('shippingBoxes'))||0,shipping_vat:val('shippingVat')||'VAT 별도',delivery_date:val('deliveryDate')||null,delivery_address:val('dcRecipient')+' / '+val('dcPhone')+' / '+val('dcAddress'),show_payment_notice:document.getElementById('showPaymentNotice').checked,total_amount:e?e.grand:0,status:'작성중',images_data:imgData};
+  var data={doc_number:docNum,doc_date:val('date')||null,company_name:val('companyName'),contact_person:val('contactPerson'),title:val('title'),manager:val('manager'),product_name:val('productName'),quantity:toNum(val('quantity')),unit:val('unit'),unit_price:toNum(val('unitPrice')),unit_price_vat:val('unitPriceVat'),color:val('color'),print_color_size:val('printColorSize'),print_method:valField('printMethod'),print_fee:toNum(val('printFee'))||0,print_fee_vat:val('printFeeVat'),print_fee_apply:val('printFeeApply'),packaging:valField('packaging'),packaging_fee:toNum(val('packagingFee'))||0,packaging_fee_vat:val('packagingFeeVat'),packaging_fee_apply:val('packagingFeeApply'),shipping_type:val('shippingType')||'',shipping_cost:getDcShipCost()||0,shipping_cost_per_box:toNum(val('shippingPerBox'))||0,shipping_boxes:toNum(val('shippingBoxes'))||0,shipping_vat:val('shippingVat')||'VAT 별도',delivery_date:val('deliveryDate')||null,delivery_address:packShip(val('dcRecipient'),val('dcPhone'),val('dcAddress')),show_payment_notice:document.getElementById('showPaymentNotice').checked,total_amount:e?e.grand:0,status:'작성중',images_data:imgData};
   try{
     var savedDocNum = await saveConfirmationWithRetry(docNum, data);
     if (savedDocNum !== docNum) {
@@ -1414,7 +1426,7 @@ async function saveWrToDb(){
     packaging_fee_apply:val('wrPkgFeeApply')||'1개당',
     shipping_type:val('wrShippingType')||'',shipping_cost:getWrShipCost()||0,shipping_cost_per_box:toNum(val('wrShippingPerBox'))||0,shipping_boxes:toNum(val('wrShippingBoxes'))||0,shipping_vat:val('wrShippingVat')||'VAT 별도',
     delivery_date:val('wrDeliveryDate')||null,
-    delivery_address:val('wrRecipient')+' / '+val('wrPhone')+' / '+val('wrAddress'),
+    delivery_address:packShip(val('wrRecipient'),val('wrPhone'),val('wrAddress')),
     show_payment_notice:true,
     total_amount:we?we.grand:0,
     status:'작업요청서',
@@ -1674,11 +1686,11 @@ async function loadRecord(id){
       if(r.shipping_type==='퀵'){document.getElementById('wrShippingCost').value=r.shipping_cost||''}
       try{toggleWrShipping();calcWrShipTotal();}catch(e){}
       document.getElementById('wrDeliveryDate').value=r.delivery_date||'';
-      /* 배송정보 파싱: "수령인 / 폰 / 주소" */
-      var addrParts=(r.delivery_address||'').split(' / ');
-      document.getElementById('wrRecipient').value=addrParts[0]||'';
-      document.getElementById('wrPhone').value=addrParts[1]||'';
-      document.getElementById('wrAddress').value=addrParts[2]||addrParts.join(' ');
+      /* 배송정보 복원 (JSON/구버전 호환) */
+      var addrParts=unpackShip(r.delivery_address);
+      document.getElementById('wrRecipient').value=addrParts[0];
+      document.getElementById('wrPhone').value=addrParts[1];
+      document.getElementById('wrAddress').value=addrParts[2];
       /* 이미지 복원 (FIX #10) */
       if(r.images_data){var imgs=unpackImages(r.images_data);wrMainImg=imgs.main;wrSubImgs=imgs.subs}else{wrMainImg=null;wrSubImgs=[]}
       renderWrMainThumb();renderWrSubThumbs();
@@ -1743,11 +1755,11 @@ async function loadRecord(id){
       if(r.shipping_type==='퀵'){document.getElementById('shippingCost').value=r.shipping_cost||''}
       try{toggleDcShipping();calcDcShipTotal();}catch(e){}
       document.getElementById('deliveryDate').value=r.delivery_date||'';
-      /* 배송정보 파싱: "수령인 / 폰 / 주소" */
-      var dcAddrParts=(r.delivery_address||'').split(' / ');
-      document.getElementById('dcRecipient').value=dcAddrParts[0]||'';
-      document.getElementById('dcPhone').value=dcAddrParts[1]||'';
-      document.getElementById('dcAddress').value=dcAddrParts[2]||dcAddrParts.join(' ');
+      /* 배송정보 복원 (JSON/구버전 호환) */
+      var dcAddrParts=unpackShip(r.delivery_address);
+      document.getElementById('dcRecipient').value=dcAddrParts[0];
+      document.getElementById('dcPhone').value=dcAddrParts[1];
+      document.getElementById('dcAddress').value=dcAddrParts[2];
       document.getElementById('showPaymentNotice').checked=r.show_payment_notice!==false;togglePayPreview();
       /* 이미지 복원 (FIX #10) */
       if(r.images_data){var imgs=unpackImages(r.images_data);mainImg=imgs.main;subImgs=imgs.subs}else{mainImg=null;subImgs=[]}
