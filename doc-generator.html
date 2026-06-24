@@ -891,6 +891,22 @@ async function selectLinkedDC(id){
   showMsg('✅ 디자인확인서 연동 완료!')}catch(err){showMsg('❌ 연동 실패',true)}
 }
 
+/* 배송 정보(수령인/연락처/주소) 블록의 실제 높이(px) 추정 —
+   고정 A4(1123px, overflow:hidden) 하단 예약 높이 계산에 사용.
+   기존엔 65px로 고정돼 있어, 3행(제목+수령인+연락처+주소) 기본 높이(~92px)조차 부족했고
+   "구로 : … / 성북 : …"처럼 긴 값이 줄바꿈되면 하단(견적/푸터/주소)이 잘렸다.
+   값 컬럼 가용 폭 기준으로 각 행의 줄 수를 추정해 동적으로 예약한다. */
+function shipBlockH(r,p,a){
+  function lines(t){
+    var s=String(t||'');if(!s)return 1;
+    var px=0;for(var i=0;i<s.length;i++){px+=/[가-힣ㄱ-ㅎㅏ-ㅣ]/.test(s.charAt(i))?12:6.5;}
+    var perLine=580; /* 값 컬럼 가용 폭(px) — 보수적으로 잡아 잘림 방지 */
+    return Math.max(1,Math.ceil(px/perLine));
+  }
+  var extra=(lines(r)-1)+(lines(p)-1)+(lines(a)-1);
+  return 96+extra*16; /* 제목+3행 기본 96px + 줄바꿈 추가분(행당 16px) */
+}
+
 /* === BUILD DC DOC (기존과 동일) === */
 function buildDoc(){
   var seq=Math.max(1,parseInt(document.getElementById('docSeq').value)||1);
@@ -904,7 +920,7 @@ function buildDoc(){
   /* 푸터(약40) + 면책(약44) + 결제문구(약24) + 견적(가변) */
   var fixedBottom=80; /* 푸터+면책 기본 */
   if(showPay)fixedBottom+=20;
-  fixedBottom+=65; /* 배송 정보 블록 */
+  fixedBottom+=shipBlockH(val('dcRecipient'),val('dcPhone'),val('dcAddress')); /* 배송 정보 블록(동적: 긴 주소 잘림 방지) */
   var estRows=0;
   if(e&&e.grand>0){estRows=2;if(e.hasPr)estRows++;if(e.hasPk)estRows++;if(e.hasSh)estRows++;if(e.vat>0)estRows++;estRows+=1;/* 공급가 */fixedBottom+=30+(estRows*18)+36}
   /* 상단 고정: 헤더+라인+업체+제목+제품테이블 */
@@ -925,7 +941,7 @@ function buildDoc(){
   var rightRows=[['인쇄 방법',valField('printMethod')]];if(val('printMethod')!=='없음')rightRows.push(['인쇄비',printFeeStr]);rightRows.push(['포장',valField('packaging')]);rightRows.push(['포장비',pkgFeeStr]);if(shType)rightRows.push(['배송',shType+(shType==='택배'&&toNum(val('shippingBoxes'))?' ('+val('shippingBoxes')+'박스)':'')]);if(shCost)rightRows.push(['배송비',shCostStr]);
   function ic(k,v){return '<tr><td style="padding:5px 12px;font-weight:500;color:#999;font-size:10px;letter-spacing:.3px;border-bottom:1px solid #f0f0f0;width:110px;vertical-align:top">'+k+'</td><td style="padding:5px 12px;font-size:11.5px;border-bottom:1px solid #f0f0f0;color:#222;font-weight:500">'+v+'</td></tr>'}
   /* 배송 정보 블록 */
-  var dcShipHtml='<div style="padding:8px 0;border-top:1px solid #e8e8e5;flex-shrink:0"><div style="font-size:10px;font-weight:700;color:#888;letter-spacing:1.5px;margin-bottom:5px">배송 정보</div><table style="width:100%;border-collapse:collapse;font-size:11px"><tr><td style="padding:3px 0;color:#555;font-weight:600;width:60px">수령인</td><td style="padding:3px 0;color:#222">'+esc(val('dcRecipient')||'확인 필요')+'</td></tr><tr><td style="padding:3px 0;color:#555;font-weight:600">연락처</td><td style="padding:3px 0;color:#222">'+esc(val('dcPhone')||'확인 필요')+'</td></tr><tr><td style="padding:3px 0;color:#555;font-weight:600">주소</td><td style="padding:3px 0;color:#222">'+esc(val('dcAddress')||'확인 필요')+'</td></tr></table></div>';
+  var dcShipHtml='<div style="padding:8px 0;border-top:1px solid #e8e8e5;flex-shrink:0"><div style="font-size:10px;font-weight:700;color:#888;letter-spacing:1.5px;margin-bottom:5px">배송 정보</div><table style="width:100%;border-collapse:collapse;font-size:11px"><tr><td style="padding:3px 0;color:#555;font-weight:600;width:60px">수령인</td><td style="padding:3px 0;color:#222;word-break:break-all">'+esc(val('dcRecipient')||'확인 필요')+'</td></tr><tr><td style="padding:3px 0;color:#555;font-weight:600">연락처</td><td style="padding:3px 0;color:#222;word-break:break-all">'+esc(val('dcPhone')||'확인 필요')+'</td></tr><tr><td style="padding:3px 0;color:#555;font-weight:600">주소</td><td style="padding:3px 0;color:#222;word-break:break-all">'+esc(val('dcAddress')||'확인 필요')+'</td></tr></table></div>';
   var estHtml='';
   if(e&&e.grand>0){var rows=[['제품 금액',fmtN(e.prodT)]];if(e.hasPr)rows.push(['인쇄비',fmtN(e.prT)]);if(e.hasPk)rows.push(['포장비',fmtN(e.pkT)]);if(e.hasSh)rows.push(['배송비 ('+shType+')',fmtN(e.shT)]);rows.push(['공급가액',fmtN(e.sup)]);if(e.vat>0)rows.push(['VAT',fmtN(e.vat)]);estHtml='<div style="padding:10px 0 8px;border-top:1px solid #e8e8e5;flex-shrink:0"><div style="font-size:10px;font-weight:700;color:#1F85FF;letter-spacing:1.5px;margin-bottom:6px">견적 금액</div><table style="width:100%;border-collapse:collapse;font-size:11px">'+rows.map(function(r){return '<tr><td style="padding:3px 0;color:#555;font-weight:500">'+r[0]+'</td><td style="padding:3px 0;text-align:right;font-variant-numeric:tabular-nums;color:#333;font-weight:500">'+r[1]+'</td></tr>'}).join('')+'</table><div style="margin-top:6px;padding-top:8px;border-top:2px solid #222327;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13px;font-weight:900;color:#222327">합계 금액</span><span style="font-size:20px;font-weight:900;color:#1F85FF;font-variant-numeric:tabular-nums">'+fmtN(e.grand)+'</span></div></div>'}
   var payHtml=showPay?'<div style="text-align:center;padding:4px 0;font-size:10px;color:#c41e3a;font-weight:700;flex-shrink:0">제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.</div>':'';
@@ -964,7 +980,7 @@ function buildWrDoc(){
   var fixedBottom=90; /* 푸터+면책+발송인 경고 */
   var estRows=0;
   if(we&&we.sup>0){estRows=1;if(we.hasPr)estRows++;if(we.hasPk)estRows++;if(we.hasSh)estRows++;fixedBottom+=26+(estRows*16)+32}
-  fixedBottom+=60; /* 배송 정보 */
+  fixedBottom+=shipBlockH(val('wrRecipient'),val('wrPhone'),val('wrAddress')); /* 배송 정보(동적: 긴 주소 잘림 방지) */
   var fixedTop=270; /* 헤더+라인+업체+제목+제품테이블 */
   var wrImgMaxH=1123-36-fixedTop-fixedBottom;
   if(wrImgMaxH<100)wrImgMaxH=100;
@@ -993,7 +1009,7 @@ function buildWrDoc(){
     estHtml='<div style="padding:8px 0 6px;border-top:1px solid #e8e8e5;flex-shrink:0"><div style="font-size:10px;font-weight:700;color:#E67E22;letter-spacing:1.5px;margin-bottom:5px">매입 금액</div><table style="width:100%;border-collapse:collapse;font-size:11px">'+erows.map(function(r){return '<tr><td style="padding:3px 0;color:#555;font-weight:500">'+r[0]+'</td><td style="padding:3px 0;text-align:right;font-variant-numeric:tabular-nums;color:#333;font-weight:500">'+r[1]+'</td></tr>'}).join('')+'</table><div style="margin-top:5px;padding-top:6px;border-top:2px solid #222327;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:12px;font-weight:900;color:#222327">매입 합계</span><span style="font-size:18px;font-weight:900;color:#E67E22;font-variant-numeric:tabular-nums">'+fmtN(we.grand)+'</span></div></div>';
   }
 
-  var shipHtml='<div style="padding:8px 0;border-top:1px solid #e8e8e5;flex-shrink:0"><div style="font-size:10px;font-weight:700;color:#888;letter-spacing:1.5px;margin-bottom:5px">배송 정보</div><table style="width:100%;border-collapse:collapse;font-size:11px"><tr><td style="padding:3px 0;color:#555;font-weight:600;width:60px">수령인</td><td style="padding:3px 0;color:#222">'+esc(val('wrRecipient'))+'</td></tr><tr><td style="padding:3px 0;color:#555;font-weight:600">연락처</td><td style="padding:3px 0;color:#222">'+esc(val('wrPhone'))+'</td></tr><tr><td style="padding:3px 0;color:#555;font-weight:600">주소</td><td style="padding:3px 0;color:#222">'+esc(val('wrAddress'))+'</td></tr></table></div>';
+  var shipHtml='<div style="padding:8px 0;border-top:1px solid #e8e8e5;flex-shrink:0"><div style="font-size:10px;font-weight:700;color:#888;letter-spacing:1.5px;margin-bottom:5px">배송 정보</div><table style="width:100%;border-collapse:collapse;font-size:11px"><tr><td style="padding:3px 0;color:#555;font-weight:600;width:60px">수령인</td><td style="padding:3px 0;color:#222;word-break:break-all">'+esc(val('wrRecipient'))+'</td></tr><tr><td style="padding:3px 0;color:#555;font-weight:600">연락처</td><td style="padding:3px 0;color:#222;word-break:break-all">'+esc(val('wrPhone'))+'</td></tr><tr><td style="padding:3px 0;color:#555;font-weight:600">주소</td><td style="padding:3px 0;color:#222;word-break:break-all">'+esc(val('wrAddress'))+'</td></tr></table></div>';
 
   document.getElementById('wrDocEl').innerHTML='<div style="width:794px;height:1123px;overflow:hidden;background:#fff;font-family:\'Noto Sans KR\',sans-serif;font-size:12px;color:#222327;position:relative"><div style="padding:20px 28px 16px;display:flex;flex-direction:column;height:1123px">'+
   /* 헤더 */
