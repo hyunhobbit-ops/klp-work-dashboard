@@ -3602,6 +3602,7 @@ async function createDocFromProject(id, type) {
         recipient: p.recipient || '',
         phone: p.phone || '',
         address: p.address || '',
+        memo: p.memo || '',
         startDate: p.startDate || '',
         supplier: p.supplier || '',
         supplierContact: p.supplierContact || ''
