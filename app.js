@@ -4759,6 +4759,99 @@ function closeModal(fromPopstate) {
 }
 
 // ===== Add Handlers =====
+// ===== 웹푸시 알림 (PWA) =====
+const PUSH_VAPID_PUBLIC = 'BO51LjQZu_swVb0UvfhAv9eTcT9gvbEkaxKlzRjRnVlin8-67Ynhv94urY7knMFb7vA4Q1NFs2J1Yxvs_Z_D6e0';
+
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    const arr = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+    return arr;
+}
+
+// "알림 켜기" 버튼 → 권한 요청 + 구독 + Supabase 저장
+async function enablePushNotifications() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+        showToast('이 기기/브라우저는 알림을 지원하지 않습니다');
+        return;
+    }
+    try {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') {
+            showToast(perm === 'denied' ? '알림이 차단되어 있어요. 브라우저 설정에서 허용해주세요.' : '알림 권한이 필요합니다.');
+            refreshPushButton();
+            return;
+        }
+        const reg = await navigator.serviceWorker.ready;
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+            sub = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(PUSH_VAPID_PUBLIC),
+            });
+        }
+        const j = sub.toJSON();
+        const row = {
+            endpoint: j.endpoint,
+            p256dh: j.keys && j.keys.p256dh,
+            auth: j.keys && j.keys.auth,
+            user_name: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || '',
+        };
+        const { error } = await sb.from('push_subscriptions').upsert(row, { onConflict: 'endpoint' });
+        if (error) { showToast('알림 등록 실패: ' + error.message); return; }
+        showToast('🔔 알림이 켜졌습니다');
+        refreshPushButton();
+    } catch (e) {
+        console.error('알림 설정 실패', e);
+        showToast('알림 설정 실패: ' + (e && e.message ? e.message : e));
+    }
+}
+
+function refreshPushButton() {
+    const btn = document.getElementById('pushToggleBtn');
+    if (!btn) return;
+    const supported = ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window);
+    if (!supported) { btn.style.display = 'none'; return; }
+    btn.style.display = 'flex';
+    const lbl = document.getElementById('pushToggleLabel');
+    if (Notification.permission === 'granted') { if (lbl) lbl.textContent = '알림 켜짐 (재등록)'; btn.style.opacity = '0.7'; }
+    else if (Notification.permission === 'denied') { if (lbl) lbl.textContent = '알림 차단됨'; btn.style.opacity = '1'; }
+    else { if (lbl) lbl.textContent = '알림 켜기'; btn.style.opacity = '1'; }
+}
+
+// 이벤트 발생 시 서버로 발송 요청 (fire-and-forget — UI 막지 않음)
+function triggerPush(title, body, url) {
+    (async () => {
+        try {
+            const { data } = await sb.auth.getSession();
+            const token = data && data.session && data.session.access_token;
+            if (!token) return;
+            await fetch('/api/send-push', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ title: title, body: body, url: url || '/' }),
+            });
+        } catch (e) { console.warn('알림 발송 실패', e); }
+    })();
+}
+
+function notifyNewProject(p) {
+    if (!p) return;
+    const who = (p.manager || (Array.isArray(p.assignees) ? p.assignees.join(', ') : '') || '').trim();
+    const body = ((p.client ? p.client + ' ' : '') + (p.name || '') + (who ? ' (담당: ' + who + ')' : '')).trim();
+    triggerPush('🆕 새 프로젝트', body || '새 프로젝트가 등록되었습니다', '/#projects-domestic');
+}
+
+function notifyNewTask(t) {
+    if (!t) return;
+    const body = ((t.assignee ? t.assignee + ' · ' : '') + (t.task || '')).trim();
+    triggerPush('🆕 새 할 일', body || '새 할 일이 등록되었습니다', '/#daily');
+}
+
+window.addEventListener('DOMContentLoaded', function () { setTimeout(refreshPushButton, 1200); });
+
 async function addProject(type) {
     const name = document.getElementById('newProjectName').value.trim();
     const client = document.getElementById('newProjectClient').value.trim();
@@ -4920,6 +5013,7 @@ async function addProject(type) {
     projects.unshift(newProject);
     if (type === 'domestic') await syncProjectDeadlineTask(newProject);
 
+    try { notifyNewProject(newProject); } catch (e) {}
     closeModal(); renderProjects(); renderHome();
     showToast('프로젝트가 추가되었습니다');
 }
@@ -5291,7 +5385,9 @@ function subscribeDailyTasks() {
 async function dbInsertTask(t) {
     const { data, error } = await sb.from('daily_tasks').insert(taskToDb(t)).select().single();
     if (error) { console.error(error); showToast('DB 저장 실패: ' + error.message); return null; }
-    return taskFromDb(data);
+    const saved = taskFromDb(data);
+    try { notifyNewTask(saved); } catch (e) {}
+    return saved;
 }
 async function dbUpdateTask(id, patch) {
     const map = { task:'task', date:'date', assignee:'assignee', target:'target', priority:'priority',
