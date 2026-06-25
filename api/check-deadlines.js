@@ -24,15 +24,15 @@ module.exports = async (req, res) => {
   const tomorrow = kstDateStr(1);
 
   try {
-    const q = `projects_domestic?select=product_name,client,deadline,status&deadline=in.(${today},${tomorrow})&status=neq.${encodeURIComponent('완료')}`;
+    const q = `projects_domestic?select=product_name,client,delivery_date,status&delivery_date=in.(${today},${tomorrow})&status=neq.${encodeURIComponent('완료')}`;
     const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, {
       headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
     });
     if (!r.ok) { res.status(500).json({ error: '프로젝트 조회 실패: ' + r.status }); return; }
     const rows = await r.json();
 
-    const todayRows = (rows || []).filter(x => x.deadline === today);
-    const tomRows = (rows || []).filter(x => x.deadline === tomorrow);
+    const todayRows = (rows || []).filter(x => x.delivery_date === today);
+    const tomRows = (rows || []).filter(x => x.delivery_date === tomorrow);
     if (todayRows.length === 0 && tomRows.length === 0) {
       res.status(200).json({ ok: true, message: '납기 임박 없음' }); return;
     }
