@@ -2888,7 +2888,7 @@ function renderDeliveries() {
             <td class="td-check"><input type="checkbox" class="delivery-check" data-id="${d.id}" ${d._checked ? 'checked' : ''}></td>
             <td class="cell-editable" data-id="${d.id}" data-field="date" data-type="date">${fmtDisplay(d.date)}${isToday ? ' <span class="today-badge">오늘</span>' : ''}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="type" data-type="select" data-options="일반,중고,번개,당근,GS반택,ETSY"><span class="badge ${typeBadgeClass(d.type)}">${d.type}</span></td>
-            <td class="cell-editable" data-id="${d.id}" data-field="sender" data-type="select" data-options="케이엘피코리아,김관택,이현주,김현호,유지은,구정두,황선영,(이현주),기타" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.sender}</td>
+            <td class="cell-editable" data-id="${d.id}" data-field="sender" data-type="select" data-options="케이엘피코리아,김관택(케이엘피코리아),김관택,이현주,김현호,유지은,구정두,황선영,(이현주),기타" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.sender}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="recipient" style="max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><strong>${d.recipient}</strong></td>
             <td class="cell-editable" data-id="${d.id}" data-field="phone">${d.phone || '-'}</td>
             <td class="cell-editable" data-id="${d.id}" data-field="zipcode">${d.zipcode || '-'}</td>
@@ -3006,7 +3006,7 @@ function openEditDelivery(id) {
             </div>
             <div class="form-group"><label class="form-label">발송인</label>
                 ${(() => {
-                    const senders = ['케이엘피코리아','김관택','이현주','김현호','유지은','구정두','황선영','(이현주)'];
+                    const senders = ['케이엘피코리아','김관택(케이엘피코리아)','김관택','이현주','김현호','유지은','구정두','황선영','(이현주)'];
                     const isCustom = d.sender && !senders.includes(d.sender);
                     const opts = senders.map(s => `<option value="${s}" ${d.sender === s ? 'selected' : ''}>${s}</option>`).join('');
                     return `<select class="form-select" id="editDelSender">
@@ -4575,6 +4575,7 @@ function openModal(type) {
                 <div class="form-group"><label class="form-label">발송인</label>
                     <select class="form-select" id="newDelSender">
                         <option value="케이엘피코리아">케이엘피코리아</option>
+                        <option value="김관택(케이엘피코리아)">김관택(케이엘피코리아)</option>
                         <option value="김관택">김관택</option>
                         <option value="이현주">이현주</option>
                         <option value="김현호">김현호</option>
