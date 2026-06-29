@@ -26,9 +26,10 @@ module.exports = async (req, res) => {
   const title = (body && body.title) || 'KLP 대시보드';
   const text = (body && body.body) || '';
   const url = (body && body.url) || '/';
+  const targets = body && Array.isArray(body.targets) ? body.targets : null;
 
   try {
-    const result = await sendToAll({ title, body: text, url });
+    const result = await sendToAll({ title, body: text, url }, targets);
     res.status(200).json({ ok: true, ...result });
   } catch (err) {
     res.status(500).json({ error: '알림 발송 실패', detail: (err && err.message) || '' });

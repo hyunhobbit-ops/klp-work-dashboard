@@ -4831,17 +4831,23 @@ function refreshPushButton() {
     else { if (lbl) lbl.textContent = '알림 켜기'; btn.style.opacity = '1'; }
 }
 
+// 그룹 지정값(개인이 아닌 공통/그룹) — 이 경우엔 전체 발송
+const PUSH_GROUP_NAMES = ['전체', '임원', '대표님'];
+
 // 이벤트 발생 시 서버로 발송 요청 (fire-and-forget — UI 막지 않음)
-function triggerPush(title, body, url) {
+// targets: 받을 사람 이름 배열(당사자만). null/빈배열이면 전체 발송.
+function triggerPush(title, body, url, targets) {
     (async () => {
         try {
             const { data } = await sb.auth.getSession();
             const token = data && data.session && data.session.access_token;
             if (!token) return;
+            const payload = { title: title, body: body, url: url || '/' };
+            if (Array.isArray(targets) && targets.length) payload.targets = targets;
             await fetch('/api/send-push', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                body: JSON.stringify({ title: title, body: body, url: url || '/' }),
+                body: JSON.stringify(payload),
             });
         } catch (e) { console.warn('알림 발송 실패', e); }
     })();
@@ -4851,13 +4857,20 @@ function notifyNewProject(p) {
     if (!p) return;
     const who = (p.manager || (Array.isArray(p.assignees) ? p.assignees.join(', ') : '') || '').trim();
     const body = ((p.client ? p.client + ' ' : '') + (p.name || '') + (who ? ' (담당: ' + who + ')' : '')).trim();
-    triggerPush('🆕 새 프로젝트', body || '새 프로젝트가 등록되었습니다', '/#projects-domestic');
+    // 당사자(담당자)만: assignees + manager 첫 단어("김현호 팀장"→"김현호"). 개인이 없으면 전체 발송.
+    const names = [];
+    if (Array.isArray(p.assignees)) names.push(...p.assignees);
+    if (p.manager) names.push(String(p.manager).trim().split(/\s+/)[0]);
+    const targets = Array.from(new Set(names.filter(n => n && !PUSH_GROUP_NAMES.includes(n))));
+    triggerPush('🆕 새 프로젝트', body || '새 프로젝트가 등록되었습니다', '/#projects-domestic', targets.length ? targets : null);
 }
 
 function notifyNewTask(t) {
     if (!t) return;
     const body = ((t.assignee ? t.assignee + ' · ' : '') + (t.task || '')).trim();
-    triggerPush('🆕 새 할 일', body || '새 할 일이 등록되었습니다', '/#daily');
+    // 당사자(담당자)만: 개인이면 본인에게만, 전체/임원/대표님 같은 공통이면 전체 발송.
+    const targets = (t.assignee && !PUSH_GROUP_NAMES.includes(t.assignee)) ? [t.assignee] : null;
+    triggerPush('🆕 새 할 일', body || '새 할 일이 등록되었습니다', '/#daily', targets);
 }
 
 window.addEventListener('DOMContentLoaded', function () { setTimeout(refreshPushButton, 1200); });

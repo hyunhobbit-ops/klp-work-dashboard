@@ -33,13 +33,18 @@ async function sbFetch(pathAndQuery, init) {
 }
 
 // payload: { title, body, url }
-async function sendToAll(payload) {
+// targets: 받을 사람 이름 배열. 있으면 해당 user_name 구독에게만 발송. 없으면 전체 발송.
+async function sendToAll(payload, targets) {
   if (!SERVICE_KEY) throw new Error('SUPABASE_SERVICE_ROLE_KEY 미설정');
   if (!ensureVapid()) throw new Error('VAPID_PRIVATE_KEY 미설정');
 
-  const res = await sbFetch('push_subscriptions?select=id,endpoint,p256dh,auth', { method: 'GET' });
+  const res = await sbFetch('push_subscriptions?select=id,endpoint,p256dh,auth,user_name', { method: 'GET' });
   if (!res.ok) throw new Error('구독 목록 조회 실패: ' + res.status);
-  const subs = await res.json();
+  let subs = await res.json();
+  if (Array.isArray(targets) && targets.length) {
+    const set = new Set(targets.map((x) => String(x).trim()));
+    subs = (subs || []).filter((s) => set.has(String(s.user_name || '').trim()));
+  }
 
   const data = JSON.stringify({
     title: payload.title || 'KLP 대시보드',
