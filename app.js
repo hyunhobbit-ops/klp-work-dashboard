@@ -2,6 +2,9 @@
 // KLP KOREA Work Dashboard v2
 // ========================================
 
+// 탭 전환(pushState) 시 브라우저/WebView 의 자동 스크롤 복원을 끈다 → switchTab 이 항상 맨 위로 고정
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
 // ===== Supabase =====
 const SUPABASE_URL = 'https://vtulmuxkriklpiibiues.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
@@ -1058,10 +1061,18 @@ function switchTab(tabId, fromHistory = false) {
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebarOverlay').classList.remove('show');
 
-    // 탭 전환 시 스크롤 위로
-    window.scrollTo(0, 0);
-    const mainWrap = document.querySelector('.main-wrap');
-    if (mainWrap) mainWrap.scrollTo(0, 0);
+    // 탭 전환 시 스크롤 위로 — 즉시 + 렌더/pushState 이후(rAF) 두 번 강제.
+    // (안드로이드 WebView 는 pushState 시 이전 스크롤을 복원하려 하므로 다음 프레임에서 한 번 더 맨 위로 고정)
+    const scrollTabTop = () => {
+        window.scrollTo(0, 0);
+        if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+        const mw = document.querySelector('.main-wrap');
+        if (mw) mw.scrollTop = 0;
+        const active = document.querySelector('.content.active');
+        if (active) active.scrollTop = 0;
+    };
+    scrollTabTop();
+    requestAnimationFrame(scrollTabTop);
 
     // URL 해시 동기화 (브라우저 뒤로/앞으로 + 새로고침 시 탭 유지)
     if (!fromHistory) {
