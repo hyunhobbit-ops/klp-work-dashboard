@@ -2847,24 +2847,6 @@ async function toggleTask(id) {
     renderHome();
 }
 
-// 오늘 완료처리한 할 일을 다시 미완료로 되돌리기 (현재 보고 있는 탭 기준)
-async function undoTodayCompletions() {
-    const todayStr = fmtDate(new Date());
-    let targets = dailyTasks.filter(t => t.done && t.completedAt && fmtDate(new Date(t.completedAt)) === todayStr);
-    if (currentPersonFilter === 'ceo') targets = targets.filter(t => t.assignee === '대표님');
-    else if (currentPersonFilter !== 'viewall') targets = targets.filter(t => t.assignee === currentPersonFilter);
-    if (targets.length === 0) { showToast('오늘 완료처리한 할 일이 없습니다'); return; }
-    const scopeLabel = currentPersonFilter === 'viewall' ? '전체' : (currentPersonFilter === 'ceo' ? '대표님' : currentPersonFilter);
-    if (!confirm(`오늘 완료처리한 할 일 ${targets.length}건(${scopeLabel})을 모두 미완료로 되돌릴까요?`)) return;
-    const ids = targets.map(t => t.id);
-    const { error } = await sb.from('daily_tasks').update({ done: false, completed_at: null }).in('id', ids);
-    if (error) { showToast('되돌리기 실패: ' + error.message); return; }
-    targets.forEach(t => { t.done = false; t.completedAt = null; });
-    showToast(`${ids.length}건을 미완료로 되돌렸습니다`);
-    renderDaily();
-    renderHome();
-}
-
 // =====================================
 // DELIVERIES
 // =====================================
