@@ -1954,6 +1954,8 @@ function renderDaily() {
     }
 
     const todayStr = fmtDate(currentDate);
+    // 미완료 이월 판별: 과거 날짜 + 미완료 + 마감복제 아님 → 당일 컬럼에도 계속 노출
+    const isOverdueOpen = (t) => !!(t.date && t.date < todayStr && !t.done && !t.isDeadlineCopy);
     const days = ['일', '월', '화', '수', '목', '금', '토'];
     const d = currentDate;
     document.getElementById('currentDateDisplay').textContent =
@@ -2057,7 +2059,7 @@ function renderDaily() {
     function renderColumn(title, tasks, assignee) {
         const doneCount = tasks.filter(t => t.done).length;
         let itemsHtml = '';
-        const sorted = [...tasks].sort((a, b) => a.done - b.done);
+        const sorted = [...tasks].sort((a, b) => (a.done - b.done) || (isOverdueOpen(b) - isOverdueOpen(a)) || ((a.date || '').localeCompare(b.date || '')));
         sorted.forEach(t => {
             const tagClass = t.priority.includes('긴급') ? 'tag-urgent' : t.priority.includes('낮음') ? 'tag-low' : 'tag-normal';
             const tagLabel = t.priority.includes('긴급') ? '긴급' : t.priority.includes('낮음') ? '낮음' : '보통';
@@ -2067,7 +2069,9 @@ function renderDaily() {
             const clientStr = t.client ? `<span class="daily-client">📌 ${t.client}</span>` : '';
             const ddayClass = ddayStr.includes('D+') ? 'dday-over' : ddayStr.includes('D-Day') ? 'dday-today' : 'dday-left';
             const isDeadline = t.isDeadlineCopy;
-            itemsHtml += `<div class="daily-item ${t.done ? 'completed' : ''} ${isDeadline ? 'deadline-item' : ''}" onclick="openEditTask(${t.id})" style="cursor:pointer;">
+            const isCarry = isOverdueOpen(t);
+            const carryBadge = isCarry ? `<span class="daily-carry-badge" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;color:#E8590C;background:#FFF0E6;border-radius:4px;padding:1px 6px">⏮ 이월 ${fmtDisplay(t.date)}</span>` : '';
+            itemsHtml += `<div class="daily-item ${t.done ? 'completed' : ''} ${isDeadline ? 'deadline-item' : ''}" onclick="openEditTask(${t.id})" style="cursor:pointer;${isCarry ? 'box-shadow:inset 3px 0 0 #E8590C;' : ''}">
                 <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">${checkSvg}</div>
                 <div class="daily-info">
                     <div class="daily-title">${t.task}</div>
@@ -2075,6 +2079,7 @@ function renderDaily() {
                         <span class="daily-tag ${tagClass}">${tagLabel}</span>
                         ${labelStr}
                         ${clientStr}
+                        ${carryBadge}
                     </div>
                 </div>
                 ${isDeadline ? `<div class="deadline-badge-wrap"><span class="deadline-badge-lg">🔥 마감일</span></div>`
@@ -2123,13 +2128,15 @@ function renderDaily() {
             const tagLabel = (t.priority || '').includes('긴급') ? '긴급' : (t.priority || '').includes('낮음') ? '낮음' : '보통';
             const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
             const clientStr = t.client ? `<span class="daily-client">📌 ${t.client}</span>` : '';
+            const isCarry = isOverdueOpen(t);
+            const carryBadge = isCarry ? `<span class="daily-carry-badge" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;color:#E8590C;background:#FFF0E6;border-radius:4px;padding:1px 6px">⏮ 이월 ${fmtDisplay(t.date)}</span>` : '';
             const ddayStr = t.deadline ? getDday(t.deadline) : '';
             const ddayClass = ddayStr.includes('D+') ? 'dday-over' : ddayStr.includes('D-Day') ? 'dday-today' : 'dday-left';
             const isDeadline = t.isDeadlineCopy;
             const ddayHtml = isDeadline
                 ? `<span class="deadline-badge-lg">🔥 마감일</span>`
                 : t.deadline ? `<span class="daily-dday ${ddayClass}">${ddayStr}</span>` : '';
-            return `<div class="daily-item daily-common-item ${t.done ? 'completed' : ''} ${isDeadline ? 'deadline-item' : ''}" onclick="openEditTask(${t.id})" style="cursor:pointer">
+            return `<div class="daily-item daily-common-item ${t.done ? 'completed' : ''} ${isDeadline ? 'deadline-item' : ''}" onclick="openEditTask(${t.id})" style="cursor:pointer;${isCarry ? 'box-shadow:inset 3px 0 0 #E8590C;' : ''}">
                 <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">${checkSvg}</div>
                 <div class="daily-info">
                     <div class="daily-title">${t.task}</div>
@@ -2137,6 +2144,7 @@ function renderDaily() {
                         <span class="daily-tag ${tagClass}">${tagLabel}</span>
                         ${labelStr}
                         ${clientStr}
+                        ${carryBadge}
                         ${ddayHtml}
                     </div>
                 </div>
@@ -2166,17 +2174,17 @@ function renderDaily() {
     const renderCommonCols = (includeCeo) => {
         let h = '';
         if (showExecColumn) {
-            const execTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '임원');
+            const execTasks = dailyTasks.filter(t => t.assignee === '임원' && (t.date === todayStr || isOverdueOpen(t)));
             h += renderColumn('임원', execTasks, '임원');
         }
         if (includeCeo && showCeoColumn) {
-            const ceoTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '대표님');
+            const ceoTasks = dailyTasks.filter(t => t.assignee === '대표님' && (t.date === todayStr || isOverdueOpen(t)));
             h += renderColumn('대표님', ceoTasks, '대표님');
         }
         return h;
     };
     const renderPersonalCols = () => displayPeople.map(person => {
-        const tasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === person);
+        const tasks = dailyTasks.filter(t => t.assignee === person && (t.date === todayStr || isOverdueOpen(t)));
         return renderColumn(person, tasks, person);
     }).join('');
 
@@ -2185,7 +2193,7 @@ function renderDaily() {
 
     if (currentPersonFilter === 'ceo') {
         // 대표님 탭: 대표님 컬럼을 맨 앞에, 그 다음 임원 + 미완료
-        const ceoTasks = dailyTasks.filter(t => t.date === todayStr && t.assignee === '대표님');
+        const ceoTasks = dailyTasks.filter(t => t.assignee === '대표님' && (t.date === todayStr || isOverdueOpen(t)));
         html += renderColumn('대표님', ceoTasks, '대표님');
         html += renderCommonCols(false);
         html += renderOverdueColumn('대표님');
