@@ -2833,14 +2833,34 @@ async function toggleTask(id) {
     const task = dailyTasks.find(t => t.id === id);
     if (!task) return;
     const newDone = !task.done;
+    const nowIso = newDone ? new Date().toISOString() : null; // 완료 시각 기록(해제 시 null)
     task.done = newDone;
+    task.completedAt = nowIso;
     // 연동된 태스크도 동일하게 체크/해제
     if (task.linkedGroup) {
-        dailyTasks.filter(t => t.linkedGroup === task.linkedGroup).forEach(t => t.done = newDone);
-        await dbUpdateTasksByGroup(task.linkedGroup, { done: newDone });
+        dailyTasks.filter(t => t.linkedGroup === task.linkedGroup).forEach(t => { t.done = newDone; t.completedAt = nowIso; });
+        await dbUpdateTasksByGroup(task.linkedGroup, { done: newDone, completedAt: nowIso });
     } else {
-        await dbUpdateTask(id, { done: newDone });
+        await dbUpdateTask(id, { done: newDone, completedAt: nowIso });
     }
+    renderDaily();
+    renderHome();
+}
+
+// 오늘 완료처리한 할 일을 다시 미완료로 되돌리기 (현재 보고 있는 탭 기준)
+async function undoTodayCompletions() {
+    const todayStr = fmtDate(new Date());
+    let targets = dailyTasks.filter(t => t.done && t.completedAt && fmtDate(new Date(t.completedAt)) === todayStr);
+    if (currentPersonFilter === 'ceo') targets = targets.filter(t => t.assignee === '대표님');
+    else if (currentPersonFilter !== 'viewall') targets = targets.filter(t => t.assignee === currentPersonFilter);
+    if (targets.length === 0) { showToast('오늘 완료처리한 할 일이 없습니다'); return; }
+    const scopeLabel = currentPersonFilter === 'viewall' ? '전체' : (currentPersonFilter === 'ceo' ? '대표님' : currentPersonFilter);
+    if (!confirm(`오늘 완료처리한 할 일 ${targets.length}건(${scopeLabel})을 모두 미완료로 되돌릴까요?`)) return;
+    const ids = targets.map(t => t.id);
+    const { error } = await sb.from('daily_tasks').update({ done: false, completed_at: null }).in('id', ids);
+    if (error) { showToast('되돌리기 실패: ' + error.message); return; }
+    targets.forEach(t => { t.done = false; t.completedAt = null; });
+    showToast(`${ids.length}건을 미완료로 되돌렸습니다`);
     renderDaily();
     renderHome();
 }
@@ -5134,7 +5154,8 @@ function taskToDb(t) {
         client: t.client || '',
         linked_group: t.linkedGroup || null,
         is_deadline_copy: !!t.isDeadlineCopy,
-        project_id: t.projectId || null
+        project_id: t.projectId || null,
+        completed_at: t.completedAt || null
     };
 }
 function taskFromDb(r) {
@@ -5151,7 +5172,8 @@ function taskFromDb(r) {
         client: r.client || '',
         linkedGroup: r.linked_group || null,
         isDeadlineCopy: !!r.is_deadline_copy,
-        projectId: r.project_id || null
+        projectId: r.project_id || null,
+        completedAt: r.completed_at || null
     };
 }
 async function loadDailyTasksFromDb() {
@@ -5400,7 +5422,7 @@ async function dbInsertTask(t) {
 async function dbUpdateTask(id, patch) {
     const map = { task:'task', date:'date', assignee:'assignee', target:'target', priority:'priority',
         done:'done', deadline:'deadline', label:'label', client:'client',
-        linkedGroup:'linked_group', isDeadlineCopy:'is_deadline_copy' };
+        linkedGroup:'linked_group', isDeadlineCopy:'is_deadline_copy', completedAt:'completed_at' };
     const dbPatch = {};
     for (const [k, v] of Object.entries(patch)) {
         if (!map[k]) continue;
@@ -5412,7 +5434,7 @@ async function dbUpdateTask(id, patch) {
 }
 async function dbUpdateTasksByGroup(groupId, patch) {
     const map = { task:'task', date:'date', assignee:'assignee', target:'target', priority:'priority',
-        done:'done', deadline:'deadline', label:'label', client:'client' };
+        done:'done', deadline:'deadline', label:'label', client:'client', completedAt:'completed_at' };
     const dbPatch = {};
     for (const [k, v] of Object.entries(patch)) {
         if (!map[k]) continue;
