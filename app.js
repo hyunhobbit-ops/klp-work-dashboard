@@ -4836,7 +4836,7 @@ const PUSH_GROUP_NAMES = ['전체', '임원', '대표님'];
 
 // 이벤트 발생 시 서버로 발송 요청 (fire-and-forget — UI 막지 않음)
 // targets: 받을 사람 이름 배열(당사자만). null/빈배열이면 전체 발송.
-function triggerPush(title, body, url, targets) {
+function triggerPush(title, body, url, targets, taskId) {
     (async () => {
         try {
             const { data } = await sb.auth.getSession();
@@ -4844,6 +4844,7 @@ function triggerPush(title, body, url, targets) {
             if (!token) return;
             const payload = { title: title, body: body, url: url || '/' };
             if (Array.isArray(targets) && targets.length) payload.targets = targets;
+            if (taskId != null) payload.taskId = taskId;
             await fetch('/api/send-push', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
@@ -4871,7 +4872,7 @@ function notifyNewTask(t) {
     // 담당자 개인에게만: 전체/임원/대표님 같은 공통 건은 알림 안 보냄(전체 발송 제거).
     if (!t.assignee || PUSH_GROUP_NAMES.includes(t.assignee)) return;
     const body = (t.assignee + ' · ' + (t.task || '')).trim();
-    triggerPush('🆕 새 할 일', body, '/#daily', [t.assignee]);
+    triggerPush('🆕 새 할 일', body, '/#daily', [t.assignee], t.id);
 }
 
 window.addEventListener('DOMContentLoaded', function () { setTimeout(refreshPushButton, 1200); });

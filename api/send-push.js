@@ -27,9 +27,10 @@ module.exports = async (req, res) => {
   const text = (body && body.body) || '';
   const url = (body && body.url) || '/';
   const targets = body && Array.isArray(body.targets) ? body.targets : null;
+  const taskId = body && body.taskId ? body.taskId : null;
 
   try {
-    const result = await sendToAll({ title, body: text, url }, targets);
+    const result = await sendToAll({ title, body: text, url, taskId }, targets);
     res.status(200).json({ ok: true, ...result });
   } catch (err) {
     res.status(500).json({ error: '알림 발송 실패', detail: (err && err.message) || '' });

@@ -1,6 +1,12 @@
 // 공용 웹푸시 발송 모듈 (api/ 안의 _밑줄 파일은 Vercel 라우트로 노출되지 않음)
 // 모든 등록 구독에게 알림을 보낸다. 만료된(404/410) 구독은 자동 삭제.
 const webpush = require('web-push');
+const crypto = require('crypto');
+
+// 알림 "완료" 버튼용 서명 토큰: 특정 할 일 id에 대해서만 완료를 허용 (서비스키로 HMAC, 키 자체는 노출 안 됨)
+function taskToken(id) {
+  return crypto.createHmac('sha256', SERVICE_KEY).update('task:' + String(id)).digest('hex');
+}
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vtulmuxkriklpiibiues.supabase.co';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -46,11 +52,13 @@ async function sendToAll(payload, targets) {
     subs = (subs || []).filter((s) => set.has(String(s.user_name || '').trim()));
   }
 
-  const data = JSON.stringify({
+  const payloadObj = {
     title: payload.title || 'KLP 대시보드',
     body: payload.body || '',
     url: payload.url || '/',
-  });
+  };
+  if (payload.taskId) { payloadObj.taskId = payload.taskId; payloadObj.token = taskToken(payload.taskId); }
+  const data = JSON.stringify(payloadObj);
 
   let sent = 0, removed = 0;
   await Promise.all((subs || []).map(async (s) => {

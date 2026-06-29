@@ -39,14 +39,41 @@ self.addEventListener('push', (e) => {
     body: data.body || '',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    data: { url: data.url || '/' },
+    data: { url: data.url || '/', taskId: data.taskId || null, token: data.token || null, body: data.body || '' },
   };
+  // 할 일 알림이면 "완료" 버튼 추가 → 잠금화면에서 바로 체크
+  if (data.taskId && data.token) {
+    options.actions = [{ action: 'done', title: '✅ 완료' }];
+  }
   e.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener('notificationclick', (e) => {
+  const data = e.notification.data || {};
+  // "✅ 완료" 버튼 → 앱 안 열고 바로 완료 처리
+  if (e.action === 'done' && data.taskId && data.token) {
+    e.notification.close();
+    e.waitUntil((async () => {
+      try {
+        const r = await fetch('/api/complete-task', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: data.taskId, token: data.token }),
+        });
+        if (r.ok) {
+          await self.registration.showNotification('✅ 완료 처리됨', { body: data.body || '', icon: '/icon-192.png', badge: '/icon-192.png', tag: 'done-' + data.taskId });
+        } else {
+          await self.registration.showNotification('완료 처리 실패', { body: '앱에서 다시 시도해주세요', icon: '/icon-192.png', badge: '/icon-192.png' });
+        }
+      } catch (_) {
+        await self.registration.showNotification('완료 처리 실패', { body: '네트워크 오류 — 앱에서 다시 시도해주세요', icon: '/icon-192.png', badge: '/icon-192.png' });
+      }
+    })());
+    return;
+  }
+  // 일반 클릭 → 앱 열기
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || '/';
+  const url = data.url || '/';
   e.waitUntil((async () => {
     const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const c of all) {
