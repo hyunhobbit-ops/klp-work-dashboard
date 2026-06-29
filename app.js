@@ -4857,20 +4857,21 @@ function notifyNewProject(p) {
     if (!p) return;
     const who = (p.manager || (Array.isArray(p.assignees) ? p.assignees.join(', ') : '') || '').trim();
     const body = ((p.client ? p.client + ' ' : '') + (p.name || '') + (who ? ' (담당: ' + who + ')' : '')).trim();
-    // 당사자(담당자)만: assignees + manager 첫 단어("김현호 팀장"→"김현호"). 개인이 없으면 전체 발송.
+    // 담당자 개인에게만: assignees + manager 첫 단어("김현호 팀장"→"김현호"). 개인 담당 없으면 알림 안 보냄(전체 발송 제거).
     const names = [];
     if (Array.isArray(p.assignees)) names.push(...p.assignees);
     if (p.manager) names.push(String(p.manager).trim().split(/\s+/)[0]);
     const targets = Array.from(new Set(names.filter(n => n && !PUSH_GROUP_NAMES.includes(n))));
-    triggerPush('🆕 새 프로젝트', body || '새 프로젝트가 등록되었습니다', '/#projects-domestic', targets.length ? targets : null);
+    if (!targets.length) return; // 개인 담당자 없음 → 알림 없음
+    triggerPush('🆕 새 프로젝트', body || '새 프로젝트가 등록되었습니다', '/#projects-domestic', targets);
 }
 
 function notifyNewTask(t) {
     if (!t) return;
-    const body = ((t.assignee ? t.assignee + ' · ' : '') + (t.task || '')).trim();
-    // 당사자(담당자)만: 개인이면 본인에게만, 전체/임원/대표님 같은 공통이면 전체 발송.
-    const targets = (t.assignee && !PUSH_GROUP_NAMES.includes(t.assignee)) ? [t.assignee] : null;
-    triggerPush('🆕 새 할 일', body || '새 할 일이 등록되었습니다', '/#daily', targets);
+    // 담당자 개인에게만: 전체/임원/대표님 같은 공통 건은 알림 안 보냄(전체 발송 제거).
+    if (!t.assignee || PUSH_GROUP_NAMES.includes(t.assignee)) return;
+    const body = (t.assignee + ' · ' + (t.task || '')).trim();
+    triggerPush('🆕 새 할 일', body, '/#daily', [t.assignee]);
 }
 
 window.addEventListener('DOMContentLoaded', function () { setTimeout(refreshPushButton, 1200); });

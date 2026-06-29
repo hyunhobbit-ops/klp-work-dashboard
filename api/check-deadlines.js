@@ -58,13 +58,13 @@ module.exports = async (req, res) => {
 
     let totalSent = 0;
     for (const [person, g] of Object.entries(byPerson)) {
+      if (person === '*') continue; // 담당자 없는 건은 알림 안 보냄(전체 발송 제거)
       const parts = [];
       if (g.today.length) parts.push(`오늘 마감 ${g.today.length}건: ` + g.today.map(name).join(', '));
       if (g.tom.length) parts.push(`내일 마감 ${g.tom.length}건: ` + g.tom.map(name).join(', '));
       let body = parts.join(' / ');
       if (body.length > 180) body = body.slice(0, 177) + '...';
-      const targets = person === '*' ? null : [person];
-      const r2 = await sendToAll({ title: '📦 납기 임박 알림', body, url: '/#projects-domestic' }, targets);
+      const r2 = await sendToAll({ title: '📦 납기 임박 알림', body, url: '/#projects-domestic' }, [person]);
       totalSent += (r2 && r2.sent) || 0;
     }
     res.status(200).json({ ok: true, today: todayRows.length, tomorrow: tomRows.length, people: Object.keys(byPerson), sent: totalSent });
