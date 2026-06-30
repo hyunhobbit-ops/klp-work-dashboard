@@ -359,6 +359,8 @@ async function showApp() {
     subscribeDailyTasks();
     subscribeAllRealtime();
     renderAll();
+    // 안드로이드 앱이면 FCM 토큰 등록 (로그인 사용자와 연결)
+    try { registerAndroidPushIfNeeded(); } catch (e) { console.warn('android push:', e); }
     // 사이드바 URL 바로가기: 카테고리 열림 상태 적용 + 사용자 추가 URL 로드
     try { applyUrlCategoryOpenState(); } catch (e) {}
     loadUrlShortcuts().catch(e => console.warn(e));
@@ -4791,6 +4793,31 @@ function urlBase64ToUint8Array(base64String) {
     for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
     return arr;
 }
+
+// ===== 안드로이드 네이티브(FCM) 푸시 =====
+// 안드로이드 앱(WebView)에서만 동작. 네이티브가 토큰을 받아 window.klpOnPushToken 으로 넘겨준다.
+function registerAndroidPushIfNeeded() {
+    if (window.AndroidBridge && typeof window.AndroidBridge.requestPushToken === 'function') {
+        window.AndroidBridge.requestPushToken();
+    }
+}
+
+// 네이티브에서 FCM 토큰을 전달받아 로그인 사용자와 함께 push_subscriptions 에 저장
+window.klpOnPushToken = async function (token) {
+    try {
+        if (!token) return;
+        const row = {
+            endpoint: token,                 // FCM 토큰을 endpoint(unique)로 사용
+            platform: 'android',
+            user_name: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || '',
+        };
+        const { error } = await sb.from('push_subscriptions').upsert(row, { onConflict: 'endpoint' });
+        if (error) console.error('FCM 토큰 저장 실패', error);
+        else console.log('FCM 토큰 등록 완료');
+    } catch (e) {
+        console.error('klpOnPushToken 오류', e);
+    }
+};
 
 // "알림 켜기" 버튼 → 권한 요청 + 구독 + Supabase 저장
 async function enablePushNotifications() {
