@@ -526,6 +526,13 @@ document.addEventListener('DOMContentLoaded', () => {
     setupNavTooltips();
     setupDragAutoScroll();
 
+    // 앱이 다시 보이면(포그라운드 재개) 홈 재렌더 → 위젯 데이터 갱신
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && currentUser) {
+            try { renderHome(); } catch (e) { /* 무시 */ }
+        }
+    });
+
     // ===== 세션 만료/변경 자동 처리 =====
     sb.auth.onAuthStateChange((event, session) => {
         if ((event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') && !session) {
