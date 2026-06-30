@@ -1444,6 +1444,19 @@ function renderHome() {
     const soonItems = deadlineList.filter(x => x.diff >= 0 && x.diff <= 3).sort(sortFn);
     const weekItems = deadlineList.filter(x => x.diff > 3 && x.diff <= 7).sort(sortFn);
 
+    // 안드로이드 홈 화면 위젯 갱신 (요약 + 오늘 할 일 목록·완료 토큰)
+    try {
+        syncAndroidWidget(myTodayItems, {
+            userName: myName || '',
+            todayTasks: myTodayItems.length,
+            urgent: totalUrgent,
+            rate: rate,
+            overdue: overdueItems.length,
+            soon: soonItems.length,
+            active: activeCount,
+        });
+    } catch (e) { /* 위젯 갱신 실패는 무시 */ }
+
     const renderDeadlineCard = (items, listId, countId, kind) => {
         const listEl = document.getElementById(listId);
         const countEl = document.getElementById(countId);
@@ -4800,6 +4813,38 @@ function registerAndroidPushIfNeeded() {
     if (window.AndroidBridge && typeof window.AndroidBridge.requestPushToken === 'function') {
         window.AndroidBridge.requestPushToken();
     }
+}
+
+// 안드로이드 홈 화면 위젯에 요약 + 오늘 할 일 목록(완료 토큰 포함) 전달
+let _widgetLastPush = 0;
+async function syncAndroidWidget(todayItems, summary) {
+    if (!(window.AndroidBridge && typeof window.AndroidBridge.updateWidget === 'function')) return;
+    const now = Date.now();
+    if (now - _widgetLastPush < 15000) return;   // 과도한 호출 방지 (15초 쓰로틀)
+    _widgetLastPush = now;
+    let tasks = [];
+    try {
+        const ids = (todayItems || []).map(t => t.id).filter(Boolean);
+        let tokens = {};
+        if (ids.length) {
+            const { data: { session } } = await sb.auth.getSession();
+            const at = session && session.access_token;
+            if (at) {
+                const r = await fetch('/api/widget-task-tokens', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + at },
+                    body: JSON.stringify({ ids }),
+                });
+                if (r.ok) { const j = await r.json(); tokens = j.tokens || {}; }
+            }
+        }
+        tasks = (todayItems || []).map(t => ({
+            id: t.id, task: t.task || '', done: !!t.done, token: tokens[t.id] || '',
+        }));
+    } catch (e) { /* 토큰 발급 실패해도 요약은 보냄 */ }
+    try {
+        window.AndroidBridge.updateWidget(JSON.stringify({ ...summary, tasks, updatedAt: Date.now() }));
+    } catch (e) { /* 무시 */ }
 }
 
 // 네이티브에서 FCM 토큰을 전달받아 로그인 사용자와 함께 push_subscriptions 에 저장
