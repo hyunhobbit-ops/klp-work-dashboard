@@ -10359,6 +10359,7 @@ const tempProjects = [];
 function _projectsTempRowToObj(r) {
     return {
         id: r.id,
+        sortOrder: (r.sort_order != null ? r.sort_order : r.id),
         date: r.date || '',
         client: r.client || '',
         clientContact: r.client_contact || '',
@@ -10435,7 +10436,7 @@ function renderTempProjects() {
     const pill = (bg, fg, text) => `<span style="display:inline-block;padding:4px 10px;border-radius:6px;background:${bg};color:${fg};font-weight:800;font-size:13px;white-space:nowrap">${text}</span>`;
 
     // 날짜+매출처 기준 그룹핑
-    const sorted = [...tempProjects].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (a.client || '').localeCompare(b.client || ''));
+    const sorted = [...tempProjects].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (a.client || '').localeCompare(b.client || '') || ((a.sortOrder ?? a.id) - (b.sortOrder ?? b.id)));
     tempGroups = [];
     const groups = tempGroups;
     sorted.forEach(p => {
@@ -10471,7 +10472,7 @@ function renderTempProjects() {
                 : '<span style="color:var(--text-tertiary)">-</span>';
 
             const borderTop = pi === 0 && gi > 0 ? 'border-top:2px solid var(--gray-200);' : '';
-            rowHtml += `<tr style="background:${bgColor};${borderTop}">`;
+            rowHtml += `<tr data-titem-id="${p.id}" data-titem-gi="${gi}" style="background:${bgColor};${borderTop}">`;
             // rowspan +1 for the group inline add row
             const rs = rowspan + 1;
             const ce = (field, type) => `class="cell-editable" data-id="${p.id}" data-field="${field}" data-type="${type || 'text'}" data-entity="temp"`;
@@ -10506,7 +10507,7 @@ function renderTempProjects() {
             ].filter(Boolean);
             const supFeeBadge = supFeeDetails.length > 0 ? `<div style="margin-top:4px;font-size:10px;color:var(--text-tertiary);line-height:1.5">${supFeeDetails.map(f => '+' + f).join('<br>')}</div>` : '';
 
-            rowHtml += `<td ${ce('item')} style="cursor:pointer">${p.item || '-'}</td>
+            rowHtml += `<td ${ce('item')} style="cursor:pointer"><span class="temp-drag-handle" draggable="true" data-id="${p.id}" data-gi="${gi}" title="드래그하여 순서 변경">⠿</span>${p.item || '-'}</td>
             <td ${ce('unitPrice','number')} style="cursor:pointer">${p.unitPrice ? p.unitPrice.toLocaleString() + '원' : '-'}${vatBadge(p.unitPriceVat)}</td>
             <td ${ce('qty','number')} style="cursor:pointer">${p.qty ? p.qty.toLocaleString() : '-'}</td>
             <td>${revenueStr}${feeBadge}</td>
@@ -10571,6 +10572,7 @@ function renderTempProjects() {
         rowHtml = '<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-tertiary)">등록된 견적 의뢰가 없습니다</td></tr>';
     }
     tbody.innerHTML = rowHtml;
+    _bindTempDnd(tbody);
     if (cardGrid) cardGrid.innerHTML = cardHtml;
 
     // Phase 3 #10: 더 보기 버튼
@@ -10579,6 +10581,68 @@ function renderTempProjects() {
         _rebuildTempProjectsFromPagination();
         renderTempProjects();
     });
+}
+
+// 견적 의뢰 품목 드래그 순서변경 — 위임 리스너 1회 바인딩 (tbody는 유지, innerHTML만 교체됨)
+function _bindTempDnd(tbody) {
+    if (!tbody || tbody._tempDndBound) return;
+    tbody._tempDndBound = true;
+    let dragId = null, dragGi = null;
+    const clearMarks = () => tbody.querySelectorAll('.temp-drop-before,.temp-drop-after,.temp-dragging')
+        .forEach(x => x.classList.remove('temp-drop-before', 'temp-drop-after', 'temp-dragging'));
+    tbody.addEventListener('dragstart', (e) => {
+        const h = e.target.closest && e.target.closest('.temp-drag-handle');
+        if (!h) return;
+        dragId = h.dataset.id; dragGi = h.dataset.gi;
+        try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); } catch (_) {}
+        const tr = h.closest('tr'); if (tr) tr.classList.add('temp-dragging');
+    });
+    tbody.addEventListener('dragover', (e) => {
+        if (dragId == null) return;
+        const tr = e.target.closest && e.target.closest('tr[data-titem-gi]');
+        if (!tr || tr.dataset.titemGi !== dragGi) return; // 같은 그룹 안에서만
+        e.preventDefault();
+        try { e.dataTransfer.dropEffect = 'move'; } catch (_) {}
+        tbody.querySelectorAll('.temp-drop-before,.temp-drop-after').forEach(x => x.classList.remove('temp-drop-before', 'temp-drop-after'));
+        const rect = tr.getBoundingClientRect();
+        tr.classList.add((e.clientY - rect.top) > rect.height / 2 ? 'temp-drop-after' : 'temp-drop-before');
+    });
+    tbody.addEventListener('drop', (e) => {
+        if (dragId == null) { clearMarks(); return; }
+        const tr = e.target.closest && e.target.closest('tr[data-titem-gi]');
+        if (tr && tr.dataset.titemGi === dragGi) {
+            e.preventDefault();
+            const rect = tr.getBoundingClientRect();
+            const after = (e.clientY - rect.top) > rect.height / 2;
+            reorderTempItem(dragGi, dragId, tr.dataset.titemId, after);
+        }
+        dragId = dragGi = null; clearMarks();
+    });
+    tbody.addEventListener('dragend', () => { dragId = dragGi = null; clearMarks(); });
+}
+
+// 같은 그룹 내 품목 순서 재배치 + sort_order 저장
+async function reorderTempItem(gi, dragId, targetId, after) {
+    if (String(dragId) === String(targetId)) return;
+    const g = tempGroups[Number(gi)];
+    if (!g || !g.items) return;
+    const moved = g.items.find(x => String(x.id) === String(dragId));
+    if (!moved) return;
+    const arr = g.items.filter(x => String(x.id) !== String(dragId));
+    const ti = arr.findIndex(x => String(x.id) === String(targetId));
+    if (ti < 0) return;
+    arr.splice(after ? ti + 1 : ti, 0, moved);
+    // 새 순서로 sort_order 0..n-1 재부여 (객체가 tempProjects와 동일 참조라 즉시 반영)
+    arr.forEach((it, idx) => { it.sortOrder = idx; });
+    renderTempProjects();
+    try {
+        for (let idx = 0; idx < arr.length; idx++) {
+            const { error } = await sb.from('projects_temp').update({ sort_order: idx }).eq('id', arr[idx].id);
+            if (error) throw error;
+        }
+    } catch (e) {
+        showToast('순서 저장 실패: ' + (e.message || e));
+    }
 }
 
 function getTodayStr() {

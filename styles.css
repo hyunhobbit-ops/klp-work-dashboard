@@ -2643,6 +2643,13 @@ body {
 }
 .field > input:focus, .field > select:focus, .field > textarea:focus { border-color: var(--blue); background: var(--white); }
 
+/* 견적 의뢰 품목 드래그 순서변경 */
+.temp-drag-handle { display: inline-block; cursor: grab; color: var(--gray-400); font-size: 13px; margin-right: 6px; user-select: none; vertical-align: middle; }
+.temp-drag-handle:active { cursor: grabbing; }
+tr.temp-dragging { opacity: 0.45; }
+tr.temp-drop-before td { box-shadow: inset 0 2px 0 0 var(--blue); }
+tr.temp-drop-after td { box-shadow: inset 0 -2px 0 0 var(--blue); }
+
 /* ============================
    EMPTY & TOAST
    ============================ */
