@@ -11888,6 +11888,14 @@ function planningSanitizeHtml(html) {
             if (node.tagName === 'A' && node.getAttribute('target') === '_blank') {
                 node.setAttribute('rel', 'noopener noreferrer');
             }
+            // 붙여넣은 외부 글의 인라인 글자색/배경색 제거 → 테마 색상 상속(다크모드에서도 항상 읽힘)
+            if (node.style) {
+                node.style.removeProperty('color');
+                node.style.removeProperty('background-color');
+                node.style.removeProperty('background');
+                if (!node.getAttribute('style')) node.removeAttribute('style');
+            }
+            if (typeof node.removeAttribute === 'function') node.removeAttribute('bgcolor');
         });
         planningSanitizeHtml._hookRegistered = true;
     }
