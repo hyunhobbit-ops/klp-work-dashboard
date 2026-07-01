@@ -2631,6 +2631,18 @@ body {
 .form-submit { width: 100%; padding: 13px; border: none; border-radius: var(--radius-xs); background: var(--blue); color: white; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 8px; transition: all var(--transition); }
 .form-submit:hover { background: var(--blue-dark); }
 
+/* .field — 견적 의뢰(임시 프로젝트) 등 모달의 라벨+입력 세로 스택 레이아웃 */
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field > label { font-size: 13px; font-weight: 600; color: var(--gray-600); }
+.field > input, .field > select, .field > textarea {
+    width: 100%; box-sizing: border-box; padding: 11px 14px;
+    border: 1px solid var(--gray-200); border-radius: var(--radius-xs);
+    font-size: 14px; font-family: inherit; color: var(--gray-900);
+    background: var(--gray-50); outline: none;
+    transition: border-color var(--transition), background var(--transition);
+}
+.field > input:focus, .field > select:focus, .field > textarea:focus { border-color: var(--blue); background: var(--white); }
+
 /* ============================
    EMPTY & TOAST
    ============================ */
