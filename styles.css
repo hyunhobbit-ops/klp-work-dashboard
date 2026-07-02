@@ -2288,6 +2288,9 @@ body {
 
 /* Inline task input */
 .daily-inline-add { padding: 8px 0; }
+/* 컬럼 헤더 아래 고정 입력 영역 (스크롤과 무관하게 항상 상단 노출) */
+.daily-col-addbar { padding: 10px 16px; border-bottom: 1px solid var(--gray-100); background: var(--white); }
+.daily-common-inline-add-top { padding-top: 0; margin-bottom: 8px; }
 .daily-inline-input {
     width: 100%;
     padding: 10px 12px;

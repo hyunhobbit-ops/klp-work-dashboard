@@ -2092,7 +2092,7 @@ function renderDaily() {
     function renderColumn(title, tasks, assignee) {
         const doneCount = tasks.filter(t => t.done).length;
         let itemsHtml = '';
-        const sorted = [...tasks].sort((a, b) => (a.done - b.done) || (isOverdueOpen(b) - isOverdueOpen(a)) || ((a.date || '').localeCompare(b.date || '')));
+        const sorted = [...tasks].sort((a, b) => (a.done - b.done) || ((b.id || 0) - (a.id || 0)));
         sorted.forEach(t => {
             const tagClass = t.priority.includes('긴급') ? 'tag-urgent' : t.priority.includes('낮음') ? 'tag-low' : 'tag-normal';
             const tagLabel = t.priority.includes('긴급') ? '긴급' : t.priority.includes('낮음') ? '낮음' : '보통';
@@ -2133,11 +2133,11 @@ function renderDaily() {
                     <button class="daily-add-btn" onclick="openQuickTask('${assignee}')"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg> 새 할 일</button>
                 </div>
             </div>
+            <div class="daily-col-addbar">
+                <input type="text" class="daily-inline-input" placeholder="할 일 입력 후 Enter" data-assignee="${assignee}">
+            </div>
             <div class="daily-col-body">
                 ${itemsHtml}
-                <div class="daily-inline-add">
-                    <input type="text" class="daily-inline-input" placeholder="할 일 입력 후 Enter" data-assignee="${assignee}">
-                </div>
             </div>
         </div>`;
     }
@@ -2155,7 +2155,7 @@ function renderDaily() {
             (t.date === todayStr || (t.date && t.date < todayStr && !t.done))
         );
         const doneCount = commonTasks.filter(t => t.done).length;
-        const sorted = [...commonTasks].sort((a, b) => a.done - b.done);
+        const sorted = [...commonTasks].sort((a, b) => (a.done - b.done) || ((b.id || 0) - (a.id || 0)));
         const itemsHtml = sorted.map(t => {
             const tagClass = (t.priority || '').includes('긴급') ? 'tag-urgent' : (t.priority || '').includes('낮음') ? 'tag-low' : 'tag-normal';
             const tagLabel = (t.priority || '').includes('긴급') ? '긴급' : (t.priority || '').includes('낮음') ? '낮음' : '보통';
@@ -2195,11 +2195,11 @@ function renderDaily() {
                 </div>
             </div>
             <div class="daily-common-bar-body">
-                ${emptyHtml}
-                ${itemsHtml}
-                <div class="daily-inline-add daily-common-inline-add">
+                <div class="daily-inline-add daily-common-inline-add daily-common-inline-add-top">
                     <input type="text" class="daily-inline-input" placeholder="공통 할 일 입력 후 Enter" data-assignee="전체">
                 </div>
+                ${emptyHtml}
+                ${itemsHtml}
             </div>
         </div>`;
     };
