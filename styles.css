@@ -2310,6 +2310,8 @@ body {
     box-shadow: 0 0 0 3px rgba(49,130,246,0.1);
 }
 .daily-inline-input::placeholder { color: var(--gray-400); }
+/* 비고 있음 표시 배지 */
+.daily-note-badge { font-size: 12px; margin-left: 3px; cursor: help; vertical-align: middle; }
 
 /* Deadline label */
 .daily-deadline { font-size: 11px; color: var(--red); font-weight: 600; }

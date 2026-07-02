@@ -2073,6 +2073,7 @@ function renderDaily() {
                         <span class="daily-tag ${tagClass}">${tagLabel}</span>
                         ${labelStr}
                         ${clientStr}
+                        ${noteBadge(t)}
                     </div>
                     <div class="overdue-date-row"><span class="overdue-date-badge">${fmtDisplay(t.date)}</span><span class="overdue-days">${days}일 지남</span></div>
                 </div>
@@ -2113,6 +2114,7 @@ function renderDaily() {
                         ${labelStr}
                         ${clientStr}
                         ${carryBadge}
+                        ${noteBadge(t)}
                     </div>
                 </div>
                 ${isDeadline ? `<div class="deadline-badge-wrap"><span class="deadline-badge-lg">🔥 마감일</span></div>`
@@ -2178,6 +2180,7 @@ function renderDaily() {
                         ${labelStr}
                         ${clientStr}
                         ${carryBadge}
+                        ${noteBadge(t)}
                         ${ddayHtml}
                     </div>
                 </div>
@@ -2620,6 +2623,7 @@ function openCalendarAdd(person, dateStr) {
         <div class="form-group"><label class="form-label">라벨</label><select class="form-select" id="quickTaskLabel">${labelHtml}</select></div>
         <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="quickTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
         <div class="form-group"><label class="form-label">고객사</label>${buildClientDatalistField('quickTaskClient', '', 'quickClientList')}</div>
+        <div class="form-group"><label class="form-label">비고 (링크·메모)</label><textarea class="form-input" id="quickTaskNote" rows="3" placeholder="링크나 추가로 남길 말을 적어주세요" style="resize:vertical;line-height:1.5"></textarea></div>
         <button class="form-submit" onclick="addQuickTask()">할 일 추가</button>`;
     document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
 }
@@ -2653,6 +2657,7 @@ function openQuickTask(assignee) {
         <div class="form-group"><label class="form-label">라벨</label><select class="form-select" id="quickTaskLabel">${labelHtml}</select></div>
         <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="quickTaskPriority"><option value="🟡 보통">보통</option><option value="🔴 긴급">긴급</option><option value="🔵 낮음">낮음</option></select></div>
         <div class="form-group"><label class="form-label">고객사</label>${buildClientDatalistField('quickTaskClient', '', 'quickClientList')}</div>
+        <div class="form-group"><label class="form-label">비고 (링크·메모)</label><textarea class="form-input" id="quickTaskNote" rows="3" placeholder="링크나 추가로 남길 말을 적어주세요" style="resize:vertical;line-height:1.5"></textarea></div>
         <button class="form-submit" onclick="addQuickTask()">할 일 추가</button>`;
     document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
 }
@@ -2666,11 +2671,13 @@ async function addQuickTask() {
     const label = document.getElementById('quickTaskLabel').value || '';
     const client = document.getElementById('quickTaskClient').value || '';
     const priority = document.getElementById('quickTaskPriority').value;
+    const noteEl = document.getElementById('quickTaskNote');
+    const note = noteEl ? noteEl.value.trim() : '';
     const groupId = deadline && deadline !== date ? Date.now() : null;
 
     const saved = await dbInsertTask({
         task, date, assignee, deadline, label, client, target: '',
-        priority, done: false, linkedGroup: groupId
+        priority, done: false, linkedGroup: groupId, note
     });
     if (!saved) return;
     dailyTasks.push(saved);
@@ -2680,7 +2687,7 @@ async function addQuickTask() {
         const savedCopy = await dbInsertTask({
             task: `${task} (마감일)`,
             date: deadline, assignee, deadline, label, client, target: '',
-            priority, done: false, linkedGroup: groupId, isDeadlineCopy: true
+            priority, done: false, linkedGroup: groupId, isDeadlineCopy: true, note
         });
         if (savedCopy) dailyTasks.push(savedCopy);
     }
@@ -2709,6 +2716,12 @@ function getDday(dateStr) {
     if (diff === 0) return '(D-Day)';
     if (diff > 0) return `(D-${diff})`;
     return `(D+${Math.abs(diff)})`;
+}
+
+// 비고가 있으면 카드에 표시할 📝 배지 (툴팁으로 내용 미리보기)
+function noteBadge(t) {
+    if (!t || !t.note) return '';
+    return `<span class="daily-note-badge" title="${escHtml(t.note)}">📝</span>`;
 }
 
 function getLabelClass(label) {
@@ -2745,6 +2758,7 @@ function openEditTask(id) {
         <div class="form-group"><label class="form-label">라벨</label><select class="form-select" id="editTaskLabel">${labelHtml}</select></div>
         <div class="form-group"><label class="form-label">우선순위</label><select class="form-select" id="editTaskPriority">${priorityHtml}</select></div>
         <div class="form-group"><label class="form-label">고객사</label>${buildClientDatalistField('editTaskClient', t.client || '', 'editClientList')}</div>
+        <div class="form-group"><label class="form-label">비고 (링크·메모)</label><textarea class="form-input" id="editTaskNote" rows="3" placeholder="링크나 추가로 남길 말을 적어주세요" style="resize:vertical;line-height:1.5">${escHtml(t.note || '')}</textarea></div>
         <div style="display:flex;gap:8px;">
             <button class="form-submit" style="flex:1;" onclick="saveEditTask(${id})">수정 완료</button>
             <button class="form-submit" style="flex:0;background:var(--red);min-width:80px;" onclick="deleteTask(${id})">삭제</button>
@@ -2763,6 +2777,8 @@ async function saveEditTask(id) {
     const newClient = document.getElementById('editTaskClient').value || '';
     const newPriority = document.getElementById('editTaskPriority').value;
     const newDate = document.getElementById('editTaskDate').value;
+    const newNoteEl = document.getElementById('editTaskNote');
+    const newNote = newNoteEl ? newNoteEl.value.trim() : '';
 
     // 마감일 복사본을 수정하는 경우, 원본 이름에서 (마감일) 제거한 이름 사용
     const baseName = t.isDeadlineCopy ? name.replace(/\s*\(마감일\)\s*$/, '') : name;
@@ -2772,7 +2788,7 @@ async function saveEditTask(id) {
         // 공통 필드는 그룹 일괄 업데이트
         await dbUpdateTasksByGroup(t.linkedGroup, {
             assignee: newAssignee, deadline: newDeadline,
-            label: newLabel, client: newClient, priority: newPriority
+            label: newLabel, client: newClient, priority: newPriority, note: newNote
         });
         // task 이름/date는 isDeadlineCopy 여부로 달라짐 → 개별 업데이트
         const linkedList = dailyTasks.filter(x => x.linkedGroup === t.linkedGroup);
@@ -2782,6 +2798,7 @@ async function saveEditTask(id) {
             linked.label = newLabel;
             linked.client = newClient;
             linked.priority = newPriority;
+            linked.note = newNote;
             if (linked.isDeadlineCopy) {
                 linked.task = `${baseName} (마감일)`;
                 if (newDeadline) linked.date = newDeadline;
@@ -2799,10 +2816,11 @@ async function saveEditTask(id) {
         t.label = newLabel;
         t.client = newClient;
         t.priority = newPriority;
+        t.note = newNote;
 
         await dbUpdateTask(id, {
             task: name, assignee: newAssignee, date: newDate,
-            deadline: newDeadline, label: newLabel, client: newClient, priority: newPriority
+            deadline: newDeadline, label: newLabel, client: newClient, priority: newPriority, note: newNote
         });
 
         // 마감일이 새로 추가된 경우 연동 태스크 생성
@@ -5242,7 +5260,8 @@ function taskToDb(t) {
         linked_group: t.linkedGroup || null,
         is_deadline_copy: !!t.isDeadlineCopy,
         project_id: t.projectId || null,
-        completed_at: t.completedAt || null
+        completed_at: t.completedAt || null,
+        note: t.note || null
     };
 }
 function taskFromDb(r) {
@@ -5260,7 +5279,8 @@ function taskFromDb(r) {
         linkedGroup: r.linked_group || null,
         isDeadlineCopy: !!r.is_deadline_copy,
         projectId: r.project_id || null,
-        completedAt: r.completed_at || null
+        completedAt: r.completed_at || null,
+        note: r.note || ''
     };
 }
 async function loadDailyTasksFromDb() {
@@ -5509,7 +5529,7 @@ async function dbInsertTask(t) {
 async function dbUpdateTask(id, patch) {
     const map = { task:'task', date:'date', assignee:'assignee', target:'target', priority:'priority',
         done:'done', deadline:'deadline', label:'label', client:'client',
-        linkedGroup:'linked_group', isDeadlineCopy:'is_deadline_copy', completedAt:'completed_at' };
+        linkedGroup:'linked_group', isDeadlineCopy:'is_deadline_copy', completedAt:'completed_at', note:'note' };
     const dbPatch = {};
     for (const [k, v] of Object.entries(patch)) {
         if (!map[k]) continue;
@@ -5521,7 +5541,7 @@ async function dbUpdateTask(id, patch) {
 }
 async function dbUpdateTasksByGroup(groupId, patch) {
     const map = { task:'task', date:'date', assignee:'assignee', target:'target', priority:'priority',
-        done:'done', deadline:'deadline', label:'label', client:'client', completedAt:'completed_at' };
+        done:'done', deadline:'deadline', label:'label', client:'client', completedAt:'completed_at', note:'note' };
     const dbPatch = {};
     for (const [k, v] of Object.entries(patch)) {
         if (!map[k]) continue;
