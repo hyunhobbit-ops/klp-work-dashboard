@@ -1384,7 +1384,7 @@ function renderHome() {
     else greet = '좋은 저녁이에요';
     const _me = myName || '';
     const urgentProjCount = projects.filter(p => {
-        if (!p.priority || !p.priority.includes('긴급') || p.status === '완료') return false;
+        if (!p.priority || !p.priority.includes('긴급') || p.status === '완료' || p.status === '취소') return false;
         const owners = p.assignees || [];
         return owners.includes(_me) || owners.includes('전체');
     }).length;
@@ -1423,7 +1423,7 @@ function renderHome() {
     const today0 = new Date(todayStr + 'T00:00:00');
     const meName = myName || '';
     const projDeadlines = projects
-        .filter(p => p.status !== '완료' && p.deadline)
+        .filter(p => p.status !== '완료' && p.status !== '취소' && p.deadline)
         .map(p => {
             const d = new Date(p.deadline + 'T00:00:00');
             const diff = Math.round((d - today0) / 86400000);
@@ -1513,7 +1513,7 @@ function renderHome() {
     const me = myName || '';
     const urgentProjects = projects.filter(p => {
         if (!p.priority || !p.priority.includes('긴급')) return false;
-        if (p.status === '완료') return false;
+        if (p.status === '완료' || p.status === '취소') return false;
         const owners = p.assignees || [];
         return owners.includes(me) || owners.includes('전체');
     });
@@ -1642,7 +1642,7 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
         const ownerStr = p.manager || (p.assignees && p.assignees.length ? p.assignees.join(', ') : '-');
         const statusCls = statusBadgeClass(p.status);
-        const statusOptsHtml = ['시작 전', '진행 중', '완료'].map(s => `<option value="${s}"${s === p.status ? ' selected' : ''}>${s}</option>`).join('');
+        const statusOptsHtml = ['시작 전', '진행 중', '완료', '취소'].map(s => `<option value="${s}"${s === p.status ? ' selected' : ''}>${s}</option>`).join('');
         rowHtmlById.set(p.id, `<tr onclick="projectRowClick(${p.id})" ondblclick="projectRowDblClick(${p.id})" style="cursor:pointer">
             <td><select class="status-select badge ${statusCls}" onclick="event.stopPropagation()" onchange="updateProjectStatus(${p.id}, this.value)">${statusOptsHtml}</select></td>
             <td><strong>${p.client || '-'}</strong></td>
@@ -1682,18 +1682,21 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
         const sections = [
             { key: '시작 전', color: '#A9B1BB', bg: '#F7F8FA' },
             { key: '진행 중', color: '#7CA9E6', bg: '#F3F8FE' },
-            { key: '완료', color: '#8FD4AE', bg: '#F2FBF6' }
+            { key: '완료', color: '#8FD4AE', bg: '#F2FBF6' },
+            { key: '취소', color: '#D08A8A', bg: '#FBF3F3' }
         ];
         // 정규화 매칭으로 버킷 분류 — 알 수 없는 상태는 '시작 전'에 합류
-        const buckets = { '시작 전': [], '진행 중': [], '완료': [] };
+        const buckets = { '시작 전': [], '진행 중': [], '완료': [], '취소': [] };
         filtered.forEach(p => {
             const n = normalize(p.status);
             if (n === normalize('진행 중')) buckets['진행 중'].push(p);
             else if (n === normalize('완료')) buckets['완료'].push(p);
+            else if (n === normalize('취소')) buckets['취소'].push(p);
             else buckets['시작 전'].push(p);
         });
         sections.forEach(sec => {
             const group = buckets[sec.key];
+            if (sec.key === '취소' && group.length === 0) return;   // 취소 건 없으면 섹션 숨김
             const active = sec.key === '진행 중';   // 제일 중요한 섹션 — 강조
 
             // ===== 테이블 헤더 =====
@@ -3699,7 +3702,7 @@ function openEditProject(id) {
         supplierPayment: { label: '공급처 송금', desc: '공급처(협력업체) 대금 송금' },
         delivered: { label: '납품 완료', desc: '최종 납품 완료' }
     };
-    const statusOpts = ['시작 전', '진행 중', '완료'];
+    const statusOpts = ['시작 전', '진행 중', '완료', '취소'];
     const vatCurrent = p.vat === 'include' ? 'include' : 'exclude';
 
     const checksHtml = Object.entries(checkDetails).map(([key, info]) => `
@@ -4349,7 +4352,7 @@ function openModal(type) {
                         </div>
                         <div class="form-group"><label class="form-label">상태</label>
                             <select class="form-select" id="newProjectStatus">
-                                <option>시작 전</option><option>진행 중</option><option>완료</option>
+                                <option>시작 전</option><option>진행 중</option><option>완료</option><option>취소</option>
                             </select>
                         </div>
                     </div>
@@ -7366,6 +7369,7 @@ function showToast(msg) {
 function statusBadgeClass(s) {
     if (s === '진행 중') return 'badge-blue';
     if (s === '완료') return 'badge-green';
+    if (s === '취소') return 'badge-red';
     return 'badge-gray';
 }
 
