@@ -481,6 +481,7 @@ const pageTitles = {
     marketdb: '중고마켓DB',
     quotes: '견적서 만들기',
     'margin-calc': '마진계산기',
+    'ad-studio': 'AI 광고 제작',
     planning: '프로젝트',
     'planning-company': '회사 프로젝트',
     'planning-funding': '펀딩 프로젝트',
@@ -1116,6 +1117,10 @@ function switchTab(tabId, fromHistory = false) {
     // 견적서 탭 열릴 때: DB 로드 + 리스트 렌더
     if (tabId === 'quotes') {
         loadQuotesFromDb().then(() => renderQuotes()).catch(e => console.error('loadQuotes failed', e));
+    }
+
+    if (tabId === 'ad-studio') {
+        try { renderAdStudio(); } catch (e) { console.error('renderAdStudio failed', e); }
     }
 
     // 제안서 탭에 사용자가 직접 진입(사이드바 클릭 등) 시 목록 뷰로 리셋.
@@ -16603,3 +16608,353 @@ document.addEventListener('keydown', e => {
         else if (histOv && histOv.style.display !== 'none') closeCashHistoryModal();
     }
 });
+
+// =====================================================================
+// AI 광고 제작 (Phase 1 MVP)
+//  - 문구=Claude(/api/ad-copy), 배경이미지=OpenAI(/api/ad-image), 합성=앱(html2canvas)
+// =====================================================================
+let _adProduct = null;      // {id, name, price, imageUrl, points}
+let _adSettings = null;     // {goal, tone, target, emphasis}
+let _adResults = null;      // {variants:[], images:[], selCopy, selImg, composed}
+let _adSourceMode = 'db';   // 'db' | 'upload'
+
+function renderAdStudio() {
+    const el = document.getElementById('adStudioBody');
+    if (!el) return;
+    // 상품 DB가 아직 안 실렸으면 로드 후 재렌더
+    if (_adSourceMode === 'db' && productsDB.length === 0) {
+        el.innerHTML = '<div style="padding:24px;color:var(--gray-500)">상품 목록 불러오는 중…</div>';
+        loadProductsFromDb().then(() => ensureProductImages()).then(() => renderAdStudio()).catch(() => renderAdStudio());
+        return;
+    }
+    if (_adSourceMode === 'db') { try { ensureProductImages(); } catch (_) {} }
+
+    const dbOpts = productsDB.map(p => `<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
+    const goalOpts = ['신제품 홍보', '할인·프로모션', '브랜드 이미지', '재고 소진', '기타']
+        .map(g => `<option value="${g}">${g}</option>`).join('');
+    const toneOpts = ['고급스럽고 세련된', '친근하고 따뜻한', '재미있고 발랄한', '신뢰감 있는', '미니멀·감성']
+        .map(t => `<option value="${t}">${t}</option>`).join('');
+
+    el.innerHTML = `
+    <div style="max-width:760px">
+      <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:14px;padding:20px;margin-bottom:16px">
+        <div style="font-weight:800;font-size:15px;margin-bottom:12px">1. 제품 선택</div>
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="filter-chip ${_adSourceMode === 'db' ? 'active' : ''}" onclick="adSetSource('db')">상품 DB에서 선택</button>
+          <button class="filter-chip ${_adSourceMode === 'upload' ? 'active' : ''}" onclick="adSetSource('upload')">직접 업로드</button>
+        </div>
+        <div id="adSourceDb" style="display:${_adSourceMode === 'db' ? 'block' : 'none'}">
+          <div class="form-group"><label class="form-label">상품</label>
+            <select class="form-select" id="adDbSelect" onchange="adPickDbProduct(this.value)">
+              <option value="">— 상품 선택 —</option>${dbOpts}
+            </select>
+          </div>
+        </div>
+        <div id="adSourceUpload" style="display:${_adSourceMode === 'upload' ? 'block' : 'none'}">
+          <div class="form-group"><label class="form-label">제품 사진</label>
+            <input type="file" accept="image/*" class="form-input" id="adUpFile" onchange="adOnUpload(this)"></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">제품명</label><input type="text" class="form-input" id="adUpName" placeholder="제품명"></div>
+            <div class="form-group"><label class="form-label">가격(선택)</label><input type="text" class="form-input" id="adUpPrice" placeholder="예: 29,000원"></div>
+          </div>
+          <div class="form-group"><label class="form-label">핵심 포인트</label><textarea class="form-input" id="adUpPoints" rows="2" placeholder="강점·특징을 몇 줄로" style="resize:vertical"></textarea></div>
+        </div>
+        <div id="adProductPreview" style="margin-top:6px"></div>
+      </div>
+
+      <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:14px;padding:20px;margin-bottom:16px">
+        <div style="font-weight:800;font-size:15px;margin-bottom:12px">2. 광고 설정</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">목적</label><select class="form-select" id="adGoal">${goalOpts}</select></div>
+          <div class="form-group"><label class="form-label">톤</label><select class="form-select" id="adTone">${toneOpts}</select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">타깃</label><input type="text" class="form-input" id="adTarget" placeholder="예: 20~30대 직장인"></div>
+          <div class="form-group"><label class="form-label">강조 문구(선택)</label><input type="text" class="form-input" id="adEmphasis" placeholder="예: 한정 수량, 무료배송"></div>
+        </div>
+      </div>
+
+      <button class="form-submit" id="adGenerateBtn" onclick="generateAdMaterials()" style="font-size:15px">✨ 광고 생성</button>
+
+      <div id="adResultsArea" style="margin-top:20px"></div>
+      <div id="adRecentArea" style="margin-top:28px"></div>
+    </div>`;
+
+    _adRenderProductPreview();
+    loadAdCampaigns();
+    if (_adResults) renderAdResults();
+}
+
+function adSetSource(mode) {
+    _adSourceMode = mode;
+    renderAdStudio();
+}
+
+function _adRenderProductPreview() {
+    const box = document.getElementById('adProductPreview');
+    if (!box) return;
+    if (!_adProduct || !_adProduct.imageUrl) { box.innerHTML = ''; return; }
+    box.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <img src="${escHtml(_adProduct.imageUrl)}" style="width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid var(--gray-200)">
+        <div><div style="font-weight:700">${escHtml(_adProduct.name || '')}</div>
+        <div style="font-size:12px;color:var(--gray-500)">${escHtml(String(_adProduct.price || ''))}</div></div></div>`;
+}
+
+function adPickDbProduct(id) {
+    const p = productsDB.find(x => String(x.id) === String(id));
+    if (!p) { _adProduct = null; _adRenderProductPreview(); return; }
+    const priceStr = p.unitPrice ? (Number(p.unitPrice).toLocaleString() + '원' + (p.vatIncluded ? ' (VAT포함)' : '')) : '';
+    _adProduct = { id: p.id, name: p.name, price: priceStr, imageUrl: p.image || '', points: p.description || '' };
+    _adRenderProductPreview();
+}
+
+// 업로드 이미지 → 최대 1200px로 리사이즈한 data URL
+function _adFileToDataUrl(file, maxDim) {
+    return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                let w = img.naturalWidth, h = img.naturalHeight;
+                const scale = Math.min(1, (maxDim || 1200) / Math.max(w, h));
+                w = Math.round(w * scale); h = Math.round(h * scale);
+                const c = document.createElement('canvas'); c.width = w; c.height = h;
+                c.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(c.toDataURL('image/jpeg', 0.88));
+            };
+            img.onerror = () => reject(new Error('이미지 로드 실패'));
+            img.src = fr.result;
+        };
+        fr.onerror = () => reject(new Error('파일 읽기 실패'));
+        fr.readAsDataURL(file);
+    });
+}
+
+async function adOnUpload(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+        const dataUrl = await _adFileToDataUrl(file, 1200);
+        if (!_adProduct) _adProduct = {};
+        _adProduct.imageUrl = dataUrl;
+        _adProduct.id = null;
+        // 이름/가격/포인트는 아래 입력칸에서 수집 시 채움
+        _adRenderProductPreview();
+    } catch (e) { showToast('이미지 처리 실패: ' + (e.message || e)); }
+}
+
+function _adCollectInputs() {
+    if (_adSourceMode === 'upload') {
+        const name = (document.getElementById('adUpName') || {}).value || '';
+        const price = (document.getElementById('adUpPrice') || {}).value || '';
+        const points = (document.getElementById('adUpPoints') || {}).value || '';
+        if (!_adProduct) _adProduct = {};
+        _adProduct.name = name.trim();
+        _adProduct.price = price.trim();
+        _adProduct.points = points.trim();
+    }
+    _adSettings = {
+        goal: (document.getElementById('adGoal') || {}).value || '',
+        tone: (document.getElementById('adTone') || {}).value || '',
+        target: (document.getElementById('adTarget') || {}).value || '',
+        emphasis: (document.getElementById('adEmphasis') || {}).value || ''
+    };
+}
+
+async function generateAdMaterials() {
+    _adCollectInputs();
+    if (!_adProduct || !_adProduct.name) { showToast('제품을 먼저 선택/입력해주세요'); return; }
+    if (!_adProduct.imageUrl) { showToast('제품 사진이 필요합니다'); return; }
+    const { data } = await sb.auth.getSession();
+    const token = data && data.session && data.session.access_token;
+    if (!token) { showToast('다시 로그인해주세요'); return; }
+
+    const btn = document.getElementById('adGenerateBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'AI가 만드는 중… (최대 30초)'; }
+    const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+    const prodForApi = { name: _adProduct.name, price: _adProduct.price, points: _adProduct.points };
+
+    const [copyRes, imgRes] = await Promise.allSettled([
+        fetch('/api/ad-copy', { method: 'POST', headers, body: JSON.stringify({ product: prodForApi, settings: _adSettings }) })
+            .then(r => r.json().then(j => ({ ok: r.ok, j }))),
+        fetch('/api/ad-image', { method: 'POST', headers, body: JSON.stringify({ product: prodForApi, settings: _adSettings, count: 2 }) })
+            .then(r => r.json().then(j => ({ ok: r.ok, j })))
+    ]);
+
+    const variants = (copyRes.status === 'fulfilled' && copyRes.value.ok) ? (copyRes.value.j.variants || []) : [];
+    const images = (imgRes.status === 'fulfilled' && imgRes.value.ok) ? (imgRes.value.j.images || []) : [];
+
+    if (btn) { btn.disabled = false; btn.textContent = '✨ 다시 생성'; }
+
+    if (!variants.length && !images.length) {
+        const emsg = (copyRes.status === 'fulfilled' && copyRes.value.j && copyRes.value.j.error)
+            || (imgRes.status === 'fulfilled' && imgRes.value.j && imgRes.value.j.error) || '생성 실패';
+        showToast('생성 실패 — ' + emsg);
+        return;
+    }
+    if (!variants.length) showToast('문구 생성 실패(이미지는 성공)');
+    if (!images.length) {
+        const em = (imgRes.status === 'fulfilled' && imgRes.value.j && imgRes.value.j.error) || 'OpenAI 키/크레딧 확인';
+        showToast('이미지 생성 실패 — ' + em);
+    }
+    _adResults = { variants, images, selCopy: 0, selImg: 0, composed: null };
+    renderAdResults();
+}
+
+function renderAdResults() {
+    const area = document.getElementById('adResultsArea');
+    if (!area || !_adResults) return;
+    const r = _adResults;
+    const v = r.variants[r.selCopy] || {};
+
+    const imgThumbs = r.images.length
+        ? r.images.map((src, i) => `<img src="${escHtml(src)}" onclick="adPickImg(${i})" style="width:96px;height:96px;object-fit:cover;border-radius:10px;cursor:pointer;border:3px solid ${i === r.selImg ? 'var(--blue)' : 'transparent'}">`).join('')
+        : `<div style="color:var(--gray-500);font-size:13px">이미지 없음 (OpenAI 키 미설정 시). 문구만 사용할 수 있어요.</div>`;
+
+    const copyCards = r.variants.map((c, i) => `
+        <div onclick="adPickCopy(${i})" style="border:2px solid ${i === r.selCopy ? 'var(--blue)' : 'var(--gray-200)'};border-radius:10px;padding:12px;cursor:pointer;min-width:200px;flex:1">
+            <div style="font-weight:800;font-size:14px">${escHtml(c.headline || '')}</div>
+            <div style="font-size:12px;color:var(--gray-500);margin-top:4px">${escHtml(c.sub || '')}</div>
+        </div>`).join('');
+
+    area.innerHTML = `
+    <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:14px;padding:20px">
+      <div style="font-weight:800;font-size:15px;margin-bottom:12px">3. 배경 선택</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px">${imgThumbs}</div>
+
+      <div style="font-weight:800;font-size:15px;margin-bottom:12px">4. 문구 선택 & 수정</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">${copyCards}</div>
+      <div class="form-group"><label class="form-label">헤드라인</label><input type="text" class="form-input" id="adEditHeadline" value="${escHtml(v.headline || '')}" oninput="adEditCopy('headline',this.value)"></div>
+      <div class="form-group"><label class="form-label">보조 문구</label><input type="text" class="form-input" id="adEditSub" value="${escHtml(v.sub || '')}" oninput="adEditCopy('sub',this.value)"></div>
+      <div class="form-group"><label class="form-label">본문</label><textarea class="form-input" rows="2" oninput="adEditCopy('body',this.value)" style="resize:vertical">${escHtml(v.body || '')}</textarea></div>
+      <div class="form-group"><label class="form-label">CTA(행동 유도)</label><input type="text" class="form-input" id="adEditCta" value="${escHtml(v.cta || '')}" oninput="adEditCopy('cta',this.value)"></div>
+
+      <div style="font-weight:800;font-size:15px;margin:18px 0 12px">5. 미리보기 & 내보내기</div>
+      <div id="adPreview" style="margin-bottom:14px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="form-submit" style="flex:0 0 auto;padding:10px 16px" onclick="adDownloadImage()">🖼️ 이미지 다운로드</button>
+        <button class="form-submit" style="flex:0 0 auto;padding:10px 16px;background:var(--gray-100);color:var(--gray-800)" onclick="adCopyKakao()">💬 카톡 문구 복사</button>
+        <button class="form-submit" style="flex:0 0 auto;padding:10px 16px;background:var(--gray-100);color:var(--gray-800)" onclick="adCopyEmail()">✉️ 이메일 문구 복사</button>
+        <button class="form-submit" style="flex:0 0 auto;padding:10px 16px;background:var(--gray-100);color:var(--gray-800)" onclick="saveAdCampaign()">💾 캠페인 저장</button>
+      </div>
+    </div>`;
+
+    composeAdImage();
+}
+
+function adPickImg(i) { if (!_adResults) return; _adResults.selImg = i; renderAdResults(); }
+function adPickCopy(i) { if (!_adResults) return; _adResults.selCopy = i; renderAdResults(); }
+function adEditCopy(field, val) {
+    if (!_adResults) return;
+    const v = _adResults.variants[_adResults.selCopy]; if (!v) return;
+    v[field] = val;
+    clearTimeout(_adEditCopy._t);
+    _adEditCopy._t = setTimeout(composeAdImage, 400); // 타이핑 중 과도한 재합성 방지
+}
+
+// 선택 배경 + 제품 카드 + 또렷한 한글 텍스트를 1080x1080 정사각으로 합성
+async function composeAdImage() {
+    if (!_adResults) return;
+    const r = _adResults;
+    const v = r.variants[r.selCopy] || {};
+    const bg = r.images[r.selImg] || '';
+    const preview = document.getElementById('adPreview');
+    if (typeof html2canvas === 'undefined') { if (preview) preview.innerHTML = '<div style="color:var(--red)">합성 라이브러리 로드 실패</div>'; return; }
+
+    const stage = document.createElement('div');
+    stage.style.cssText = 'position:fixed;left:-10000px;top:0;width:1080px;height:1080px;overflow:hidden;font-family:Pretendard,sans-serif';
+    const bgStyle = bg
+        ? `background-image:url('${bg}');background-size:cover;background-position:center`
+        : 'background:linear-gradient(135deg,#1F85FF,#0F6CD9)';
+    stage.innerHTML = `
+      <div style="position:absolute;inset:0;${bgStyle}"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0) 45%,rgba(0,0,0,.72) 100%)"></div>
+      ${_adProduct && _adProduct.imageUrl ? `<div style="position:absolute;top:70px;left:50%;transform:translateX(-50%);width:560px;height:560px;background:#fff;border-radius:28px;box-shadow:0 20px 60px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;overflow:hidden">
+        <img src="${_adProduct.imageUrl}" style="max-width:92%;max-height:92%;object-fit:contain">
+      </div>` : ''}
+      <div style="position:absolute;left:64px;right:64px;bottom:64px;color:#fff">
+        <div style="font-size:64px;font-weight:900;line-height:1.15;letter-spacing:-1px;text-shadow:0 2px 12px rgba(0,0,0,.35)">${escHtml(v.headline || '')}</div>
+        <div style="font-size:30px;font-weight:600;margin-top:12px;opacity:.95">${escHtml(v.sub || '')}</div>
+        ${_adProduct && _adProduct.price ? `<div style="font-size:34px;font-weight:800;margin-top:14px">${escHtml(String(_adProduct.price))}</div>` : ''}
+        ${v.cta ? `<div style="display:inline-block;margin-top:22px;background:#1F85FF;color:#fff;font-size:30px;font-weight:800;padding:14px 34px;border-radius:999px">${escHtml(v.cta)}</div>` : ''}
+      </div>`;
+    document.body.appendChild(stage);
+    try {
+        const canvas = await html2canvas(stage, { width: 1080, height: 1080, scale: 1, useCORS: true, backgroundColor: '#ffffff', logging: false });
+        r.composed = canvas.toDataURL('image/png');
+        if (preview) preview.innerHTML = `<img src="${r.composed}" style="width:100%;max-width:420px;border-radius:14px;border:1px solid var(--gray-200)">`;
+    } catch (e) {
+        if (preview) preview.innerHTML = `<div style="color:var(--red);font-size:13px">미리보기 합성 실패: ${escHtml(e.message || String(e))}</div>`;
+    } finally {
+        document.body.removeChild(stage);
+    }
+}
+
+function adDownloadImage() {
+    if (!_adResults || !_adResults.composed) { showToast('아직 미리보기가 준비되지 않았어요'); return; }
+    const a = document.createElement('a');
+    a.download = 'KLP_광고_' + getTodayStr() + '.png';
+    a.href = _adResults.composed;
+    a.click();
+}
+function adCopyKakao() {
+    if (!_adResults) return;
+    const v = _adResults.variants[_adResults.selCopy] || {};
+    const text = [v.headline, '', v.body, v.cta, '', v.hashtags].filter(x => x != null).join('\n');
+    navigator.clipboard.writeText(text).then(() => showToast('카톡 문구를 복사했어요')).catch(() => showToast('복사 실패'));
+}
+function adCopyEmail() {
+    if (!_adResults) return;
+    const v = _adResults.variants[_adResults.selCopy] || {};
+    const text = '[제목] ' + (v.emailSubject || '') + '\n\n' + (v.emailBody || '');
+    navigator.clipboard.writeText(text).then(() => showToast('이메일 문구를 복사했어요')).catch(() => showToast('복사 실패'));
+}
+
+async function saveAdCampaign() {
+    if (!_adResults) { showToast('생성 후 저장할 수 있어요'); return; }
+    const v = _adResults.variants[_adResults.selCopy] || {};
+    const row = {
+        author: (typeof currentUser !== 'undefined' && currentUser && currentUser.name) || '',
+        product_id: (_adProduct && _adProduct.id) || null,
+        product_snapshot: _adProduct ? { name: _adProduct.name, price: _adProduct.price, imageUrl: _adProduct.imageUrl, points: _adProduct.points } : null,
+        settings: _adSettings,
+        copy: v,
+        bg_image: _adResults.images[_adResults.selImg] || null,
+        status: '작성'
+    };
+    const { error } = await sb.from('ad_campaigns').insert(row);
+    if (error) { showToast('저장 실패: ' + error.message); return; }
+    showToast('캠페인이 저장되었습니다');
+    loadAdCampaigns();
+}
+
+async function loadAdCampaigns() {
+    const area = document.getElementById('adRecentArea');
+    if (!area) return;
+    try {
+        const { data, error } = await sb.from('ad_campaigns').select('id,created_at,product_snapshot,copy').order('created_at', { ascending: false }).limit(10);
+        if (error) throw error;
+        if (!data || !data.length) { area.innerHTML = ''; return; }
+        const items = data.map(c => {
+            const nm = (c.product_snapshot && c.product_snapshot.name) || '(제품)';
+            const hl = (c.copy && c.copy.headline) || '';
+            return `<div onclick="adOpenCampaign(${c.id})" style="padding:10px 12px;border:1px solid var(--gray-200);border-radius:10px;cursor:pointer;display:flex;justify-content:space-between;gap:10px">
+                <span style="font-weight:700">${escHtml(nm)}</span>
+                <span style="color:var(--gray-500);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(hl)}</span></div>`;
+        }).join('');
+        area.innerHTML = `<div style="font-weight:800;font-size:15px;margin-bottom:10px">최근 저장한 광고</div><div style="display:flex;flex-direction:column;gap:8px">${items}</div>`;
+    } catch (e) { area.innerHTML = ''; }
+}
+
+async function adOpenCampaign(id) {
+    try {
+        const { data, error } = await sb.from('ad_campaigns').select('*').eq('id', id).single();
+        if (error) throw error;
+        const snap = data.product_snapshot || {};
+        _adProduct = { id: data.product_id, name: snap.name, price: snap.price, imageUrl: snap.imageUrl, points: snap.points };
+        _adSettings = data.settings || {};
+        _adResults = { variants: [data.copy || {}], images: data.bg_image ? [data.bg_image] : [], selCopy: 0, selImg: 0, composed: null };
+        renderAdResults();
+        document.getElementById('adResultsArea').scrollIntoView({ behavior: 'smooth' });
+    } catch (e) { showToast('불러오기 실패: ' + (e.message || e)); }
+}

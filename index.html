@@ -186,6 +186,10 @@
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h3m2 0h3M8 15h3m2 0h3M8 19h3"/></svg>
                         <span>마진계산기</span>
                     </button>
+                    <button class="nav-item" data-tab="ad-studio" data-tip="AI로 광고 문구·이미지 제작 (카톡·이메일 배포용)">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 11-5.8-1.6"/></svg>
+                        <span>AI 광고 제작</span>
+                    </button>
                     <a class="nav-item nav-external" href="doc-generator.html" target="_blank" rel="noopener" data-tip="디자인확인서·작업요청서 생성 페이지 (새 창)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                         <span>문서생성기</span>
@@ -1430,6 +1434,14 @@
             </main>
 
             <!-- ===== 마진계산기 ===== -->
+            <!-- ===== AI 광고 제작 ===== -->
+            <main class="content" id="tab-ad-studio">
+                <div class="content-toolbar">
+                    <div class="toolbar-left"><h2 style="margin:0;font-size:18px">AI 광고 제작</h2></div>
+                </div>
+                <div id="adStudioBody"></div>
+            </main>
+
             <main class="content" id="tab-margin-calc">
                 <!-- 리스트 뷰 (기본 첫 화면) -->
                 <div id="marginListView">
@@ -1597,6 +1609,6 @@
       <div id="marketGalleryDots" style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:8px"></div>
     </div>
     <script src="klp-assets.js"></script>
-    <script src="app.js?v=20260701a"></script>
+    <script src="app.js?v=20260702a"></script>
 </body>
 </html>
