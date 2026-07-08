@@ -16786,18 +16786,32 @@ async function generateAdMaterials() {
 
     if (btn) { btn.disabled = false; btn.textContent = '✨ 다시 생성'; }
 
+    // 각 요청의 에러 메시지(+상세)를 추출 — 실패 원인을 화면에 그대로 노출
+    const errOf = (r) => {
+        if (r.status !== 'fulfilled') return (r.reason && r.reason.message) || '네트워크 오류';
+        if (r.value.ok) return '';
+        const j = r.value.j || {};
+        return (j.error || '실패') + (j.detail ? (' — ' + j.detail) : '');
+    };
+    const copyErr = errOf(copyRes);
+    const imgErr = errOf(imgRes);
+
     if (!variants.length && !images.length) {
-        const emsg = (copyRes.status === 'fulfilled' && copyRes.value.j && copyRes.value.j.error)
-            || (imgRes.status === 'fulfilled' && imgRes.value.j && imgRes.value.j.error) || '생성 실패';
-        showToast('생성 실패 — ' + emsg);
+        const area = document.getElementById('adResultsArea');
+        if (area) area.innerHTML = `<div style="background:var(--white);border:1px solid var(--toss-red,#E03131);border-radius:12px;padding:16px">
+            <div style="font-weight:800;color:var(--toss-red,#E03131);margin-bottom:8px">생성 실패</div>
+            <div style="font-size:13px;line-height:1.8;color:var(--gray-800)">
+              • 문구(Claude): ${copyErr ? escHtml(copyErr) : '알 수 없음'}<br>
+              • 이미지(OpenAI): ${imgErr ? escHtml(imgErr) : '알 수 없음'}
+            </div>
+            <div style="font-size:12px;color:var(--gray-500);margin-top:10px">이 화면을 캡처해서 알려주시면 원인을 정확히 잡을 수 있어요.</div>
+        </div>`;
+        showToast('생성 실패 — 아래 상세를 확인하세요');
         return;
     }
-    if (!variants.length) showToast('문구 생성 실패(이미지는 성공)');
-    if (!images.length) {
-        const em = (imgRes.status === 'fulfilled' && imgRes.value.j && imgRes.value.j.error) || 'OpenAI 키/크레딧 확인';
-        showToast('이미지 생성 실패 — ' + em);
-    }
     _adResults = { variants, images, selCopy: 0, selImg: 0, composed: null };
+    if (!variants.length) showToast('문구 생성 실패: ' + (copyErr || '알 수 없음'));
+    if (!images.length && imgErr) showToast('이미지 생성 실패: ' + imgErr);
     renderAdResults();
 }
 

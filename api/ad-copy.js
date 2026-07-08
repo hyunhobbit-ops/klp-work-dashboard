@@ -59,7 +59,7 @@ module.exports = async (req, res) => {
       method: 'POST',
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({
-        model: ANTHROPIC_MODEL, max_tokens: 1500,
+        model: ANTHROPIC_MODEL, max_tokens: 4000,
         tools: [tool], tool_choice: { type: 'tool', name: 'ad_copy' },
         messages: [{ role: 'user', content: prompt }]
       })
