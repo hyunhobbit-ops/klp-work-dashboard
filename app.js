@@ -16844,6 +16844,9 @@ function renderAdResults() {
       <div class="form-group"><label class="form-label">CTA(행동 유도)</label><input type="text" class="form-input" id="adEditCta" value="${escHtml(v.cta || '')}" oninput="adEditCopy('cta',this.value)"></div>
 
       <div style="font-weight:800;font-size:15px;margin:18px 0 12px">5. 미리보기 & 내보내기</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        ${AD_FORMATS.map(f => `<button class="filter-chip ${_adFormat === f.key ? 'active' : ''}" onclick="adSetFormat('${f.key}')">${f.label}</button>`).join('')}
+      </div>
       <div id="adPreview" style="margin-bottom:14px"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="form-submit" style="flex:0 0 auto;padding:10px 16px" onclick="adDownloadImage()">🖼️ 이미지 다운로드</button>
@@ -16866,39 +16869,77 @@ function adEditCopy(field, val) {
     _adEditCopy._t = setTimeout(composeAdImage, 400); // 타이핑 중 과도한 재합성 방지
 }
 
-// 선택 배경 + 제품 카드 + 또렷한 한글 텍스트를 1080x1080 정사각으로 합성
+// 출력 형식: 카톡 정사각 / 이메일 가로형 / A4 인쇄 세로
+const AD_FORMATS = [
+    { key: 'kakao', label: '카톡·SNS (정사각)', w: 1080, h: 1080 },
+    { key: 'email', label: '이메일 (가로형)', w: 1200, h: 628 },
+    { key: 'print', label: 'A4 인쇄 (세로)', w: 1240, h: 1754 }
+];
+let _adFormat = 'kakao';
+function adSetFormat(key) { _adFormat = key; renderAdResults(); }
+
+// 선택 배경 + 제품 카드 + 또렷한 한글 텍스트를 선택 형식(정사각/가로/세로)으로 합성.
+// 제품 사진은 <img object-fit>가 html2canvas에서 잘려서 background-size:contain 사용.
 async function composeAdImage() {
     if (!_adResults) return;
     const r = _adResults;
     const v = r.variants[r.selCopy] || {};
     const bg = r.images[r.selImg] || '';
     const preview = document.getElementById('adPreview');
-    if (typeof html2canvas === 'undefined') { if (preview) preview.innerHTML = '<div style="color:var(--red)">합성 라이브러리 로드 실패</div>'; return; }
+    if (typeof html2canvas === 'undefined') { if (preview) preview.innerHTML = '<div style="color:var(--toss-red)">합성 라이브러리 로드 실패</div>'; return; }
 
-    const stage = document.createElement('div');
-    stage.style.cssText = 'position:fixed;left:-10000px;top:0;width:1080px;height:1080px;overflow:hidden;font-family:Pretendard,sans-serif';
+    const fmt = AD_FORMATS.find(f => f.key === _adFormat) || AD_FORMATS[0];
+    const W = fmt.w, H = fmt.h;
+    const px = n => Math.round(n) + 'px';
+    const esc = escHtml;
+    const prod = (_adProduct && _adProduct.imageUrl) || '';
     const bgStyle = bg
         ? `background-image:url('${bg}');background-size:cover;background-position:center`
         : 'background:linear-gradient(135deg,#1F85FF,#0F6CD9)';
-    stage.innerHTML = `
-      <div style="position:absolute;inset:0;${bgStyle}"></div>
-      <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0) 45%,rgba(0,0,0,.72) 100%)"></div>
-      ${_adProduct && _adProduct.imageUrl ? `<div style="position:absolute;top:70px;left:50%;transform:translateX(-50%);width:560px;height:560px;background:#fff;border-radius:28px;box-shadow:0 20px 60px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;overflow:hidden">
-        <img src="${_adProduct.imageUrl}" style="max-width:92%;max-height:92%;object-fit:contain">
-      </div>` : ''}
-      <div style="position:absolute;left:64px;right:64px;bottom:64px;color:#fff">
-        <div style="font-size:64px;font-weight:900;line-height:1.15;letter-spacing:-1px;text-shadow:0 2px 12px rgba(0,0,0,.35)">${escHtml(v.headline || '')}</div>
-        <div style="font-size:30px;font-weight:600;margin-top:12px;opacity:.95">${escHtml(v.sub || '')}</div>
-        ${_adProduct && _adProduct.price ? `<div style="font-size:34px;font-weight:800;margin-top:14px">${escHtml(String(_adProduct.price))}</div>` : ''}
-        ${v.cta ? `<div style="display:inline-block;margin-top:22px;background:#1F85FF;color:#fff;font-size:30px;font-weight:800;padding:14px 34px;border-radius:999px">${escHtml(v.cta)}</div>` : ''}
-      </div>`;
+    const productCard = (size, posCss) => prod
+        ? `<div style="position:absolute;${posCss};width:${px(size)};height:${px(size)};background:#fff;border-radius:${px(28)};box-shadow:0 20px 60px rgba(0,0,0,.28);overflow:hidden">
+             <div style="position:absolute;inset:6%;background-image:url('${prod}');background-size:contain;background-repeat:no-repeat;background-position:center"></div>
+           </div>` : '';
+
+    let inner;
+    if (W > H) {
+        // 가로형(이메일): 제품 좌측 · 문구 우측
+        const s = W / 1200;
+        inner = `
+          <div style="position:absolute;inset:0;${bgStyle}"></div>
+          <div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(0,0,0,.12) 0%,rgba(0,0,0,0) 30%,rgba(0,0,0,.78) 72%)"></div>
+          ${productCard(H * 0.78, `top:50%;left:${px(H * 0.11)};transform:translateY(-50%)`)}
+          <div style="position:absolute;top:50%;right:${px(W * 0.05)};transform:translateY(-50%);width:${px(W * 0.46)};color:#fff;text-align:right">
+            <div style="font-size:${px(58 * s)};font-weight:900;line-height:1.12;letter-spacing:-1px;text-shadow:0 2px 12px rgba(0,0,0,.35)">${esc(v.headline || '')}</div>
+            <div style="font-size:${px(26 * s)};font-weight:600;margin-top:${px(10)};opacity:.95">${esc(v.sub || '')}</div>
+            ${_adProduct && _adProduct.price ? `<div style="font-size:${px(30 * s)};font-weight:800;margin-top:${px(12)}">${esc(String(_adProduct.price))}</div>` : ''}
+            ${v.cta ? `<div style="display:inline-block;margin-top:${px(20)};background:#1F85FF;color:#fff;font-size:${px(26 * s)};font-weight:800;padding:${px(12)} ${px(28)};border-radius:999px">${esc(v.cta)}</div>` : ''}
+          </div>`;
+    } else {
+        // 정사각/세로(카톡·A4): 제품 상단 · 문구 하단
+        const s = W / 1080;
+        inner = `
+          <div style="position:absolute;inset:0;${bgStyle}"></div>
+          <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0) 42%,rgba(0,0,0,.75) 100%)"></div>
+          ${productCard(W * 0.54, `top:${px(H * 0.06)};left:50%;transform:translateX(-50%)`)}
+          <div style="position:absolute;left:${px(W * 0.06)};right:${px(W * 0.06)};bottom:${px(H * 0.05)};color:#fff">
+            <div style="font-size:${px(64 * s)};font-weight:900;line-height:1.15;letter-spacing:-1px;text-shadow:0 2px 12px rgba(0,0,0,.35)">${esc(v.headline || '')}</div>
+            <div style="font-size:${px(30 * s)};font-weight:600;margin-top:${px(12)};opacity:.95">${esc(v.sub || '')}</div>
+            ${_adProduct && _adProduct.price ? `<div style="font-size:${px(34 * s)};font-weight:800;margin-top:${px(14)}">${esc(String(_adProduct.price))}</div>` : ''}
+            ${v.cta ? `<div style="display:inline-block;margin-top:${px(22)};background:#1F85FF;color:#fff;font-size:${px(30 * s)};font-weight:800;padding:${px(14)} ${px(34)};border-radius:999px">${esc(v.cta)}</div>` : ''}
+          </div>`;
+    }
+
+    const stage = document.createElement('div');
+    stage.style.cssText = `position:fixed;left:-10000px;top:0;width:${W}px;height:${H}px;overflow:hidden;font-family:Pretendard,sans-serif`;
+    stage.innerHTML = inner;
     document.body.appendChild(stage);
     try {
-        const canvas = await html2canvas(stage, { width: 1080, height: 1080, scale: 1, useCORS: true, backgroundColor: '#ffffff', logging: false });
+        const canvas = await html2canvas(stage, { width: W, height: H, scale: 1, useCORS: true, backgroundColor: '#ffffff', logging: false });
         r.composed = canvas.toDataURL('image/png');
-        if (preview) preview.innerHTML = `<img src="${r.composed}" style="width:100%;max-width:420px;border-radius:14px;border:1px solid var(--gray-200)">`;
+        if (preview) preview.innerHTML = `<img src="${r.composed}" style="width:100%;max-width:${W > H ? 520 : 380}px;border-radius:14px;border:1px solid var(--gray-200)">`;
     } catch (e) {
-        if (preview) preview.innerHTML = `<div style="color:var(--red);font-size:13px">미리보기 합성 실패: ${escHtml(e.message || String(e))}</div>`;
+        if (preview) preview.innerHTML = `<div style="color:var(--toss-red);font-size:13px">미리보기 합성 실패: ${esc(e.message || String(e))}</div>`;
     } finally {
         document.body.removeChild(stage);
     }
@@ -16907,7 +16948,7 @@ async function composeAdImage() {
 function adDownloadImage() {
     if (!_adResults || !_adResults.composed) { showToast('아직 미리보기가 준비되지 않았어요'); return; }
     const a = document.createElement('a');
-    a.download = 'KLP_광고_' + getTodayStr() + '.png';
+    a.download = 'KLP_광고_' + _adFormat + '_' + getTodayStr() + '.png';
     a.href = _adResults.composed;
     a.click();
 }
