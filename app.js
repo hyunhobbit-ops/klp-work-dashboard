@@ -16730,13 +16730,73 @@ function _adFileToDataUrl(file, maxDim) {
     });
 }
 
+// 제품 이미지의 단색 여백(빈 배경)을 자동으로 잘라냄.
+// 색과 무관하게 "가장자리부터 변화 없는(단색) 줄"을 제거 → 제품만 남김.
+// (크롬 시계처럼 배경색과 제품색이 비슷해도, 변화량 기준이라 안전)
+function _adAutoTrim(dataUrl) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            try {
+                const w = img.naturalWidth, h = img.naturalHeight;
+                if (!w || !h) return resolve(dataUrl);
+                const c = document.createElement('canvas'); c.width = w; c.height = h;
+                const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
+                const data = ctx.getImageData(0, 0, w, h).data;
+                const THRESH = 34; // 한 줄 내 색 변화 합이 이보다 작으면 '단색 줄'
+                // 지정 범위(y0..y1)의 세로줄 x 가 단색인지
+                const colUniform = (x, y0, y1) => {
+                    let rmin = 255, rmax = 0, gmin = 255, gmax = 0, bmin = 255, bmax = 0;
+                    const sy = Math.max(1, Math.floor((y1 - y0 + 1) / 60));
+                    for (let y = y0; y <= y1; y += sy) {
+                        const i = (y * w + x) * 4, R = data[i], G = data[i + 1], B = data[i + 2];
+                        if (R < rmin) rmin = R; if (R > rmax) rmax = R;
+                        if (G < gmin) gmin = G; if (G > gmax) gmax = G;
+                        if (B < bmin) bmin = B; if (B > bmax) bmax = B;
+                    }
+                    return (rmax - rmin) + (gmax - gmin) + (bmax - bmin) < THRESH;
+                };
+                // 지정 범위(x0..x1)의 가로줄 y 가 단색인지
+                const rowUniform = (y, x0, x1) => {
+                    let rmin = 255, rmax = 0, gmin = 255, gmax = 0, bmin = 255, bmax = 0;
+                    const sx = Math.max(1, Math.floor((x1 - x0 + 1) / 60));
+                    for (let x = x0; x <= x1; x += sx) {
+                        const i = (y * w + x) * 4, R = data[i], G = data[i + 1], B = data[i + 2];
+                        if (R < rmin) rmin = R; if (R > rmax) rmax = R;
+                        if (G < gmin) gmin = G; if (G > gmax) gmax = G;
+                        if (B < bmin) bmin = B; if (B > bmax) bmax = B;
+                    }
+                    return (rmax - rmin) + (gmax - gmin) + (bmax - bmin) < THRESH;
+                };
+                // 2단계: 가로 자른 뒤 그 범위에서 세로 재검사 → 제품 꽉 차게
+                let L = 0, R = w - 1, T = 0, B = h - 1;
+                for (let pass = 0; pass < 2; pass++) {
+                    while (L < R && colUniform(L, T, B)) L++;
+                    while (R > L && colUniform(R, T, B)) R--;
+                    while (T < B && rowUniform(T, L, R)) T++;
+                    while (B > T && rowUniform(B, L, R)) B--;
+                }
+                const cw = R - L + 1, ch = B - T + 1;
+                // 거의 안 잘리면(여백 없음) or 너무 작게 잡히면(오검출) 원본 유지
+                if ((cw >= w * 0.96 && ch >= h * 0.96) || cw < w * 0.1 || ch < h * 0.1) return resolve(dataUrl);
+                const oc = document.createElement('canvas'); oc.width = cw; oc.height = ch;
+                oc.getContext('2d').drawImage(c, L, T, cw, ch, 0, 0, cw, ch);
+                resolve(oc.toDataURL('image/png'));
+            } catch (e) { resolve(dataUrl); } // 교차출처 등 → 원본 유지
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+    });
+}
+
 async function adOnUpload(input) {
     const file = input.files && input.files[0];
     if (!file) return;
     try {
         const dataUrl = await _adFileToDataUrl(file, 1200);
         if (!_adProduct) _adProduct = {};
-        _adProduct.imageUrl = dataUrl;
+        _adProduct.imageUrl = await _adAutoTrim(dataUrl);
+        _adProduct._trimmed = true;
         _adProduct.id = null;
         // 이름/가격/포인트는 아래 입력칸에서 수집 시 채움
         _adRenderProductPreview();
@@ -16888,6 +16948,12 @@ async function composeAdImage() {
     const preview = document.getElementById('adPreview');
     if (typeof html2canvas === 'undefined') { if (preview) preview.innerHTML = '<div style="color:var(--toss-red)">합성 라이브러리 로드 실패</div>'; return; }
 
+    // 이미 등록된 이미지도 합성 전에 단색 여백 자동 크롭 (1회만)
+    if (_adProduct && _adProduct.imageUrl && !_adProduct._trimmed) {
+        _adProduct.imageUrl = await _adAutoTrim(_adProduct.imageUrl);
+        _adProduct._trimmed = true;
+        _adRenderProductPreview();
+    }
     const fmt = AD_FORMATS.find(f => f.key === _adFormat) || AD_FORMATS[0];
     const W = fmt.w, H = fmt.h;
     const px = n => Math.round(n) + 'px';
