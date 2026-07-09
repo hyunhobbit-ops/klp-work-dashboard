@@ -2,8 +2,10 @@
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vtulmuxkriklpiibiues.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
-// dall-e-3: 조직 인증 불필요·안정적(한 번에 1장) → 2장은 병렬 호출로 생성.
-const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'dall-e-3';
+// 계정마다 쓸 수 있는 이미지 모델이 다름(신규 계정엔 dall-e 계열이 없음) → 순서대로 시도해 되는 것 사용.
+const MODEL_CANDIDATES = [process.env.OPENAI_IMAGE_MODEL, 'gpt-image-1-mini', 'gpt-image-1', 'dall-e-3', 'dall-e-2']
+  .filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+let _workingModel = null; // 웜 인스턴스 동안 성공 모델 캐시
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST 요청만 허용됩니다.' }); return; }
@@ -28,14 +30,12 @@ module.exports = async (req, res) => {
     '톤: ' + (s.tone || '고급스럽고 밝은') + '. 타깃: ' + (s.target || '일반') + '. ' +
     '중요: 어떤 글자/텍스트/로고도 넣지 말 것. 제품 자체를 그리지 말고, 제품을 올려놓기 좋은 여백 있는 배경만. 사실적 스튜디오/라이프스타일 톤.';
 
-  // dall-e-3는 요청당 1장만 → count 만큼 병렬 호출.
-  // response_format은 최신 모델에서 거부되므로 보내지 않음.
-  // 결과가 URL이면 서버가 받아 base64로 변환(브라우저 CORS·합성 이슈 회피).
-  const genOne = async () => {
+  // 특정 모델로 1장 생성. b64 또는 URL(서버가 받아 base64 변환) 모두 처리.
+  const genWith = async (model) => {
     const oimg = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: OPENAI_IMAGE_MODEL, prompt, n: 1, size: '1024x1024' })
+      body: JSON.stringify({ model, prompt, n: 1, size: '1024x1024' })
     });
     const j = await oimg.json().catch(() => ({}));
     if (!oimg.ok) {
@@ -56,19 +56,40 @@ module.exports = async (req, res) => {
   };
 
   try {
-    const settled = await Promise.allSettled(Array.from({ length: count }, () => genOne()));
-    const images = settled.filter(s => s.status === 'fulfilled' && s.value).map(s => s.value);
-    if (images.length) { res.status(200).json({ images }); return; }
-    // 전부 실패 → 첫 에러로 안내
-    const first = settled.find(s => s.status === 'rejected');
-    const err = first ? first.reason : null;
+    const images = [];
+    let lastErr = null;
+    // 1장째: 사용 가능한 모델을 순서대로 탐색 (키/크레딧 문제면 즉시 중단)
+    if (!_workingModel) {
+      for (const m of MODEL_CANDIDATES) {
+        try { images.push(await genWith(m)); _workingModel = m; break; }
+        catch (e) {
+          lastErr = e;
+          if (e.status === 401 || e.status === 429) break; // 다른 모델 시도 무의미
+        }
+      }
+    } else {
+      try { images.push(await genWith(_workingModel)); }
+      catch (e) { lastErr = e; _workingModel = null; }
+    }
+    // 나머지 장수는 확정된 모델로 병렬 생성
+    if (_workingModel && images.length && count > 1) {
+      const rest = await Promise.allSettled(
+        Array.from({ length: count - 1 }, () => genWith(_workingModel))
+      );
+      rest.forEach(s => { if (s.status === 'fulfilled' && s.value) images.push(s.value); });
+    }
+    if (images.length) { res.status(200).json({ images, model: _workingModel }); return; }
+
+    const err = lastErr;
     const code = (err && err.status) || 502;
+    const detail = (err && err.message) || '';
     let msg = '이미지 생성 실패';
     if (code === 401) msg = 'OpenAI 키가 올바르지 않습니다.';
-    else if (code === 429) msg = '요청이 많거나 크레딧이 부족합니다.';
+    else if (code === 429) msg = '크레딧이 부족하거나 요청 한도를 넘었습니다. OpenAI Billing에서 충전해주세요.';
+    else if (/verif/i.test(detail)) msg = 'OpenAI 조직 인증이 필요합니다. platform.openai.com → Settings → Organization → Verify 후 재시도.';
     else if (code === 403) msg = '모델 사용 권한이 없습니다(조직 인증이 필요할 수 있음).';
-    else if (code === 400) msg = '요청이 거부되었습니다(콘텐츠 정책/모델 설정 등).';
-    res.status(code >= 400 && code < 500 ? code : 502).json({ error: msg, detail: (err && err.message) || '' });
+    else if (code === 400 || code === 404) msg = '사용 가능한 이미지 모델을 찾지 못했습니다.';
+    res.status(code >= 400 && code < 500 ? code : 502).json({ error: msg, detail });
   } catch (err) {
     res.status(502).json({ error: '이미지 생성 서버 오류', detail: (err && err.message) || '' });
   }
