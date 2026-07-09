@@ -28,12 +28,14 @@ module.exports = async (req, res) => {
     '톤: ' + (s.tone || '고급스럽고 밝은') + '. 타깃: ' + (s.target || '일반') + '. ' +
     '중요: 어떤 글자/텍스트/로고도 넣지 말 것. 제품 자체를 그리지 말고, 제품을 올려놓기 좋은 여백 있는 배경만. 사실적 스튜디오/라이프스타일 톤.';
 
-  // dall-e-3는 요청당 1장만 → count 만큼 병렬 호출
+  // dall-e-3는 요청당 1장만 → count 만큼 병렬 호출.
+  // response_format은 최신 모델에서 거부되므로 보내지 않음.
+  // 결과가 URL이면 서버가 받아 base64로 변환(브라우저 CORS·합성 이슈 회피).
   const genOne = async () => {
     const oimg = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: OPENAI_IMAGE_MODEL, prompt, n: 1, size: '1024x1024', response_format: 'b64_json' })
+      body: JSON.stringify({ model: OPENAI_IMAGE_MODEL, prompt, n: 1, size: '1024x1024' })
     });
     const j = await oimg.json().catch(() => ({}));
     if (!oimg.ok) {
@@ -42,7 +44,15 @@ module.exports = async (req, res) => {
       throw e;
     }
     const d = (j.data && j.data[0]) || {};
-    return d.b64_json ? ('data:image/png;base64,' + d.b64_json) : d.url;
+    if (d.b64_json) return 'data:image/png;base64,' + d.b64_json;
+    if (d.url) {
+      const ir = await fetch(d.url);
+      if (!ir.ok) throw new Error('이미지 다운로드 실패(' + ir.status + ')');
+      const buf = Buffer.from(await ir.arrayBuffer());
+      const ct = ir.headers.get('content-type') || 'image/png';
+      return 'data:' + ct + ';base64,' + buf.toString('base64');
+    }
+    throw new Error('이미지 응답이 비어있음');
   };
 
   try {

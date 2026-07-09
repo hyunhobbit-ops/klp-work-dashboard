@@ -16730,6 +16730,16 @@ function _adFileToDataUrl(file, maxDim) {
     });
 }
 
+// 이미지의 자연 크기(가로/세로) 반환
+function _adImgNatural(url) {
+    return new Promise((resolve, reject) => {
+        const im = new Image();
+        im.onload = () => resolve({ w: im.naturalWidth, h: im.naturalHeight });
+        im.onerror = () => reject(new Error('이미지 로드 실패'));
+        im.src = url;
+    });
+}
+
 // 제품 이미지의 단색 여백(빈 배경)을 자동으로 잘라냄.
 // 색과 무관하게 "가장자리부터 변화 없는(단색) 줄"을 제거 → 제품만 남김.
 // (크롬 시계처럼 배경색과 제품색이 비슷해도, 변화량 기준이라 안전)
@@ -16901,6 +16911,10 @@ function renderAdResults() {
       <div class="form-group"><label class="form-label">CTA(행동 유도)</label><input type="text" class="form-input" id="adEditCta" value="${escHtml(v.cta || '')}" oninput="adEditCopy('cta',this.value)"></div>
 
       <div style="font-weight:800;font-size:15px;margin:18px 0 12px">5. 미리보기 & 내보내기</div>
+      ${(_adProduct && _adProduct.imageUrl) ? `<div style="margin-bottom:12px">
+        <div style="font-size:12px;color:var(--gray-500);margin-bottom:6px">합성에 쓰는 제품 이미지 (이게 잘려 보이면 원본/저장 문제):</div>
+        <img src="${escHtml(_adProduct.imageUrl)}" style="height:96px;border-radius:8px;border:1px solid var(--gray-200);background:#fff;padding:4px;object-fit:contain">
+      </div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
         ${AD_FORMATS.map(f => `<button class="filter-chip ${_adFormat === f.key ? 'active' : ''}" onclick="adSetFormat('${f.key}')">${f.label}</button>`).join('')}
       </div>
@@ -16956,13 +16970,24 @@ async function composeAdImage() {
     const px = n => Math.round(n) + 'px';
     const esc = escHtml;
     const prod = (_adProduct && _adProduct.imageUrl) || '';
+    let prodNat = null;
+    if (prod) { try { prodNat = await _adImgNatural(prod); } catch (_) {} }
     const bgStyle = bg
         ? `background-image:url('${bg}');background-size:cover;background-position:center`
         : 'background:linear-gradient(135deg,#1F85FF,#0F6CD9)';
-    const productCard = (size, posCss) => prod
-        ? `<div style="position:absolute;${posCss};width:${px(size)};height:${px(size)};background:#fff;border-radius:${px(28)};box-shadow:0 20px 60px rgba(0,0,0,.28);overflow:hidden">
-             <div style="position:absolute;inset:6%;background-image:url('${prod}');background-size:contain;background-repeat:no-repeat;background-position:center"></div>
-           </div>` : '';
+    // 제품 사진: object-fit/background-size는 html2canvas에서 불안정 → 비율 계산한 <img> 크기로 그림
+    const productCard = (size, posCss) => {
+        if (!prod) return '';
+        const box = size * 0.88;
+        let iw = box, ih = box;
+        if (prodNat && prodNat.w && prodNat.h) {
+            const ar = prodNat.w / prodNat.h;
+            if (ar >= 1) { iw = box; ih = box / ar; } else { ih = box; iw = box * ar; }
+        }
+        return `<div style="position:absolute;${posCss};width:${px(size)};height:${px(size)};background:#fff;border-radius:${px(28)};box-shadow:0 20px 60px rgba(0,0,0,.28);overflow:hidden">
+            <img src="${prod}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:${px(iw)};height:${px(ih)}">
+        </div>`;
+    };
 
     let inner;
     if (W > H) {
