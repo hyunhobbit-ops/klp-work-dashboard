@@ -16618,6 +16618,8 @@ let _adSettings = null;     // {goal, tone, target, emphasis}
 let _adResults = null;      // {variants:[], images:[], selCopy, selImg, composed}
 let _adSourceMode = 'db';   // 'db' | 'upload'
 let _adStyleRefs = [];      // 스타일 참조 이미지(data URL) 최대 3장
+let _adBlend = false;       // 제품을 장면에 녹여 합성(true) vs 카드형(false)
+function adSetBlend(v) { _adBlend = !!v; renderAdStudio(); }
 
 function _adRenderStyleRefs() {
     const box = document.getElementById('adStyleRefBox');
@@ -16692,6 +16694,18 @@ function renderAdStudio() {
           <div class="form-group"><label class="form-label">타깃</label><input type="text" class="form-input" id="adTarget" placeholder="예: 20~30대 직장인"></div>
           <div class="form-group"><label class="form-label">강조 문구(선택)</label><input type="text" class="form-input" id="adEmphasis" placeholder="예: 한정 수량, 무료배송"></div>
         </div>
+      </div>
+
+      <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:14px;padding:20px;margin-bottom:16px">
+        <div style="font-weight:800;font-size:15px;margin-bottom:6px">제품 표현 방식</div>
+        <div style="font-size:12px;color:var(--gray-500);margin-bottom:10px">제품을 배경에 어떻게 넣을지 선택하세요.</div>
+        <div style="display:flex;gap:8px">
+          <button class="filter-chip ${!_adBlend ? 'active' : ''}" onclick="adSetBlend(false)">카드형 (정확)</button>
+          <button class="filter-chip ${_adBlend ? 'active' : ''}" onclick="adSetBlend(true)">장면에 녹이기 (자연스러움)</button>
+        </div>
+        <div style="font-size:12px;color:var(--gray-500);margin-top:8px">${_adBlend
+            ? '제품 사진을 AI가 장면 속에 실제처럼 합성합니다. 더 자연스럽지만 제품 모양이 약간 달라질 수 있고, gpt-image(조직 인증) 필요.'
+            : '제품 사진을 흰 카드에 얹습니다. 제품이 100% 정확합니다.'}</div>
       </div>
 
       <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:14px;padding:20px;margin-bottom:16px">
@@ -16825,7 +16839,7 @@ async function generateAdMaterials() {
     const [copyRes, imgRes] = await Promise.allSettled([
         fetch('/api/ad-copy', { method: 'POST', headers, body: JSON.stringify({ product: prodForApi, settings: _adSettings }) })
             .then(r => r.json().then(j => ({ ok: r.ok, j }))),
-        fetch('/api/ad-image', { method: 'POST', headers, body: JSON.stringify({ product: prodForApi, settings: _adSettings, count: 2, styleRefs: _adStyleRefs }) })
+        fetch('/api/ad-image', { method: 'POST', headers, body: JSON.stringify({ product: prodForApi, settings: _adSettings, count: 2, styleRefs: _adStyleRefs, blend: _adBlend, productImage: _adBlend ? (_adProduct && _adProduct.imageUrl) : undefined }) })
             .then(r => r.json().then(j => ({ ok: r.ok, j })))
     ]);
 
@@ -16857,7 +16871,8 @@ async function generateAdMaterials() {
         showToast('생성 실패 — 아래 상세를 확인하세요');
         return;
     }
-    _adResults = { variants, images, selCopy: 0, selImg: 0, composed: null, imgErr: imgErr };
+    const respBlend = (imgRes.status === 'fulfilled' && imgRes.value.ok && imgRes.value.j.blend) || false;
+    _adResults = { variants, images, selCopy: 0, selImg: 0, composed: null, imgErr: imgErr, blend: respBlend };
     if (!variants.length) showToast('문구 생성 실패: ' + (copyErr || '알 수 없음'));
     if (!images.length && imgErr) showToast('이미지 생성 실패: ' + imgErr);
     renderAdResults();
@@ -16952,7 +16967,7 @@ async function composeAdImage() {
     // stage에는 흰 카드만 두고, 합성이 끝난 캔버스 위에 drawImage로 직접 그림(2단계).
     let cardGeom = null; // {x, y, size}
     const productCard = (size, x, y) => {
-        if (!prod) return '';
+        if (!prod || r.blend) return ''; // 녹이기 모드: 제품이 배경에 이미 합성됨 → 카드 없음
         cardGeom = { x: Math.round(x), y: Math.round(y), size: Math.round(size) };
         return `<div style="position:absolute;left:${px(x)};top:${px(y)};width:${px(size)};height:${px(size)};background:#fff;border-radius:${px(28)};box-shadow:0 20px 60px rgba(0,0,0,.28)"></div>`;
     };

@@ -28,14 +28,23 @@ module.exports = async (req, res) => {
   // 스타일 참조 이미지(선택, 최대 3장) — data URL 배열
   const styleRefs = (Array.isArray(body && body.styleRefs) ? body.styleRefs : [])
     .filter(x => typeof x === 'string' && x.indexOf('data:') === 0).slice(0, 3);
+  // 녹이기 모드: 제품 사진을 장면에 직접 합성
+  const productImage = (typeof (body && body.productImage) === 'string' && body.productImage.indexOf('data:') === 0) ? body.productImage : null;
+  const blend = !!(body && body.blend) && !!productImage;
+  // 편집(edits)에 넣을 이미지: 녹이기면 [제품, 참조...], 아니면 [참조...]
+  const editImages = blend ? [productImage].concat(styleRefs) : styleRefs;
 
-  // 배경/무드만. 제품 자체·글자는 넣지 말 것(글자는 앱이 합성).
   const basePrompt = '한국 상업 광고용 정사각 배경 이미지. 제품 카테고리 "' + (p.name || '제품') + '"에 어울리는 감성적이고 깔끔한 배경/무드. ' +
     '톤: ' + (s.tone || '고급스럽고 밝은') + '. 타깃: ' + (s.target || '일반') + '. ' +
     '중요: 어떤 글자/텍스트/로고도 넣지 말 것. 제품 자체를 그리지 말고, 제품을 올려놓기 좋은 여백 있는 배경만. 사실적 스튜디오/라이프스타일 톤.';
-  const prompt = styleRefs.length
-    ? '첨부한 참조 이미지들의 분위기·색감·조명·질감·구도 스타일을 최대한 그대로 따라서 만들어줘. ' + basePrompt
-    : basePrompt;
+  const prompt = blend
+    ? ('첨부한 첫 번째 이미지 속 제품을, ' + (s.tone || '고급스럽고 밝은') + ' 분위기의 실제 공간/스튜디오 장면에 자연스럽게 놓인 상업 광고 사진처럼 합성해줘. '
+        + '제품의 형태·색·비율·로고·디테일은 절대 바꾸지 말고 그대로 유지하고, 그림자·반사·조명만 장면에 어울리게. '
+        + (styleRefs.length ? '나머지 참조 이미지들의 분위기·색감·조명·질감을 따라. ' : '')
+        + '어떤 글자/텍스트/워터마크도 넣지 말 것. 정사각 구도. 제품은 화면 위쪽~가운데에 크게 배치하고, 아래 1/3 정도는 텍스트를 얹을 단순한 여백(바닥/배경)으로 남겨줘.')
+    : (styleRefs.length
+        ? '첨부한 참조 이미지들의 분위기·색감·조명·질감·구도 스타일을 최대한 그대로 따라서 만들어줘. ' + basePrompt
+        : basePrompt);
 
   const dataUrlToPart = (dataUrl) => {
     const m = /^data:([^;]+);base64,([\s\S]*)$/.exec(dataUrl);
@@ -47,15 +56,15 @@ module.exports = async (req, res) => {
   // 특정 모델로 1장 생성. b64 또는 URL(서버가 받아 base64 변환) 모두 처리.
   const genWith = async (model) => {
     let oimg;
-    if (styleRefs.length && /^gpt-image/.test(model)) {
-      // 참조 이미지가 있으면 편집(edits) 엔드포인트로 스타일 반영 (gpt-image 전용, multipart)
+    if (editImages.length && /^gpt-image/.test(model)) {
+      // 참조/제품 이미지가 있으면 편집(edits) 엔드포인트 사용 (gpt-image 전용, multipart)
       const form = new FormData();
       form.append('model', model);
       form.append('prompt', prompt);
       form.append('n', '1');
       form.append('size', '1024x1024');
       form.append('quality', 'high');
-      styleRefs.forEach((ref, idx) => {
+      editImages.forEach((ref, idx) => {
         const { buf, mime } = dataUrlToPart(ref);
         const ext = mime.indexOf('png') >= 0 ? 'png' : (mime.indexOf('webp') >= 0 ? 'webp' : 'jpg');
         form.append('image[]', new Blob([buf], { type: mime }), 'ref' + idx + '.' + ext);
@@ -97,8 +106,8 @@ module.exports = async (req, res) => {
   try {
     const images = [];
     let lastErr = null;
-    // 참조 이미지가 있으면 편집 지원 모델(gpt-image)만 대상
-    const candidates = styleRefs.length ? MODEL_CANDIDATES.filter(m => /^gpt-image/.test(m)) : MODEL_CANDIDATES;
+    // 참조/제품 이미지가 있으면 편집 지원 모델(gpt-image)만 대상
+    const candidates = editImages.length ? MODEL_CANDIDATES.filter(m => /^gpt-image/.test(m)) : MODEL_CANDIDATES;
     const canUseCache = _workingModel && candidates.indexOf(_workingModel) >= 0;
     // 1장째: 사용 가능한 모델을 순서대로 탐색 (키/크레딧 문제면 즉시 중단)
     if (!canUseCache) {
@@ -120,7 +129,7 @@ module.exports = async (req, res) => {
       );
       rest.forEach(s => { if (s.status === 'fulfilled' && s.value) images.push(s.value); });
     }
-    if (images.length) { res.status(200).json({ images, model: _workingModel }); return; }
+    if (images.length) { res.status(200).json({ images, model: _workingModel, blend }); return; }
 
     const err = lastErr;
     const code = (err && err.status) || 502;
@@ -131,8 +140,8 @@ module.exports = async (req, res) => {
     else if (/verif/i.test(detail)) msg = 'OpenAI 조직 인증이 필요합니다. platform.openai.com → Settings → Organization → Verify 후 재시도.';
     else if (code === 403) msg = '모델 사용 권한이 없습니다(조직 인증이 필요할 수 있음).';
     else if (code === 400 || code === 404) msg = '사용 가능한 이미지 모델을 찾지 못했습니다.';
-    if (styleRefs.length) msg += ' (스타일 참조는 gpt-image 모델이 필요 — 조직 인증이 안 됐다면 참조 없이 시도해보세요)';
-    res.status(code >= 400 && code < 500 ? code : 502).json({ error: msg, detail });
+    if (editImages.length) msg += ' (스타일 참조·녹이기는 gpt-image 모델이 필요 — 조직 인증이 안 됐다면 카드형/참조 없이 시도해보세요)';
+    res.status(code >= 400 && code < 500 ? code : 502).json({ error: msg, detail, blend });
   } catch (err) {
     res.status(502).json({ error: '이미지 생성 서버 오류', detail: (err && err.message) || '' });
   }
