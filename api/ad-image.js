@@ -2,8 +2,9 @@
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vtulmuxkriklpiibiues.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
-// 계정마다 쓸 수 있는 이미지 모델이 다름(신규 계정엔 dall-e 계열이 없음) → 순서대로 시도해 되는 것 사용.
-const MODEL_CANDIDATES = [process.env.OPENAI_IMAGE_MODEL, 'gpt-image-1-mini', 'gpt-image-1', 'dall-e-3', 'dall-e-2']
+// 계정마다 쓸 수 있는 이미지 모델이 다름(신규 계정엔 dall-e 계열이 없음).
+// 최고 성능 우선으로 시도하고, 권한이 없으면 차선책으로 내려감.
+const MODEL_CANDIDATES = [process.env.OPENAI_IMAGE_MODEL, 'gpt-image-1', 'gpt-image-1-mini', 'dall-e-3', 'dall-e-2']
   .filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
 let _workingModel = null; // 웜 인스턴스 동안 성공 모델 캐시
 
@@ -32,10 +33,14 @@ module.exports = async (req, res) => {
 
   // 특정 모델로 1장 생성. b64 또는 URL(서버가 받아 base64 변환) 모두 처리.
   const genWith = async (model) => {
+    // 품질은 항상 최고급으로 (gpt-image 계열: high / dall-e-3: hd)
+    const payload = { model, prompt, n: 1, size: '1024x1024' };
+    if (/^gpt-image/.test(model)) payload.quality = 'high';
+    else if (model === 'dall-e-3') payload.quality = 'hd';
     const oimg = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, prompt, n: 1, size: '1024x1024' })
+      body: JSON.stringify(payload)
     });
     const j = await oimg.json().catch(() => ({}));
     if (!oimg.ok) {
