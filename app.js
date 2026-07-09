@@ -16617,6 +16617,26 @@ let _adProduct = null;      // {id, name, price, imageUrl, points}
 let _adSettings = null;     // {goal, tone, target, emphasis}
 let _adResults = null;      // {variants:[], images:[], selCopy, selImg, composed}
 let _adSourceMode = 'db';   // 'db' | 'upload'
+let _adStyleRefs = [];      // 스타일 참조 이미지(data URL) 최대 3장
+
+function _adRenderStyleRefs() {
+    const box = document.getElementById('adStyleRefBox');
+    if (!box) return;
+    box.innerHTML = _adStyleRefs.map((src, i) => `<div style="position:relative">
+        <img src="${escHtml(src)}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--gray-200)">
+        <button onclick="adRemoveStyleRef(${i})" title="삭제" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border:none;border-radius:50%;background:var(--toss-red,#E03131);color:#fff;font-size:12px;line-height:1;cursor:pointer">×</button>
+    </div>`).join('');
+}
+async function adAddStyleRefs(input) {
+    const files = Array.from(input.files || []);
+    for (const f of files) {
+        if (_adStyleRefs.length >= 3) { showToast('스타일 참조는 최대 3장까지예요'); break; }
+        try { _adStyleRefs.push(await _adFileToDataUrl(f, 1024)); } catch (_) {}
+    }
+    input.value = '';
+    _adRenderStyleRefs();
+}
+function adRemoveStyleRef(i) { _adStyleRefs.splice(i, 1); _adRenderStyleRefs(); }
 
 function renderAdStudio() {
     const el = document.getElementById('adStudioBody');
@@ -16674,6 +16694,13 @@ function renderAdStudio() {
         </div>
       </div>
 
+      <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:14px;padding:20px;margin-bottom:16px">
+        <div style="font-weight:800;font-size:15px;margin-bottom:6px">스타일 참조 이미지 <span style="font-weight:500;color:var(--gray-500);font-size:12px">(선택 · 최대 3장)</span></div>
+        <div style="font-size:12px;color:var(--gray-500);margin-bottom:10px">좋아하는 광고·배경 이미지를 올리면, 그 <b>분위기·색감·조명·질감</b>을 따라 AI 배경을 만듭니다. (최고급 gpt-image 모델 필요)</div>
+        <input type="file" accept="image/*" multiple class="form-input" id="adStyleRefFile" onchange="adAddStyleRefs(this)">
+        <div id="adStyleRefBox" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
+      </div>
+
       <button class="form-submit" id="adGenerateBtn" onclick="generateAdMaterials()" style="font-size:15px">✨ 광고 생성</button>
 
       <div id="adResultsArea" style="margin-top:20px"></div>
@@ -16681,6 +16708,7 @@ function renderAdStudio() {
     </div>`;
 
     _adRenderProductPreview();
+    _adRenderStyleRefs();
     loadAdCampaigns();
     if (_adResults) renderAdResults();
 }
@@ -16797,7 +16825,7 @@ async function generateAdMaterials() {
     const [copyRes, imgRes] = await Promise.allSettled([
         fetch('/api/ad-copy', { method: 'POST', headers, body: JSON.stringify({ product: prodForApi, settings: _adSettings }) })
             .then(r => r.json().then(j => ({ ok: r.ok, j }))),
-        fetch('/api/ad-image', { method: 'POST', headers, body: JSON.stringify({ product: prodForApi, settings: _adSettings, count: 2 }) })
+        fetch('/api/ad-image', { method: 'POST', headers, body: JSON.stringify({ product: prodForApi, settings: _adSettings, count: 2, styleRefs: _adStyleRefs }) })
             .then(r => r.json().then(j => ({ ok: r.ok, j })))
     ]);
 
