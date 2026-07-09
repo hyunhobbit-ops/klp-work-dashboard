@@ -16802,8 +16802,7 @@ async function adOnUpload(input) {
     try {
         const dataUrl = await _adFileToDataUrl(file, 1200);
         if (!_adProduct) _adProduct = {};
-        _adProduct.imageUrl = await _adAutoTrim(dataUrl);
-        _adProduct._trimmed = true;
+        _adProduct.imageUrl = dataUrl;   // 원본 그대로 사용(자동 크롭 없음)
         _adProduct.id = null;
         // 이름/가격/포인트는 아래 입력칸에서 수집 시 채움
         _adRenderProductPreview();
@@ -16959,12 +16958,6 @@ async function composeAdImage() {
     const preview = document.getElementById('adPreview');
     if (typeof html2canvas === 'undefined') { if (preview) preview.innerHTML = '<div style="color:var(--toss-red)">합성 라이브러리 로드 실패</div>'; return; }
 
-    // 이미 등록된 이미지도 합성 전에 단색 여백 자동 크롭 (1회만)
-    if (_adProduct && _adProduct.imageUrl && !_adProduct._trimmed) {
-        _adProduct.imageUrl = await _adAutoTrim(_adProduct.imageUrl);
-        _adProduct._trimmed = true;
-        _adRenderProductPreview();
-    }
     const fmt = AD_FORMATS.find(f => f.key === _adFormat) || AD_FORMATS[0];
     const W = fmt.w, H = fmt.h;
     const px = n => Math.round(n) + 'px';
