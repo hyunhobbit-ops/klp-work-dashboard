@@ -16750,72 +16750,6 @@ async function _adFileToDataUrl(file, maxDim) {
     });
 }
 
-// 이미지의 자연 크기(가로/세로) 반환
-function _adImgNatural(url) {
-    return new Promise((resolve, reject) => {
-        const im = new Image();
-        im.onload = () => resolve({ w: im.naturalWidth, h: im.naturalHeight });
-        im.onerror = () => reject(new Error('이미지 로드 실패'));
-        im.src = url;
-    });
-}
-
-// 제품 이미지의 단색 여백(빈 배경)을 자동으로 잘라냄.
-// 색과 무관하게 "가장자리부터 변화 없는(단색) 줄"을 제거 → 제품만 남김.
-// (크롬 시계처럼 배경색과 제품색이 비슷해도, 변화량 기준이라 안전)
-function _adAutoTrim(dataUrl) {
-    return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-            try {
-                const w = img.naturalWidth, h = img.naturalHeight;
-                if (!w || !h) return resolve(dataUrl);
-                const c = document.createElement('canvas'); c.width = w; c.height = h;
-                const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
-                const data = ctx.getImageData(0, 0, w, h).data;
-                // '빈 여백 줄' 판정: 줄을 따라가며 인접 픽셀의 '가장 강한 변화(최대)'가 작으면 여백.
-                // → 단색/그라데이션 배경은 여백으로 보고 자르되, 얇은 제품 윤곽(강한 경계)에서 멈춤.
-                const EDGE = 40;
-                const step = Math.max(1, Math.floor(Math.min(w, h) / 600));
-                const colUniform = (x, y0, y1) => {
-                    let pr = -1, pg = -1, pb = -1, mx = 0;
-                    for (let y = y0; y <= y1; y += step) {
-                        const i = (y * w + x) * 4, R = data[i], G = data[i + 1], B = data[i + 2];
-                        if (pr >= 0) { const d = Math.abs(R - pr) + Math.abs(G - pg) + Math.abs(B - pb); if (d > mx) mx = d; }
-                        pr = R; pg = G; pb = B;
-                    }
-                    return mx < EDGE;
-                };
-                const rowUniform = (y, x0, x1) => {
-                    let pr = -1, pg = -1, pb = -1, mx = 0;
-                    for (let x = x0; x <= x1; x += step) {
-                        const i = (y * w + x) * 4, R = data[i], G = data[i + 1], B = data[i + 2];
-                        if (pr >= 0) { const d = Math.abs(R - pr) + Math.abs(G - pg) + Math.abs(B - pb); if (d > mx) mx = d; }
-                        pr = R; pg = G; pb = B;
-                    }
-                    return mx < EDGE;
-                };
-                // 2단계: 가로 자른 뒤 그 범위에서 세로 재검사 → 제품 꽉 차게
-                let L = 0, R = w - 1, T = 0, B = h - 1;
-                for (let pass = 0; pass < 2; pass++) {
-                    while (L < R && colUniform(L, T, B)) L++;
-                    while (R > L && colUniform(R, T, B)) R--;
-                    while (T < B && rowUniform(T, L, R)) T++;
-                    while (B > T && rowUniform(B, L, R)) B--;
-                }
-                const cw = R - L + 1, ch = B - T + 1;
-                // 거의 안 잘리면(여백 없음) or 너무 작게 잡히면(오검출) 원본 유지
-                if ((cw >= w * 0.96 && ch >= h * 0.96) || cw < w * 0.1 || ch < h * 0.1) return resolve(dataUrl);
-                const oc = document.createElement('canvas'); oc.width = cw; oc.height = ch;
-                oc.getContext('2d').drawImage(c, L, T, cw, ch, 0, 0, cw, ch);
-                resolve(oc.toDataURL('image/png'));
-            } catch (e) { resolve(dataUrl); } // 교차출처 등 → 원본 유지
-        };
-        img.onerror = () => resolve(dataUrl);
-        img.src = dataUrl;
-    });
-}
-
 async function adOnUpload(input) {
     const file = input.files && input.files[0];
     if (!file) return;
@@ -16983,23 +16917,16 @@ async function composeAdImage() {
     const px = n => Math.round(n) + 'px';
     const esc = escHtml;
     const prod = (_adProduct && _adProduct.imageUrl) || '';
-    let prodNat = null;
-    if (prod) { try { prodNat = await _adImgNatural(prod); } catch (_) {} }
     const bgStyle = bg
         ? `background-image:url('${bg}');background-size:cover;background-position:center`
         : 'background:linear-gradient(135deg,#1F85FF,#0F6CD9)';
-    // 제품 사진: object-fit/background-size는 html2canvas에서 불안정 → 비율 계산한 <img> 크기로 그림
-    const productCard = (size, posCss) => {
+    // 제품 사진은 html2canvas에 맡기지 않음(큰 이미지를 절반만 그리는 버그).
+    // stage에는 흰 카드만 두고, 합성이 끝난 캔버스 위에 drawImage로 직접 그림(2단계).
+    let cardGeom = null; // {x, y, size}
+    const productCard = (size, x, y) => {
         if (!prod) return '';
-        const box = size * 0.88;
-        let iw = box, ih = box;
-        if (prodNat && prodNat.w && prodNat.h) {
-            const ar = prodNat.w / prodNat.h;
-            if (ar >= 1) { iw = box; ih = box / ar; } else { ih = box; iw = box * ar; }
-        }
-        return `<div style="position:absolute;${posCss};width:${px(size)};height:${px(size)};background:#fff;border-radius:${px(28)};box-shadow:0 20px 60px rgba(0,0,0,.28);overflow:hidden">
-            <img src="${prod}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:${px(iw)};height:${px(ih)}">
-        </div>`;
+        cardGeom = { x: Math.round(x), y: Math.round(y), size: Math.round(size) };
+        return `<div style="position:absolute;left:${px(x)};top:${px(y)};width:${px(size)};height:${px(size)};background:#fff;border-radius:${px(28)};box-shadow:0 20px 60px rgba(0,0,0,.28)"></div>`;
     };
 
     let inner;
@@ -17009,7 +16936,7 @@ async function composeAdImage() {
         inner = `
           <div style="position:absolute;inset:0;${bgStyle}"></div>
           <div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(0,0,0,.12) 0%,rgba(0,0,0,0) 30%,rgba(0,0,0,.78) 72%)"></div>
-          ${productCard(H * 0.78, `top:50%;left:${px(H * 0.11)};transform:translateY(-50%)`)}
+          ${productCard(H * 0.78, H * 0.11, (H - H * 0.78) / 2)}
           <div style="position:absolute;top:50%;right:${px(W * 0.05)};transform:translateY(-50%);width:${px(W * 0.46)};color:#fff;text-align:right">
             <div style="font-size:${px(58 * s)};font-weight:900;line-height:1.12;letter-spacing:-1px;text-shadow:0 2px 12px rgba(0,0,0,.35)">${esc(v.headline || '')}</div>
             <div style="font-size:${px(26 * s)};font-weight:600;margin-top:${px(10)};opacity:.95">${esc(v.sub || '')}</div>
@@ -17022,7 +16949,7 @@ async function composeAdImage() {
         inner = `
           <div style="position:absolute;inset:0;${bgStyle}"></div>
           <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0) 42%,rgba(0,0,0,.75) 100%)"></div>
-          ${productCard(W * 0.54, `top:${px(H * 0.06)};left:50%;transform:translateX(-50%)`)}
+          ${productCard(W * 0.54, (W - W * 0.54) / 2, H * 0.06)}
           <div style="position:absolute;left:${px(W * 0.06)};right:${px(W * 0.06)};bottom:${px(H * 0.05)};color:#fff">
             <div style="font-size:${px(64 * s)};font-weight:900;line-height:1.15;letter-spacing:-1px;text-shadow:0 2px 12px rgba(0,0,0,.35)">${esc(v.headline || '')}</div>
             <div style="font-size:${px(30 * s)};font-weight:600;margin-top:${px(12)};opacity:.95">${esc(v.sub || '')}</div>
@@ -17036,7 +16963,33 @@ async function composeAdImage() {
     stage.innerHTML = inner;
     document.body.appendChild(stage);
     try {
-        const canvas = await html2canvas(stage, { width: W, height: H, scale: 1, useCORS: true, backgroundColor: '#ffffff', logging: false });
+        const h2c = await html2canvas(stage, { width: W, height: H, scale: 1, useCORS: true, backgroundColor: '#ffffff', logging: false });
+        // html2canvas가 돌려준 캔버스는 잔여 컨텍스트 상태 때문에 추가 drawImage가 무시됨(검증됨)
+        // → 새 캔버스에 복사한 뒤 그 위에 제품 사진을 직접 그림
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        const cx = canvas.getContext('2d');
+        cx.drawImage(h2c, 0, 0);
+        if (cardGeom && prod) {
+            const pim = await new Promise((ok, bad) => {
+                const im = new Image();
+                im.onload = () => ok(im);
+                im.onerror = () => bad(new Error('제품 이미지 로드 실패'));
+                im.src = prod;
+            });
+            const inset = cardGeom.size * 0.06;
+            const box = cardGeom.size - inset * 2;
+            const ar = (pim.naturalWidth || 1) / (pim.naturalHeight || 1);
+            const iw = ar >= 1 ? box : box * ar;
+            const ih = ar >= 1 ? box / ar : box;
+            cx.save();
+            cx.beginPath();
+            if (cx.roundRect) cx.roundRect(cardGeom.x + 2, cardGeom.y + 2, cardGeom.size - 4, cardGeom.size - 4, 26);
+            else cx.rect(cardGeom.x + 2, cardGeom.y + 2, cardGeom.size - 4, cardGeom.size - 4);
+            cx.clip();
+            cx.drawImage(pim, cardGeom.x + (cardGeom.size - iw) / 2, cardGeom.y + (cardGeom.size - ih) / 2, iw, ih);
+            cx.restore();
+        }
         r.composed = canvas.toDataURL('image/png');
         if (preview) preview.innerHTML = `<img src="${r.composed}" style="width:100%;max-width:${W > H ? 520 : 380}px;border-radius:14px;border:1px solid var(--gray-200)">`;
     } catch (e) {
