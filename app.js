@@ -16694,10 +16694,13 @@ function _adRenderProductPreview() {
     const box = document.getElementById('adProductPreview');
     if (!box) return;
     if (!_adProduct || !_adProduct.imageUrl) { box.innerHTML = ''; return; }
-    box.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-        <img src="${escHtml(_adProduct.imageUrl)}" style="width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid var(--gray-200)">
-        <div><div style="font-weight:700">${escHtml(_adProduct.name || '')}</div>
-        <div style="font-size:12px;color:var(--gray-500)">${escHtml(String(_adProduct.price || ''))}</div></div></div>`;
+    // 업로드 직후 크게 보여줌 — 여기서 이미 잘려 보이면 저장 단계/원본 파일 문제로 즉시 판별 가능
+    box.innerHTML = `<div style="margin-top:10px">
+        <img src="${escHtml(_adProduct.imageUrl)}" style="max-width:220px;max-height:180px;object-fit:contain;border-radius:10px;border:1px solid var(--gray-200);background:#fff;padding:4px">
+        <div style="margin-top:6px"><span style="font-weight:700">${escHtml(_adProduct.name || '')}</span>
+        <span style="font-size:12px;color:var(--gray-500);margin-left:6px">${escHtml(String(_adProduct.price || ''))}</span></div>
+        <div style="font-size:12px;color:var(--gray-500);margin-top:2px">↑ 이 미리보기가 잘려 보이면 알려주세요 (원본 파일 또는 저장 단계 문제)</div>
+    </div>`;
 }
 
 function adPickDbProduct(id) {
@@ -16709,18 +16712,35 @@ function adPickDbProduct(id) {
 }
 
 // 업로드 이미지 → 최대 1200px로 리사이즈한 data URL
-function _adFileToDataUrl(file, maxDim) {
+// createImageBitmap: 파일을 통째로 확실히 디코드(부분 디코드로 절반이 회색으로 남는 문제 방지, EXIF 회전 반영)
+async function _adFileToDataUrl(file, maxDim) {
+    const drawToDataUrl = (src, w0, h0) => {
+        const scale = Math.min(1, (maxDim || 1200) / Math.max(w0, h0));
+        const w = Math.round(w0 * scale), h = Math.round(h0 * scale);
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h); // PNG 투명 배경 → 흰색
+        ctx.drawImage(src, 0, 0, w, h);
+        return c.toDataURL('image/jpeg', 0.9);
+    };
+    // 1) 최우선: createImageBitmap (완전 디코드 보장)
+    try {
+        if (typeof createImageBitmap === 'function') {
+            const bmp = await createImageBitmap(file);
+            const out = drawToDataUrl(bmp, bmp.width, bmp.height);
+            if (bmp.close) bmp.close();
+            return out;
+        }
+    } catch (_) { /* 아래 폴백으로 */ }
+    // 2) 폴백: FileReader + Image (+ decode()로 전체 디코드 대기)
     return new Promise((resolve, reject) => {
         const fr = new FileReader();
         fr.onload = () => {
             const img = new Image();
-            img.onload = () => {
-                let w = img.naturalWidth, h = img.naturalHeight;
-                const scale = Math.min(1, (maxDim || 1200) / Math.max(w, h));
-                w = Math.round(w * scale); h = Math.round(h * scale);
-                const c = document.createElement('canvas'); c.width = w; c.height = h;
-                c.getContext('2d').drawImage(img, 0, 0, w, h);
-                resolve(c.toDataURL('image/jpeg', 0.88));
+            img.onload = async () => {
+                try { if (img.decode) await img.decode(); } catch (_) {}
+                try { resolve(drawToDataUrl(img, img.naturalWidth, img.naturalHeight)); }
+                catch (e) { reject(e); }
             };
             img.onerror = () => reject(new Error('이미지 로드 실패'));
             img.src = fr.result;
