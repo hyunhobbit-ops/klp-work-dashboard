@@ -16743,30 +16743,27 @@ function _adAutoTrim(dataUrl) {
                 const c = document.createElement('canvas'); c.width = w; c.height = h;
                 const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
                 const data = ctx.getImageData(0, 0, w, h).data;
-                const THRESH = 34; // 한 줄 내 색 변화 합이 이보다 작으면 '단색 줄'
-                // 지정 범위(y0..y1)의 세로줄 x 가 단색인지
+                // '빈 여백 줄' 판정: 줄을 따라가며 인접 픽셀의 '가장 강한 변화(최대)'가 작으면 여백.
+                // → 단색/그라데이션 배경은 여백으로 보고 자르되, 얇은 제품 윤곽(강한 경계)에서 멈춤.
+                const EDGE = 40;
+                const step = Math.max(1, Math.floor(Math.min(w, h) / 600));
                 const colUniform = (x, y0, y1) => {
-                    let rmin = 255, rmax = 0, gmin = 255, gmax = 0, bmin = 255, bmax = 0;
-                    const sy = Math.max(1, Math.floor((y1 - y0 + 1) / 60));
-                    for (let y = y0; y <= y1; y += sy) {
+                    let pr = -1, pg = -1, pb = -1, mx = 0;
+                    for (let y = y0; y <= y1; y += step) {
                         const i = (y * w + x) * 4, R = data[i], G = data[i + 1], B = data[i + 2];
-                        if (R < rmin) rmin = R; if (R > rmax) rmax = R;
-                        if (G < gmin) gmin = G; if (G > gmax) gmax = G;
-                        if (B < bmin) bmin = B; if (B > bmax) bmax = B;
+                        if (pr >= 0) { const d = Math.abs(R - pr) + Math.abs(G - pg) + Math.abs(B - pb); if (d > mx) mx = d; }
+                        pr = R; pg = G; pb = B;
                     }
-                    return (rmax - rmin) + (gmax - gmin) + (bmax - bmin) < THRESH;
+                    return mx < EDGE;
                 };
-                // 지정 범위(x0..x1)의 가로줄 y 가 단색인지
                 const rowUniform = (y, x0, x1) => {
-                    let rmin = 255, rmax = 0, gmin = 255, gmax = 0, bmin = 255, bmax = 0;
-                    const sx = Math.max(1, Math.floor((x1 - x0 + 1) / 60));
-                    for (let x = x0; x <= x1; x += sx) {
+                    let pr = -1, pg = -1, pb = -1, mx = 0;
+                    for (let x = x0; x <= x1; x += step) {
                         const i = (y * w + x) * 4, R = data[i], G = data[i + 1], B = data[i + 2];
-                        if (R < rmin) rmin = R; if (R > rmax) rmax = R;
-                        if (G < gmin) gmin = G; if (G > gmax) gmax = G;
-                        if (B < bmin) bmin = B; if (B > bmax) bmax = B;
+                        if (pr >= 0) { const d = Math.abs(R - pr) + Math.abs(G - pg) + Math.abs(B - pb); if (d > mx) mx = d; }
+                        pr = R; pg = G; pb = B;
                     }
-                    return (rmax - rmin) + (gmax - gmin) + (bmax - bmin) < THRESH;
+                    return mx < EDGE;
                 };
                 // 2단계: 가로 자른 뒤 그 범위에서 세로 재검사 → 제품 꽉 차게
                 let L = 0, R = w - 1, T = 0, B = h - 1;
@@ -16869,7 +16866,7 @@ async function generateAdMaterials() {
         showToast('생성 실패 — 아래 상세를 확인하세요');
         return;
     }
-    _adResults = { variants, images, selCopy: 0, selImg: 0, composed: null };
+    _adResults = { variants, images, selCopy: 0, selImg: 0, composed: null, imgErr: imgErr };
     if (!variants.length) showToast('문구 생성 실패: ' + (copyErr || '알 수 없음'));
     if (!images.length && imgErr) showToast('이미지 생성 실패: ' + imgErr);
     renderAdResults();
@@ -16883,7 +16880,7 @@ function renderAdResults() {
 
     const imgThumbs = r.images.length
         ? r.images.map((src, i) => `<img src="${escHtml(src)}" onclick="adPickImg(${i})" style="width:96px;height:96px;object-fit:cover;border-radius:10px;cursor:pointer;border:3px solid ${i === r.selImg ? 'var(--blue)' : 'transparent'}">`).join('')
-        : `<div style="color:var(--gray-500);font-size:13px">이미지 없음 (OpenAI 키 미설정 시). 문구만 사용할 수 있어요.</div>`;
+        : `<div style="font-size:13px;color:var(--gray-700);line-height:1.6">AI 배경 이미지가 생성되지 않았습니다${r.imgErr ? ' — <b style="color:var(--toss-red,#E03131)">' + escHtml(r.imgErr) + '</b>' : ''}.<br><span style="color:var(--gray-500)">지금은 파란 배경으로 대체되며, 문구·형식·다운로드는 정상 사용할 수 있어요.</span></div>`;
 
     const copyCards = r.variants.map((c, i) => `
         <div onclick="adPickCopy(${i})" style="border:2px solid ${i === r.selCopy ? 'var(--blue)' : 'var(--gray-200)'};border-radius:10px;padding:12px;cursor:pointer;min-width:200px;flex:1">
