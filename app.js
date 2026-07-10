@@ -17602,7 +17602,7 @@ async function sendMeetingActionsToDaily(meetingId) {
         ok++;
     }
 
-    let msg = ok + '건을 일일계획표로 보냈습니다';
+    let msg = ok ? (ok + '건을 일일계획표로 보냈습니다') : '전송된 항목이 없습니다';
     if (fail) msg += ' · ' + fail + '건 실패';
     if (orphan) msg += ' · ' + orphan + '건은 할 일은 생성됐지만 연결에 실패했습니다. 다시 보내면 중복되니 일일계획표를 먼저 확인하세요.';
     showToast(msg);
