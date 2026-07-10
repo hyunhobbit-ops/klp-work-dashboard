@@ -17470,3 +17470,91 @@ async function deleteMeeting() {
     showToast('삭제되었습니다');
     closeMeetingEditor();
 }
+
+async function loadMeetingActions(meetingId) {
+    _meetingActions = [];
+    _meetingActionDone = {};
+    if (!meetingId) return;
+    const { data, error } = await sb.from('meeting_actions')
+        .select('*').eq('meeting_id', meetingId).order('id', { ascending: true });
+    if (error) { console.error(error); showToast('액션아이템 불러오기 실패: ' + error.message); return; }
+    _meetingActions = (data || []).map(a => ({
+        id: a.id, task: a.task || '', assignee: a.assignee || '',
+        dueDate: a.due_date || '', dailyTaskId: a.daily_task_id || null
+    }));
+    // 전송된 항목의 완료 여부는 daily_tasks 가 원본
+    const ids = _meetingActions.map(a => a.dailyTaskId).filter(Boolean);
+    if (ids.length) {
+        const { data: tasks } = await sb.from('daily_tasks').select('id, done').in('id', ids);
+        (tasks || []).forEach(t => { _meetingActionDone[t.id] = !!t.done; });
+    }
+}
+
+function renderMeetingActions() {
+    const card = document.getElementById('meetingActionsCard');
+    if (!card) return;
+    const sent = _meetingActions.filter(a => a.dailyTaskId).length;
+    const unsent = _meetingActions.filter(a => !a.dailyTaskId && a.task.trim() && a.assignee).length;
+
+    card.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0">액션아이템 <span style="font-weight:400;color:var(--gray-500);font-size:13px">전송 ${sent} / 전체 ${_meetingActions.length}</span></h3>
+        <button class="btn-primary" id="meetingSendBtn" ${unsent ? '' : 'disabled'}>일일계획표로 보내기${unsent ? ' (' + unsent + ')' : ''}</button>
+      </div>
+      <table class="data-table"><thead><tr>
+        <th>할 일</th><th style="width:130px">담당자</th><th style="width:150px">마감일</th><th style="width:110px">상태</th><th style="width:50px"></th>
+      </tr></thead><tbody id="meetingActionsTbody">
+        ${_meetingActions.map((a, i) => {
+            let state = '미전송';
+            if (a.dailyTaskId) state = _meetingActionDone[a.dailyTaskId] ? '✅ 완료' : '📤 전송됨';
+            const locked = !!a.dailyTaskId;
+            return `<tr>
+              <td><input type="text" data-act-task="${i}" value="${escHtml(a.task)}" ${locked ? 'disabled' : ''}></td>
+              <td><select data-act-assignee="${i}" ${locked ? 'disabled' : ''}>
+                <option value="">선택</option>
+                ${MEETING_ASSIGNEES.map(n => `<option${n === a.assignee ? ' selected' : ''}>${n}</option>`).join('')}
+              </select></td>
+              <td><input type="date" data-act-due="${i}" value="${escHtml(a.dueDate)}" ${locked ? 'disabled' : ''}></td>
+              <td>${state}</td>
+              <td>${locked ? '' : `<button type="button" class="meeting-del" data-act-del="${i}">✕</button>`}</td>
+            </tr>`;
+        }).join('')}
+      </tbody></table>
+      <button type="button" class="btn-ghost" id="meetingActionAdd" style="margin-top:10px">+ 액션아이템 추가</button>
+      <p style="margin-top:10px;font-size:12px;color:var(--gray-500)">전송된 항목은 여기서 수정할 수 없습니다. 완료 체크는 <b>일일계획표</b>에서 하세요.</p>`;
+
+    card.querySelectorAll('[data-act-task]').forEach(el => el.addEventListener('input', () => { _meetingActions[Number(el.dataset.actTask)].task = el.value; }));
+    card.querySelectorAll('[data-act-assignee]').forEach(el => el.addEventListener('change', () => { _meetingActions[Number(el.dataset.actAssignee)].assignee = el.value; renderMeetingActions(); }));
+    card.querySelectorAll('[data-act-due]').forEach(el => el.addEventListener('change', () => { _meetingActions[Number(el.dataset.actDue)].dueDate = el.value; }));
+    card.querySelectorAll('[data-act-del]').forEach(el => el.addEventListener('click', async () => {
+        const i = Number(el.dataset.actDel);
+        const a = _meetingActions[i];
+        if (a.id) { const { error } = await sb.from('meeting_actions').delete().eq('id', a.id); if (error) { showToast('삭제 실패: ' + error.message); return; } }
+        _meetingActions.splice(i, 1);
+        renderMeetingActions();
+    }));
+    card.querySelector('#meetingActionAdd').addEventListener('click', () => {
+        _meetingActions.push({ id: null, task: '', assignee: '', dueDate: '', dailyTaskId: null });
+        renderMeetingActions();
+    });
+    card.querySelector('#meetingSendBtn').addEventListener('click', () => sendMeetingActionsToDaily(_meetingEditingId));
+}
+
+async function saveMeetingActions() {
+    const mid = _meetingEditingId;
+    if (!mid) return;
+    for (const a of _meetingActions) {
+        const task = (a.task || '').trim();
+        if (!task) continue;
+        const row = { meeting_id: mid, task, assignee: a.assignee || null, due_date: a.dueDate || null };
+        if (a.id) {
+            if (a.dailyTaskId) continue; // 전송된 항목은 잠금
+            const { error } = await sb.from('meeting_actions').update(row).eq('id', a.id);
+            if (error) throw error;
+        } else {
+            const { data, error } = await sb.from('meeting_actions').insert(row).select().single();
+            if (error) throw error;
+            a.id = data.id;
+        }
+    }
+}
