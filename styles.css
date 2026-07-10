@@ -3557,12 +3557,53 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 }
 #tab-meetings h3 { font-size: 15px; font-weight: 800; color: var(--gray-900); letter-spacing: -0.2px; }
 
-/* 인라인 스타일에 배경/글자색이 없는 요소들 — 다크모드에서 흰 화면으로 남는다 */
+/* 논의 내용 — 이미지 붙여넣기 가능한 편집 영역 */
 #meetingContent {
+    min-height: 220px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 12px;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-xs);
     background: var(--gray-50);
     color: var(--gray-900);
+    font-size: 14px;
+    line-height: 1.65;
+    outline: none;
 }
 #meetingContent:focus { border-color: var(--blue); background: var(--white); }
+#meetingContent.drag { border-color: var(--blue); border-style: dashed; background: var(--blue-light); }
+#meetingContent:empty::before {
+    content: attr(data-placeholder);
+    color: var(--gray-400);
+    pointer-events: none;
+}
+#meetingContent img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 8px 0;
+    display: block;
+}
+.meeting-img-uploading {
+    display: inline-block;
+    padding: 4px 10px;
+    margin: 4px 0;
+    border-radius: 6px;
+    background: var(--gray-200);
+    color: var(--gray-600);
+    font-size: 12px;
+    font-weight: 600;
+}
+/* 전원 선택 버튼 */
+.meeting-chip-all {
+    font-family: inherit;
+    border-style: dashed;
+    color: var(--gray-700);
+}
+.meeting-chip-all.on { border-style: solid; }
+
+/* 인라인 스타일에 배경/글자색이 없는 요소들 — 다크모드에서 흰 화면으로 남는다 */
 #meetingsSearch {
     background: var(--white);
     color: var(--gray-900);

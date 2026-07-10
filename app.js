@@ -17119,7 +17119,7 @@ async function adOpenCampaign(id) {
 
 // ===== 회의록 =====================================================
 const MEETING_ASSIGNEES = ['전체', '임원', '대표님', '이현주', '김현호', '유지은', '구정두'];
-const MEETING_STAFF = ['이현주', '김현호', '유지은', '구정두'];
+const MEETING_STAFF = ['대표님', '이현주', '김현호', '유지은', '구정두'];
 const MEETING_STATUSES = ['작성중', '공유됨', '완료'];
 
 let _meetings = [];            // 목록에 그릴 회의 배열 (DB row 그대로)
@@ -17129,6 +17129,7 @@ let _meetingDraft = null;      // 편집 중인 회의 객체
 let _meetingActions = [];      // 편집 중인 회의의 액션아이템
 let _meetingActionDone = {};   // { daily_task_id: true/false } — daily_tasks.done 사본
 let _meetingsSearch = '';
+let _meetingDirty = false;     // 편집 중 저장하지 않은 변경이 있는가
 
 function _meetingRowDefaults(r) {
     return {
@@ -17146,6 +17147,32 @@ function _meetingRowDefaults(r) {
         status: r.status || '작성중',
         isPrivate: !!r.is_private
     };
+}
+
+// 논의 내용은 HTML(이미지 포함). 옛 데이터는 plain text라 <가 없으면 텍스트로 취급해 줄바꿈만 살린다.
+function _meetingContentHtml(raw) {
+    if (!raw) return '';
+    // 진짜 태그(<p>, </div>, <br/>)가 있어야 HTML로 본다. "<태그>" 같은 글자는 평문 취급.
+    if (!/<\/?[a-z][a-z0-9]*(\s|\/?>)/i.test(raw)) return escHtml(raw).replace(/\n/g, '<br>');
+    return planningSanitizeHtml(raw);
+}
+
+// 이 회의록을 고칠 수 있는가? (RLS의 UPDATE/DELETE 조건과 동일하게 맞춰야 한다)
+// 어긋나면 화면엔 저장 버튼이 보이는데 DB가 조용히 0건 처리해 수정분이 사라진다.
+function _meetingCanEdit() {
+    if (_meetingEditingId === null) return true;               // 새 회의록
+    if (!currentUser || !currentUser.name) return false;
+    if (!_meetingDraft) return false;
+    return _meetingDraft.author === currentUser.name || ADMIN_ROLES.includes(currentUser.role);
+}
+
+// 전원 선택 버튼의 상태·문구를 참석자 목록과 맞춘다.
+function _syncMeetingAllBtn() {
+    const btn = document.getElementById('meetingAttAll');
+    if (!btn || !_meetingDraft) return;
+    const everyone = MEETING_STAFF.every(n => _meetingDraft.attendees.includes(n));
+    btn.classList.toggle('on', everyone);
+    btn.textContent = everyone ? '전원 해제' : '전원 선택';
 }
 
 // 날짜 입력이 비었거나 손상된 경우 null. (new Date('...').toISOString()은 RangeError를 던진다)
@@ -17230,6 +17257,8 @@ async function renderMeetings() {
     if (_meetingEditingId !== undefined) { renderMeetingEditor(); return; }
     box.innerHTML = '<div style="padding:40px;text-align:center;color:var(--gray-500)">불러오는 중…</div>';
     await loadMeetings();
+    // 로딩 중 사용자가 F2 등으로 편집기를 열었다면 목록으로 덮어쓰지 않는다
+    if (_meetingEditingId !== undefined) return;
     await _renderMeetingList();
 }
 
@@ -17293,6 +17322,7 @@ async function _renderMeetingList() {
 
 async function openMeetingEditor(id) {
     _meetingEditingId = id; // null = 신규
+    _meetingDirty = false;
     if (id === null) {
         const now = new Date();
         _meetingDraft = _meetingRowDefaults({
@@ -17312,6 +17342,8 @@ async function openMeetingEditor(id) {
 }
 
 function closeMeetingEditor() {
+    if (_meetingDirty && !confirm('저장하지 않은 내용이 있습니다. 목록으로 나가면 사라집니다. 나가시겠어요?')) return;
+    _meetingDirty = false;
     _meetingEditingId = undefined;
     _meetingDraft = null;
     _meetingActions = [];
@@ -17323,7 +17355,10 @@ function renderMeetingEditor() {
     if (!box || !_meetingDraft) return;
     const m = _meetingDraft;
 
-    const attendeeChips = MEETING_STAFF.map(n => `
+    const allOn = MEETING_STAFF.every(n => m.attendees.includes(n));
+    const attendeeChips =
+      `<button type="button" class="meeting-chip meeting-chip-all${allOn ? ' on' : ''}" id="meetingAttAll">${allOn ? '전원 해제' : '전원 선택'}</button>` +
+      MEETING_STAFF.map(n => `
       <label class="meeting-chip${m.attendees.includes(n) ? ' on' : ''}">
         <input type="checkbox" data-att="${escHtml(n)}" ${m.attendees.includes(n) ? 'checked' : ''} hidden>${escHtml(n)}
       </label>`).join('');
@@ -17338,12 +17373,15 @@ function renderMeetingEditor() {
       </div>
       <button type="button" class="btn-ghost" id="meeting${kind}Add">+ 추가</button>`;
 
+    const canEdit = _meetingCanEdit();
+
     box.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <button class="btn-ghost" id="meetingBackBtn">← 목록</button>
-        <div style="display:flex;gap:8px">
-          ${_meetingEditingId ? '<button class="btn-danger" id="meetingDeleteBtn">삭제</button>' : ''}
-          <button class="btn-primary" id="meetingSaveBtn">저장</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          ${canEdit ? '' : `<span style="font-size:13px;color:var(--gray-500)">읽기 전용 — 작성자(${escHtml(m.author || '?')})와 관리자만 수정할 수 있습니다</span>`}
+          ${(canEdit && _meetingEditingId) ? '<button class="btn-danger" id="meetingDeleteBtn">삭제</button>' : ''}
+          ${canEdit ? '<button class="btn-primary" id="meetingSaveBtn">저장</button>' : ''}
         </div>
       </div>
 
@@ -17380,8 +17418,15 @@ function renderMeetingEditor() {
       </div>
 
       <div class="card" style="padding:20px;margin-bottom:16px">
-        <h3 style="margin:0 0 12px">논의 내용</h3>
-        <textarea id="meetingContent" rows="10" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid var(--gray-200);border-radius:8px;font-family:inherit;font-size:14px">${escHtml(m.content)}</textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <h3 style="margin:0">논의 내용</h3>
+          <label class="btn-ghost" style="margin:0">
+            🖼 이미지 넣기
+            <input type="file" id="meetingImageFile" accept="image/*" multiple hidden>
+          </label>
+        </div>
+        <div id="meetingContent" class="meeting-content" contenteditable="true"
+             data-placeholder="내용을 입력하세요. 이미지는 붙여넣기(Ctrl+V) 하거나 끌어다 놓으세요.">${_meetingContentHtml(m.content)}</div>
       </div>
 
       <div class="card" style="padding:20px;margin-bottom:16px">
@@ -17397,9 +17442,20 @@ function renderMeetingEditor() {
 
 function _bindMeetingEditor() {
     document.getElementById('meetingBackBtn').addEventListener('click', closeMeetingEditor);
-    document.getElementById('meetingSaveBtn').addEventListener('click', saveMeeting);
+    const save = document.getElementById('meetingSaveBtn');
+    if (save) save.addEventListener('click', saveMeeting);
     const del = document.getElementById('meetingDeleteBtn');
     if (del) del.addEventListener('click', deleteMeeting);
+
+    // 수정 권한이 없으면 입력 자체를 잠근다 (DB가 조용히 거부하는 것보다 낫다)
+    if (!_meetingCanEdit()) {
+        const box = document.getElementById('meetingsBody');
+        box.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; });
+        box.querySelectorAll('.meeting-del, #meetingAgendaAdd, #meetingDecisionsAdd, #meetingAttAll').forEach(el => { el.disabled = true; });
+        const ce = document.getElementById('meetingContent');
+        if (ce) ce.setAttribute('contenteditable', 'false');
+        return; // 나머지 편집 핸들러는 달지 않는다
+    }
 
     document.querySelectorAll('#meetingAttendees input[data-att]').forEach(cb => {
         cb.addEventListener('change', () => {
@@ -17409,7 +17465,19 @@ function _bindMeetingEditor() {
             if (on) set.add(n); else set.delete(n);
             _meetingDraft.attendees = MEETING_STAFF.filter(x => set.has(x));
             cb.parentElement.classList.toggle('on', on);
+            _syncMeetingAllBtn();
         });
+    });
+
+    const allBtn = document.getElementById('meetingAttAll');
+    if (allBtn) allBtn.addEventListener('click', () => {
+        const everyone = MEETING_STAFF.every(n => _meetingDraft.attendees.includes(n));
+        _meetingDraft.attendees = everyone ? [] : MEETING_STAFF.slice();
+        document.querySelectorAll('#meetingAttendees input[data-att]').forEach(cb => {
+            cb.checked = !everyone;
+            cb.parentElement.classList.toggle('on', !everyone);
+        });
+        _syncMeetingAllBtn();
     });
 
     const bindList = (kind, key) => {
@@ -17435,6 +17503,94 @@ function _bindMeetingEditor() {
     };
     bindList('Agenda', 'agenda');
     bindList('Decisions', 'decisions');
+    _bindMeetingContentImages();
+
+    // 어디든 손대면 "미저장" 표시 (저장 시 해제).
+    // #meetingsBody는 재렌더돼도 유지되므로 리스너는 딱 한 번만 단다.
+    const box = document.getElementById('meetingsBody');
+    if (!box.dataset.dirtyBound) {
+        box.dataset.dirtyBound = '1';
+        ['input', 'change'].forEach(ev => box.addEventListener(ev, () => {
+            if (_meetingEditingId !== undefined) _meetingDirty = true;
+        }));
+    }
+}
+
+// 논의 내용에 이미지 붙여넣기 / 끌어다 놓기 / 파일 선택
+function _bindMeetingContentImages() {
+    const ce = document.getElementById('meetingContent');
+    if (!ce) return;
+
+    ce.addEventListener('paste', (e) => {
+        const files = [...((e.clipboardData && e.clipboardData.files) || [])].filter(f => f.type.startsWith('image/'));
+        if (!files.length) return;           // 글자 붙여넣기는 기본 동작에 맡긴다
+        e.preventDefault();
+        _meetingUploadImages(files);
+    });
+
+    ce.addEventListener('dragover', (e) => { e.preventDefault(); ce.classList.add('drag'); });
+    ce.addEventListener('dragleave', () => ce.classList.remove('drag'));
+    ce.addEventListener('drop', (e) => {
+        ce.classList.remove('drag');
+        const files = [...((e.dataTransfer && e.dataTransfer.files) || [])].filter(f => f.type.startsWith('image/'));
+        if (!files.length) return;
+        e.preventDefault();
+        _meetingUploadImages(files);
+    });
+
+    const picker = document.getElementById('meetingImageFile');
+    if (picker) picker.addEventListener('change', () => {
+        const files = [...picker.files].filter(f => f.type.startsWith('image/'));
+        picker.value = '';
+        if (files.length) _meetingUploadImages(files);
+    });
+}
+
+// 커서 위치(없으면 맨 끝)에 노드를 넣는다.
+function _meetingInsertNode(node) {
+    const ce = document.getElementById('meetingContent');
+    if (!ce) return;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && ce.contains(sel.anchorNode)) {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(node);
+        range.setStartAfter(node);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    } else {
+        ce.appendChild(node);
+    }
+}
+
+const MEETING_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
+async function _meetingUploadImages(files) {
+    for (const file of files) {
+        if (file.size > MEETING_IMAGE_MAX_BYTES) {
+            showToast('이미지가 너무 큽니다 (10MB 이하): ' + (file.name || '붙여넣은 이미지'));
+            continue;
+        }
+        // 업로드 중 자리표시자 — 실패하면 지운다
+        const ph = document.createElement('span');
+        ph.className = 'meeting-img-uploading';
+        ph.textContent = '이미지 업로드 중…';
+        ph.setAttribute('contenteditable', 'false');
+        _meetingInsertNode(ph);
+        try {
+            const url = await uploadPlanningImage(file);
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = '';
+            ph.replaceWith(img);
+        } catch (e) {
+            console.error('회의록 이미지 업로드 실패', e);
+            ph.remove();
+            showToast('이미지 업로드 실패: ' + ((e && e.message) || e));
+        }
+    }
+    _readMeetingFields(); // 삽입된 이미지를 초안에 반영
 }
 
 // 화면의 입력값을 초안으로 옮긴다(가공 없이).
@@ -17448,7 +17604,8 @@ function _readMeetingFields() {
     _meetingDraft.externalAttendees = v('meetingExternal');
     _meetingDraft.client = v('meetingClient');
     _meetingDraft.status = v('meetingStatus');
-    _meetingDraft.content = v('meetingContent');
+    const ce = document.getElementById('meetingContent');
+    if (ce) _meetingDraft.content = ce.innerHTML;
     _meetingDraft.isPrivate = !!(document.getElementById('meetingPrivate') || {}).checked;
 }
 
@@ -17461,9 +17618,17 @@ function _readMeetingForm() {
     _meetingDraft.client = (_meetingDraft.client || '').trim();
     _meetingDraft.agenda = _meetingDraft.agenda.map(s => (s || '').trim()).filter(Boolean);
     _meetingDraft.decisions = _meetingDraft.decisions.map(s => (s || '').trim()).filter(Boolean);
+    // 붙여넣은 HTML을 정화하고, 업로드 중이던 자리표시자는 버린다
+    _meetingDraft.content = planningSanitizeHtml(
+        (_meetingDraft.content || '').replace(/<span class="meeting-img-uploading"[^>]*>[\s\S]*?<\/span>/g, '')
+    );
 }
 
 async function saveMeeting() {
+    if (document.querySelector('#meetingContent .meeting-img-uploading')) {
+        showToast('이미지 업로드가 끝난 뒤에 저장해주세요');
+        return;
+    }
     _readMeetingForm();
     if (!_meetingDraft.title) { showToast('제목을 입력해주세요'); return; }
     if (!currentUser || !currentUser.name) { showToast('로그인이 필요합니다'); return; }
@@ -17473,8 +17638,10 @@ async function saveMeeting() {
         if (!_meetingDraft.author) _meetingDraft.author = (currentUser && currentUser.name) || '';
         const payload = _meetingToDb(_meetingDraft);
         if (_meetingEditingId) {
-            const { error } = await sb.from('meetings').update(payload).eq('id', _meetingEditingId);
+            // .select()로 반환 행을 확인한다 — RLS가 막으면 에러 없이 0건이 온다
+            const { data, error } = await sb.from('meetings').update(payload).eq('id', _meetingEditingId).select('id');
             if (error) throw error;
+            if (!data || !data.length) throw new Error('수정 권한이 없습니다 (작성자와 관리자만 수정 가능)');
         } else {
             const { data, error } = await sb.from('meetings').insert(payload).select().single();
             if (error) throw error;
@@ -17482,6 +17649,7 @@ async function saveMeeting() {
             _meetingDraft.id = data.id;
         }
         await saveMeetingActions();
+        _meetingDirty = false;
         showToast('저장되었습니다');
         renderMeetingEditor();
     } catch (e) {
@@ -17495,9 +17663,11 @@ async function saveMeeting() {
 async function deleteMeeting() {
     if (!_meetingEditingId) return;
     if (!confirm('이 회의록을 삭제할까요? 액션아이템도 함께 지워집니다. (이미 보낸 일일계획표 할 일은 남습니다)')) return;
-    const { error } = await sb.from('meetings').delete().eq('id', _meetingEditingId);
+    const { data, error } = await sb.from('meetings').delete().eq('id', _meetingEditingId).select('id');
     if (error) { console.error(error); showToast('삭제 실패: ' + error.message); return; }
+    if (!data || !data.length) { showToast('삭제 권한이 없습니다 (작성자와 관리자만 삭제 가능)'); return; }
     showToast('삭제되었습니다');
+    _meetingDirty = false;
     closeMeetingEditor();
 }
 
@@ -17574,6 +17744,11 @@ function renderMeetingActions() {
         renderMeetingActions();
     });
     card.querySelector('#meetingSendBtn').addEventListener('click', () => sendMeetingActionsToDaily(_meetingEditingId));
+
+    // 읽기 전용 회의록이면 액션아이템도 잠근다
+    if (!_meetingCanEdit()) {
+        card.querySelectorAll('input, select, button').forEach(el => { el.disabled = true; });
+    }
 }
 
 async function saveMeetingActions() {
@@ -17644,3 +17819,24 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     openMeetingEditor(null);
 });
+
+// 회의록 편집 중 저장 안 하고 새로고침·창닫기 → 브라우저 기본 경고
+window.addEventListener('beforeunload', (e) => {
+    if (_meetingEditingId !== undefined && _meetingDirty) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// 회의록 편집 중 사이드바로 다른 메뉴 이동 → 확인 후 이동
+document.addEventListener('click', (e) => {
+    if (_meetingEditingId === undefined || !_meetingDirty) return;
+    const nav = e.target.closest && e.target.closest('.nav-item[data-tab]');
+    if (!nav || nav.dataset.tab === 'meetings') return;
+    if (!confirm('저장하지 않은 회의록 내용이 있습니다. 이동하면 사라집니다. 이동할까요?')) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+    }
+    _meetingDirty = false;
+    _meetingEditingId = undefined;
+    _meetingDraft = null;
+    _meetingActions = [];
+}, true);
