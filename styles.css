@@ -3603,6 +3603,61 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 }
 .meeting-chip-all.on { border-style: solid; }
 
+/* 편집 화면 하단 — 전 직원 일일계획표 한 줄 보기 (읽기 전용) */
+.meeting-daily-head {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
+}
+.meeting-daily-head input[type="date"] {
+    padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: 6px;
+    font-size: 13px; font-family: inherit;
+    background: var(--white); color: var(--gray-900);
+}
+.meeting-daily-board {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(150px, 1fr));
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+.meeting-daily-col {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-100);
+    border-radius: 10px;
+    min-width: 0;
+    display: flex; flex-direction: column;
+}
+.meeting-daily-col-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--gray-200);
+    font-size: 13px; color: var(--gray-900);
+}
+.mdt-count { font-size: 11px; font-weight: 700; color: var(--blue); white-space: nowrap; }
+.mdt-count.zero { color: var(--gray-400); font-weight: 600; }
+.meeting-daily-col-body {
+    padding: 8px; display: flex; flex-direction: column; gap: 6px;
+    max-height: 260px; overflow-y: auto;
+}
+.meeting-daily-task {
+    background: var(--white);
+    border: 1px solid var(--gray-100);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--gray-800);
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px;
+}
+.meeting-daily-task.done { opacity: .5; }
+.meeting-daily-task.done .mdt-text { text-decoration: line-through; }
+.mdt-pri { flex-shrink: 0; }
+.mdt-text { flex: 1; min-width: 0; word-break: break-word; }
+.mdt-client { font-size: 10px; font-weight: 700; color: var(--blue); background: var(--blue-light); padding: 1px 6px; border-radius: 4px; }
+.meeting-daily-empty { font-size: 12px; color: var(--gray-400); text-align: center; padding: 14px 0; }
+@media (max-width: 1100px) {
+    .meeting-daily-board { grid-template-columns: repeat(7, 160px); }
+}
+
 /* 인라인 스타일에 배경/글자색이 없는 요소들 — 다크모드에서 흰 화면으로 남는다 */
 #meetingsSearch {
     background: var(--white);

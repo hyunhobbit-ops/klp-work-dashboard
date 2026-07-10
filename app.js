@@ -17130,6 +17130,9 @@ let _meetingActions = [];      // 편집 중인 회의의 액션아이템
 let _meetingActionDone = {};   // { daily_task_id: true/false } — daily_tasks.done 사본
 let _meetingsSearch = '';
 let _meetingDirty = false;     // 편집 중 저장하지 않은 변경이 있는가
+let _meetingDailyDate = '';    // 편집 화면 하단 일일계획표가 보여주는 날짜
+// 일일계획표 전체보기와 같은 순서 (한 줄에 나란히)
+const MEETING_DAILY_COLUMNS = ['전체', '임원', '대표님', '이현주', '김현호', '유지은', '구정두'];
 
 function _meetingRowDefaults(r) {
     return {
@@ -17434,10 +17437,15 @@ function renderMeetingEditor() {
         ${listEditor('Decisions', m.decisions)}
       </div>
 
-      <div class="card" style="padding:20px" id="meetingActionsCard"></div>`;
+      <div class="card" style="padding:20px;margin-bottom:16px" id="meetingActionsCard"></div>
+
+      <div class="card" style="padding:20px" id="meetingDailyCard"></div>`;
 
     _bindMeetingEditor();
     renderMeetingActions();
+    // 회의 일시는 UTC로 저장되므로 로컬 날짜로 환산해서 쓴다 (그냥 자르면 하루 어긋남)
+    _meetingDailyDate = _meetingLocalDateTime(m.meetAt).slice(0, 10) || getTodayStr();
+    renderMeetingDailyBoard();
 }
 
 function _bindMeetingEditor() {
@@ -17770,6 +17778,71 @@ async function saveMeetingActions() {
     }
 }
 
+// 편집 화면 하단: 그 날짜의 전 직원 일일계획표를 한 줄로 (읽기 전용)
+async function renderMeetingDailyBoard() {
+    const card = document.getElementById('meetingDailyCard');
+    if (!card) return;
+    const date = _meetingDailyDate || getTodayStr();
+
+    card.innerHTML = `
+      <div class="meeting-daily-head">
+        <h3 style="margin:0">📋 일일계획표 <span style="font-weight:400;color:var(--gray-500);font-size:13px">— 액션아이템을 누구에게 줄지 참고하세요</span></h3>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="date" id="meetingDailyDate" value="${escHtml(date)}">
+          <button type="button" class="btn-ghost" id="meetingDailyToday">오늘</button>
+        </div>
+      </div>
+      <div class="meeting-daily-board" id="meetingDailyBoard">
+        <div style="padding:24px;color:var(--gray-500);font-size:13px">불러오는 중…</div>
+      </div>`;
+
+    const dateInput = card.querySelector('#meetingDailyDate');
+    dateInput.addEventListener('change', () => {
+        if (!dateInput.value) return;
+        _meetingDailyDate = dateInput.value;
+        renderMeetingDailyBoard();
+    });
+    card.querySelector('#meetingDailyToday').addEventListener('click', () => {
+        _meetingDailyDate = getTodayStr();
+        renderMeetingDailyBoard();
+    });
+
+    const { data, error } = await sb.from('daily_tasks')
+        .select('id, task, assignee, done, priority, client')
+        .eq('date', date);
+
+    const board = document.getElementById('meetingDailyBoard');
+    if (!board || _meetingDailyDate !== date) return; // 날짜를 다시 바꿨으면 늦게 온 응답은 버린다
+    if (error) {
+        console.error('renderMeetingDailyBoard failed', error);
+        board.innerHTML = `<div style="padding:24px;color:var(--red);font-size:13px">일일계획표를 불러오지 못했습니다 — ${escHtml(error.message)}</div>`;
+        return;
+    }
+
+    const rows = data || [];
+    board.innerHTML = MEETING_DAILY_COLUMNS.map(col => {
+        const list = rows.filter(t => t.assignee === col)
+            .sort((a, b) => (a.done - b.done) || ((b.id || 0) - (a.id || 0)));
+        const left = list.filter(t => !t.done).length;
+        const body = list.length
+            ? list.map(t => `
+                <div class="meeting-daily-task${t.done ? ' done' : ''}">
+                  <span class="mdt-pri">${escHtml((t.priority || '').slice(0, 2))}</span>
+                  <span class="mdt-text">${escHtml(t.task || '')}</span>
+                  ${t.client ? `<span class="mdt-client">${escHtml(t.client)}</span>` : ''}
+                </div>`).join('')
+            : '<div class="meeting-daily-empty">없음</div>';
+        return `
+          <div class="meeting-daily-col">
+            <div class="meeting-daily-col-head">
+              <b>${escHtml(col)}</b>
+              <span class="mdt-count${left ? '' : ' zero'}">${left ? left + '건 남음' : '완료'}</span>
+            </div>
+            <div class="meeting-daily-col-body">${body}</div>
+          </div>`;
+    }).join('');
+}
+
 async function sendMeetingActionsToDaily(meetingId) {
     if (!meetingId) { showToast('먼저 회의록을 저장해주세요'); return; }
     // 표에 입력만 하고 저장 안 한 항목이 있을 수 있으니 먼저 저장
@@ -17806,6 +17879,7 @@ async function sendMeetingActionsToDaily(meetingId) {
     if (orphan) msg += ' · ' + orphan + '건은 할 일은 생성됐지만 연결에 실패했습니다. 다시 보내면 중복되니 일일계획표를 먼저 확인하세요.';
     showToast(msg);
     renderMeetingActions();
+    renderMeetingDailyBoard(); // 방금 보낸 할 일이 아래 표에 바로 보이도록
 }
 
 // F2: 회의록 목록에서 새 회의록 바로 만들기
