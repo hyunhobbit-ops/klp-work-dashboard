@@ -17278,3 +17278,195 @@ async function renderMeetings() {
         tr.addEventListener('click', () => openMeetingEditor(Number(tr.dataset.mid)));
     });
 }
+
+async function openMeetingEditor(id) {
+    _meetingEditingId = id; // null = 신규
+    if (id === null) {
+        const now = new Date();
+        _meetingDraft = _meetingRowDefaults({
+            author: (currentUser && currentUser.name) || '',
+            title: '', meet_at: now.toISOString(), attendees: [], status: '작성중'
+        });
+        _meetingActions = [];
+        _meetingActionDone = {};
+        renderMeetingEditor();
+        return;
+    }
+    const { data, error } = await sb.from('meetings').select('*').eq('id', id).single();
+    if (error) { console.error(error); showToast('회의록 불러오기 실패: ' + error.message); _meetingEditingId = undefined; renderMeetings(); return; }
+    _meetingDraft = _meetingRowDefaults(data);
+    await loadMeetingActions(id);
+    renderMeetingEditor();
+}
+
+function closeMeetingEditor() {
+    _meetingEditingId = undefined;
+    _meetingDraft = null;
+    _meetingActions = [];
+    renderMeetings();
+}
+
+function renderMeetingEditor() {
+    const box = document.getElementById('meetingsBody');
+    if (!box || !_meetingDraft) return;
+    const m = _meetingDraft;
+
+    const attendeeChips = MEETING_STAFF.map(n => `
+      <label class="meeting-chip${m.attendees.includes(n) ? ' on' : ''}">
+        <input type="checkbox" data-att="${escHtml(n)}" ${m.attendees.includes(n) ? 'checked' : ''} hidden>${escHtml(n)}
+      </label>`).join('');
+
+    const listEditor = (kind, items) => `
+      <div id="meeting${kind}List">
+        ${items.map((v, i) => `
+          <div class="meeting-list-row">
+            <input type="text" data-${kind.toLowerCase()}-i="${i}" value="${escHtml(v)}">
+            <button type="button" class="meeting-del" data-${kind.toLowerCase()}-del="${i}">✕</button>
+          </div>`).join('')}
+      </div>
+      <button type="button" class="btn-ghost" id="meeting${kind}Add">+ 추가</button>`;
+
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <button class="btn-ghost" id="meetingBackBtn">← 목록</button>
+        <div style="display:flex;gap:8px">
+          ${_meetingEditingId ? '<button class="btn-danger" id="meetingDeleteBtn">삭제</button>' : ''}
+          <button class="btn-primary" id="meetingSaveBtn">저장</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:20px;margin-bottom:16px">
+        <div class="field"><label>제목</label>
+          <input id="meetingTitle" type="text" value="${escHtml(m.title)}" placeholder="예: 2월 신제품 킥오프"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px">
+          <div class="field"><label>일시</label>
+            <input id="meetingMeetAt" type="datetime-local" value="${_meetingLocalDateTime(m.meetAt)}"></div>
+          <div class="field"><label>장소</label>
+            <input id="meetingLocation" type="text" value="${escHtml(m.location)}" placeholder="회의실 / 온라인"></div>
+        </div>
+        <div class="field" style="margin-top:14px"><label>참석자 (직원)</label>
+          <div id="meetingAttendees" class="meeting-chips">${attendeeChips}</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px">
+          <div class="field"><label>외부 참석자</label>
+            <input id="meetingExternal" type="text" value="${escHtml(m.externalAttendees)}" placeholder="예: OO상사 김부장"></div>
+          <div class="field"><label>거래처</label>
+            <input id="meetingClient" type="text" value="${escHtml(m.client)}"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px">
+          <div class="field"><label>상태</label>
+            <select id="meetingStatus">${MEETING_STATUSES.map(s => `<option${s === m.status ? ' selected' : ''}>${s}</option>`).join('')}</select></div>
+          <div class="field"><label>공개 범위</label>
+            <label style="display:flex;align-items:center;gap:8px;padding-top:8px">
+              <input id="meetingPrivate" type="checkbox" ${m.isPrivate ? 'checked' : ''}> 🔒 비공개 (참석자·작성자·관리자만)
+            </label></div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:20px;margin-bottom:16px">
+        <h3 style="margin:0 0 12px">안건</h3>
+        ${listEditor('Agenda', m.agenda)}
+      </div>
+
+      <div class="card" style="padding:20px;margin-bottom:16px">
+        <h3 style="margin:0 0 12px">논의 내용</h3>
+        <textarea id="meetingContent" rows="10" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid var(--gray-200);border-radius:8px;font-family:inherit;font-size:14px">${escHtml(m.content)}</textarea>
+      </div>
+
+      <div class="card" style="padding:20px;margin-bottom:16px">
+        <h3 style="margin:0 0 12px">결정사항</h3>
+        ${listEditor('Decisions', m.decisions)}
+      </div>
+
+      <div class="card" style="padding:20px" id="meetingActionsCard"></div>`;
+
+    _bindMeetingEditor();
+    renderMeetingActions();
+}
+
+function _bindMeetingEditor() {
+    document.getElementById('meetingBackBtn').addEventListener('click', closeMeetingEditor);
+    document.getElementById('meetingSaveBtn').addEventListener('click', saveMeeting);
+    const del = document.getElementById('meetingDeleteBtn');
+    if (del) del.addEventListener('click', deleteMeeting);
+
+    document.querySelectorAll('#meetingAttendees input[data-att]').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const n = cb.dataset.att;
+            const on = cb.checked;
+            const set = new Set(_meetingDraft.attendees);
+            if (on) set.add(n); else set.delete(n);
+            _meetingDraft.attendees = MEETING_STAFF.filter(x => set.has(x));
+            cb.parentElement.classList.toggle('on', on);
+        });
+    });
+
+    const bindList = (kind, key) => {
+        const lower = kind.toLowerCase();
+        document.querySelectorAll(`[data-${lower}-i]`).forEach(inp => {
+            inp.addEventListener('input', () => { _meetingDraft[key][Number(inp.dataset[lower + 'I'])] = inp.value; });
+        });
+        document.querySelectorAll(`[data-${lower}-del]`).forEach(btn => {
+            btn.addEventListener('click', () => {
+                _meetingDraft[key].splice(Number(btn.dataset[lower + 'Del']), 1);
+                renderMeetingEditor();
+            });
+        });
+        document.getElementById('meeting' + kind + 'Add').addEventListener('click', () => {
+            _meetingDraft[key].push('');
+            renderMeetingEditor();
+        });
+    };
+    bindList('Agenda', 'agenda');
+    bindList('Decisions', 'decisions');
+}
+
+function _readMeetingForm() {
+    const v = (id) => (document.getElementById(id) || {}).value || '';
+    _meetingDraft.title = v('meetingTitle').trim();
+    _meetingDraft.meetAt = v('meetingMeetAt');
+    _meetingDraft.location = v('meetingLocation').trim();
+    _meetingDraft.externalAttendees = v('meetingExternal').trim();
+    _meetingDraft.client = v('meetingClient').trim();
+    _meetingDraft.status = v('meetingStatus');
+    _meetingDraft.content = v('meetingContent');
+    _meetingDraft.isPrivate = !!(document.getElementById('meetingPrivate') || {}).checked;
+    _meetingDraft.agenda = _meetingDraft.agenda.map(s => (s || '').trim()).filter(Boolean);
+    _meetingDraft.decisions = _meetingDraft.decisions.map(s => (s || '').trim()).filter(Boolean);
+}
+
+async function saveMeeting() {
+    _readMeetingForm();
+    if (!_meetingDraft.title) { showToast('제목을 입력해주세요'); return; }
+    const btn = document.getElementById('meetingSaveBtn');
+    btn.disabled = true; btn.textContent = '저장 중…';
+    try {
+        if (!_meetingDraft.author) _meetingDraft.author = (currentUser && currentUser.name) || '';
+        const payload = _meetingToDb(_meetingDraft);
+        if (_meetingEditingId) {
+            const { error } = await sb.from('meetings').update(payload).eq('id', _meetingEditingId);
+            if (error) throw error;
+        } else {
+            const { data, error } = await sb.from('meetings').insert(payload).select().single();
+            if (error) throw error;
+            _meetingEditingId = data.id;
+            _meetingDraft.id = data.id;
+        }
+        await saveMeetingActions();
+        showToast('저장되었습니다');
+        renderMeetingEditor();
+    } catch (e) {
+        console.error('saveMeeting failed', e);
+        showToast('저장 실패: ' + (e.message || e));
+    } finally {
+        btn.disabled = false; btn.textContent = '저장';
+    }
+}
+
+async function deleteMeeting() {
+    if (!_meetingEditingId) return;
+    if (!confirm('이 회의록을 삭제할까요? 액션아이템도 함께 지워집니다. (이미 보낸 일일계획표 할 일은 남습니다)')) return;
+    const { error } = await sb.from('meetings').delete().eq('id', _meetingEditingId);
+    if (error) { console.error(error); showToast('삭제 실패: ' + error.message); return; }
+    showToast('삭제되었습니다');
+    closeMeetingEditor();
+}
