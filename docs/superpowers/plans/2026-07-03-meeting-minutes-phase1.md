@@ -899,8 +899,25 @@ git commit -m "회의록: 액션아이템을 일일계획표 할 일로 전송(�
 
 - [ ] **Step 1: 회의록 전용 스타일을 `styles.css` 맨 아래에 추가**
 
+> **Task 4에서 확인된 사실:** `.card`, `.btn-ghost`, `.btn-danger` 클래스는 이 프로젝트에 **정의되어 있지 않다**(`.btn-danger`는 app.js 한 곳에서 인라인 스타일로 전부 덮어써서 쓰고 있음). 전역 클래스를 새로 만들면 다른 화면에 영향이 갈 수 있으므로, **`#tab-meetings` 안으로 스코프해서** 정의한다.
+
 ```css
 /* 회의록 */
+#tab-meetings .card {
+    background: var(--white); border: 1px solid var(--gray-100);
+    border-radius: var(--radius-sm, 12px); box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+#tab-meetings .btn-ghost {
+    padding: 9px 16px; border: 1px solid var(--gray-200); border-radius: 8px;
+    background: var(--white); color: var(--gray-600); font-size: 13px;
+    font-family: inherit; cursor: pointer;
+}
+#tab-meetings .btn-ghost:hover { background: var(--gray-50); color: var(--gray-900); }
+#tab-meetings .btn-danger {
+    padding: 9px 16px; border: none; border-radius: 8px;
+    background: #e05252; color: #fff; font-size: 13px; font-weight: 600;
+    font-family: inherit; cursor: pointer;
+}
 .meeting-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .meeting-chip {
     padding: 7px 14px; border: 1px solid var(--gray-200); border-radius: 999px;
