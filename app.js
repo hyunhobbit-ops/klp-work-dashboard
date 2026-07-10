@@ -17778,15 +17778,17 @@ async function saveMeetingActions() {
     }
 }
 
-// 편집 화면 하단: 그 날짜의 전 직원 일일계획표를 한 줄로 (읽기 전용)
+// 편집 화면 하단: 전 직원 일일계획표를 한 줄로 (읽기 전용)
+// 미완료 할 일은 날짜와 상관없이 전부, 완료 할 일은 선택한 날짜 것만 보여준다.
 async function renderMeetingDailyBoard() {
     const card = document.getElementById('meetingDailyCard');
     if (!card) return;
     const date = _meetingDailyDate || getTodayStr();
+    const today = getTodayStr();
 
     card.innerHTML = `
       <div class="meeting-daily-head">
-        <h3 style="margin:0">📋 일일계획표 <span style="font-weight:400;color:var(--gray-500);font-size:13px">— 액션아이템을 누구에게 줄지 참고하세요</span></h3>
+        <h3 style="margin:0">📋 일일계획표 <span style="font-weight:400;color:var(--gray-500);font-size:13px">— 미완료 전체 + 선택한 날짜의 완료건</span></h3>
         <div style="display:flex;gap:8px;align-items:center">
           <input type="date" id="meetingDailyDate" value="${escHtml(date)}">
           <button type="button" class="btn-ghost" id="meetingDailyToday">오늘</button>
@@ -17807,36 +17809,49 @@ async function renderMeetingDailyBoard() {
         renderMeetingDailyBoard();
     });
 
-    const { data, error } = await sb.from('daily_tasks')
-        .select('id, task, assignee, done, priority, client')
-        .eq('date', date);
+    const cols = 'id, task, assignee, done, priority, client, date';
+    // ① 미완료는 날짜 무관 전부  ② 완료는 선택한 날짜 것만
+    const [undone, doneToday] = await Promise.all([
+        sb.from('daily_tasks').select(cols).eq('done', false),
+        sb.from('daily_tasks').select(cols).eq('done', true).eq('date', date)
+    ]);
 
     const board = document.getElementById('meetingDailyBoard');
     if (!board || _meetingDailyDate !== date) return; // 날짜를 다시 바꿨으면 늦게 온 응답은 버린다
+    const error = undone.error || doneToday.error;
     if (error) {
         console.error('renderMeetingDailyBoard failed', error);
         board.innerHTML = `<div style="padding:24px;color:var(--red);font-size:13px">일일계획표를 불러오지 못했습니다 — ${escHtml(error.message)}</div>`;
         return;
     }
 
-    const rows = data || [];
+    const rows = (undone.data || []).concat(doneToday.data || []);
     board.innerHTML = MEETING_DAILY_COLUMNS.map(col => {
-        const list = rows.filter(t => t.assignee === col)
-            .sort((a, b) => (a.done - b.done) || ((b.id || 0) - (a.id || 0)));
+        const list = rows.filter(t => t.assignee === col).sort((a, b) =>
+            (a.done - b.done)                              // 미완료 먼저
+            || String(a.date || '').localeCompare(String(b.date || '')) // 오래된 것 먼저
+            || ((b.id || 0) - (a.id || 0)));
         const left = list.filter(t => !t.done).length;
+        const overdue = list.filter(t => !t.done && t.date && t.date < today).length;
         const body = list.length
-            ? list.map(t => `
+            ? list.map(t => {
+                const late = !t.done && t.date && t.date < today;
+                const other = t.date && t.date !== date;
+                return `
                 <div class="meeting-daily-task${t.done ? ' done' : ''}">
                   <span class="mdt-pri">${escHtml((t.priority || '').slice(0, 2))}</span>
                   <span class="mdt-text">${escHtml(t.task || '')}</span>
+                  ${other ? `<span class="mdt-date${late ? ' late' : ''}">${escHtml(t.date.slice(5))}</span>` : ''}
                   ${t.client ? `<span class="mdt-client">${escHtml(t.client)}</span>` : ''}
-                </div>`).join('')
+                </div>`;
+            }).join('')
             : '<div class="meeting-daily-empty">없음</div>';
         return `
           <div class="meeting-daily-col">
             <div class="meeting-daily-col-head">
               <b>${escHtml(col)}</b>
               <span class="mdt-count${left ? '' : ' zero'}">${left ? left + '건 남음' : '완료'}</span>
+              ${overdue ? `<span class="mdt-overdue" title="마감일이 지난 미완료">지연 ${overdue}</span>` : ''}
             </div>
             <div class="meeting-daily-col-body">${body}</div>
           </div>`;
