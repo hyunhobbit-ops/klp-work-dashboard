@@ -17116,3 +17116,165 @@ async function adOpenCampaign(id) {
         document.getElementById('adResultsArea').scrollIntoView({ behavior: 'smooth' });
     } catch (e) { showToast('불러오기 실패: ' + (e.message || e)); }
 }
+
+// ===== 회의록 =====================================================
+const MEETING_ASSIGNEES = ['전체', '임원', '대표님', '이현주', '김현호', '유지은', '구정두'];
+const MEETING_STAFF = ['이현주', '김현호', '유지은', '구정두'];
+const MEETING_STATUSES = ['작성중', '공유됨', '완료'];
+
+let _meetings = [];            // 목록에 그릴 회의 배열 (DB row 그대로)
+let _meetingsPage = null;      // paginatedLoad 상태
+let _meetingEditingId;         // undefined=목록, null=새 회의록, 숫자=편집 중
+let _meetingDraft = null;      // 편집 중인 회의 객체
+let _meetingActions = [];      // 편집 중인 회의의 액션아이템
+let _meetingActionDone = {};   // { daily_task_id: true/false } — daily_tasks.done 사본
+let _meetingsSearch = '';
+
+function _meetingRowDefaults(r) {
+    return {
+        id: r.id,
+        author: r.author || '',
+        title: r.title || '',
+        meetAt: r.meet_at || '',
+        location: r.location || '',
+        attendees: Array.isArray(r.attendees) ? r.attendees : [],
+        externalAttendees: r.external_attendees || '',
+        client: r.client || '',
+        agenda: Array.isArray(r.agenda) ? r.agenda : [],
+        content: r.content || '',
+        decisions: Array.isArray(r.decisions) ? r.decisions : [],
+        status: r.status || '작성중',
+        isPrivate: !!r.is_private
+    };
+}
+
+function _meetingToDb(m) {
+    return {
+        author: m.author || null,
+        title: m.title,
+        meet_at: m.meetAt ? new Date(m.meetAt).toISOString() : null,
+        location: m.location || null,
+        attendees: m.attendees || [],
+        external_attendees: m.externalAttendees || null,
+        client: m.client || null,
+        agenda: m.agenda || [],
+        content: m.content || null,
+        decisions: m.decisions || [],
+        status: m.status || '작성중',
+        is_private: !!m.isPrivate
+    };
+}
+
+// datetime-local 입력값 ↔ ISO
+function _meetingLocalDateTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+        'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+function _meetingDateLabel(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    if (isNaN(d)) return '-';
+    const pad = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '.' + pad(d.getMonth() + 1) + '.' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+async function loadMeetings() {
+    try {
+        _meetingsPage = await paginatedLoad('meetings', {
+            pageSize: 30, orderBy: 'meet_at', orderDir: 'desc', secondaryOrderBy: 'id', secondaryOrderDir: 'desc'
+        });
+        _meetings = _meetingsPage.data || [];
+    } catch (e) {
+        console.error('loadMeetings failed', e);
+        showToast('회의록 불러오기 실패: ' + (e.message || e));
+        _meetings = [];
+    }
+}
+
+// 목록에 진행률을 보여주려면 각 회의의 액션아이템 + 연결된 할 일의 done이 필요하다.
+// 한 번에 다 긁어와 메모리에서 집계 (건수가 작음).
+async function _meetingLoadProgress(ids) {
+    const map = {}; // meetingId -> { total, done }
+    if (!ids.length) return map;
+    const { data: acts, error } = await sb.from('meeting_actions')
+        .select('meeting_id, daily_task_id').in('meeting_id', ids);
+    if (error) { console.error(error); return map; }
+    const taskIds = (acts || []).map(a => a.daily_task_id).filter(Boolean);
+    const doneMap = {};
+    if (taskIds.length) {
+        const { data: tasks } = await sb.from('daily_tasks').select('id, done').in('id', taskIds);
+        (tasks || []).forEach(t => { doneMap[t.id] = !!t.done; });
+    }
+    (acts || []).forEach(a => {
+        if (!map[a.meeting_id]) map[a.meeting_id] = { total: 0, done: 0 };
+        map[a.meeting_id].total++;
+        if (a.daily_task_id && doneMap[a.daily_task_id]) map[a.meeting_id].done++;
+    });
+    return map;
+}
+
+async function renderMeetings() {
+    const box = document.getElementById('meetingsBody');
+    if (!box) return;
+    if (_meetingEditingId !== undefined) { renderMeetingEditor(); return; }
+
+    box.innerHTML = '<div style="padding:40px;text-align:center;color:var(--gray-500)">불러오는 중…</div>';
+    await loadMeetings();
+    const progress = await _meetingLoadProgress(_meetings.map(m => m.id));
+
+    const q = _meetingsSearch.trim().toLowerCase();
+    const rows = _meetings.filter(m => !q ||
+        (m.title || '').toLowerCase().includes(q) ||
+        (m.content || '').toLowerCase().includes(q));
+
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px">
+        <input id="meetingsSearch" type="text" placeholder="제목·내용 검색" value="${escHtml(_meetingsSearch)}"
+               style="flex:1;max-width:320px;padding:10px 14px;border:1px solid var(--gray-200);border-radius:8px;font-size:14px">
+        <button class="btn-primary" id="meetingNewBtn">+ 새 회의록</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th style="width:150px">일시</th><th>제목</th><th style="width:200px">참석자</th>
+            <th style="width:110px">액션아이템</th><th style="width:90px">상태</th>
+          </tr></thead>
+          <tbody id="meetingsTbody"></tbody>
+        </table>
+      </div>
+      <div id="meetingsMore"></div>`;
+
+    const tb = document.getElementById('meetingsTbody');
+    if (!rows.length) {
+        tb.innerHTML = '<tr><td colspan="5" style="padding:40px;text-align:center;color:var(--gray-500)">회의록이 없습니다. 오른쪽 위 “+ 새 회의록”을 눌러 시작하세요.</td></tr>';
+    } else {
+        tb.innerHTML = rows.map(m => {
+            const p = progress[m.id] || { total: 0, done: 0 };
+            const att = (Array.isArray(m.attendees) ? m.attendees : []).join(', ');
+            return `<tr class="meeting-row" data-mid="${m.id}" style="cursor:pointer">
+              <td>${escHtml(_meetingDateLabel(m.meet_at))}</td>
+              <td>${m.is_private ? '🔒 ' : ''}${escHtml(m.title || '(제목 없음)')}</td>
+              <td>${escHtml(att)}</td>
+              <td>${p.total ? (p.done + ' / ' + p.total) : '-'}</td>
+              <td>${escHtml(m.status || '작성중')}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    renderLoadMoreButton(document.getElementById('meetingsMore'), _meetingsPage, () => {
+        _meetings = _meetingsPage.data || [];
+        renderMeetings();
+    });
+
+    document.getElementById('meetingNewBtn').addEventListener('click', () => openMeetingEditor(null));
+    const s = document.getElementById('meetingsSearch');
+    s.addEventListener('input', () => { _meetingsSearch = s.value; });
+    s.addEventListener('keydown', (e) => { if (e.key === 'Enter') renderMeetings(); });
+    tb.querySelectorAll('.meeting-row').forEach(tr => {
+        tr.addEventListener('click', () => openMeetingEditor(Number(tr.dataset.mid)));
+    });
+}
