@@ -481,6 +481,7 @@ const pageTitles = {
     marketdb: '중고마켓DB',
     quotes: '견적서 만들기',
     'margin-calc': '마진계산기',
+    'meetings': '회의록',
     'ad-studio': 'AI 광고 제작',
     planning: '프로젝트',
     'planning-company': '회사 프로젝트',
@@ -1117,6 +1118,11 @@ function switchTab(tabId, fromHistory = false) {
     // 견적서 탭 열릴 때: DB 로드 + 리스트 렌더
     if (tabId === 'quotes') {
         loadQuotesFromDb().then(() => renderQuotes()).catch(e => console.error('loadQuotes failed', e));
+    }
+
+    if (tabId === 'meetings') {
+        if (!fromHistory) _meetingEditingId = undefined; // 사이드바 클릭 시 목록으로 리셋
+        try { renderMeetings(); } catch (e) { console.error('renderMeetings failed', e); }
     }
 
     if (tabId === 'ad-studio') {
