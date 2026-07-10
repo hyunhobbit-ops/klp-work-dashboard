@@ -17558,3 +17558,38 @@ async function saveMeetingActions() {
         }
     }
 }
+
+async function sendMeetingActionsToDaily(meetingId) {
+    if (!meetingId) { showToast('먼저 회의록을 저장해주세요'); return; }
+    // 표에 입력만 하고 저장 안 한 항목이 있을 수 있으니 먼저 저장
+    try { await saveMeetingActions(); } catch (e) { showToast('저장 실패: ' + (e.message || e)); return; }
+
+    const targets = _meetingActions.filter(a => a.id && !a.dailyTaskId && (a.task || '').trim() && a.assignee);
+    if (!targets.length) { showToast('보낼 항목이 없습니다 (담당자를 지정해주세요)'); return; }
+
+    const btn = document.getElementById('meetingSendBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '전송 중…'; }
+
+    let ok = 0, fail = 0;
+    for (const a of targets) {
+        const saved = await dbInsertTask({
+            task: a.task.trim(),
+            date: a.dueDate || getTodayStr(),
+            assignee: a.assignee,
+            label: '회사 업무',
+            client: _meetingDraft.client || '',
+            note: '회의록: ' + (_meetingDraft.title || ''),
+            priority: '🟡 보통',
+            done: false
+        });
+        if (!saved || !saved.id) { fail++; continue; }
+        const { error } = await sb.from('meeting_actions').update({ daily_task_id: saved.id }).eq('id', a.id);
+        if (error) { console.error(error); fail++; continue; }
+        a.dailyTaskId = saved.id;
+        _meetingActionDone[saved.id] = false;
+        ok++;
+    }
+
+    showToast(fail ? (ok + '건 전송, ' + fail + '건 실패') : (ok + '건을 일일계획표로 보냈습니다'));
+    renderMeetingActions();
+}
