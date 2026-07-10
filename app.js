@@ -17221,9 +17221,14 @@ async function renderMeetings() {
     const box = document.getElementById('meetingsBody');
     if (!box) return;
     if (_meetingEditingId !== undefined) { renderMeetingEditor(); return; }
-
     box.innerHTML = '<div style="padding:40px;text-align:center;color:var(--gray-500)">불러오는 중…</div>';
     await loadMeetings();
+    await _renderMeetingList();
+}
+
+async function _renderMeetingList() {
+    const box = document.getElementById('meetingsBody');
+    if (!box) return;
     const progress = await _meetingLoadProgress(_meetings.map(m => m.id));
 
     const q = _meetingsSearch.trim().toLowerCase();
@@ -17267,13 +17272,13 @@ async function renderMeetings() {
 
     renderLoadMoreButton(document.getElementById('meetingsMore'), _meetingsPage, () => {
         _meetings = _meetingsPage.data || [];
-        renderMeetings();
+        _renderMeetingList();
     });
 
     document.getElementById('meetingNewBtn').addEventListener('click', () => openMeetingEditor(null));
     const s = document.getElementById('meetingsSearch');
     s.addEventListener('input', () => { _meetingsSearch = s.value; });
-    s.addEventListener('keydown', (e) => { if (e.key === 'Enter') renderMeetings(); });
+    s.addEventListener('keydown', (e) => { if (e.key === 'Enter') _renderMeetingList(); });
     tb.querySelectorAll('.meeting-row').forEach(tr => {
         tr.addEventListener('click', () => openMeetingEditor(Number(tr.dataset.mid)));
     });
@@ -17437,6 +17442,7 @@ function _readMeetingForm() {
 async function saveMeeting() {
     _readMeetingForm();
     if (!_meetingDraft.title) { showToast('제목을 입력해주세요'); return; }
+    if (!currentUser || !currentUser.name) { showToast('로그인이 필요합니다'); return; }
     const btn = document.getElementById('meetingSaveBtn');
     btn.disabled = true; btn.textContent = '저장 중…';
     try {
@@ -17527,10 +17533,16 @@ function renderMeetingActions() {
     card.querySelectorAll('[data-act-assignee]').forEach(el => el.addEventListener('change', () => { _meetingActions[Number(el.dataset.actAssignee)].assignee = el.value; renderMeetingActions(); }));
     card.querySelectorAll('[data-act-due]').forEach(el => el.addEventListener('change', () => { _meetingActions[Number(el.dataset.actDue)].dueDate = el.value; }));
     card.querySelectorAll('[data-act-del]').forEach(el => el.addEventListener('click', async () => {
-        const i = Number(el.dataset.actDel);
-        const a = _meetingActions[i];
-        if (a.id) { const { error } = await sb.from('meeting_actions').delete().eq('id', a.id); if (error) { showToast('삭제 실패: ' + error.message); return; } }
-        _meetingActions.splice(i, 1);
+        if (el.disabled) return;
+        el.disabled = true;
+        const a = _meetingActions[Number(el.dataset.actDel)];
+        if (!a) return;
+        if (a.id) {
+            const { error } = await sb.from('meeting_actions').delete().eq('id', a.id);
+            if (error) { showToast('삭제 실패: ' + error.message); el.disabled = false; return; }
+        }
+        const idx = _meetingActions.indexOf(a);
+        if (idx >= 0) _meetingActions.splice(idx, 1);
         renderMeetingActions();
     }));
     card.querySelector('#meetingActionAdd').addEventListener('click', () => {
@@ -17545,10 +17557,10 @@ async function saveMeetingActions() {
     if (!mid) return;
     for (const a of _meetingActions) {
         const task = (a.task || '').trim();
-        if (!task) continue;
+        if (!task && !a.id) continue;          // 아직 저장 안 된 빈 행은 무시
+        if (a.id && a.dailyTaskId) continue;   // 전송된 항목은 잠금
         const row = { meeting_id: mid, task, assignee: a.assignee || null, due_date: a.dueDate || null };
         if (a.id) {
-            if (a.dailyTaskId) continue; // 전송된 항목은 잠금
             const { error } = await sb.from('meeting_actions').update(row).eq('id', a.id);
             if (error) throw error;
         } else {
@@ -17570,7 +17582,7 @@ async function sendMeetingActionsToDaily(meetingId) {
     const btn = document.getElementById('meetingSendBtn');
     if (btn) { btn.disabled = true; btn.textContent = '전송 중…'; }
 
-    let ok = 0, fail = 0;
+    let ok = 0, fail = 0, orphan = 0;
     for (const a of targets) {
         const saved = await dbInsertTask({
             task: a.task.trim(),
@@ -17584,12 +17596,15 @@ async function sendMeetingActionsToDaily(meetingId) {
         });
         if (!saved || !saved.id) { fail++; continue; }
         const { error } = await sb.from('meeting_actions').update({ daily_task_id: saved.id }).eq('id', a.id);
-        if (error) { console.error(error); fail++; continue; }
+        if (error) { console.error('daily_task_id 연결 실패', error); orphan++; continue; }
         a.dailyTaskId = saved.id;
         _meetingActionDone[saved.id] = false;
         ok++;
     }
 
-    showToast(fail ? (ok + '건 전송, ' + fail + '건 실패') : (ok + '건을 일일계획표로 보냈습니다'));
+    let msg = ok + '건을 일일계획표로 보냈습니다';
+    if (fail) msg += ' · ' + fail + '건 실패';
+    if (orphan) msg += ' · ' + orphan + '건은 할 일은 생성됐지만 연결에 실패했습니다. 다시 보내면 중복되니 일일계획표를 먼저 확인하세요.';
+    showToast(msg);
     renderMeetingActions();
 }
