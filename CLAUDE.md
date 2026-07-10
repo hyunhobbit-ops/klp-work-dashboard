@@ -93,6 +93,22 @@
 - 주요 함수: `renderProductDB`, `openProductDBModal`, `saveProduct`, `showProductDetail`, `renderProposals`, `openProposalEditor`, `closeProposalEditor`, `renderProposalEditor`, `saveProposal`, `addProductToProposal`, `removeProductFromProposal`, `updateProposalItemQty`, `recalcProposalTotal`, `openProductPicker`, `generateShareLink`, `openProposalPreview`, `renderProposalPreview`, `setPreviewFilter`, `setPreviewView`
 - 데이터: 현재 JS 배열 → Supabase `products`, `proposals`, `proposal_items` 테이블로 전환 예정
 
+## 회의록 (업무 그룹)
+- **목적**: 회의 기록 → 액션아이템 → **일일계획표 할 일 자동 생성 + 푸시 알림**
+- 탭 `meetings`, 컨테이너 `#tab-meetings` 안에서 목록 뷰 ↔ 편집 뷰 전환 (제안서 패턴)
+- **테이블**: `meetings` (attendees/agenda/decisions는 jsonb 배열), `meeting_actions` (meeting_id FK cascade)
+  - `meeting_actions`에 **`done` 컬럼이 없다.** 완료 여부는 `daily_task_id`로 `daily_tasks.done`을 읽어 표시 (일일계획표가 단일 원본)
+- **RLS**: 이 앱에서 유일하게 "authenticated 전체 허용"이 아닌 테이블.
+  `current_profile_name()` / `current_profile_role()` (security definer) 기준으로
+  비공개 회의는 작성자·참석자·관리자급(`관리자/부장/대표`)만 조회. `migrations/019_meetings.sql` 참조
+- **전송**: `sendMeetingActionsToDaily(meetingId)` → 기존 `dbInsertTask()` 호출 (내부에서 `notifyNewTask`가 푸시 발송)
+  → 반환된 id를 `meeting_actions.daily_task_id`에 저장. 전송된 행은 회의록에서 잠김
+  - INSERT는 됐는데 `daily_task_id` 연결이 실패한 건은 `orphan`으로 세어 토스트로 경고 (재전송 시 중복되므로)
+- **목록 렌더 분리**: `renderMeetings()`는 로드 후 `_renderMeetingList()`에 위임. "더 보기"·검색은 `_renderMeetingList()`만 호출해야 함
+  (`renderMeetings()`를 부르면 `loadMeetings()`가 1페이지를 다시 받아 추가 로드분을 버림)
+- 주요 함수: `renderMeetings`, `_renderMeetingList`, `openMeetingEditor`, `closeMeetingEditor`, `renderMeetingEditor`, `saveMeeting`, `deleteMeeting`, `loadMeetingActions`, `renderMeetingActions`, `saveMeetingActions`, `sendMeetingActionsToDaily`
+- 2단계(`api/meeting-summarize.js`, AI 정리), 3단계(`api/meeting-transcribe.js`, 녹음 전사)는 미구현
+
 ## 마진계산기 (편의성 그룹)
 - **목적**: 원가 항목들과 판매가를 입력해 마진/마진율을 계산. 기존 엑셀 양식(이니셜D 시계 굿즈 기준)을 발전시킨 자유형 구조
 - **데이터 모델**: `margin_simulations` 테이블 (margin_simulations.sql 참조). 자유형 카테고리/항목을 `categories` jsonb 컬럼에 저장
