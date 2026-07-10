@@ -17148,11 +17148,18 @@ function _meetingRowDefaults(r) {
     };
 }
 
+// 날짜 입력이 비었거나 손상된 경우 null. (new Date('...').toISOString()은 RangeError를 던진다)
+function _meetingIsoOrNull(v) {
+    if (!v) return null;
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 function _meetingToDb(m) {
     return {
         author: m.author || null,
         title: m.title,
-        meet_at: m.meetAt ? new Date(m.meetAt).toISOString() : null,
+        meet_at: _meetingIsoOrNull(m.meetAt),
         location: m.location || null,
         attendees: m.attendees || [],
         external_attendees: m.externalAttendees || null,
@@ -17240,7 +17247,7 @@ async function _renderMeetingList() {
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px">
         <input id="meetingsSearch" type="text" placeholder="제목·내용 검색" value="${escHtml(_meetingsSearch)}"
                style="flex:1;max-width:320px;padding:10px 14px;border:1px solid var(--gray-200);border-radius:8px;font-size:14px">
-        <button class="btn-primary" id="meetingNewBtn">+ 새 회의록</button>
+        <button class="btn-primary" id="meetingNewBtn" title="단축키 F2">+ 새 회의록 <span style="opacity:.55;font-size:11px;font-weight:600">F2</span></button>
       </div>
       <div class="table-wrap">
         <table class="data-table">
@@ -17412,29 +17419,46 @@ function _bindMeetingEditor() {
         });
         document.querySelectorAll(`[data-${lower}-del]`).forEach(btn => {
             btn.addEventListener('click', () => {
+                _readMeetingFields(); // 아직 초안에 없는 제목·내용 등을 먼저 보존
                 _meetingDraft[key].splice(Number(btn.dataset[lower + 'Del']), 1);
                 renderMeetingEditor();
             });
         });
         document.getElementById('meeting' + kind + 'Add').addEventListener('click', () => {
+            _readMeetingFields();
             _meetingDraft[key].push('');
             renderMeetingEditor();
+            const inputs = document.querySelectorAll(`[data-${lower}-i]`);
+            const last = inputs[inputs.length - 1];
+            if (last) last.focus();
         });
     };
     bindList('Agenda', 'agenda');
     bindList('Decisions', 'decisions');
 }
 
-function _readMeetingForm() {
+// 화면의 입력값을 초안으로 옮긴다(가공 없이).
+// 재렌더 전에 반드시 호출 — 안 그러면 아직 초안에 없는 입력이 날아간다.
+function _readMeetingFields() {
+    if (!_meetingDraft || !document.getElementById('meetingTitle')) return;
     const v = (id) => (document.getElementById(id) || {}).value || '';
-    _meetingDraft.title = v('meetingTitle').trim();
+    _meetingDraft.title = v('meetingTitle');
     _meetingDraft.meetAt = v('meetingMeetAt');
-    _meetingDraft.location = v('meetingLocation').trim();
-    _meetingDraft.externalAttendees = v('meetingExternal').trim();
-    _meetingDraft.client = v('meetingClient').trim();
+    _meetingDraft.location = v('meetingLocation');
+    _meetingDraft.externalAttendees = v('meetingExternal');
+    _meetingDraft.client = v('meetingClient');
     _meetingDraft.status = v('meetingStatus');
     _meetingDraft.content = v('meetingContent');
     _meetingDraft.isPrivate = !!(document.getElementById('meetingPrivate') || {}).checked;
+}
+
+// 저장 직전용 — 필드를 읽고 공백 정리 + 빈 안건/결정 제거.
+function _readMeetingForm() {
+    _readMeetingFields();
+    _meetingDraft.title = (_meetingDraft.title || '').trim();
+    _meetingDraft.location = (_meetingDraft.location || '').trim();
+    _meetingDraft.externalAttendees = (_meetingDraft.externalAttendees || '').trim();
+    _meetingDraft.client = (_meetingDraft.client || '').trim();
     _meetingDraft.agenda = _meetingDraft.agenda.map(s => (s || '').trim()).filter(Boolean);
     _meetingDraft.decisions = _meetingDraft.decisions.map(s => (s || '').trim()).filter(Boolean);
 }
@@ -17608,3 +17632,15 @@ async function sendMeetingActionsToDaily(meetingId) {
     showToast(msg);
     renderMeetingActions();
 }
+
+// F2: 회의록 목록에서 새 회의록 바로 만들기
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'F2') return;
+    const tab = document.getElementById('tab-meetings');
+    if (!tab || !tab.classList.contains('active')) return;   // 회의록 탭이 아닐 때는 무시
+    if (_meetingEditingId !== undefined) return;             // 이미 편집 중이면 무시
+    const t = e.target;
+    if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return; // 입력 중에는 무시
+    e.preventDefault();
+    openMeetingEditor(null);
+});
