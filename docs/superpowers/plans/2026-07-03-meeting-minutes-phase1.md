@@ -173,7 +173,7 @@ where table_name in ('meetings','meeting_actions')
 order by table_name, ordinal_position;
 ```
 
-기대: `meetings` 17개 컬럼(id…audio_path), `meeting_actions` 6개 컬럼. `meeting_actions`에 **`done` 컬럼이 없어야 한다**(완료 여부의 원본은 `daily_tasks.done`).
+기대: `meetings` 18개 컬럼(id…audio_path), `meeting_actions` 7개 컬럼. `meeting_actions`에 **`done` 컬럼이 없어야 한다**(완료 여부의 원본은 `daily_tasks.done`).
 
 이어서 정책 확인:
 
