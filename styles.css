@@ -3546,6 +3546,9 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 /* ============================
    회의록
    ============================ */
+/* 네이티브 컨트롤(날짜/시간 선택기, 체크박스)도 테마를 따르게 */
+[data-theme="dark"] #tab-meetings { color-scheme: dark; }
+
 #tab-meetings .card {
     background: var(--white);
     border: 1px solid var(--gray-100);
@@ -3553,6 +3556,19 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
     box-shadow: var(--shadow-xs);
 }
 #tab-meetings h3 { font-size: 15px; font-weight: 800; color: var(--gray-900); letter-spacing: -0.2px; }
+
+/* 인라인 스타일에 배경/글자색이 없는 요소들 — 다크모드에서 흰 화면으로 남는다 */
+#meetingContent {
+    background: var(--gray-50);
+    color: var(--gray-900);
+}
+#meetingContent:focus { border-color: var(--blue); background: var(--white); }
+#meetingsSearch {
+    background: var(--white);
+    color: var(--gray-900);
+}
+#meetingsSearch::placeholder, #tab-meetings input::placeholder { color: var(--gray-400); }
+#meetingsSearch:focus { border-color: var(--blue); }
 #tab-meetings .btn-ghost {
     padding: 9px 16px;
     border: 1px solid var(--gray-200);
