@@ -17809,7 +17809,7 @@ async function renderMeetingDailyBoard() {
         renderMeetingDailyBoard();
     });
 
-    const cols = 'id, task, assignee, done, priority, client, date';
+    const cols = 'id, task, assignee, done, priority, client, date, linked_group';
     // ① 미완료는 날짜 무관 전부  ② 완료는 선택한 날짜 것만
     const [undone, doneToday] = await Promise.all([
         sb.from('daily_tasks').select(cols).eq('done', false),
@@ -17840,12 +17840,13 @@ async function renderMeetingDailyBoard() {
                 const late = !t.done && t.date && t.date < today;
                 const other = t.date && t.date !== date;
                 return `
-                <div class="meeting-daily-task${t.done ? ' done' : ''}">
+                <label class="meeting-daily-task${t.done ? ' done' : ''}">
+                  <input type="checkbox" class="mdt-check" data-task-id="${t.id}" ${t.done ? 'checked' : ''}>
                   <span class="mdt-pri">${escHtml((t.priority || '').slice(0, 2))}</span>
                   <span class="mdt-text">${escHtml(t.task || '')}</span>
                   ${other ? `<span class="mdt-date${late ? ' late' : ''}">${escHtml(t.date.slice(5))}</span>` : ''}
                   ${t.client ? `<span class="mdt-client">${escHtml(t.client)}</span>` : ''}
-                </div>`;
+                </label>`;
             }).join('')
             : '<div class="meeting-daily-empty">없음</div>';
         return `
@@ -17858,6 +17859,57 @@ async function renderMeetingDailyBoard() {
             <div class="meeting-daily-col-body">${body}</div>
           </div>`;
     }).join('');
+
+    // 컬럼 헤더의 "N건 남음 / 완료 / 지연 N"을 현재 rows 상태로 다시 계산
+    const refreshCounts = () => {
+        [...board.querySelectorAll('.meeting-daily-col')].forEach(colEl => {
+            const name = colEl.querySelector('b').textContent;
+            const list = rows.filter(t => t.assignee === name);
+            const left = list.filter(t => !t.done).length;
+            const overdue = list.filter(t => !t.done && t.date && t.date < today).length;
+            const cnt = colEl.querySelector('.mdt-count');
+            cnt.textContent = left ? left + '건 남음' : '완료';
+            cnt.classList.toggle('zero', !left);
+            let od = colEl.querySelector('.mdt-overdue');
+            if (overdue) {
+                if (!od) { od = document.createElement('span'); od.className = 'mdt-overdue'; od.title = '마감일이 지난 미완료'; colEl.querySelector('.meeting-daily-col-head').appendChild(od); }
+                od.textContent = '지연 ' + overdue;
+            } else if (od) { od.remove(); }
+        });
+    };
+
+    // 체크박스로 완료 표시 — 원본은 일일계획표와 같은 daily_tasks.done
+    board.querySelectorAll('.mdt-check').forEach(cb => {
+        cb.addEventListener('change', async () => {
+            const id = Number(cb.dataset.taskId);
+            const t = rows.find(x => x.id === id);
+            if (!t) return;
+            const newDone = cb.checked;
+            const nowIso = newDone ? new Date().toISOString() : null;
+            const rowEl = cb.closest('.meeting-daily-task');
+            t.done = newDone;                      // 낙관적 반영
+            rowEl.classList.toggle('done', newDone);
+            refreshCounts();
+            cb.disabled = true;
+            // 연동 그룹(마감일 복사 등)까지 함께
+            const { error } = t.linked_group
+                ? await sb.from('daily_tasks').update({ done: newDone, completed_at: nowIso }).eq('linked_group', t.linked_group)
+                : await sb.from('daily_tasks').update({ done: newDone, completed_at: nowIso }).eq('id', id);
+            cb.disabled = false;
+            if (error) {
+                console.error('일일계획표 완료 저장 실패', error);
+                showToast('완료 상태 저장 실패: ' + error.message);
+                t.done = !newDone; cb.checked = !newDone; rowEl.classList.toggle('done', !newDone); refreshCounts();
+                return;
+            }
+            // 이미 로드된 일일계획표 화면과 어긋나지 않게 로컬 배열도 맞춘다
+            if (typeof dailyTasks !== 'undefined' && Array.isArray(dailyTasks)) {
+                dailyTasks.forEach(dt => {
+                    if (dt.id === id || (t.linked_group && dt.linkedGroup === t.linked_group)) { dt.done = newDone; dt.completedAt = nowIso; }
+                });
+            }
+        });
+    });
 }
 
 async function sendMeetingActionsToDaily(meetingId) {

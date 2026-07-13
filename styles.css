@@ -3648,6 +3648,12 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
     line-height: 1.45;
     color: var(--gray-800);
     display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px;
+    cursor: pointer;
+}
+.meeting-daily-task:hover { border-color: var(--gray-300); }
+.mdt-check {
+    flex-shrink: 0; width: 15px; height: 15px; margin: 0;
+    align-self: center; cursor: pointer; accent-color: var(--blue);
 }
 .meeting-daily-task.done { opacity: .5; }
 .meeting-daily-task.done .mdt-text { text-decoration: line-through; }
