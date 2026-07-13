@@ -17888,6 +17888,18 @@ async function renderMeetingDailyBoard() {
         });
     };
 
+    // 완료된 항목은 칸 아래로 (렌더 정렬과 동일: 미완료 먼저 → 오래된 날짜 → 최신 id)
+    const reorderColumnBody = (bodyEl) => {
+        if (!bodyEl) return;
+        [...bodyEl.querySelectorAll('.meeting-daily-task')]
+            .map(n => ({ n, t: rows.find(x => x.id === Number(n.querySelector('.mdt-check').dataset.taskId)) }))
+            .filter(o => o.t)
+            .sort((A, B) => (A.t.done - B.t.done)
+                || String(A.t.date || '').localeCompare(String(B.t.date || ''))
+                || ((B.t.id || 0) - (A.t.id || 0)))
+            .forEach(o => bodyEl.appendChild(o.n)); // 정렬 순서대로 다시 붙여 재배치
+    };
+
     // 체크박스로 완료 표시 — 원본은 일일계획표와 같은 daily_tasks.done
     board.querySelectorAll('.mdt-check').forEach(cb => {
         cb.addEventListener('change', async () => {
@@ -17897,9 +17909,11 @@ async function renderMeetingDailyBoard() {
             const newDone = cb.checked;
             const nowIso = newDone ? new Date().toISOString() : null;
             const rowEl = cb.closest('.meeting-daily-task');
+            const bodyEl = cb.closest('.meeting-daily-col-body');
             t.done = newDone;                      // 낙관적 반영
             rowEl.classList.toggle('done', newDone);
             refreshCounts();
+            reorderColumnBody(bodyEl);             // 체크한 항목을 아래로 내림
             cb.disabled = true;
             // 연동 그룹(마감일 복사 등)까지 함께
             const { error } = t.linked_group
@@ -17909,7 +17923,7 @@ async function renderMeetingDailyBoard() {
             if (error) {
                 console.error('일일계획표 완료 저장 실패', error);
                 showToast('완료 상태 저장 실패: ' + error.message);
-                t.done = !newDone; cb.checked = !newDone; rowEl.classList.toggle('done', !newDone); refreshCounts();
+                t.done = !newDone; cb.checked = !newDone; rowEl.classList.toggle('done', !newDone); refreshCounts(); reorderColumnBody(bodyEl);
                 return;
             }
             // 이미 로드된 일일계획표 화면과 어긋나지 않게 로컬 배열도 맞춘다
