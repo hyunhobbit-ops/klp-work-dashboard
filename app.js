@@ -17133,6 +17133,11 @@ let _meetingDirty = false;     // 편집 중 저장하지 않은 변경이 있�
 let _meetingDailyDate = '';    // 편집 화면 하단 일일계획표가 보여주는 날짜
 // 하단 일일계획표에 보여줄 담당자 (임원·구정두 제외)
 const MEETING_DAILY_COLUMNS = ['전체', '대표님', '이현주', '김현호', '유지은'];
+let _meetingMonth = '';        // 월간 달력이 보여주는 달 (YYYY-MM)
+// 담당자별 색 (월간 달력 칩 왼쪽 띠)
+const MEETING_ASSIGNEE_COLORS = {
+    '전체': '#8b95a1', '대표님': '#8b5cf6', '이현주': '#3182f6', '김현호': '#f97316', '유지은': '#30c85e'
+};
 
 function _meetingRowDefaults(r) {
     return {
@@ -17439,13 +17444,18 @@ function renderMeetingEditor() {
 
       <div class="card" style="padding:20px;margin-bottom:16px" id="meetingActionsCard"></div>
 
-      <div class="card" style="padding:20px" id="meetingDailyCard"></div>`;
+      <div class="card" style="padding:20px;margin-bottom:16px" id="meetingDailyCard"></div>
+
+      <div class="card" style="padding:20px" id="meetingMonthlyCard"></div>`;
 
     _bindMeetingEditor();
     renderMeetingActions();
     // 회의 일시는 UTC로 저장되므로 로컬 날짜로 환산해서 쓴다 (그냥 자르면 하루 어긋남)
-    _meetingDailyDate = _meetingLocalDateTime(m.meetAt).slice(0, 10) || getTodayStr();
+    const localDate = _meetingLocalDateTime(m.meetAt).slice(0, 10) || getTodayStr();
+    _meetingDailyDate = localDate;
+    _meetingMonth = localDate.slice(0, 7);
     renderMeetingDailyBoard();
+    renderMeetingMonthlyBoard();
 }
 
 function _bindMeetingEditor() {
@@ -17910,6 +17920,86 @@ async function renderMeetingDailyBoard() {
             }
         });
     });
+}
+
+// YYYY-MM 을 delta개월 이동
+function _meetingMonthShift(ym, delta) {
+    let [y, mo] = ym.split('-').map(Number);
+    mo += delta;
+    while (mo < 1) { mo += 12; y--; }
+    while (mo > 12) { mo -= 12; y++; }
+    return y + '-' + String(mo).padStart(2, '0');
+}
+
+// 편집 화면 하단: 그 달의 전 직원 일정을 달력으로 (읽기 전용, 임원·구정두 제외)
+async function renderMeetingMonthlyBoard() {
+    const card = document.getElementById('meetingMonthlyCard');
+    if (!card) return;
+    const ym = _meetingMonth || getTodayStr().slice(0, 7);
+    _meetingMonth = ym;
+    const [y, mo] = ym.split('-').map(Number);
+    const daysInMonth = new Date(y, mo, 0).getDate();     // mo는 1-based → 그 달 말일
+    const firstWeekday = new Date(y, mo - 1, 1).getDay(); // 0=일
+    const first = ym + '-01';
+    const last = ym + '-' + String(daysInMonth).padStart(2, '0');
+    const today = getTodayStr();
+
+    card.innerHTML = `
+      <div class="meeting-daily-head">
+        <h3 style="margin:0">🗓 월간 계획표 <span style="font-weight:400;color:var(--gray-500);font-size:13px">— 담당자별 일정 한눈에</span></h3>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button type="button" class="btn-ghost" id="meetingMonthPrev">‹</button>
+          <span style="font-weight:700;font-size:14px;min-width:96px;text-align:center">${y}년 ${mo}월</span>
+          <button type="button" class="btn-ghost" id="meetingMonthNext">›</button>
+          <button type="button" class="btn-ghost" id="meetingMonthThis">이번 달</button>
+        </div>
+      </div>
+      <div class="meeting-month-legend">
+        ${MEETING_DAILY_COLUMNS.map(n => `<span class="mm-leg"><i style="background:${MEETING_ASSIGNEE_COLORS[n]}"></i>${escHtml(n)}</span>`).join('')}
+      </div>
+      <div class="meeting-month" id="meetingMonthGrid">
+        <div class="meeting-month-loading">불러오는 중…</div>
+      </div>`;
+
+    card.querySelector('#meetingMonthPrev').addEventListener('click', () => { _meetingMonth = _meetingMonthShift(ym, -1); renderMeetingMonthlyBoard(); });
+    card.querySelector('#meetingMonthNext').addEventListener('click', () => { _meetingMonth = _meetingMonthShift(ym, 1); renderMeetingMonthlyBoard(); });
+    card.querySelector('#meetingMonthThis').addEventListener('click', () => { _meetingMonth = getTodayStr().slice(0, 7); renderMeetingMonthlyBoard(); });
+
+    const { data, error } = await sb.from('daily_tasks')
+        .select('id, task, assignee, done, date')
+        .gte('date', first).lte('date', last);
+
+    const grid = document.getElementById('meetingMonthGrid');
+    if (!grid || _meetingMonth !== ym) return; // 달을 다시 바꿨으면 늦게 온 응답은 버린다
+    if (error) {
+        console.error('renderMeetingMonthlyBoard failed', error);
+        grid.innerHTML = `<div class="meeting-month-loading" style="color:var(--red)">달력을 불러오지 못했습니다 — ${escHtml(error.message)}</div>`;
+        return;
+    }
+
+    const byDay = {};
+    (data || []).forEach(t => {
+        if (!MEETING_DAILY_COLUMNS.includes(t.assignee)) return; // 임원·구정두 제외
+        if (!t.date) return;
+        (byDay[t.date] = byDay[t.date] || []).push(t);
+    });
+
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+    let cells = weekdays.map((w, i) => `<div class="mm-wd${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${w}</div>`).join('');
+    for (let i = 0; i < firstWeekday; i++) cells += '<div class="mm-cell mm-empty"></div>';
+    for (let day = 1; day <= daysInMonth; day++) {
+        const ds = ym + '-' + String(day).padStart(2, '0');
+        const wd = (firstWeekday + day - 1) % 7;
+        const tasks = (byDay[ds] || []).slice().sort((a, b) => (a.done - b.done));
+        const chips = tasks.slice(0, 4).map(t =>
+            `<div class="mm-task${t.done ? ' done' : ''}" style="border-left-color:${MEETING_ASSIGNEE_COLORS[t.assignee] || '#8b95a1'}" title="${escHtml(t.assignee + ' · ' + (t.task || ''))}">${escHtml(t.task || '')}</div>`).join('');
+        const more = tasks.length > 4 ? `<div class="mm-more">+${tasks.length - 4}건</div>` : '';
+        cells += `<div class="mm-cell${ds === today ? ' today' : ''}">
+            <div class="mm-day${wd === 0 ? ' sun' : wd === 6 ? ' sat' : ''}">${day}</div>
+            ${chips}${more}
+          </div>`;
+    }
+    grid.innerHTML = cells;
 }
 
 async function sendMeetingActionsToDaily(meetingId) {
