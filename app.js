@@ -17131,8 +17131,8 @@ let _meetingActionDone = {};   // { daily_task_id: true/false } — daily_tasks.
 let _meetingsSearch = '';
 let _meetingDirty = false;     // 편집 중 저장하지 않은 변경이 있는가
 let _meetingDailyDate = '';    // 편집 화면 하단 일일계획표가 보여주는 날짜
-// 일일계획표 전체보기와 같은 순서 (한 줄에 나란히)
-const MEETING_DAILY_COLUMNS = ['전체', '임원', '대표님', '이현주', '김현호', '유지은', '구정두'];
+// 하단 일일계획표에 보여줄 담당자 (임원·구정두 제외)
+const MEETING_DAILY_COLUMNS = ['전체', '대표님', '이현주', '김현호', '유지은'];
 
 function _meetingRowDefaults(r) {
     return {
@@ -17788,7 +17788,7 @@ async function renderMeetingDailyBoard() {
 
     card.innerHTML = `
       <div class="meeting-daily-head">
-        <h3 style="margin:0">📋 일일계획표 <span style="font-weight:400;color:var(--gray-500);font-size:13px">— 미완료 전체 + 선택한 날짜의 완료건</span></h3>
+        <h3 style="margin:0">📋 일일계획표 <span style="font-weight:400;color:var(--gray-500);font-size:13px">— 오늘까지 밀린 미완료 + 선택한 날짜의 완료건</span></h3>
         <div style="display:flex;gap:8px;align-items:center">
           <input type="date" id="meetingDailyDate" value="${escHtml(date)}">
           <button type="button" class="btn-ghost" id="meetingDailyToday">오늘</button>
@@ -17825,7 +17825,9 @@ async function renderMeetingDailyBoard() {
         return;
     }
 
-    const rows = (undone.data || []).concat(doneToday.data || []);
+    // 미완료 중 미래 일정(오늘 이후)은 제외 — 지금 챙길 일만 보이게
+    const undoneRows = (undone.data || []).filter(t => !(t.date && t.date > today));
+    const rows = undoneRows.concat(doneToday.data || []);
     board.innerHTML = MEETING_DAILY_COLUMNS.map(col => {
         const list = rows.filter(t => t.assignee === col).sort((a, b) =>
             (a.done - b.done)                              // 미완료 먼저
