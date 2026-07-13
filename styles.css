@@ -3555,7 +3555,17 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
     border-radius: var(--radius-sm);
     box-shadow: var(--shadow-xs);
 }
-#tab-meetings h3 { font-size: 15px; font-weight: 800; color: var(--gray-900); letter-spacing: -0.2px; }
+#tab-meetings h3 { font-size: 18px; font-weight: 800; color: var(--gray-900); letter-spacing: -0.2px; }
+
+/* 회의록은 발표(TV 화면) 목적 — 편집 화면 글씨를 전반적으로 크게 */
+#tab-meetings .field > label { font-size: 15px; }
+#tab-meetings .field > input,
+#tab-meetings .field > select,
+#tab-meetings .field > textarea { font-size: 16px; padding: 12px 15px; }
+#tab-meetings .btn-ghost,
+#tab-meetings .btn-primary,
+#tab-meetings .btn-danger { font-size: 15px; }
+#tab-meetings .field label { font-size: 15px; }        /* 🔒 비공개 체크박스 라벨 포함 */
 
 /* 논의 내용 — 이미지 붙여넣기 가능한 편집 영역 */
 #meetingContent {
@@ -3567,8 +3577,8 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
     border-radius: var(--radius-xs);
     background: var(--gray-50);
     color: var(--gray-900);
-    font-size: 14px;
-    line-height: 1.65;
+    font-size: 16px;
+    line-height: 1.7;
     outline: none;
 }
 #meetingContent:focus { border-color: var(--blue); background: var(--white); }
@@ -3716,12 +3726,12 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 #meetingsSearch::placeholder, #tab-meetings input::placeholder { color: var(--gray-400); }
 #meetingsSearch:focus { border-color: var(--blue); }
 #tab-meetings .btn-ghost {
-    padding: 9px 16px;
+    padding: 10px 17px;
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-xs);
     background: var(--white);
     color: var(--gray-600);
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
@@ -3729,22 +3739,22 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 }
 #tab-meetings .btn-ghost:hover { background: var(--gray-50); color: var(--gray-900); }
 #tab-meetings .btn-danger {
-    padding: 9px 16px;
+    padding: 10px 17px;
     border: none;
     border-radius: var(--radius-xs);
     background: var(--red);
     color: #fff;
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
 }
 .meeting-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .meeting-chip {
-    padding: 7px 14px;
+    padding: 9px 18px;
     border: 1px solid var(--gray-200);
     border-radius: 999px;
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 600;
     cursor: pointer;
     user-select: none;
@@ -3756,10 +3766,10 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .meeting-list-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .meeting-list-row input {
     flex: 1;
-    padding: 10px 12px;
+    padding: 12px 14px;
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-xs);
-    font-size: 14px;
+    font-size: 16px;
     font-family: inherit;
     color: var(--gray-900);
     background: var(--gray-50);
@@ -3779,16 +3789,16 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .meeting-del:disabled { opacity: 0.4; cursor: default; }
 .meeting-row:hover { background: var(--gray-50); }
 #meetingActionsCard table th,
-#meetingActionsCard table td { font-size: 14px; }
+#meetingActionsCard table td { font-size: 15px; }
 #meetingActionsCard input[type="text"],
 #meetingActionsCard input[type="date"],
 #meetingActionsCard select {
     width: 100%;
     box-sizing: border-box;
-    padding: 9px 11px;
+    padding: 10px 12px;
     border: 1px solid var(--gray-200);
     border-radius: 6px;
-    font-size: 14px;
+    font-size: 15px;
     font-family: inherit;
     color: var(--gray-900);
     background: var(--white);
