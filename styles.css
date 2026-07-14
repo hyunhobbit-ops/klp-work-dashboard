@@ -3792,7 +3792,7 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .meeting-list-row.item-done input[type="text"] {
     color: var(--gray-400); text-decoration: line-through; background: var(--gray-50);
 }
-.meeting-list-row input {
+.meeting-list-row input[type="text"] {
     flex: 1;
     padding: 12px 14px;
     border: 1px solid var(--gray-200);
@@ -3803,7 +3803,7 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
     background: var(--gray-50);
     outline: none;
 }
-.meeting-list-row input:focus { border-color: var(--blue); background: var(--white); }
+.meeting-list-row input[type="text"]:focus { border-color: var(--blue); background: var(--white); }
 .meeting-del {
     border: none;
     background: transparent;
