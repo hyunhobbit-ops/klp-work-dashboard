@@ -4821,6 +4821,11 @@ function openModalHistory() {
     if (!history.state || !history.state.modal) {
         history.pushState({ modal: true }, '');
     }
+    // 모달이 열릴 때, 거래처 자동완성 datalist가 있으면 전체 거래처명으로 채운다
+    // (인라인 초기값은 앞 500건만이라 그 뒤 거래처가 누락됨)
+    ['clientsListDoc', 'quoteClientsListModal', 'fundPlanClientList'].forEach(id => {
+        if (document.getElementById(id)) fillClientDatalist(id);
+    });
 }
 function closeModal(fromPopstate) {
     const overlay = document.getElementById('modalOverlay');
@@ -5780,6 +5785,7 @@ async function loadClientsFromDb() {
 async function dbInsertClient(c) {
     const { data, error } = await sb.from('clients').insert(clientToDb(c)).select().single();
     if (error) { console.error(error); showToast('DB 저장 실패: ' + error.message); return null; }
+    invalidateClientNamesCache();
     return clientFromDb(data);
 }
 // 인라인 편집 + 모달 수정 양쪽에서 쓰이므로 patch 의 실제 키만 DB 컬럼으로 매핑.
@@ -5810,10 +5816,12 @@ async function dbUpdateClient(id, patch) {
     if (Object.keys(dbPatch).length === 0) return;
     const { error } = await sb.from('clients').update(dbPatch).eq('id', id);
     if (error) { console.error(error); showToast('DB 수정 실패: ' + error.message); }
+    else invalidateClientNamesCache();
 }
 async function dbDeleteClient(id) {
     const { error } = await sb.from('clients').delete().eq('id', id);
     if (error) { console.error(error); showToast('DB 삭제 실패: ' + error.message); }
+    else invalidateClientNamesCache();
 }
 
 function filterClients() {
@@ -5905,6 +5913,7 @@ async function bulkDeleteClients() {
         if (error) { console.error(error); fail += chunk.length; continue; }
         ok += chunk.length;
     }
+    invalidateClientNamesCache();
     // 로컬 상태 정리
     const idSet = new Set(ids);
     for (let i = clients.length - 1; i >= 0; i--) {
@@ -7129,6 +7138,7 @@ async function importClientsFromExcel(event) {
                 break;
             }
             (data || []).forEach(r => clients.push(clientFromDb(r)));
+            invalidateClientNamesCache();
             inserted += batch.length;
             showToast(`업로드 중... (${inserted}/${toInsert.length})`);
         }
@@ -10803,7 +10813,11 @@ async function saveTempProject(id) {
 
 // 자동완성용 전체 거래처명 — 목록 화면은 500건씩 페이지네이션하지만,
 // 자동완성은 전체(3천여 건)가 다 떠야 하므로 이름만 따로 전부 가져온다.
+// 5분 캐시로 여러 폼에서 재사용(거래처 추가/삭제 시 즉시 무효화).
+let _clientNamesCache = { names: null, at: 0 };
+function invalidateClientNamesCache() { _clientNamesCache = { names: null, at: 0 }; }
 async function fetchAllClientNames() {
+    if (_clientNamesCache.names && (Date.now() - _clientNamesCache.at) < 300000) return _clientNamesCache.names;
     const names = [];
     let from = 0; const size = 1000; // Supabase 기본 상한(1000)에 맞춰 페이지로 나눠 전부 수집
     while (true) {
@@ -10819,7 +10833,19 @@ async function fetchAllClientNames() {
         const { data } = await sb.from('clients_overseas').select('company_name');
         (data || []).forEach(r => { if (r.company_name) names.push(r.company_name); });
     } catch (e) {}
-    return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+    const result = [...new Set(names)].sort((a, b) => a.localeCompare(b));
+    _clientNamesCache = { names: result, at: Date.now() };
+    return result;
+}
+
+// 이미 렌더된 datalist(id)를 전체 거래처명으로 채운다.
+async function fillClientDatalist(id) {
+    const dl = document.getElementById(id);
+    if (!dl) return;
+    try {
+        const names = await fetchAllClientNames();
+        dl.innerHTML = names.map(n => `<option value="${n.replace(/"/g, '&quot;')}"></option>`).join('');
+    } catch (e) { /* 실패 시 인라인 초기값(앞 500건) 유지 */ }
 }
 
 async function buildTempClientDatalist() {
