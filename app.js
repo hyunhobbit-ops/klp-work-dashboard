@@ -17539,6 +17539,9 @@ function _bindMeetingContentImages() {
     const ce = document.getElementById('meetingContent');
     if (!ce) return;
 
+    // 저장된 내용을 다시 열 때: 이미지 래퍼를 원자 요소로(커서 진입·타이핑 방지) + 리사이즈 유지
+    ce.querySelectorAll('.mtg-img').forEach(w => w.setAttribute('contenteditable', 'false'));
+
     ce.addEventListener('paste', (e) => {
         const files = [...((e.clipboardData && e.clipboardData.files) || [])].filter(f => f.type.startsWith('image/'));
         if (!files.length) return;           // 글자 붙여넣기는 기본 동작에 맡긴다
@@ -17598,10 +17601,17 @@ async function _meetingUploadImages(files) {
         _meetingInsertNode(ph);
         try {
             const url = await uploadPlanningImage(file);
+            // 리사이즈 가능한 래퍼로 감싼다(기본 500px, 모서리 드래그로 조절)
+            const wrap = document.createElement('span');
+            wrap.className = 'mtg-img';
+            wrap.setAttribute('contenteditable', 'false');
+            wrap.style.width = '500px';
             const img = document.createElement('img');
-            img.src = url;
             img.alt = '';
-            ph.replaceWith(img);
+            img.onload = () => { if (img.naturalWidth && img.naturalWidth < 500) wrap.style.width = img.naturalWidth + 'px'; };
+            img.src = url;
+            wrap.appendChild(img);
+            ph.replaceWith(wrap);
         } catch (e) {
             console.error('회의록 이미지 업로드 실패', e);
             ph.remove();

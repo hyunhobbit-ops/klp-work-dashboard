@@ -3567,11 +3567,11 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 #tab-meetings .btn-danger { font-size: 15px; }
 #tab-meetings .field label { font-size: 15px; }        /* 🔒 비공개 체크박스 라벨 포함 */
 
-/* 논의 내용 — 이미지 붙여넣기 가능한 편집 영역 */
+/* 논의 내용 — 이미지 붙여넣기 가능한 편집 영역 (아래 모서리 드래그로 높이 조절) */
 #meetingContent {
-    min-height: 220px;
-    max-height: 60vh;
-    overflow-y: auto;
+    min-height: 240px;
+    overflow: auto;
+    resize: vertical;
     padding: 12px;
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-xs);
@@ -3582,6 +3582,20 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
     outline: none;
 }
 #meetingContent:focus { border-color: var(--blue); background: var(--white); }
+/* 삽입 이미지: 기본 500px, 모서리(오른쪽 아래) 드래그로 너비 조절 */
+#meetingContent .mtg-img {
+    display: inline-block;
+    resize: horizontal;
+    overflow: hidden;
+    max-width: 100%;
+    width: 500px;
+    min-width: 80px;
+    margin: 8px 0;
+    vertical-align: top;
+    border-radius: 8px;
+    line-height: 0;
+}
+#meetingContent .mtg-img img { width: 100%; height: auto; display: block; margin: 0; border-radius: 8px; }
 #meetingContent.drag { border-color: var(--blue); border-style: dashed; background: var(--blue-light); }
 #meetingContent:empty::before {
     content: attr(data-placeholder);
