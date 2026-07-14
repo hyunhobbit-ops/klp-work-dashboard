@@ -3647,7 +3647,7 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .mdt-count.zero { color: var(--gray-400); font-weight: 600; }
 .meeting-daily-col-body {
     padding: 8px; display: flex; flex-direction: column; gap: 6px;
-    max-height: 340px; overflow-y: auto;
+    max-height: 680px; overflow-y: auto;
 }
 .meeting-daily-task {
     background: var(--white);
