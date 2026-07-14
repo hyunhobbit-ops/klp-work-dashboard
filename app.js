@@ -17139,6 +17139,14 @@ const MEETING_ASSIGNEE_COLORS = {
     '전체': '#8b95a1', '대표님': '#8b5cf6', '이현주': '#3182f6', '김현호': '#f97316', '유지은': '#30c85e'
 };
 
+// 안건 항목: {text, done}. 예전 데이터(문자열 배열)도 받아서 변환한다.
+function _normMeetingAgenda(a) {
+    if (!Array.isArray(a)) return [];
+    return a.map(it => (typeof it === 'string')
+        ? { text: it, done: false }
+        : { text: (it && it.text) || '', done: !!(it && it.done) });
+}
+
 function _meetingRowDefaults(r) {
     return {
         id: r.id,
@@ -17149,7 +17157,7 @@ function _meetingRowDefaults(r) {
         attendees: Array.isArray(r.attendees) ? r.attendees : [],
         externalAttendees: r.external_attendees || '',
         client: r.client || '',
-        agenda: Array.isArray(r.agenda) ? r.agenda : [],
+        agenda: _normMeetingAgenda(r.agenda),
         content: r.content || '',
         decisions: Array.isArray(r.decisions) ? r.decisions : [],
         status: r.status || '작성중',
@@ -17371,16 +17379,25 @@ function renderMeetingEditor() {
         <input type="checkbox" data-att="${escHtml(n)}" ${m.attendees.includes(n) ? 'checked' : ''} hidden>${escHtml(n)}
       </label>`).join('');
 
-    const listEditor = (kind, items) => `
+    // check=true 이면 각 항목에 완료 체크박스 (안건용). 항목은 {text,done} 객체.
+    const listEditor = (kind, items, check) => {
+        const lo = kind.toLowerCase();
+        return `
       <div id="meeting${kind}List">
-        ${items.map((v, i) => `
-          <div class="meeting-list-row" data-${kind.toLowerCase()}-row="${i}">
-            <span class="meeting-drag-handle" draggable="true" data-${kind.toLowerCase()}-drag="${i}" title="드래그해서 순서 변경">⠿</span>
-            <input type="text" data-${kind.toLowerCase()}-i="${i}" value="${escHtml(v)}">
-            <button type="button" class="meeting-del" data-${kind.toLowerCase()}-del="${i}">✕</button>
-          </div>`).join('')}
+        ${items.map((v, i) => {
+            const text = check ? (v.text || '') : v;
+            const done = check ? !!v.done : false;
+            return `
+          <div class="meeting-list-row${done ? ' item-done' : ''}" data-${lo}-row="${i}">
+            <span class="meeting-drag-handle" draggable="true" data-${lo}-drag="${i}" title="드래그해서 순서 변경">⠿</span>
+            ${check ? `<input type="checkbox" class="meeting-item-check" data-${lo}-check="${i}" ${done ? 'checked' : ''} title="완료 표시">` : ''}
+            <input type="text" data-${lo}-i="${i}" value="${escHtml(text)}">
+            <button type="button" class="meeting-del" data-${lo}-del="${i}">✕</button>
+          </div>`;
+        }).join('')}
       </div>
       <button type="button" class="btn-ghost" id="meeting${kind}Add">+ 추가</button>`;
+    };
 
     const canEdit = _meetingCanEdit();
 
@@ -17423,7 +17440,7 @@ function renderMeetingEditor() {
 
       <div class="card" style="padding:20px;margin-bottom:16px">
         <h3 style="margin:0 0 12px">안건</h3>
-        ${listEditor('Agenda', m.agenda)}
+        ${listEditor('Agenda', m.agenda, true)}
       </div>
 
       <div class="card" style="padding:20px;margin-bottom:16px">
@@ -17499,11 +17516,25 @@ function _bindMeetingEditor() {
         _syncMeetingAllBtn();
     });
 
-    const bindList = (kind, key) => {
+    const bindList = (kind, key, check) => {
         const lower = kind.toLowerCase();
         document.querySelectorAll(`[data-${lower}-i]`).forEach(inp => {
-            inp.addEventListener('input', () => { _meetingDraft[key][Number(inp.dataset[lower + 'I'])] = inp.value; });
+            inp.addEventListener('input', () => {
+                const i = Number(inp.dataset[lower + 'I']);
+                if (check) _meetingDraft[key][i].text = inp.value;
+                else _meetingDraft[key][i] = inp.value;
+            });
         });
+        if (check) {
+            document.querySelectorAll(`[data-${lower}-check]`).forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const i = Number(cb.dataset[lower + 'Check']);
+                    _meetingDraft[key][i].done = cb.checked;
+                    cb.closest('.meeting-list-row').classList.toggle('item-done', cb.checked);
+                    _meetingDirty = true;
+                });
+            });
+        }
         document.querySelectorAll(`[data-${lower}-del]`).forEach(btn => {
             btn.addEventListener('click', () => {
                 _readMeetingFields(); // 아직 초안에 없는 제목·내용 등을 먼저 보존
@@ -17513,7 +17544,7 @@ function _bindMeetingEditor() {
         });
         document.getElementById('meeting' + kind + 'Add').addEventListener('click', () => {
             _readMeetingFields();
-            _meetingDraft[key].push('');
+            _meetingDraft[key].push(check ? { text: '', done: false } : '');
             renderMeetingEditor();
             const inputs = document.querySelectorAll(`[data-${lower}-i]`);
             const last = inputs[inputs.length - 1];
@@ -17556,8 +17587,8 @@ function _bindMeetingEditor() {
             });
         }
     };
-    bindList('Agenda', 'agenda');
-    bindList('Decisions', 'decisions');
+    bindList('Agenda', 'agenda', true);
+    bindList('Decisions', 'decisions', false);
     _bindMeetingContentImages();
 
     // 어디든 손대면 "미저장" 표시 (저장 시 해제).
@@ -17681,7 +17712,9 @@ function _readMeetingForm() {
     _meetingDraft.location = (_meetingDraft.location || '').trim();
     _meetingDraft.externalAttendees = (_meetingDraft.externalAttendees || '').trim();
     _meetingDraft.client = (_meetingDraft.client || '').trim();
-    _meetingDraft.agenda = _meetingDraft.agenda.map(s => (s || '').trim()).filter(Boolean);
+    _meetingDraft.agenda = _meetingDraft.agenda
+        .map(it => ({ text: ((it && it.text) || '').trim(), done: !!(it && it.done) }))
+        .filter(it => it.text);
     _meetingDraft.decisions = _meetingDraft.decisions.map(s => (s || '').trim()).filter(Boolean);
     // 붙여넣은 HTML을 정화하고, 업로드 중이던 자리표시자는 버린다
     _meetingDraft.content = planningSanitizeHtml(
