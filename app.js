@@ -17849,12 +17849,17 @@ async function renderMeetingDailyBoard() {
             ? list.map(t => {
                 const late = !t.done && t.date && t.date < today;
                 const other = t.date && t.date !== date;
+                // 지연 건은 날짜 대신 "N일 지연"으로 (더 직관적)
+                const daysLate = late ? Math.round((Date.parse(today) - Date.parse(t.date)) / 86400000) : 0;
+                const badge = late
+                    ? `<span class="mdt-date late">${daysLate}일 지연</span>`
+                    : (other ? `<span class="mdt-date">${escHtml(t.date.slice(5))}</span>` : '');
                 return `
                 <label class="meeting-daily-task${t.done ? ' done' : ''}">
                   <input type="checkbox" class="mdt-check" data-task-id="${t.id}" ${t.done ? 'checked' : ''}>
                   <span class="mdt-pri">${escHtml((t.priority || '').slice(0, 2))}</span>
                   <span class="mdt-text">${escHtml(t.task || '')}</span>
-                  ${other ? `<span class="mdt-date${late ? ' late' : ''}">${escHtml(t.date.slice(5))}</span>` : ''}
+                  ${badge}
                   ${t.client ? `<span class="mdt-client">${escHtml(t.client)}</span>` : ''}
                 </label>`;
             }).join('')
