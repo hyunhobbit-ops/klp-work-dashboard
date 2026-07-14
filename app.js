@@ -10801,18 +10801,41 @@ async function saveTempProject(id) {
     renderTempProjects();
 }
 
-function buildTempClientDatalist() {
+// 자동완성용 전체 거래처명 — 목록 화면은 500건씩 페이지네이션하지만,
+// 자동완성은 전체(3천여 건)가 다 떠야 하므로 이름만 따로 전부 가져온다.
+async function fetchAllClientNames() {
+    const names = [];
+    let from = 0; const size = 1000; // Supabase 기본 상한(1000)에 맞춰 페이지로 나눠 전부 수집
+    while (true) {
+        const { data, error } = await sb.from('clients')
+            .select('company_name').order('company_name').range(from, from + size - 1);
+        if (error) { console.error('거래처명 로드 실패', error); break; }
+        (data || []).forEach(r => { if (r.company_name) names.push(r.company_name); });
+        if (!data || data.length < size) break;
+        from += size;
+    }
+    // 해외 거래처도 포함
+    try {
+        const { data } = await sb.from('clients_overseas').select('company_name');
+        (data || []).forEach(r => { if (r.company_name) names.push(r.company_name); });
+    } catch (e) {}
+    return [...new Set(names)].sort((a, b) => a.localeCompare(b));
+}
+
+async function buildTempClientDatalist() {
     let dl = document.getElementById('tempClientList');
     if (!dl) {
         dl = document.createElement('datalist');
         dl.id = 'tempClientList';
         document.body.appendChild(dl);
     }
-    const names = clients
-        .map(c => c.companyName)
-        .filter(Boolean)
-        .filter((v, i, a) => a.indexOf(v) === i)
-        .sort((a, b) => a.localeCompare(b));
+    let names;
+    try { names = await fetchAllClientNames(); }
+    catch (e) {
+        // 실패 시 메모리에 있는 것만이라도 (앞 500건)
+        names = clients.map(c => c.companyName).filter(Boolean)
+            .filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a.localeCompare(b));
+    }
     dl.innerHTML = names.map(n => `<option value="${n.replace(/"/g, '&quot;')}"></option>`).join('');
 }
 
