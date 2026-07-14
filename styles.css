@@ -3835,3 +3835,21 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 #meetingActionsCard input:focus, #meetingActionsCard select:focus { border-color: var(--blue); }
 #meetingActionsCard input:disabled,
 #meetingActionsCard select:disabled { background: var(--gray-50); color: var(--gray-500); }
+
+/* 거래처 상세 — 근처 거래처 목록 */
+.nearby-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 9px 12px; border: 1px solid var(--gray-100); border-radius: 8px;
+    margin-bottom: 6px; background: var(--white);
+}
+.nearby-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; min-width: 0; }
+.nearby-main b { font-size: 14px; color: var(--gray-900); }
+.nearby-dong { font-size: 12px; font-weight: 700; color: var(--gray-500); background: var(--gray-100); padding: 1px 7px; border-radius: 4px; }
+.nearby-dong.same { color: var(--blue); background: var(--blue-light); }
+.nearby-phone { font-size: 12px; color: var(--gray-500); font-variant-numeric: tabular-nums; }
+.nearby-map {
+    flex-shrink: 0; font-size: 13px; font-weight: 600; color: var(--blue);
+    text-decoration: none; border: 1px solid var(--gray-200); border-radius: 6px; padding: 5px 11px;
+    white-space: nowrap;
+}
+.nearby-map:hover { background: var(--blue-light); border-color: var(--blue); }

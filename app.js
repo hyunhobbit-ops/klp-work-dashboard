@@ -6199,8 +6199,13 @@ function clientRowClick(id) {
     }, 250);
 }
 
-function openClientDetail(id) {
-    const c = clients.find(x => x.id === id);
+async function openClientDetail(id) {
+    let c = clients.find(x => x.id === id);
+    if (!c) {
+        // 목록에 아직 로드 안 된 거래처(근처 목록 등에서 진입)도 열 수 있게 DB에서 직접 조회
+        const { data } = await sb.from('clients').select('*').eq('id', id).single();
+        if (data) c = clientFromDb(data);
+    }
     if (!c) return;
     const title = document.getElementById('modalTitle');
     const body = document.getElementById('modalBody');
@@ -6278,7 +6283,9 @@ function openClientDetail(id) {
                     ${row('핸드폰', c.mobile)}
                     ${row('이메일', c.email)}
                     ${row('우편번호', c.zipcode)}
-                    ${row('주소', c.address)}
+                    ${c.address
+        ? `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--gray-100)"><div style="width:100px;color:var(--text-tertiary);font-size:13px">주소</div><div style="flex:1;font-size:14px"><a href="${_mapsUrl(c.address)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none">${esc(c.address)} <span style="font-size:12px">🗺 지도</span></a></div></div>`
+        : row('주소', c.address)}
                     ${row('업태', c.bizType)}
                     ${row('업종', c.bizItem)}
                     ${row('등급', c.grade)}
@@ -6297,6 +6304,8 @@ function openClientDetail(id) {
                 ${projectsHtml}
             </div>
         </div>
+        <div class="form-section-title" style="margin-top:20px">📍 근처 거래처 <span style="font-weight:400;color:var(--text-tertiary);font-size:13px">— 방문 동선 참고</span></div>
+        <div id="nearbyClientsBox" style="max-height:280px;overflow-y:auto;margin-top:6px">불러오는 중…</div>
         <div style="display:flex;gap:8px;margin-top:20px">
             <button class="form-submit" style="flex:1" onclick="openEditClient(${id})">✏️ 편집</button>
             <button class="form-submit" style="flex:1;background:var(--gray-200);color:var(--gray-800)" onclick="closeModal()">닫기</button>
@@ -6304,6 +6313,7 @@ function openClientDetail(id) {
     const overlay = document.getElementById('modalOverlay');
     overlay.classList.add('show'); openModalHistory();
     overlay.classList.add('modal-wide');
+    renderNearbyClients(id, c.address);
 }
 
 async function saveEditClient(id) {
@@ -10815,7 +10825,96 @@ async function saveTempProject(id) {
 // 자동완성은 전체(3천여 건)가 다 떠야 하므로 이름만 따로 전부 가져온다.
 // 5분 캐시로 여러 폼에서 재사용(거래처 추가/삭제 시 즉시 무효화).
 let _clientNamesCache = { names: null, at: 0 };
-function invalidateClientNamesCache() { _clientNamesCache = { names: null, at: 0 }; }
+let _clientsLiteCache = { rows: null, at: 0 };
+function invalidateClientNamesCache() {
+    _clientNamesCache = { names: null, at: 0 };
+    _clientsLiteCache = { rows: null, at: 0 };
+}
+
+// 근처 거래처용: 전체 거래처의 id·상호·주소·전화만 전부 가져온다(5분 캐시).
+async function fetchAllClientsLite() {
+    if (_clientsLiteCache.rows && (Date.now() - _clientsLiteCache.at) < 300000) return _clientsLiteCache.rows;
+    const rows = [];
+    let from = 0; const size = 1000;
+    while (true) {
+        const { data, error } = await sb.from('clients')
+            .select('id, company_name, address, phone').order('id').range(from, from + size - 1);
+        if (error) { console.error('거래처 로드 실패', error); break; }
+        (data || []).forEach(r => rows.push(r));
+        if (!data || data.length < size) break;
+        from += size;
+    }
+    _clientsLiteCache = { rows, at: Date.now() };
+    return rows;
+}
+
+// 주소 문자열에서 지역(시/도·시군구·동)을 뽑아 "같은 지역" 판별에 쓴다.
+function _clientRegion(addr) {
+    const s = (addr || '').replace(/\s+/g, ' ').trim();
+    if (!s) return { key: '', dong: '' };
+    const toks = s.split(' ');
+    let sido = (toks[0] || '')
+        .replace(/특별자치시$|특별자치도$|특별시$|광역시$|자치도$|도$/, '');
+    sido = ({ '충청북': '충북', '충청남': '충남', '전라북': '전북', '전라남': '전남', '경상북': '경북', '경상남': '경남' })[sido] || sido;
+    let city = '', gu = '';
+    for (let i = 1; i < toks.length; i++) {
+        const t = toks[i];
+        if (/구$/.test(t)) { gu = t; break; }
+        if (/시$/.test(t) && !city) city = t;
+        if (/군$/.test(t) && !gu) { gu = t; break; }
+    }
+    let dong = '';
+    for (let i = 1; i < toks.length; i++) {
+        const t = toks[i];
+        if (/[동읍면]$/.test(t) && !/[시군구]$/.test(t)) { dong = t; break; }
+    }
+    return { key: [sido, city, gu].filter(Boolean).join(' '), dong };
+}
+
+function _mapsUrl(addr) {
+    return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(addr || '');
+}
+
+// 상세 화면 하단: 같은 지역(시군구) 거래처를 목록으로 (읽기 전용)
+async function renderNearbyClients(id, address) {
+    const box = document.getElementById('nearbyClientsBox');
+    if (!box) return;
+    const reg = _clientRegion(address);
+    if (!reg.key) {
+        box.innerHTML = '<div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">주소가 없어 근처 거래처를 찾을 수 없습니다.</div>';
+        return;
+    }
+    let all;
+    try { all = await fetchAllClientsLite(); }
+    catch (e) { box.innerHTML = '<div style="color:var(--red);font-size:13px;padding:8px 0">근처 거래처 불러오기 실패</div>'; return; }
+    if (!document.getElementById('nearbyClientsBox')) return; // 모달이 닫혔으면 중단
+    const near = all
+        .filter(x => x.id !== id && _clientRegion(x.address).key === reg.key)
+        .sort((a, b) => {
+            const da = _clientRegion(a.address).dong === reg.dong ? 0 : 1;
+            const db = _clientRegion(b.address).dong === reg.dong ? 0 : 1;
+            return da - db || (a.company_name || '').localeCompare(b.company_name || '');
+        });
+    if (!near.length) {
+        box.innerHTML = `<div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">${escHtml(reg.key)} 지역에 다른 거래처가 없습니다.</div>`;
+        return;
+    }
+    const shown = near.slice(0, 40);
+    box.innerHTML = `<div style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px">${escHtml(reg.key)} · 총 ${near.length}곳${near.length > 40 ? ' (가까운 순 40곳 표시)' : ''}</div>` +
+        shown.map(x => {
+            const r = _clientRegion(x.address);
+            const same = r.dong && r.dong === reg.dong;
+            return `<div class="nearby-item">
+                <div class="nearby-main">
+                    <b>${escHtml(x.company_name || '')}</b>
+                    ${r.dong ? `<span class="nearby-dong${same ? ' same' : ''}">${escHtml(r.dong)}</span>` : ''}
+                    ${x.phone ? `<span class="nearby-phone">${escHtml(x.phone)}</span>` : ''}
+                </div>
+                <a class="nearby-map" href="${_mapsUrl(x.address)}" target="_blank" rel="noopener">🗺 지도</a>
+            </div>`;
+        }).join('');
+}
+
 async function fetchAllClientNames() {
     if (_clientNamesCache.names && (Date.now() - _clientNamesCache.at) < 300000) return _clientNamesCache.names;
     const names = [];
