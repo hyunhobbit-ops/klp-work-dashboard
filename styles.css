@@ -3777,7 +3777,14 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
     transition: all var(--transition);
 }
 .meeting-chip.on { background: var(--blue); border-color: var(--blue); color: #fff; }
-.meeting-list-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.meeting-list-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; border-radius: var(--radius-xs); }
+.meeting-drag-handle {
+    flex-shrink: 0; cursor: grab; color: var(--gray-400); font-size: 17px;
+    line-height: 1; padding: 0 2px; user-select: none;
+}
+.meeting-drag-handle:active { cursor: grabbing; }
+.meeting-list-row.mlr-dragging { opacity: .45; }
+.meeting-list-row.mlr-over { box-shadow: inset 0 3px 0 0 var(--blue); }
 .meeting-list-row input {
     flex: 1;
     padding: 12px 14px;

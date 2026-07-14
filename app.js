@@ -17374,7 +17374,8 @@ function renderMeetingEditor() {
     const listEditor = (kind, items) => `
       <div id="meeting${kind}List">
         ${items.map((v, i) => `
-          <div class="meeting-list-row">
+          <div class="meeting-list-row" data-${kind.toLowerCase()}-row="${i}">
+            <span class="meeting-drag-handle" draggable="true" data-${kind.toLowerCase()}-drag="${i}" title="드래그해서 순서 변경">⠿</span>
             <input type="text" data-${kind.toLowerCase()}-i="${i}" value="${escHtml(v)}">
             <button type="button" class="meeting-del" data-${kind.toLowerCase()}-del="${i}">✕</button>
           </div>`).join('')}
@@ -17518,6 +17519,42 @@ function _bindMeetingEditor() {
             const last = inputs[inputs.length - 1];
             if (last) last.focus();
         });
+
+        // 드래그(⠿ 핸들)로 순서 변경
+        const listEl = document.getElementById('meeting' + kind + 'List');
+        if (listEl) {
+            let dragFrom = null;
+            listEl.querySelectorAll('.meeting-drag-handle').forEach(h => {
+                h.addEventListener('dragstart', (e) => {
+                    dragFrom = Number(h.dataset[lower + 'Drag']);
+                    e.dataTransfer.effectAllowed = 'move';
+                    try { e.dataTransfer.setData('text/plain', String(dragFrom)); } catch (_) {}
+                    h.closest('.meeting-list-row').classList.add('mlr-dragging');
+                });
+                h.addEventListener('dragend', () => {
+                    dragFrom = null;
+                    listEl.querySelectorAll('.meeting-list-row').forEach(r => r.classList.remove('mlr-dragging', 'mlr-over'));
+                });
+            });
+            listEl.querySelectorAll('.meeting-list-row').forEach(row => {
+                row.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; row.classList.add('mlr-over'); });
+                row.addEventListener('dragleave', () => row.classList.remove('mlr-over'));
+                row.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    row.classList.remove('mlr-over');
+                    let from = dragFrom;
+                    if (from == null) { const d = Number(e.dataTransfer.getData('text/plain')); from = isNaN(d) ? null : d; }
+                    const to = Number(row.dataset[lower + 'Row']);
+                    if (from == null || isNaN(from) || isNaN(to) || from === to) return;
+                    _readMeetingFields(); // 제목·내용 등 보존
+                    const arr = _meetingDraft[key];
+                    const [moved] = arr.splice(from, 1);
+                    arr.splice(to, 0, moved);
+                    _meetingDirty = true;
+                    renderMeetingEditor();
+                });
+            });
+        }
     };
     bindList('Agenda', 'agenda');
     bindList('Decisions', 'decisions');
