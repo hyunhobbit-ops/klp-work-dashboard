@@ -17516,6 +17516,21 @@ function closeMeetingEditor() {
     renderMeetings();
 }
 
+// 안건/결정 목록의 행 HTML (부분 재렌더에서도 재사용)
+function _meetingListRowsHtml(kind, items, check) {
+    const lo = kind.toLowerCase();
+    return items.map((v, i) => {
+        const text = check ? (v.text || '') : v;
+        const done = check ? !!v.done : false;
+        return `<div class="meeting-list-row${done ? ' item-done' : ''}" data-${lo}-row="${i}">
+            <span class="meeting-drag-handle" draggable="true" data-${lo}-drag="${i}" title="드래그해서 순서 변경">⠿</span>
+            ${check ? `<input type="checkbox" class="meeting-item-check" data-${lo}-check="${i}" ${done ? 'checked' : ''} title="완료 표시">` : ''}
+            <input type="text" data-${lo}-i="${i}" value="${escHtml(text)}">
+            <button type="button" class="meeting-del" data-${lo}-del="${i}">✕</button>
+        </div>`;
+    }).join('');
+}
+
 function renderMeetingEditor() {
     const box = document.getElementById('meetingsBody');
     if (!box || !_meetingDraft) return;
@@ -17530,24 +17545,9 @@ function renderMeetingEditor() {
       </label>`).join('');
 
     // check=true 이면 각 항목에 완료 체크박스 (안건용). 항목은 {text,done} 객체.
-    const listEditor = (kind, items, check) => {
-        const lo = kind.toLowerCase();
-        return `
-      <div id="meeting${kind}List">
-        ${items.map((v, i) => {
-            const text = check ? (v.text || '') : v;
-            const done = check ? !!v.done : false;
-            return `
-          <div class="meeting-list-row${done ? ' item-done' : ''}" data-${lo}-row="${i}">
-            <span class="meeting-drag-handle" draggable="true" data-${lo}-drag="${i}" title="드래그해서 순서 변경">⠿</span>
-            ${check ? `<input type="checkbox" class="meeting-item-check" data-${lo}-check="${i}" ${done ? 'checked' : ''} title="완료 표시">` : ''}
-            <input type="text" data-${lo}-i="${i}" value="${escHtml(text)}">
-            <button type="button" class="meeting-del" data-${lo}-del="${i}">✕</button>
-          </div>`;
-        }).join('')}
-      </div>
+    const listEditor = (kind, items, check) => `
+      <div id="meeting${kind}List">${_meetingListRowsHtml(kind, items, check)}</div>
       <button type="button" class="btn-ghost" id="meeting${kind}Add">+ 추가</button>`;
-    };
 
     const canEdit = _meetingCanEdit();
 
@@ -17686,46 +17686,44 @@ function _bindMeetingEditor() {
         _syncMeetingAllBtn();
     });
 
+    // 안건/결정 목록: 추가·삭제·순서변경 시 전체가 아니라 이 목록만 다시 그린다
+    // (전체 재렌더는 아래 점검 패널·보드까지 재로딩돼 화면이 밀림)
     const bindList = (kind, key, check) => {
         const lower = kind.toLowerCase();
-        document.querySelectorAll(`[data-${lower}-i]`).forEach(inp => {
-            inp.addEventListener('input', () => {
-                const i = Number(inp.dataset[lower + 'I']);
-                if (check) _meetingDraft[key][i].text = inp.value;
-                else _meetingDraft[key][i] = inp.value;
-            });
-        });
-        if (check) {
-            document.querySelectorAll(`[data-${lower}-check]`).forEach(cb => {
-                cb.addEventListener('change', () => {
-                    const i = Number(cb.dataset[lower + 'Check']);
-                    _meetingDraft[key][i].done = cb.checked;
-                    cb.closest('.meeting-list-row').classList.toggle('item-done', cb.checked);
-                    _meetingDirty = true;
+        const listEl = document.getElementById('meeting' + kind + 'List');
+        if (!listEl) { const ab = document.getElementById('meeting' + kind + 'Add'); if (!ab) return; }
+
+        const rerender = () => {
+            if (!listEl) return;
+            listEl.innerHTML = _meetingListRowsHtml(kind, _meetingDraft[key], check);
+            bindRows();
+        };
+
+        function bindRows() {
+            if (!listEl) return;
+            listEl.querySelectorAll(`[data-${lower}-i]`).forEach(inp => {
+                inp.addEventListener('input', () => {
+                    const i = Number(inp.dataset[lower + 'I']);
+                    if (check) _meetingDraft[key][i].text = inp.value;
+                    else _meetingDraft[key][i] = inp.value;
                 });
             });
-        }
-        document.querySelectorAll(`[data-${lower}-del]`).forEach(btn => {
-            btn.addEventListener('click', () => {
-                _readMeetingFields(); // 아직 초안에 없는 제목·내용 등을 먼저 보존
-                _meetingDraft[key].splice(Number(btn.dataset[lower + 'Del']), 1);
-                renderMeetingEditor();
+            if (check) {
+                listEl.querySelectorAll(`[data-${lower}-check]`).forEach(cb => {
+                    cb.addEventListener('change', () => {
+                        _meetingDraft[key][Number(cb.dataset[lower + 'Check'])].done = cb.checked;
+                        cb.closest('.meeting-list-row').classList.toggle('item-done', cb.checked);
+                        _meetingDirty = true;
+                    });
+                });
+            }
+            listEl.querySelectorAll(`[data-${lower}-del]`).forEach(btn => {
+                btn.addEventListener('click', () => {
+                    _meetingDraft[key].splice(Number(btn.dataset[lower + 'Del']), 1);
+                    _meetingDirty = true;
+                    rerender();
+                });
             });
-        });
-        document.getElementById('meeting' + kind + 'Add').addEventListener('click', () => {
-            _readMeetingFields();
-            _meetingDraft[key].push(check ? { text: '', done: false } : '');
-            const y = window.scrollY; // 재렌더 후 스크롤 위치 유지
-            renderMeetingEditor();
-            window.scrollTo(0, y);
-            const inputs = document.querySelectorAll(`[data-${lower}-i]`);
-            const last = inputs[inputs.length - 1];
-            if (last) last.focus({ preventScroll: true }); // 포커스는 주되 화면은 안 움직이게
-        });
-
-        // 드래그(⠿ 핸들)로 순서 변경
-        const listEl = document.getElementById('meeting' + kind + 'List');
-        if (listEl) {
             let dragFrom = null;
             listEl.querySelectorAll('.meeting-drag-handle').forEach(h => {
                 h.addEventListener('dragstart', (e) => {
@@ -17749,15 +17747,25 @@ function _bindMeetingEditor() {
                     if (from == null) { const d = Number(e.dataTransfer.getData('text/plain')); from = isNaN(d) ? null : d; }
                     const to = Number(row.dataset[lower + 'Row']);
                     if (from == null || isNaN(from) || isNaN(to) || from === to) return;
-                    _readMeetingFields(); // 제목·내용 등 보존
                     const arr = _meetingDraft[key];
                     const [moved] = arr.splice(from, 1);
                     arr.splice(to, 0, moved);
                     _meetingDirty = true;
-                    renderMeetingEditor();
+                    rerender();
                 });
             });
         }
+
+        bindRows();
+        const addBtn = document.getElementById('meeting' + kind + 'Add');
+        if (addBtn) addBtn.addEventListener('click', () => {
+            _meetingDraft[key].push(check ? { text: '', done: false } : '');
+            _meetingDirty = true;
+            rerender();
+            const inputs = listEl ? listEl.querySelectorAll(`[data-${lower}-i]`) : [];
+            const last = inputs[inputs.length - 1];
+            if (last) last.focus({ preventScroll: true }); // 포커스만, 화면 스크롤 안 함
+        });
     };
     bindList('Agenda', 'agenda', true);
     bindList('Decisions', 'decisions', false);
