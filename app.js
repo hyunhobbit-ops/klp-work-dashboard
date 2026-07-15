@@ -18394,7 +18394,13 @@ async function renderMeetingReviewPanel() {
     const agendaHtml = agenda.length ? `
         <div class="mrv-agenda">
             <div class="mrv-agenda-title">지난 안건 중 미처리 (담당자 미지정)</div>
-            ${agenda.map(a => `<div class="mrv-item unsent"><div class="mrv-item-main"><span class="mrv-ic">⬜</span><span class="mrv-text">${escHtml(a.text)}</span></div>${carryBtn(a.text, '')}</div>`).join('')}
+            ${agenda.map(a => `<div class="mrv-item unsent">
+                <div class="mrv-item-main"><span class="mrv-ic">⬜</span><span class="mrv-text">${escHtml(a.text)}</span></div>
+                <div class="mrv-btns">
+                    <button type="button" class="mrv-done" data-text="${escHtml(a.text)}">완료</button>
+                    ${carryBtn(a.text, '')}
+                </div>
+            </div>`).join('')}
         </div>` : '';
 
     box.innerHTML = `<div class="mrv-board">${colHtml || '<div style="color:var(--gray-500);font-size:13px">액션아이템 없음</div>'}</div>${agendaHtml}`;
@@ -18407,6 +18413,26 @@ async function renderMeetingReviewPanel() {
         renderMeetingActions();
         showToast('오늘 액션아이템에 추가됨');
     }));
+
+    // 지난 안건 완료 처리 (그 회의의 agenda done=true 로 저장)
+    box.querySelectorAll('.mrv-done').forEach(b => b.addEventListener('click', () => markReviewAgendaDone(b.dataset.text, b)));
+}
+
+// 지난 회의의 특정 안건을 완료 처리한다 (지난 회의 agenda 저장).
+async function markReviewAgendaDone(text, btn) {
+    if (!_meetingReviewId) return;
+    btn.disabled = true; btn.textContent = '처리중…';
+    const rid = _meetingReviewId;
+    const { data, error } = await sb.from('meetings').select('agenda').eq('id', rid).single();
+    if (error) { showToast('실패: ' + error.message); btn.disabled = false; btn.textContent = '완료'; return; }
+    const agenda = _normMeetingAgenda(data && data.agenda);
+    const item = agenda.find(a => (a.text || '').trim() === (text || '').trim() && !a.done);
+    if (item) item.done = true;
+    const { data: upd, error: e2 } = await sb.from('meetings').update({ agenda }).eq('id', rid).select('id');
+    if (e2) { showToast('저장 실패: ' + e2.message); btn.disabled = false; btn.textContent = '완료'; return; }
+    if (!upd || !upd.length) { showToast('완료 처리 권한이 없습니다 (작성자·관리자만)'); btn.disabled = false; btn.textContent = '완료'; return; }
+    showToast('완료 처리했습니다');
+    if (_meetingReviewId === rid) renderMeetingReviewPanel(); // 목록에서 사라짐
 }
 
 // F2: 회의록 목록에서 새 회의록 바로 만들기

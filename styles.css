@@ -3890,3 +3890,13 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .mrv-agenda { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--gray-200); }
 .mrv-agenda-title { font-size: 13px; font-weight: 700; color: var(--gray-600); margin-bottom: 8px; }
 .mrv-agenda .mrv-item { margin-bottom: 6px; }
+
+/* 지난 안건 완료 버튼 */
+.mrv-btns { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+.mrv-done {
+    font-size: 12px; font-weight: 700; color: var(--green);
+    background: var(--green-light); border: none; border-radius: 6px; padding: 5px 9px;
+    cursor: pointer; white-space: nowrap; font-family: inherit;
+}
+.mrv-done:hover { background: var(--green); color: #fff; }
+.mrv-done:disabled { background: var(--gray-100); color: var(--gray-400); cursor: default; }
