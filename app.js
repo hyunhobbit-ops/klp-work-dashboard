@@ -18341,22 +18341,23 @@ async function renderMeetingReviewPanel() {
     box.innerHTML = '<div style="color:var(--gray-500);font-size:13px;padding:8px 0">불러오는 중…</div>';
     const rid = _meetingReviewId;
     const { data: acts, error } = await sb.from('meeting_actions')
-        .select('id, task, assignee, daily_task_id').eq('meeting_id', rid).order('id');
+        .select('id, task, assignee, daily_task_id, done').eq('meeting_id', rid).order('id');
     if (!document.getElementById('meetingReviewBox') || _meetingReviewId !== rid) return;
     if (error) { box.innerHTML = `<div style="color:var(--red);font-size:13px">불러오기 실패 — ${escHtml(error.message)}</div>`; return; }
-    // 완료 여부는 일일계획표에서
+    // 전송된 항목의 완료는 일일계획표가 원본, 미전송 항목은 meeting_actions.done
     const taskIds = (acts || []).map(a => a.daily_task_id).filter(Boolean);
     const doneMap = {};
     if (taskIds.length) {
         const { data: tasks } = await sb.from('daily_tasks').select('id, done').in('id', taskIds);
         (tasks || []).forEach(t => { doneMap[t.id] = !!t.done; });
     }
-    // 지난 회의 미완료 안건
+    // 지난 회의 안건 (완료 포함 전부 — 완료도 보이게)
     const { data: mrow } = await sb.from('meetings').select('agenda').eq('id', rid).single();
     if (!document.getElementById('meetingReviewBox') || _meetingReviewId !== rid) return;
-    const agenda = _normMeetingAgenda(mrow && mrow.agenda).filter(a => !a.done);
+    const agenda = _normMeetingAgenda(mrow && mrow.agenda);
 
-    const statusOf = (a) => !a.daily_task_id ? 'unsent' : (doneMap[a.daily_task_id] ? 'done' : 'todo');
+    const isDone = (a) => a.daily_task_id ? !!doneMap[a.daily_task_id] : !!a.done;
+    const statusOf = (a) => isDone(a) ? 'done' : (a.daily_task_id ? 'todo' : 'unsent');
     const byAssignee = {};
     (acts || []).forEach(a => { const k = a.assignee || '(미지정)'; (byAssignee[k] = byAssignee[k] || []).push(a); });
     const cols = MEETING_ASSIGNEES.concat(['(미지정)']).filter(k => byAssignee[k] && byAssignee[k].length);
@@ -18371,20 +18372,21 @@ async function renderMeetingReviewPanel() {
         const dup = already(task, assignee);
         return `<button type="button" class="mrv-carry" data-task="${escHtml(task)}" data-assignee="${escHtml(assignee || '')}"${dup ? ' disabled' : ''}>${dup ? '추가됨' : '오늘로 ↗'}</button>`;
     };
+    // kind: 'act'(액션아이템) | 'agenda'.  체크박스로 완료 토글, 완료돼도 목록 유지.
+    const chk = (kind, ident, done) => `<input type="checkbox" class="mrv-chk" data-kind="${kind}" data-id="${escHtml(String(ident))}" ${done ? 'checked' : ''} title="완료 표시">`;
 
     const colHtml = cols.map(col => {
         const items = byAssignee[col].slice().sort((a, b) => {
             const rank = s => s === 'todo' ? 0 : s === 'unsent' ? 1 : 2;
             return rank(statusOf(a)) - rank(statusOf(b));
         });
-        const left = items.filter(a => statusOf(a) !== 'done').length;
+        const left = items.filter(a => !isDone(a)).length;
         return `<div class="mrv-col">
             <div class="mrv-col-head"><b>${escHtml(col)}</b><span class="mrv-left${left ? '' : ' zero'}">${left ? left + '건 미이행' : '완료'}</span></div>
             <div class="mrv-col-body">${items.map(a => {
                 const s = statusOf(a);
-                const icon = s === 'done' ? '✅' : s === 'unsent' ? '⚠️' : '⬜';
                 return `<div class="mrv-item ${s}">
-                    <div class="mrv-item-main"><span class="mrv-ic">${icon}</span><span class="mrv-text">${escHtml(a.task || '')}</span></div>
+                    <div class="mrv-item-main">${chk('act', a.id, s === 'done')}<span class="mrv-text">${escHtml(a.task || '')}</span></div>
                     ${s !== 'done' ? carryBtn(a.task, a.assignee) : ''}
                 </div>`;
             }).join('')}</div>
@@ -18393,13 +18395,10 @@ async function renderMeetingReviewPanel() {
 
     const agendaHtml = agenda.length ? `
         <div class="mrv-agenda">
-            <div class="mrv-agenda-title">지난 안건 중 미처리 (담당자 미지정)</div>
-            ${agenda.map(a => `<div class="mrv-item unsent">
-                <div class="mrv-item-main"><span class="mrv-ic">⬜</span><span class="mrv-text">${escHtml(a.text)}</span></div>
-                <div class="mrv-btns">
-                    <button type="button" class="mrv-done" data-text="${escHtml(a.text)}">완료</button>
-                    ${carryBtn(a.text, '')}
-                </div>
+            <div class="mrv-agenda-title">지난 회의 안건 (담당자 미지정)</div>
+            ${agenda.map((a, i) => `<div class="mrv-item ${a.done ? 'done' : 'unsent'}">
+                <div class="mrv-item-main">${chk('agenda', i, a.done)}<span class="mrv-text">${escHtml(a.text)}</span></div>
+                ${a.done ? '' : carryBtn(a.text, '')}
             </div>`).join('')}
         </div>` : '';
 
@@ -18414,25 +18413,46 @@ async function renderMeetingReviewPanel() {
         showToast('오늘 액션아이템에 추가됨');
     }));
 
-    // 지난 안건 완료 처리 (그 회의의 agenda done=true 로 저장)
-    box.querySelectorAll('.mrv-done').forEach(b => b.addEventListener('click', () => markReviewAgendaDone(b.dataset.text, b)));
+    // 체크박스 완료 토글 (완료돼도 목록에 남김)
+    box.querySelectorAll('.mrv-chk').forEach(cb => cb.addEventListener('change', () => {
+        toggleReviewDone(cb.dataset.kind, cb.dataset.id, cb.checked, cb, rid);
+    }));
 }
 
-// 지난 회의의 특정 안건을 완료 처리한다 (지난 회의 agenda 저장).
-async function markReviewAgendaDone(text, btn) {
-    if (!_meetingReviewId) return;
-    btn.disabled = true; btn.textContent = '처리중…';
-    const rid = _meetingReviewId;
-    const { data, error } = await sb.from('meetings').select('agenda').eq('id', rid).single();
-    if (error) { showToast('실패: ' + error.message); btn.disabled = false; btn.textContent = '완료'; return; }
-    const agenda = _normMeetingAgenda(data && data.agenda);
-    const item = agenda.find(a => (a.text || '').trim() === (text || '').trim() && !a.done);
-    if (item) item.done = true;
-    const { data: upd, error: e2 } = await sb.from('meetings').update({ agenda }).eq('id', rid).select('id');
-    if (e2) { showToast('저장 실패: ' + e2.message); btn.disabled = false; btn.textContent = '완료'; return; }
-    if (!upd || !upd.length) { showToast('완료 처리 권한이 없습니다 (작성자·관리자만)'); btn.disabled = false; btn.textContent = '완료'; return; }
-    showToast('완료 처리했습니다');
-    if (_meetingReviewId === rid) renderMeetingReviewPanel(); // 목록에서 사라짐
+// 이행 점검 패널의 항목 완료 토글. act=액션아이템(전송건은 일일계획표, 미전송은 meeting_actions.done),
+// agenda=지난 회의 안건(agenda[].done). 성공 시 패널 재렌더(항목은 유지).
+async function toggleReviewDone(kind, ident, done, cb, rid) {
+    cb.disabled = true;
+    const nowIso = done ? new Date().toISOString() : null;
+    try {
+        if (kind === 'act') {
+            const id = Number(ident);
+            // 이 액션아이템이 전송됐는지(daily_task_id) 확인
+            const { data: a } = await sb.from('meeting_actions').select('daily_task_id').eq('id', id).single();
+            if (a && a.daily_task_id) {
+                const { error } = await sb.from('daily_tasks').update({ done, completed_at: nowIso }).eq('id', a.daily_task_id);
+                if (error) throw error;
+            } else {
+                const { data: upd, error } = await sb.from('meeting_actions').update({ done }).eq('id', id).select('id');
+                if (error) throw error;
+                if (!upd || !upd.length) { showToast('처리 권한이 없습니다 (작성자·관리자만)'); cb.checked = !done; cb.disabled = false; return; }
+            }
+        } else { // agenda
+            const idx = Number(ident);
+            const { data: m, error: er } = await sb.from('meetings').select('agenda').eq('id', rid).single();
+            if (er) throw er;
+            const agenda = _normMeetingAgenda(m && m.agenda);
+            if (agenda[idx]) agenda[idx].done = done;
+            const { data: upd, error } = await sb.from('meetings').update({ agenda }).eq('id', rid).select('id');
+            if (error) throw error;
+            if (!upd || !upd.length) { showToast('처리 권한이 없습니다 (작성자·관리자만)'); cb.checked = !done; cb.disabled = false; return; }
+        }
+        if (_meetingReviewId === rid) renderMeetingReviewPanel();
+    } catch (e) {
+        console.error('이행 점검 완료 토글 실패', e);
+        showToast('저장 실패: ' + ((e && e.message) || e));
+        cb.checked = !done; cb.disabled = false;
+    }
 }
 
 // F2: 회의록 목록에서 새 회의록 바로 만들기

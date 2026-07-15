@@ -3900,3 +3900,7 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 }
 .mrv-done:hover { background: var(--green); color: #fff; }
 .mrv-done:disabled { background: var(--gray-100); color: var(--gray-400); cursor: default; }
+
+/* 이행 점검 완료 체크박스 */
+.mrv-chk { flex-shrink: 0; width: 17px; height: 17px; margin: 0; cursor: pointer; accent-color: var(--green); }
+.mrv-item.done .mrv-chk { accent-color: var(--gray-400); }
