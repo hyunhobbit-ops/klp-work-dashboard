@@ -17715,10 +17715,12 @@ function _bindMeetingEditor() {
         document.getElementById('meeting' + kind + 'Add').addEventListener('click', () => {
             _readMeetingFields();
             _meetingDraft[key].push(check ? { text: '', done: false } : '');
+            const y = window.scrollY; // 재렌더 후 스크롤 위치 유지
             renderMeetingEditor();
+            window.scrollTo(0, y);
             const inputs = document.querySelectorAll(`[data-${lower}-i]`);
             const last = inputs[inputs.length - 1];
-            if (last) last.focus();
+            if (last) last.focus({ preventScroll: true }); // 포커스는 주되 화면은 안 움직이게
         });
 
         // 드래그(⠿ 핸들)로 순서 변경
