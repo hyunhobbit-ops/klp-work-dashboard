@@ -17282,6 +17282,7 @@ let _meetingDailyDate = '';    // 편집 화면 하단 일일계획표가 보여
 // 하단 일일계획표에 보여줄 담당자 (임원·구정두 제외)
 const MEETING_DAILY_COLUMNS = ['전체', '대표님', '이현주', '김현호', '유지은'];
 let _meetingMonth = '';        // 월간 달력이 보여주는 달 (YYYY-MM)
+let _meetingReviewId = null;   // 이행 점검 패널이 보고 있는 지난 회의 id
 // 담당자별 색 (월간 달력 칩 왼쪽 띠)
 const MEETING_ASSIGNEE_COLORS = {
     '전체': '#8b95a1', '대표님': '#8b5cf6', '이현주': '#3182f6', '김현호': '#f97316', '유지은': '#30c85e'
@@ -17487,6 +17488,7 @@ async function _renderMeetingList() {
 async function openMeetingEditor(id) {
     _meetingEditingId = id; // null = 신규
     _meetingDirty = false;
+    _meetingReviewId = null; // 회의 바뀌면 이행 점검 패널 접힘
     if (id === null) {
         const now = new Date();
         _meetingDraft = _meetingRowDefaults({
@@ -17586,6 +17588,17 @@ function renderMeetingEditor() {
         </div>
       </div>
 
+      <div class="card" style="padding:20px;margin-bottom:16px" id="meetingReviewCard">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <h3 style="margin:0">📌 지난 회의 이행 점검 <span style="font-weight:400;color:var(--gray-500);font-size:13px">— 지난 회의에서 시킨 일이 됐는지 확인</span></h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="meetingReviewSelect" style="display:none"></select>
+            <button type="button" class="btn-ghost" id="meetingReviewBtn">지난 회의 불러오기</button>
+          </div>
+        </div>
+        <div id="meetingReviewBox" style="margin-top:12px"></div>
+      </div>
+
       <div class="card" style="padding:20px;margin-bottom:16px">
         <h3 style="margin:0 0 12px">안건</h3>
         ${listEditor('Agenda', m.agenda, true)}
@@ -17622,6 +17635,7 @@ function renderMeetingEditor() {
     _meetingMonth = localDate.slice(0, 7);
     renderMeetingDailyBoard();
     renderMeetingMonthlyBoard();
+    if (_meetingReviewId) openMeetingReview(); // 재렌더 후 이행 점검 패널 복원
 }
 
 function _bindMeetingEditor() {
@@ -17651,6 +17665,14 @@ function _bindMeetingEditor() {
             cb.parentElement.classList.toggle('on', on);
             _syncMeetingAllBtn();
         });
+    });
+
+    const reviewBtn = document.getElementById('meetingReviewBtn');
+    if (reviewBtn) reviewBtn.addEventListener('click', () => openMeetingReview());
+    const reviewSel = document.getElementById('meetingReviewSelect');
+    if (reviewSel) reviewSel.addEventListener('change', () => {
+        _meetingReviewId = Number(reviewSel.value) || null;
+        renderMeetingReviewPanel();
     });
 
     const allBtn = document.getElementById('meetingAttAll');
@@ -18286,6 +18308,105 @@ async function sendMeetingActionsToDaily(meetingId) {
     showToast(msg);
     renderMeetingActions();
     renderMeetingDailyBoard(); // 방금 보낸 할 일이 아래 표에 바로 보이도록
+}
+
+// ── 지난 회의 이행 점검 ──────────────────────────────
+// 버튼 클릭 시: 최근 회의 목록을 드롭다운에 채우고 최신 회의를 점검 대상으로 잡는다.
+async function openMeetingReview() {
+    const box = document.getElementById('meetingReviewBox');
+    const sel = document.getElementById('meetingReviewSelect');
+    const btn = document.getElementById('meetingReviewBtn');
+    if (!box || !sel) return;
+    if (btn) { btn.disabled = true; btn.textContent = '불러오는 중…'; }
+    const { data, error } = await sb.from('meetings')
+        .select('id, title, meet_at').order('meet_at', { ascending: false }).limit(30);
+    if (btn) { btn.disabled = false; btn.textContent = '지난 회의 불러오기'; }
+    if (error) { showToast('회의 목록 불러오기 실패: ' + error.message); return; }
+    const list = (data || []).filter(m => m.id !== _meetingEditingId).slice(0, 20);
+    if (!list.length) {
+        box.innerHTML = '<div style="color:var(--gray-500);font-size:13px;padding:8px 0">불러올 지난 회의가 없습니다.</div>';
+        return;
+    }
+    sel.innerHTML = list.map(m => `<option value="${m.id}">${escHtml(_meetingDateLabel(m.meet_at))} · ${escHtml(m.title || '(제목 없음)')}</option>`).join('');
+    sel.style.display = '';
+    if (btn) btn.style.display = 'none';
+    if (!_meetingReviewId || !list.some(m => m.id === _meetingReviewId)) _meetingReviewId = list[0].id;
+    sel.value = String(_meetingReviewId);
+    renderMeetingReviewPanel();
+}
+
+async function renderMeetingReviewPanel() {
+    const box = document.getElementById('meetingReviewBox');
+    if (!box || !_meetingReviewId) return;
+    box.innerHTML = '<div style="color:var(--gray-500);font-size:13px;padding:8px 0">불러오는 중…</div>';
+    const rid = _meetingReviewId;
+    const { data: acts, error } = await sb.from('meeting_actions')
+        .select('id, task, assignee, daily_task_id').eq('meeting_id', rid).order('id');
+    if (!document.getElementById('meetingReviewBox') || _meetingReviewId !== rid) return;
+    if (error) { box.innerHTML = `<div style="color:var(--red);font-size:13px">불러오기 실패 — ${escHtml(error.message)}</div>`; return; }
+    // 완료 여부는 일일계획표에서
+    const taskIds = (acts || []).map(a => a.daily_task_id).filter(Boolean);
+    const doneMap = {};
+    if (taskIds.length) {
+        const { data: tasks } = await sb.from('daily_tasks').select('id, done').in('id', taskIds);
+        (tasks || []).forEach(t => { doneMap[t.id] = !!t.done; });
+    }
+    // 지난 회의 미완료 안건
+    const { data: mrow } = await sb.from('meetings').select('agenda').eq('id', rid).single();
+    if (!document.getElementById('meetingReviewBox') || _meetingReviewId !== rid) return;
+    const agenda = _normMeetingAgenda(mrow && mrow.agenda).filter(a => !a.done);
+
+    const statusOf = (a) => !a.daily_task_id ? 'unsent' : (doneMap[a.daily_task_id] ? 'done' : 'todo');
+    const byAssignee = {};
+    (acts || []).forEach(a => { const k = a.assignee || '(미지정)'; (byAssignee[k] = byAssignee[k] || []).push(a); });
+    const cols = MEETING_ASSIGNEES.concat(['(미지정)']).filter(k => byAssignee[k] && byAssignee[k].length);
+
+    if (!cols.length && !agenda.length) {
+        box.innerHTML = '<div style="color:var(--gray-500);font-size:13px;padding:8px 0">이 회의엔 점검할 액션아이템·안건이 없습니다.</div>';
+        return;
+    }
+
+    const already = (task, assignee) => _meetingActions.some(x => (x.task || '').trim() === (task || '').trim() && (x.assignee || '') === (assignee || ''));
+    const carryBtn = (task, assignee) => {
+        const dup = already(task, assignee);
+        return `<button type="button" class="mrv-carry" data-task="${escHtml(task)}" data-assignee="${escHtml(assignee || '')}"${dup ? ' disabled' : ''}>${dup ? '추가됨' : '오늘로 ↗'}</button>`;
+    };
+
+    const colHtml = cols.map(col => {
+        const items = byAssignee[col].slice().sort((a, b) => {
+            const rank = s => s === 'todo' ? 0 : s === 'unsent' ? 1 : 2;
+            return rank(statusOf(a)) - rank(statusOf(b));
+        });
+        const left = items.filter(a => statusOf(a) !== 'done').length;
+        return `<div class="mrv-col">
+            <div class="mrv-col-head"><b>${escHtml(col)}</b><span class="mrv-left${left ? '' : ' zero'}">${left ? left + '건 미이행' : '완료'}</span></div>
+            <div class="mrv-col-body">${items.map(a => {
+                const s = statusOf(a);
+                const icon = s === 'done' ? '✅' : s === 'unsent' ? '⚠️' : '⬜';
+                return `<div class="mrv-item ${s}">
+                    <div class="mrv-item-main"><span class="mrv-ic">${icon}</span><span class="mrv-text">${escHtml(a.task || '')}</span></div>
+                    ${s !== 'done' ? carryBtn(a.task, a.assignee) : ''}
+                </div>`;
+            }).join('')}</div>
+        </div>`;
+    }).join('');
+
+    const agendaHtml = agenda.length ? `
+        <div class="mrv-agenda">
+            <div class="mrv-agenda-title">지난 안건 중 미처리 (담당자 미지정)</div>
+            ${agenda.map(a => `<div class="mrv-item unsent"><div class="mrv-item-main"><span class="mrv-ic">⬜</span><span class="mrv-text">${escHtml(a.text)}</span></div>${carryBtn(a.text, '')}</div>`).join('')}
+        </div>` : '';
+
+    box.innerHTML = `<div class="mrv-board">${colHtml || '<div style="color:var(--gray-500);font-size:13px">액션아이템 없음</div>'}</div>${agendaHtml}`;
+
+    box.querySelectorAll('.mrv-carry').forEach(b => b.addEventListener('click', () => {
+        if (b.disabled) return;
+        _meetingActions.push({ id: null, task: b.dataset.task, assignee: b.dataset.assignee || '', dueDate: '', dailyTaskId: null });
+        _meetingDirty = true;
+        b.disabled = true; b.textContent = '추가됨';
+        renderMeetingActions();
+        showToast('오늘 액션아이템에 추가됨');
+    }));
 }
 
 // F2: 회의록 목록에서 새 회의록 바로 만들기

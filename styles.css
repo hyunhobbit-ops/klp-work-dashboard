@@ -3853,3 +3853,40 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
     white-space: nowrap;
 }
 .nearby-map:hover { background: var(--blue-light); border-color: var(--blue); }
+
+/* 회의록 — 지난 회의 이행 점검 */
+#meetingReviewSelect {
+    padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: 6px;
+    font-size: 14px; font-family: inherit; background: var(--white); color: var(--gray-900); max-width: 260px;
+}
+.mrv-board {
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(190px, 1fr);
+    gap: 10px; overflow-x: auto; padding-bottom: 4px;
+}
+.mrv-col { background: var(--gray-50); border: 1px solid var(--gray-100); border-radius: 10px; min-width: 0; display: flex; flex-direction: column; }
+.mrv-col-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--gray-200); font-size: 15px; color: var(--gray-900); }
+.mrv-left { font-size: 12px; font-weight: 700; color: var(--red); white-space: nowrap; }
+.mrv-left.zero { color: var(--gray-400); font-weight: 600; }
+.mrv-col-body { padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.mrv-item {
+    background: var(--white); border: 1px solid var(--gray-100); border-left: 3px solid var(--gray-300);
+    border-radius: 8px; padding: 8px 10px; font-size: 14px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.mrv-item.todo { border-left-color: var(--red); }
+.mrv-item.unsent { border-left-color: var(--orange); background: var(--orange-light); }
+.mrv-item.done { opacity: .55; }
+.mrv-item.done .mrv-text { text-decoration: line-through; }
+.mrv-item-main { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.mrv-ic { flex-shrink: 0; }
+.mrv-text { min-width: 0; word-break: break-word; color: var(--gray-800); }
+.mrv-carry {
+    flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--blue);
+    background: var(--blue-light); border: none; border-radius: 6px; padding: 5px 9px;
+    cursor: pointer; white-space: nowrap; font-family: inherit;
+}
+.mrv-carry:hover { background: var(--blue); color: #fff; }
+.mrv-carry:disabled { background: var(--gray-100); color: var(--gray-400); cursor: default; }
+.mrv-agenda { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--gray-200); }
+.mrv-agenda-title { font-size: 13px; font-weight: 700; color: var(--gray-600); margin-bottom: 8px; }
+.mrv-agenda .mrv-item { margin-bottom: 6px; }
