@@ -434,7 +434,7 @@ let currentProposalSearch = '';
 let clientSearch = '';
 let clientPage = 1;
 const CLIENTS_PER_PAGE = 50;
-let clientCategoryFilter = 'all';           // 'all' | '매출처' | '매입처' | '공란'
+let clientCategoryFilter = 'all';           // 'all' | '매출처' | '매입처' | '서비스(비용)' | '공란'
 let clientSort = { field: null, dir: 'asc' }; // 컬럼 헤더 클릭 정렬
 
 // 해외 거래처 (자료실)
@@ -5827,11 +5827,12 @@ async function dbDeleteClient(id) {
 function filterClients() {
     let list = clients;
 
-    // 1) 카테고리 필터 (매출처/매입처/공란/전체)
-    if (clientCategoryFilter === '매출처' || clientCategoryFilter === '매입처') {
+    // 1) 카테고리 필터 (매출처/매입처/서비스(비용)/공란/전체)
+    const CAT_SET = ['매출처', '매입처', '서비스(비용)'];
+    if (CAT_SET.includes(clientCategoryFilter)) {
         list = list.filter(c => (c.category || '') === clientCategoryFilter);
     } else if (clientCategoryFilter === '공란') {
-        list = list.filter(c => c.category !== '매출처' && c.category !== '매입처');
+        list = list.filter(c => !CAT_SET.includes(c.category || ''));
     }
 
     // 2) 검색 필터
@@ -6023,6 +6024,7 @@ function renderClients() {
     const catBadge = (cat) => {
         if (cat === '매입처') return `<span class="badge badge-purple">매입처</span>`;
         if (cat === '매출처') return `<span class="badge badge-blue">매출처</span>`;
+        if (cat === '서비스(비용)') return `<span class="badge" style="background:var(--teal-light);color:var(--teal)">서비스</span>`;
         return '-';
     };
     tbody.innerHTML = pageItems.map(c => {
@@ -6033,7 +6035,7 @@ function renderClients() {
         const checked = selectedClientIds.has(c.id) ? 'checked' : '';
         return `<tr onclick="clientRowClick(${c.id})" style="cursor:pointer" ${checked ? 'class="row-selected"' : ''}>
         <td style="text-align:center" onclick="event.stopPropagation()"><input type="checkbox" class="client-row-check" data-id="${c.id}" ${checked} onclick="toggleClientSelect(${c.id}, this)" style="width:16px;height:16px;cursor:pointer"></td>
-        ${ed('category', 'select', catBadge(c.category), '매입처,매출처,')}
+        ${ed('category', 'select', catBadge(c.category), '매출처,매입처,서비스(비용),')}
         ${ed('companyName', 'text', `<strong>${esc(c.companyName)}</strong>`)}
         ${ed('ceo', 'text', esc(c.ceo) || '-')}
         ${ed('phone', 'text', esc(c.phone) || '-')}
@@ -6114,8 +6116,9 @@ function openClientModal(existing) {
             <div class="form-group"><label class="form-label">구분</label>
                 <select class="form-select" id="cliCategory">
                     <option value="" ${!c.category ? 'selected' : ''}>선택 안함</option>
-                    <option value="매입처" ${c.category === '매입처' ? 'selected' : ''}>매입처</option>
                     <option value="매출처" ${c.category === '매출처' ? 'selected' : ''}>매출처</option>
+                    <option value="매입처" ${c.category === '매입처' ? 'selected' : ''}>매입처</option>
+                    <option value="서비스(비용)" ${c.category === '서비스(비용)' ? 'selected' : ''}>서비스(비용)</option>
                 </select>
             </div>
         </div>
@@ -6213,7 +6216,8 @@ async function openClientDetail(id) {
 
     const esc = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
     const cat = c.category === '매입처' ? `<span class="badge badge-purple">매입처</span>`
-              : c.category === '매출처' ? `<span class="badge badge-blue">매출처</span>` : '';
+              : c.category === '매출처' ? `<span class="badge badge-blue">매출처</span>`
+              : c.category === '서비스(비용)' ? `<span class="badge" style="background:var(--teal-light);color:var(--teal)">서비스(비용)</span>` : '';
 
     // 연동된 일일계획표 (client 필드가 회사명과 일치)
     const linkedTasks = dailyTasks
