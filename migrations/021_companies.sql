@@ -13,7 +13,7 @@ insert into companies (id, name, plan, settings)
 values (1, 'KLP KOREA', 'internal', jsonb_build_object(
   'brandName', 'KLP KOREA',
   'logoUrl', null,
-  'primaryColor', '#1F85FF',
+  'primaryColor', null,  -- KLP는 기존 Toss 블루(--blue) 그대로 유지 (덮어쓰지 않음)
   'enabledModules', jsonb_build_array(
     'home','planning','projects','daily','meetings','delivery','marketing',
     'marketdb','cash','product-db','proposals','docs','manual','ceo-vision',

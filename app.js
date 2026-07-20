@@ -10,7 +10,8 @@ const SUPABASE_URL = 'https://vtulmuxkriklpiibiues.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let currentUser = null; // { id, name, role }
+let currentUser = null; // { id, name, role, companyId }
+let currentCompany = null; // { id, name, settings:{brandName,logoUrl,primaryColor,enabledModules[]} }
 
 // =====================================
 // 🚀 Stale-while-revalidate 캐시 (localStorage)
@@ -166,7 +167,7 @@ async function checkAuth() {
     // 2) profiles에서 최신 정보 가져옴 (auth_user_id로 매칭)
     const { data: prof, error: profErr } = await sb
         .from('profiles')
-        .select('id, name, role, email, auth_user_id')
+        .select('id, name, role, email, auth_user_id, company_id')
         .eq('auth_user_id', session.user.id)
         .single();
 
@@ -188,9 +189,11 @@ async function checkAuth() {
         role: prof.role,
         email: prof.email,
         authUserId: prof.auth_user_id,
+        companyId: prof.company_id || 1,
     };
     localStorage.setItem('klp_user', JSON.stringify(currentUser));
     updateSidebarUser();
+    await loadCompanyContext();
     showApp();
 }
 
@@ -214,6 +217,64 @@ function updateSidebarUser() {
     try { applyCashPermission(); } catch (e) {}
 }
 
+// ===== 멀티테넌트: 회사 컨텍스트 =====
+// 로그인/세션복원 두 경로 모두에서 호출. currentUser.companyId 기준으로 회사 설정 로드 후 브랜딩·메뉴 반영.
+async function loadCompanyContext() {
+    const cid = (currentUser && currentUser.companyId) || 1;
+    try {
+        const { data: comp } = await sb.from('companies').select('id, name, settings').eq('id', cid).single();
+        currentCompany = comp || { id: cid, name: 'KLP KOREA', settings: {} };
+    } catch (e) {
+        console.error('회사 설정 로드 실패, 기본값 사용', e);
+        currentCompany = { id: cid, name: 'KLP KOREA', settings: {} };
+    }
+    try { applyCompanyBranding(); } catch (e) { console.error(e); }
+    try { applyModuleGating(); } catch (e) { console.error(e); }
+}
+
+// 회사 브랜딩(회사명·로고·대표색) 적용. 설정이 비면 KLP 기본 유지.
+function applyCompanyBranding() {
+    const s = (currentCompany && currentCompany.settings) || {};
+    const brand = s.brandName || (currentCompany && currentCompany.name) || 'KLP KOREA';
+    document.querySelectorAll('[data-brand-name]').forEach(el => { el.textContent = brand; });
+    document.querySelectorAll('[data-brand-initial]').forEach(el => { el.textContent = (brand.trim()[0] || 'K').toUpperCase(); });
+    // 실제 강조색 변수는 --blue(Toss 블루). 회사 대표색이 지정된 경우에만 덮어씀(KLP는 null이라 그대로 유지).
+    if (s.primaryColor) {
+        const root = document.documentElement.style;
+        root.setProperty('--blue', s.primaryColor);
+        root.setProperty('--klp-brand', s.primaryColor);
+    }
+    const logo = document.getElementById('sidebarLogo');
+    if (logo && s.logoUrl && typeof isSafeUrl === 'function' && isSafeUrl(s.logoUrl)) logo.src = s.logoUrl;
+}
+
+// 회사가 켠 모듈만 사이드바에 노출. 설정 없으면(=KLP 기본) 전체 노출. 권한 기반 숨김과는 독립(모듈 꺼진 것만 추가로 숨김).
+function applyModuleGating() {
+    const s = (currentCompany && currentCompany.settings) || {};
+    const enabled = Array.isArray(s.enabledModules) ? s.enabledModules : null;
+    if (!enabled) return; // 설정 없으면 전체 노출
+    const tabModule = {
+        'planning':'planning','planning-company':'planning','planning-personal':'planning','planning-funding':'planning',
+        'projects-temp':'projects','projects-domestic':'projects','projects-overseas':'projects',
+        'daily':'daily','meetings':'meetings','delivery':'delivery','marketing':'marketing',
+        'marketdb':'marketdb','cash':'cash','product-db':'product-db','proposals':'proposals',
+        'docs':'docs','manual':'manual','ceo-vision':'ceo-vision','clients':'clients',
+        'clients-overseas':'clients-overseas','quotes':'quotes','margin-calc':'margin-calc','ad-studio':'ad-studio'
+    };
+    const ALWAYS = new Set(['home']);
+    document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
+        const tab = btn.getAttribute('data-tab');
+        if (ALWAYS.has(tab)) return;
+        const mod = tabModule[tab] || tab;
+        if (!enabled.includes(mod)) btn.style.display = 'none'; // 모듈 꺼진 것만 숨김(권한 숨김은 유지)
+    });
+    // 하위 항목이 전부 숨은 그룹은 헤더째 숨김
+    document.querySelectorAll('.nav-group').forEach(g => {
+        const items = g.querySelectorAll('.nav-item');
+        if (items.length && !Array.from(items).some(i => i.style.display !== 'none')) g.style.display = 'none';
+    });
+}
+
 async function handleLogin() {
     const name = document.getElementById('loginName').value.trim();
     // password는 trim 금지 — 비밀번호에 의도된 앞뒤 공백이 있을 수 있어 silent 변형 방지
@@ -233,7 +294,7 @@ async function handleLogin() {
     // 1) name → email 매핑 조회
     const { data: prof, error: profErr } = await sb
         .from('profiles')
-        .select('id, name, role, email, auth_user_id')
+        .select('id, name, role, email, auth_user_id, company_id')
         .eq('name', name)
         .single();
 
@@ -274,9 +335,11 @@ async function handleLogin() {
         role: prof.role,
         email: prof.email,
         authUserId: authData.user.id,
+        companyId: prof.company_id || 1,
     };
     localStorage.setItem('klp_user', JSON.stringify(currentUser));
     updateSidebarUser();
+    await loadCompanyContext();
     showApp();
 }
 
