@@ -404,7 +404,7 @@ async function showApp() {
 
     // 2) 백그라운드 fetch — 가장 느린 쿼리가 끝나면 한 번 더 renderAll로 최신화
     //    캐시 hit이면 사용자에겐 변화 없음, miss면 빈 화면에서 채워짐
-    const profilesP = sb.from('profiles').select('name, role').then(({ data }) => {
+    const profilesP = sb.from('profiles').select('name, role, company_id, sort_order, is_active').then(({ data }) => {
         if (data) { allProfiles = data; cacheWrite('profiles', data); }
     });
     await Promise.all([
@@ -1981,18 +1981,39 @@ const EXEC_USERS = ['이현주']; // 임원 계정: 전체 + 임원 + 본인
 // 기존 role 기반 호환용
 const ADMIN_ROLES = ['관리자', '부장', '대표'];
 const EXEC_ROLES = ['임원', '차장', '과장'];
-let allProfiles = []; // {name, role} - Supabase에서 로드
+let allProfiles = []; // {name, role, company_id, sort_order, is_active} - Supabase에서 로드
+
+// ===== 멀티테넌트: 회사별 담당자 목록 (KLP는 하드코딩 기본값으로 100% 불변) =====
+function _isKlpCompany() { return !currentCompany || currentCompany.id === 1; }
+function _companyProfiles() {
+    const cid = (currentUser && currentUser.companyId) || 1;
+    return (allProfiles || []).filter(p => ((p.company_id != null ? p.company_id : 1) === cid));
+}
+// 일일계획표 컬럼/필터에 쓰는 실무자 목록. KLP=기존 4명 고정, 신규 회사=자기 회사 전체 멤버.
+function companyPeople() {
+    if (_isKlpCompany()) return ['이현주', '김현호', '유지은', '구정두'];
+    return _companyProfiles()
+        .filter(p => p.is_active !== false)
+        .sort((a, b) => (a.sort_order ?? 100) - (b.sort_order ?? 100) || String(a.name).localeCompare(b.name))
+        .map(p => DISPLAY_NAME_MAP[p.name] || p.name);
+}
+// 담당자 드롭다운 목록. KLP=기존 7개 고정, 신규 회사='전체' + 멤버.
+function assigneeOptionList() {
+    if (_isKlpCompany()) return ['전체', '임원', '대표님', '이현주', '김현호', '유지은', '구정두'];
+    return ['전체'].concat(companyPeople());
+}
 
 function isAdminUser() {
-    return currentUser && ADMIN_USERS.includes(currentUser.name);
+    // 이름 기반(KLP) 또는 역할 기반(신규 회사) — KLP는 관리자들이 이미 이름으로 포함돼 변화 없음
+    return currentUser && (ADMIN_USERS.includes(currentUser.name) || ADMIN_ROLES.includes(currentUser.role));
 }
 
 function isExecUser() {
-    return currentUser && EXEC_USERS.includes(currentUser.name);
+    return currentUser && (EXEC_USERS.includes(currentUser.name) || EXEC_ROLES.includes(currentUser.role));
 }
 
 function getVisiblePeople() {
-    const allPeople = ['이현주', '김현호', '유지은', '구정두'];
+    const allPeople = companyPeople();
     if (!currentUser) return allPeople;
 
     if (isAdminUser()) return allPeople;
@@ -2003,7 +2024,7 @@ function getVisiblePeople() {
 }
 
 function getPeopleForFilter(filter) {
-    const allPeople = ['이현주', '김현호', '유지은', '구정두'];
+    const allPeople = companyPeople();
     if (filter === 'viewall') return getVisiblePeople();
     if (filter === 'ceo') return [];
     return allPeople.filter(p => p === filter);
@@ -2024,8 +2045,8 @@ function renderDailyPersonFilter() {
         html += `<button class="filter-chip ${currentPersonFilter === 'viewall' ? 'active' : ''}" data-person="viewall">전체보기</button>`;
     }
 
-    // 관리자만 대표님 탭 표시
-    if (admin) {
+    // 관리자만 대표님 탭 표시 (KLP 전용 개념 — 신규 회사엔 미표시)
+    if (admin && _isKlpCompany()) {
         html += `<button class="filter-chip ${currentPersonFilter === 'ceo' ? 'active' : ''}" data-person="ceo">대표님</button>`;
     }
 
@@ -2108,10 +2129,10 @@ function renderDaily() {
 
     // 전체 컬럼: 항상 표시
     const showCommonColumn = true;
-    // 임원 컬럼: 김현호, 대표님, 이현주에게만 표시. 유지은/구정두(일반)에게는 숨김
+    // 임원/대표님 컬럼은 KLP 전용 개념 — 신규 회사엔 미표시(멤버 컬럼만)
     const userName = currentUser ? currentUser.name : '';
-    const showExecColumn = ADMIN_USERS.includes(userName) || EXEC_USERS.includes(userName);
-    const showCeoColumn = (currentPersonFilter === 'ceo' || (currentPersonFilter === 'viewall' && admin));
+    const showExecColumn = _isKlpCompany() && (ADMIN_USERS.includes(userName) || EXEC_USERS.includes(userName));
+    const showCeoColumn = _isKlpCompany() && (currentPersonFilter === 'ceo' || (currentPersonFilter === 'viewall' && admin));
 
     const checkSvg = `<svg width="14" height="14" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>`;
 
@@ -2684,7 +2705,7 @@ function openCalendarAdd(person, dateStr) {
     const label = person === '전체' ? '전체 (공통)' : person;
     title.textContent = `새 할 일 — ${label} (${fmtDisplay(dateStr)})`;
 
-    const assigneeOptions = ['전체', '임원', '대표님', '이현주', '김현호', '유지은', '구정두'];
+    const assigneeOptions = assigneeOptionList();
     const assigneeHtml = assigneeOptions.map(a => `<option value="${a}" ${a === person ? 'selected' : ''}>${a === '전체' ? '전체 (공통)' : a}</option>`).join('');
 
     const labelOptions = ['개인', '회사 업무', '거래처 업무', '마케팅 업무'];
@@ -2717,7 +2738,7 @@ function openQuickTask(assignee) {
 
     // 담당자 기본값: 관리자급은 '전체', 나머지는 로그인 계정명
     const defaultAssignee = isAdminUser() ? '전체' : (currentUser ? currentUser.name : assignee);
-    const assigneeOptions = ['전체', '임원', '대표님', '이현주', '김현호', '유지은', '구정두'];
+    const assigneeOptions = assigneeOptionList();
     const assigneeHtml = assigneeOptions.map(a => `<option value="${a}" ${a === defaultAssignee ? 'selected' : ''}>${a === '전체' ? '전체 (공통)' : a}</option>`).join('');
 
     // 라벨 옵션
@@ -2816,7 +2837,7 @@ function openEditTask(id) {
     const body = document.getElementById('modalBody');
     title.textContent = '할 일 수정';
 
-    const assigneeOptions = ['전체', '임원', '대표님', '이현주', '김현호', '유지은', '구정두'];
+    const assigneeOptions = assigneeOptionList();
     const assigneeHtml = assigneeOptions.map(a => `<option value="${a}" ${a === t.assignee ? 'selected' : ''}>${a === '전체' ? '전체 (공통)' : a}</option>`).join('');
 
     const labelOptions = ['개인', '회사 업무', '거래처 업무', '마케팅 업무'];
@@ -4670,7 +4691,7 @@ function openModal(type) {
         title.textContent = '새 할 일';
         body.innerHTML = `
             <div class="form-group"><label class="form-label">할 일</label><input type="text" class="form-input" id="newTaskName" placeholder="할 일 입력"></div>
-            <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="newTaskAssignee"><option value="전체">전체 (공통)</option><option value="임원">임원</option><option value="대표님">대표님</option><option value="이현주">이현주</option><option value="김현호">김현호</option><option value="유지은">유지은</option><option value="구정두">구정두</option></select></div>
+            <div class="form-group"><label class="form-label">담당자</label><select class="form-select" id="newTaskAssignee">${assigneeOptionList().map(a => `<option value="${a}">${a === '전체' ? '전체 (공통)' : a}</option>`).join('')}</select></div>
             <div class="form-row">
                 <div class="form-group"><label class="form-label">날짜</label><input type="date" class="form-input" id="newTaskDate" value="${fmtDate(currentDate)}"></div>
                 <div class="form-group"><label class="form-label">마감일</label><input type="date" class="form-input" id="newTaskDeadline"></div>
@@ -8722,7 +8743,7 @@ function renderProposalEditor() {
     if (!editingProposal) return;
     const ep = editingProposal;
     const isNew = !ep.id;
-    const assignees = ['이현주', '김현호', '유지은', '구정두', '대표님'];
+    const assignees = _isKlpCompany() ? ['이현주', '김현호', '유지은', '구정두', '대표님'] : companyPeople();
     const view = document.getElementById('proposalEditorView');
 
     // 상품 아이템 행 렌더
@@ -11883,7 +11904,7 @@ const PLANNING_CATEGORIES_ACCESS = [
     { key: 'funding',  label: '펀딩', icon: '💸', bg: '#EDE9FE', fg: '#6D28D9', note: '관리자 3인 공유' },
     { key: 'family',   label: '가족', icon: '🏠', bg: '#FCE7F3', fg: '#BE185D', note: '모두 공유' }
 ];
-const PLANNING_ASSIGNEES = ['이현주', '김현호', '유지은', '구정두', '대표님'];
+function planningAssigneesList() { return _isKlpCompany() ? ['이현주', '김현호', '유지은', '구정두', '대표님'] : companyPeople(); }
 const PLANNING_ALLOWED = ['김관택', '이현주', '김현호']; // loginName 기준 (김관택 = 대표님) — 회사 프로젝트 / 가족 프로젝트 열람 권한
 
 function planningIsAdmin() {
@@ -13021,7 +13042,7 @@ function togglePlanningAssignee(name) {
     if (wrap) wrap.innerHTML = renderPlanningAssigneeChips();
 }
 function renderPlanningAssigneeChips() {
-    return PLANNING_ASSIGNEES.map(n => {
+    return planningAssigneesList().map(n => {
         const active = planningPendingAssignees.includes(n);
         return `<button type="button" onclick="togglePlanningAssignee('${planningEsc(n)}')" style="padding:6px 12px;border:1px solid ${active ? 'var(--blue)' : 'var(--gray-200)'};background:${active ? 'var(--blue-light)' : 'var(--white)'};color:${active ? 'var(--blue)' : 'var(--gray-600,#4B5563)'};border-radius:20px;font-size:12px;font-weight:700;cursor:pointer">${active ? '✓ ' : ''}${planningEsc(n)}</button>`;
     }).join('');
@@ -17333,8 +17354,8 @@ async function adOpenCampaign(id) {
 }
 
 // ===== 회의록 =====================================================
-const MEETING_ASSIGNEES = ['전체', '임원', '대표님', '이현주', '김현호', '유지은', '구정두'];
-const MEETING_STAFF = ['대표님', '이현주', '김현호', '유지은', '구정두'];
+// 회의록 담당자/참석자 목록 — KLP는 기존 고정, 신규 회사는 자기 멤버
+function meetingStaffList() { return _isKlpCompany() ? ['대표님', '이현주', '김현호', '유지은', '구정두'] : companyPeople(); }
 const MEETING_STATUSES = ['작성중', '공유됨', '완료'];
 
 let _meetings = [];            // 목록에 그릴 회의 배열 (DB row 그대로)
@@ -17402,7 +17423,7 @@ function _meetingCanEdit() {
 function _syncMeetingAllBtn() {
     const btn = document.getElementById('meetingAttAll');
     if (!btn || !_meetingDraft) return;
-    const everyone = MEETING_STAFF.every(n => _meetingDraft.attendees.includes(n));
+    const everyone = meetingStaffList().every(n => _meetingDraft.attendees.includes(n));
     btn.classList.toggle('on', everyone);
     btn.textContent = everyone ? '전원 해제' : '전원 선택';
 }
@@ -17603,10 +17624,10 @@ function renderMeetingEditor() {
     if (!box || !_meetingDraft) return;
     const m = _meetingDraft;
 
-    const allOn = MEETING_STAFF.every(n => m.attendees.includes(n));
+    const allOn = meetingStaffList().every(n => m.attendees.includes(n));
     const attendeeChips =
       `<button type="button" class="meeting-chip meeting-chip-all${allOn ? ' on' : ''}" id="meetingAttAll">${allOn ? '전원 해제' : '전원 선택'}</button>` +
-      MEETING_STAFF.map(n => `
+      meetingStaffList().map(n => `
       <label class="meeting-chip${m.attendees.includes(n) ? ' on' : ''}">
         <input type="checkbox" data-att="${escHtml(n)}" ${m.attendees.includes(n) ? 'checked' : ''} hidden>${escHtml(n)}
       </label>`).join('');
@@ -17728,7 +17749,7 @@ function _bindMeetingEditor() {
             const on = cb.checked;
             const set = new Set(_meetingDraft.attendees);
             if (on) set.add(n); else set.delete(n);
-            _meetingDraft.attendees = MEETING_STAFF.filter(x => set.has(x));
+            _meetingDraft.attendees = meetingStaffList().filter(x => set.has(x));
             cb.parentElement.classList.toggle('on', on);
             _syncMeetingAllBtn();
         });
@@ -17744,8 +17765,8 @@ function _bindMeetingEditor() {
 
     const allBtn = document.getElementById('meetingAttAll');
     if (allBtn) allBtn.addEventListener('click', () => {
-        const everyone = MEETING_STAFF.every(n => _meetingDraft.attendees.includes(n));
-        _meetingDraft.attendees = everyone ? [] : MEETING_STAFF.slice();
+        const everyone = meetingStaffList().every(n => _meetingDraft.attendees.includes(n));
+        _meetingDraft.attendees = everyone ? [] : meetingStaffList().slice();
         document.querySelectorAll('#meetingAttendees input[data-att]').forEach(cb => {
             cb.checked = !everyone;
             cb.parentElement.classList.toggle('on', !everyone);
@@ -18057,7 +18078,7 @@ function renderMeetingActions() {
               <td><input type="text" data-act-task="${i}" value="${escHtml(a.task)}" ${locked ? 'disabled' : ''}></td>
               <td><select data-act-assignee="${i}" ${locked ? 'disabled' : ''}>
                 <option value="">선택</option>
-                ${MEETING_ASSIGNEES.map(n => `<option${n === a.assignee ? ' selected' : ''}>${n}</option>`).join('')}
+                ${assigneeOptionList().map(n => `<option${n === a.assignee ? ' selected' : ''}>${n}</option>`).join('')}
               </select></td>
               <td><input type="date" data-act-due="${i}" value="${escHtml(a.dueDate)}" ${locked ? 'disabled' : ''}></td>
               <td>${state}</td>
@@ -18439,7 +18460,7 @@ async function renderMeetingReviewPanel() {
     const statusOf = (a) => isDone(a) ? 'done' : (liveTask(a) ? 'todo' : 'unsent');
     const byAssignee = {};
     (acts || []).forEach(a => { const k = a.assignee || '(미지정)'; (byAssignee[k] = byAssignee[k] || []).push(a); });
-    const cols = MEETING_ASSIGNEES.concat(['(미지정)']).filter(k => byAssignee[k] && byAssignee[k].length);
+    const cols = assigneeOptionList().concat(['(미지정)']).filter(k => byAssignee[k] && byAssignee[k].length);
 
     if (!cols.length && !agenda.length) {
         box.innerHTML = '<div style="color:var(--gray-500);font-size:13px;padding:8px 0">이 회의엔 점검할 액션아이템·안건이 없습니다.</div>';
