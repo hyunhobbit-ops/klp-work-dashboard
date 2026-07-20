@@ -18370,8 +18370,10 @@ async function renderMeetingReviewPanel() {
     if (!document.getElementById('meetingReviewBox') || _meetingReviewId !== rid) return;
     const agenda = _normMeetingAgenda(mrow && mrow.agenda);
 
-    const isDone = (a) => a.daily_task_id ? !!doneMap[a.daily_task_id] : !!a.done;
-    const statusOf = (a) => isDone(a) ? 'done' : (a.daily_task_id ? 'todo' : 'unsent');
+    // daily_task_id가 있어도 연결된 일일계획표 항목이 삭제됐으면(doneMap에 없음) 미전송처럼 취급 → meeting_actions.done 사용
+    const liveTask = (a) => a.daily_task_id != null && Object.prototype.hasOwnProperty.call(doneMap, a.daily_task_id);
+    const isDone = (a) => liveTask(a) ? !!doneMap[a.daily_task_id] : !!a.done;
+    const statusOf = (a) => isDone(a) ? 'done' : (liveTask(a) ? 'todo' : 'unsent');
     const byAssignee = {};
     (acts || []).forEach(a => { const k = a.assignee || '(미지정)'; (byAssignee[k] = byAssignee[k] || []).push(a); });
     const cols = MEETING_ASSIGNEES.concat(['(미지정)']).filter(k => byAssignee[k] && byAssignee[k].length);
@@ -18441,15 +18443,23 @@ async function toggleReviewDone(kind, ident, done, cb, rid) {
     try {
         if (kind === 'act') {
             const id = Number(ident);
+            // meeting_actions.done 로 완료 저장 (권한 없어 0건이면 false)
+            const writeActionDone = async () => {
+                const { data: u, error } = await sb.from('meeting_actions').update({ done }).eq('id', id).select('id');
+                if (error) throw error;
+                return !!(u && u.length);
+            };
             // 이 액션아이템이 전송됐는지(daily_task_id) 확인
             const { data: a } = await sb.from('meeting_actions').select('daily_task_id').eq('id', id).single();
             if (a && a.daily_task_id) {
-                const { error } = await sb.from('daily_tasks').update({ done, completed_at: nowIso }).eq('id', a.daily_task_id);
+                const { data: upd, error } = await sb.from('daily_tasks').update({ done, completed_at: nowIso }).eq('id', a.daily_task_id).select('id');
                 if (error) throw error;
+                // 연결된 일일계획표 항목이 삭제됐으면 0건 → meeting_actions.done 로 대체 저장
+                if (!upd || !upd.length) {
+                    if (!(await writeActionDone())) { showToast('처리 권한이 없습니다 (작성자·관리자만)'); cb.checked = !done; cb.disabled = false; return; }
+                }
             } else {
-                const { data: upd, error } = await sb.from('meeting_actions').update({ done }).eq('id', id).select('id');
-                if (error) throw error;
-                if (!upd || !upd.length) { showToast('처리 권한이 없습니다 (작성자·관리자만)'); cb.checked = !done; cb.disabled = false; return; }
+                if (!(await writeActionDone())) { showToast('처리 권한이 없습니다 (작성자·관리자만)'); cb.checked = !done; cb.disabled = false; return; }
             }
         } else { // agenda
             const idx = Number(ident);
