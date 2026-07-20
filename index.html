@@ -293,6 +293,15 @@
                     <!-- 사용자 추가 카테고리 (동적 렌더) -->
                     <div id="customUrlCategories"></div>
                 </div>
+
+                <!-- 운영자(슈퍼관리자) 전용 -->
+                <div class="nav-group" id="navAdminGroup" style="display:none">
+                    <div class="nav-group-label">운영</div>
+                    <button class="nav-item" data-tab="admin-companies" id="navAdminCompanies" data-tip="새 회사 + 관리자 계정 생성 (운영자 전용)" style="display:none">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9v.01M9 12v.01M9 15v.01M9 18v.01"/></svg>
+                        <span>회사 관리</span>
+                    </button>
+                </div>
             </nav>
             <div class="sidebar-footer">
                 <button id="pushToggleBtn" onclick="enablePushNotifications()" title="이 기기로 업무 알림 받기" style="display:none;width:100%;align-items:center;gap:8px;padding:9px 12px;margin-bottom:10px;border:1px solid var(--border,#e5e7eb);border-radius:10px;background:transparent;color:var(--text-secondary,#4b5563);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">🔔 <span id="pushToggleLabel">알림 켜기</span></button>
@@ -326,6 +335,25 @@
                     <span class="topbar-date" id="topbarDate"></span>
                 </div>
             </header>
+
+            <!-- ===== 회사 관리 (운영자 전용) ===== -->
+            <main class="content" id="tab-admin-companies">
+                <div style="max-width:640px">
+                    <h2 style="font-size:20px;font-weight:800;margin:0 0 6px">회사 관리 (운영자 전용)</h2>
+                    <p style="color:var(--gray-500);font-size:13px;margin:0 0 20px">새 회사와 첫 관리자 계정을 만들어 넘겨줍니다. 생성 후 나오는 임시 비밀번호를 회사에 전달하세요.</p>
+                    <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+                        <div class="form-group"><label class="form-label">회사명</label><input type="text" class="form-input" id="acCompanyName" placeholder="예) (주)하나상사"></div>
+                        <div class="form-group"><label class="form-label">관리자 이름</label><input type="text" class="form-input" id="acAdminName" placeholder="예) 홍길동"></div>
+                        <div class="form-group"><label class="form-label">관리자 이메일 (로그인 계정)</label><input type="email" class="form-input" id="acAdminEmail" placeholder="예) admin@hana.co.kr"></div>
+                        <div class="form-group">
+                            <label class="form-label">사용할 메뉴</label>
+                            <div id="acModules" style="display:flex;flex-wrap:wrap;gap:10px 16px;font-size:14px"></div>
+                        </div>
+                        <button class="btn btn-primary" id="acCreateBtn" onclick="createCompany()" style="align-self:flex-start">회사 생성</button>
+                        <div id="acResult" style="display:none;padding:14px;border-radius:10px;background:var(--blue-light);font-size:14px;line-height:1.6"></div>
+                    </div>
+                </div>
+            </main>
 
             <!-- ===== HOME ===== -->
             <main class="content active" id="tab-home">
@@ -1624,6 +1652,6 @@
       <div id="marketGalleryDots" style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:8px"></div>
     </div>
     <script src="klp-assets.js"></script>
-    <script src="app.js?v=20260703z2"></script>
+    <script src="app.js?v=20260703z3"></script>
 </body>
 </html>

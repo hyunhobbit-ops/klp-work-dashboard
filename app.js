@@ -167,7 +167,7 @@ async function checkAuth() {
     // 2) profiles에서 최신 정보 가져옴 (auth_user_id로 매칭)
     const { data: prof, error: profErr } = await sb
         .from('profiles')
-        .select('id, name, role, email, auth_user_id, company_id')
+        .select('id, name, role, email, auth_user_id, company_id, is_superadmin')
         .eq('auth_user_id', session.user.id)
         .single();
 
@@ -190,6 +190,7 @@ async function checkAuth() {
         email: prof.email,
         authUserId: prof.auth_user_id,
         companyId: prof.company_id || 1,
+        isSuperadmin: prof.is_superadmin === true,
     };
     localStorage.setItem('klp_user', JSON.stringify(currentUser));
     updateSidebarUser();
@@ -215,6 +216,86 @@ function updateSidebarUser() {
     try { applyPlanningPermission(); } catch (e) {}
     try { applyDeliveryPricePermission(); } catch (e) {}
     try { applyCashPermission(); } catch (e) {}
+    try { applySuperadminNav(); } catch (e) {}
+}
+
+// 슈퍼관리자(운영자)에게만 '회사 관리' 메뉴 노출
+function applySuperadminNav() {
+    const show = !!(currentUser && currentUser.isSuperadmin);
+    const nav = document.getElementById('navAdminCompanies');
+    const grp = document.getElementById('navAdminGroup');
+    if (nav) nav.style.display = show ? '' : 'none';
+    if (grp) grp.style.display = show ? '' : 'none';
+}
+
+// 회사 관리 화면 — 사용할 메뉴 체크박스 렌더 (핵심 4개 기본 체크)
+const AC_MODULE_OPTIONS = [
+    { key: 'daily', label: '일일계획표', core: true },
+    { key: 'meetings', label: '회의록', core: true },
+    { key: 'clients', label: '거래처', core: true },
+    { key: 'projects', label: '프로젝트', core: true },
+    { key: 'proposals', label: '제안서' },
+    { key: 'product-db', label: '상품 DB' },
+    { key: 'quotes', label: '견적서' },
+    { key: 'margin-calc', label: '마진계산기' },
+    { key: 'marketing', label: '마케팅' },
+    { key: 'clients-overseas', label: '해외 거래처' },
+];
+function renderAdminCompanies() {
+    const box = document.getElementById('acModules');
+    if (!box) return;
+    box.innerHTML = AC_MODULE_OPTIONS.map(m =>
+        `<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" class="ac-mod" value="${m.key}" ${m.core ? 'checked' : ''} style="width:16px;height:16px">${m.label}
+        </label>`).join('');
+    const r = document.getElementById('acResult');
+    if (r) { r.style.display = 'none'; r.innerHTML = ''; }
+}
+
+async function createCompany() {
+    const btn = document.getElementById('acCreateBtn');
+    const result = document.getElementById('acResult');
+    const companyName = document.getElementById('acCompanyName').value.trim();
+    const adminName = document.getElementById('acAdminName').value.trim();
+    const adminEmail = document.getElementById('acAdminEmail').value.trim();
+    if (!companyName || !adminName || !adminEmail) { showToast('회사명·관리자 이름·이메일을 모두 입력하세요'); return; }
+    const modules = ['home'].concat(Array.from(document.querySelectorAll('.ac-mod:checked')).map(c => c.value));
+
+    btn.disabled = true; const old = btn.textContent; btn.textContent = '생성 중...';
+    try {
+        const { data: sess } = await sb.auth.getSession();
+        const token = sess && sess.session && sess.session.access_token;
+        if (!token) { showToast('세션이 만료됐습니다. 다시 로그인하세요'); btn.disabled = false; btn.textContent = old; return; }
+        const res = await fetch('/api/admin-create-company', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ companyName, adminName, adminEmail, enabledModules: modules }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+            result.style.display = 'block';
+            result.style.background = 'var(--red-light)';
+            result.innerHTML = `❌ 생성 실패: ${escHtml(data.error || ('오류 ' + res.status))}`;
+            btn.disabled = false; btn.textContent = old; return;
+        }
+        result.style.display = 'block';
+        result.style.background = 'var(--blue-light)';
+        result.innerHTML = `✅ <b>${escHtml(companyName)}</b> 생성 완료!<br><br>
+            아래 정보를 회사에 전달하세요 (첫 로그인 후 비밀번호 변경 안내):<br>
+            • 로그인 이메일: <b>${escHtml(adminEmail)}</b><br>
+            • 임시 비밀번호: <b style="user-select:all">${escHtml(data.tempPassword)}</b><br>
+            • 회사 번호: ${escHtml(String(data.companyId))}`;
+        document.getElementById('acCompanyName').value = '';
+        document.getElementById('acAdminName').value = '';
+        document.getElementById('acAdminEmail').value = '';
+        btn.disabled = false; btn.textContent = old;
+    } catch (e) {
+        console.error('createCompany error', e);
+        result.style.display = 'block';
+        result.style.background = 'var(--red-light)';
+        result.innerHTML = '❌ 네트워크 오류: ' + escHtml((e && e.message) || String(e));
+        btn.disabled = false; btn.textContent = old;
+    }
 }
 
 // ===== 멀티테넌트: 회사 컨텍스트 =====
@@ -230,6 +311,7 @@ async function loadCompanyContext() {
     }
     try { applyCompanyBranding(); } catch (e) { console.error(e); }
     try { applyModuleGating(); } catch (e) { console.error(e); }
+    try { applySuperadminNav(); } catch (e) { console.error(e); } // 게이팅 이후 재적용(그룹 숨김 방지)
 }
 
 // 회사 브랜딩(회사명·로고·대표색) 적용. 설정이 비면 KLP 기본 유지.
@@ -261,7 +343,7 @@ function applyModuleGating() {
         'docs':'docs','manual':'manual','ceo-vision':'ceo-vision','clients':'clients',
         'clients-overseas':'clients-overseas','quotes':'quotes','margin-calc':'margin-calc','ad-studio':'ad-studio'
     };
-    const ALWAYS = new Set(['home']);
+    const ALWAYS = new Set(['home', 'admin-companies']); // admin-companies는 슈퍼관리자 로직이 별도 제어
     document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
         const tab = btn.getAttribute('data-tab');
         if (ALWAYS.has(tab)) return;
@@ -294,7 +376,7 @@ async function handleLogin() {
     // 1) name → email 매핑 조회
     const { data: prof, error: profErr } = await sb
         .from('profiles')
-        .select('id, name, role, email, auth_user_id, company_id')
+        .select('id, name, role, email, auth_user_id, company_id, is_superadmin')
         .eq('name', name)
         .single();
 
@@ -336,6 +418,7 @@ async function handleLogin() {
         email: prof.email,
         authUserId: authData.user.id,
         companyId: prof.company_id || 1,
+        isSuperadmin: prof.is_superadmin === true,
     };
     localStorage.setItem('klp_user', JSON.stringify(currentUser));
     updateSidebarUser();
@@ -527,6 +610,7 @@ let currentDeliveryMonth = String(new Date().getMonth() + 1).padStart(2, '0');
 // ===== Page Titles =====
 const pageTitles = {
     home: '홈',
+    'admin-companies': '회사 관리',
     planning: '프로젝트',
     'projects-temp': '매입매출 — 견적 의뢰',
     'projects-domestic': '매입매출 — 국내',
@@ -1130,6 +1214,9 @@ function switchTab(tabId, fromHistory = false) {
 
     // Update page title
     document.getElementById('pageTitle').textContent = pageTitles[tabId] || '';
+
+    // 회사 관리(운영자) 탭 진입 시 폼 렌더
+    if (tabId === 'admin-companies') { try { renderAdminCompanies(); } catch (e) { console.error(e); } }
 
     // Close mobile sidebar
     document.getElementById('sidebar').classList.remove('open');
