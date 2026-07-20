@@ -70,6 +70,21 @@
 - `doc-generator.html`은 SDK가 아닌 hand-rolled `sbFetch` 사용 — bootstrapAuthSession에서 access_token 추출 후 Bearer 자동 첨부 (RLS 잠금 대응). `sbFetch`는 `res.ok` 체크 + 에러 throw 패턴 (Phase 3 #11).
 - **페이지네이션**: 큰 테이블 로드는 `paginatedLoad(table, options)` 헬퍼 사용 — 첫 N개만 로드 + `renderLoadMoreButton`으로 "남은 X건 더 보기" UI. 새 list view 추가 시 동일 패턴 따를 것 (Phase 3 #10). 단, kanban/relational 묶음 화면(daily_tasks, planning_*)은 cap 내에서 auto-loop 패턴 사용.
 
+## 멀티테넌트 (SaaS) — 2026-07-20 기반 공사 (migrations 021~026)
+- **목적**: KLP 전용 앱 → 여러 회사가 회사별 칸막이 안에서 쓰는 판매 제품. KLP = `company_id = 1`.
+- **회사 테이블** `companies`: id, name, plan, active, `settings` jsonb(`brandName`, `logoUrl`, `primaryColor`, `enabledModules[]`).
+- **테넌트 격리**: 모든 테넌트 테이블(24개)에 `company_id` 컬럼(NOT NULL). RLS = `company_id = current_company_id()`.
+  - `current_company_id()`: security definer, `auth.uid()` → profiles.company_id. (`current_profile_name/role`과 동일 패턴)
+  - `set_company_id()`: BEFORE INSERT 트리거 — company_id 미지정 시 자동 기입(profiles 제외). **앱 insert 코드는 company_id를 보낼 필요 없음.**
+  - meetings/meeting_actions는 기존 비공개 규칙 + 회사 경계 AND. profiles는 익명 로그인 매핑(`profiles_anon_login_lookup`) 유지 + authenticated는 회사 스코프.
+  - **KLP 안전성**: 모든 KLP 행·유저가 company_id=1이라 조건이 항상 참 → 기존과 동일 동작. 롤백: `migrations/025_tenant_rls_rollback.sql`.
+- **직원·담당자는 데이터**: 하드코딩 이름 제거. `companyPeople()`/`assigneeOptionList()`/`meetingStaffList()`/`planningAssigneesList()` 접근자가 KLP면 기존 고정값, 아니면 회사 profiles 기반. `isAdminUser/isExecUser`는 이름(KLP) + 역할 fallback(신규 회사). 임원/대표님 특수 컬럼은 `_isKlpCompany()` 게이팅.
+- **브랜딩·모듈**: 로그인 시 `loadCompanyContext()` → `applyCompanyBranding()`(회사명·`--blue`/`--klp-brand` 색) + `applyModuleGating()`(enabledModules 없는 사이드바 항목 숨김, `data-tab`→모듈키). KLP settings.primaryColor=null이라 색 불변.
+- **온보딩(수동)**: `profiles.is_superadmin`(김현호=true)만 "회사 관리" 탭(`tab-admin-companies`). `api/admin-create-company.js`(service role, 의존성 0)가 요청자 슈퍼관리자 검증 → 회사+관리자Auth계정+프로필 생성 → 임시비번 반환. **Vercel 환경변수 `SUPABASE_SERVICE_ROLE_KEY` 필수.**
+- **로그인**: 여전히 이름 기반(name→email 매핑). ⚠️ 한계 — 회사 간 동명이인이면 `.eq('name').single()` 충돌. 향후 이메일 로그인 전환 필요(2단계).
+- **범위 밖(다음 단계)**: 셀프 회원가입+자동 결제, 업종별 모듈팩(택배·문서생성 등), 랜딩. 설계·계획: `docs/superpowers/{specs,plans}/2026-07-20-multitenant-saas-*`.
+- **새 테넌트 테이블 추가 시**: `company_id bigint references companies(id) not null` + `set_company_id` 트리거 + 회사 스코프 RLS 필수.
+
 ## 프로젝트 진행사항 (국내)
 - **매출/매입 통합 단일 행**: 매출처 정보 + 매입처 상세(작업요청서용)를 한 프로젝트 행에 함께 저장
 - 신규/편집 모달에서 매입처명 입력 시 주황색 🏭 매입처 상세 카드가 펼쳐짐 (매입 단가·VAT·인쇄비·포장비)
