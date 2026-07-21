@@ -358,14 +358,14 @@ function applyModuleGating() {
 }
 
 async function handleLogin() {
-    const name = document.getElementById('loginName').value.trim();
+    const input = document.getElementById('loginName').value.trim();
     // password는 trim 금지 — 비밀번호에 의도된 앞뒤 공백이 있을 수 있어 silent 변형 방지
     const password = document.getElementById('loginPassword').value;
     const errorEl = document.getElementById('loginError');
     const btn = document.getElementById('loginBtn');
 
-    if (!name || !password) {
-        errorEl.textContent = '이름과 비밀번호를 입력해주세요';
+    if (!input || !password) {
+        errorEl.textContent = '이름(또는 이메일)과 비밀번호를 입력해주세요';
         return;
     }
 
@@ -373,31 +373,40 @@ async function handleLogin() {
     btn.textContent = '로그인 중...';
     errorEl.textContent = '';
 
-    // 1) name → email 매핑 조회
-    const { data: prof, error: profErr } = await sb
-        .from('profiles')
-        .select('id, name, role, email, auth_user_id, company_id, is_superadmin')
-        .eq('name', name)
-        .single();
+    // '@' 있으면 이메일 로그인(신규 회사), 없으면 이름 로그인(KLP 레거시: name→email 매핑)
+    const isEmail = input.includes('@');
+    let prof = null;
+    let loginEmail = null;
 
-    if (profErr || !prof || !prof.email) {
-        console.error('Login profile lookup error:', profErr);
-        errorEl.textContent = '등록되지 않은 이름입니다';
-        btn.disabled = false;
-        btn.textContent = '로그인';
-        return;
+    if (isEmail) {
+        loginEmail = input; // 프로필은 로그인 성공 후 auth_user_id로 조회
+    } else {
+        const { data: p, error: profErr } = await sb
+            .from('profiles')
+            .select('id, name, role, email, auth_user_id, company_id, is_superadmin')
+            .eq('name', input)
+            .single();
+        if (profErr || !p || !p.email) {
+            console.error('Login profile lookup error:', profErr);
+            errorEl.textContent = '등록되지 않은 이름입니다';
+            btn.disabled = false;
+            btn.textContent = '로그인';
+            return;
+        }
+        prof = p;
+        loginEmail = p.email;
     }
 
-    // 2) Supabase Auth 정식 로그인
+    // Supabase Auth 정식 로그인
     const { data: authData, error: authErr } = await sb.auth.signInWithPassword({
-        email: prof.email,
+        email: loginEmail,
         password: password,
     });
 
     if (authErr) {
         console.error('Auth signIn error:', authErr);
         if (authErr.message && authErr.message.toLowerCase().includes('invalid login credentials')) {
-            errorEl.textContent = '비밀번호가 올바르지 않습니다';
+            errorEl.textContent = isEmail ? '이메일 또는 비밀번호가 올바르지 않습니다' : '비밀번호가 올바르지 않습니다';
         } else if (authErr.message && authErr.message.toLowerCase().includes('email not confirmed')) {
             errorEl.textContent = '계정이 활성화되지 않았습니다 (관리자 문의)';
         } else {
@@ -408,7 +417,25 @@ async function handleLogin() {
         return;
     }
 
-    // 3) currentUser 구성 (기존 구조 호환)
+    // 이메일 로그인이면 프로필을 auth_user_id로 조회 (인증 후 = 회사 스코프 RLS 적용)
+    if (!prof) {
+        const { data: p2, error: e2 } = await sb
+            .from('profiles')
+            .select('id, name, role, email, auth_user_id, company_id, is_superadmin')
+            .eq('auth_user_id', authData.user.id)
+            .single();
+        if (e2 || !p2) {
+            console.error('로그인 후 프로필 조회 실패:', e2);
+            errorEl.textContent = '계정에 연결된 프로필이 없습니다 (관리자 문의)';
+            await sb.auth.signOut();
+            btn.disabled = false;
+            btn.textContent = '로그인';
+            return;
+        }
+        prof = p2;
+    }
+
+    // currentUser 구성 (기존 구조 호환)
     const displayName = DISPLAY_NAME_MAP[prof.name] || prof.name;
     currentUser = {
         id: prof.id,
@@ -4838,7 +4865,19 @@ function openModal(type) {
             <div class="form-group delivery-price-col" id="newDelPriceGroup" style="display:none"><label class="form-label">판매가</label><input type="number" class="form-input" id="newDelPrice" placeholder="0"></div>
             <div class="form-row" style="grid-template-columns:140px 1fr">
                 <div class="form-group"><label class="form-label">품목</label><input type="text" class="form-input" id="newDelProduct" placeholder="품목"></div>
-                <div class="form-group"><label class="form-label">배송메모</label><input type="text" class="form-input" id="newDelMemo" placeholder="배송메모"></div>
+                <div class="form-group"><label class="form-label">배송메모</label>
+                    <select class="form-select" id="newDelMemo">
+                        <option value="">선택 안 함</option>
+                        <option value="빠른 배송 부탁드립니다.">빠른 배송 부탁드립니다.</option>
+                        <option value="파손주의 상품이니 취급주의 부탁드립니다.">파손주의 상품이니 취급주의 부탁드립니다.</option>
+                        <option value="부재 시 문 앞에 놓아주세요.">부재 시 문 앞에 놓아주세요.</option>
+                        <option value="부재 시 경비실에 맡겨주세요.">부재 시 경비실에 맡겨주세요.</option>
+                        <option value="배송 전 연락 부탁드립니다.">배송 전 연락 부탁드립니다.</option>
+                        <option value="안전하게 포장하여 배송 부탁드립니다.">안전하게 포장하여 배송 부탁드립니다.</option>
+                        <option value="__custom">기타 (직접 작성)</option>
+                    </select>
+                    <input type="text" class="form-input" id="newDelMemoCustom" placeholder="배송메모를 직접 입력하세요" style="display:none;margin-top:6px">
+                </div>
             </div>
             <button class="form-submit" onclick="addDelivery()">택배 추가</button>`;
         // 연락처 자동 하이픈
@@ -4860,6 +4899,17 @@ function openModal(type) {
         // 발송인 변경: 기타 토글
         document.getElementById('newDelSender').addEventListener('change', function() {
             const custom = document.getElementById('newDelSenderCustom');
+            if (this.value === '__custom') {
+                custom.style.display = 'block';
+                custom.focus();
+            } else {
+                custom.style.display = 'none';
+                custom.value = '';
+            }
+        });
+        // 배송메모 변경: 기타(직접 작성) 토글
+        document.getElementById('newDelMemo').addEventListener('change', function() {
+            const custom = document.getElementById('newDelMemoCustom');
             if (this.value === '__custom') {
                 custom.style.display = 'block';
                 custom.focus();
@@ -7492,6 +7542,9 @@ async function addDelivery() {
     const senderSelect = document.getElementById('newDelSender').value;
     const senderCustom = document.getElementById('newDelSenderCustom').value.trim();
     const sender = senderSelect === '__custom' ? (senderCustom || '기타') : senderSelect;
+    const memoSelect = document.getElementById('newDelMemo').value;
+    const memoCustom = document.getElementById('newDelMemoCustom').value.trim();
+    const memo = memoSelect === '__custom' ? memoCustom : memoSelect;
     const saved = await dbInsertDelivery({
         recipient,
         date: document.getElementById('newDelDate').value || fmtDate(new Date()),
@@ -7503,7 +7556,7 @@ async function addDelivery() {
         payment: document.getElementById('newDelPayment').value,
         product: document.getElementById('newDelProduct').value.trim(),
         tracking: "",
-        memo: document.getElementById('newDelMemo').value.trim(),
+        memo,
         price: parseInt(document.getElementById('newDelPrice').value) || 0,
         rating: "", seller: "1",
         author: currentUser ? currentUser.name : '-'
