@@ -81,6 +81,7 @@ module.exports = async (req, res) => {
             body: JSON.stringify({
                 name, role: newRole, email, auth_user_id: newAuthId,
                 company_id: companyId, is_superadmin: false, sort_order: 100, is_active: true,
+                must_change_password: true,
             }),
         });
         if (!profRes.ok) {

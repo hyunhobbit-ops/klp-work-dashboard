@@ -167,7 +167,7 @@ async function checkAuth() {
     // 2) profiles에서 최신 정보 가져옴 (auth_user_id로 매칭)
     const { data: prof, error: profErr } = await sb
         .from('profiles')
-        .select('id, name, role, email, auth_user_id, company_id, is_superadmin')
+        .select('id, name, role, email, auth_user_id, company_id, is_superadmin, must_change_password')
         .eq('auth_user_id', session.user.id)
         .single();
 
@@ -191,11 +191,13 @@ async function checkAuth() {
         authUserId: prof.auth_user_id,
         companyId: prof.company_id || 1,
         isSuperadmin: prof.is_superadmin === true,
+        mustChangePassword: prof.must_change_password === true,
     };
     localStorage.setItem('klp_user', JSON.stringify(currentUser));
     updateSidebarUser();
     await loadCompanyContext();
     showApp();
+    maybePromptPasswordChange();
 }
 
 const DELIVERY_PRICE_ALLOWED = ['김관택','이현주','김현호'];
@@ -227,6 +229,58 @@ function applySuperadminNav() {
     const grp = document.getElementById('navAdminGroup');
     if (nav) nav.style.display = show ? '' : 'none';
     if (grp) grp.style.display = show ? '' : 'none';
+}
+
+// ===== 비밀번호 변경 =====
+let _pwMandatory = false;
+// 로그인 직후: 임시 비밀번호 계정이면 강제 변경 모달
+function maybePromptPasswordChange() {
+    if (currentUser && currentUser.mustChangePassword) openPasswordChangeModal(true);
+}
+function openPasswordChangeModal(mandatory) {
+    _pwMandatory = !!mandatory;
+    const ov = document.getElementById('pwChangeOverlay');
+    if (!ov) return;
+    document.getElementById('pwNew').value = '';
+    document.getElementById('pwConfirm').value = '';
+    document.getElementById('pwError').textContent = '';
+    document.getElementById('pwModalTitle').textContent = mandatory ? '비밀번호를 변경해주세요' : '비밀번호 변경';
+    document.getElementById('pwModalDesc').textContent = mandatory
+        ? '보안을 위해 임시 비밀번호를 새 비밀번호로 바꿔야 계속 이용할 수 있습니다.'
+        : '새 비밀번호를 입력하세요.';
+    document.getElementById('pwCancelBtn').style.display = mandatory ? 'none' : '';
+    ov.style.display = 'flex';
+}
+function closePasswordModal() {
+    if (_pwMandatory) return; // 강제 모드에선 닫기 불가
+    const ov = document.getElementById('pwChangeOverlay');
+    if (ov) ov.style.display = 'none';
+}
+async function submitPasswordChange() {
+    const npw = document.getElementById('pwNew').value;
+    const cpw = document.getElementById('pwConfirm').value;
+    const err = document.getElementById('pwError');
+    const btn = document.getElementById('pwSubmitBtn');
+    if (!npw || npw.length < 8) { err.textContent = '8자 이상 입력하세요'; return; }
+    if (npw !== cpw) { err.textContent = '두 비밀번호가 서로 다릅니다'; return; }
+    btn.disabled = true; const old = btn.textContent; btn.textContent = '변경 중...';
+    try {
+        const { error } = await sb.auth.updateUser({ password: npw });
+        if (error) { err.textContent = '변경 실패: ' + error.message; btn.disabled = false; btn.textContent = old; return; }
+        if (currentUser) {
+            try { await sb.from('profiles').update({ must_change_password: false }).eq('id', currentUser.id); } catch (_) {}
+            currentUser.mustChangePassword = false;
+            localStorage.setItem('klp_user', JSON.stringify(currentUser));
+        }
+        _pwMandatory = false;
+        const ov = document.getElementById('pwChangeOverlay');
+        if (ov) ov.style.display = 'none';
+        showToast('비밀번호가 변경되었습니다');
+        btn.disabled = false; btn.textContent = old;
+    } catch (e) {
+        err.textContent = '오류: ' + ((e && e.message) || e);
+        btn.disabled = false; btn.textContent = old;
+    }
 }
 
 // 회사 관리자에게만 '회사 설정' 메뉴 노출
@@ -538,7 +592,7 @@ async function handleLogin() {
     } else {
         const { data: p, error: profErr } = await sb
             .from('profiles')
-            .select('id, name, role, email, auth_user_id, company_id, is_superadmin')
+            .select('id, name, role, email, auth_user_id, company_id, is_superadmin, must_change_password')
             .eq('name', input)
             .single();
         if (profErr || !p || !p.email) {
@@ -576,7 +630,7 @@ async function handleLogin() {
     if (!prof) {
         const { data: p2, error: e2 } = await sb
             .from('profiles')
-            .select('id, name, role, email, auth_user_id, company_id, is_superadmin')
+            .select('id, name, role, email, auth_user_id, company_id, is_superadmin, must_change_password')
             .eq('auth_user_id', authData.user.id)
             .single();
         if (e2 || !p2) {
@@ -601,11 +655,13 @@ async function handleLogin() {
         authUserId: authData.user.id,
         companyId: prof.company_id || 1,
         isSuperadmin: prof.is_superadmin === true,
+        mustChangePassword: prof.must_change_password === true,
     };
     localStorage.setItem('klp_user', JSON.stringify(currentUser));
     updateSidebarUser();
     await loadCompanyContext();
-    showApp();
+    showApp(true); // 새 로그인은 홈부터
+    maybePromptPasswordChange();
 }
 
 async function handleLogout() {
@@ -657,7 +713,7 @@ function hydrateAllFromCache() {
     return any;
 }
 
-async function showApp() {
+async function showApp(goHome = false) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
 
@@ -695,7 +751,10 @@ async function showApp() {
     loadUrlShortcuts().catch(e => console.warn(e));
     // URL 해시 → 탭 전환 (새로고침 시 탭 유지, 문서생성기에서 이동해온 경우 등)
     const hash = location.hash.replace('#', '');
-    if (hash.startsWith('planning/p-')) {
+    if (goHome) {
+        // 새 로그인은 항상 홈 화면부터
+        switchTab('home');
+    } else if (hash.startsWith('planning/p-')) {
         const pid = parseInt(hash.slice('planning/p-'.length), 10);
         if (!isNaN(pid)) currentPlanningProjectId = pid;
         switchTab(`planning-${currentPlanningMode}`, true);

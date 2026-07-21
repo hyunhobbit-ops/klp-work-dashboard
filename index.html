@@ -314,6 +314,7 @@
             </nav>
             <div class="sidebar-footer">
                 <button id="pushToggleBtn" onclick="enablePushNotifications()" title="이 기기로 업무 알림 받기" style="display:none;width:100%;align-items:center;gap:8px;padding:9px 12px;margin-bottom:10px;border:1px solid var(--border,#e5e7eb);border-radius:10px;background:transparent;color:var(--text-secondary,#4b5563);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">🔔 <span id="pushToggleLabel">알림 켜기</span></button>
+                <button onclick="openPasswordChangeModal(false)" title="비밀번호 변경" style="width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;margin-bottom:10px;border:1px solid var(--border,#e5e7eb);border-radius:10px;background:transparent;color:var(--text-secondary,#4b5563);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">🔒 <span>비밀번호 변경</span></button>
                 <div class="sidebar-user">
                     <div class="user-avatar" id="userAvatar">--</div>
                     <div class="user-info">
@@ -1703,6 +1704,21 @@
       <div id="marketGalleryDots" style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:8px"></div>
     </div>
     <script src="klp-assets.js"></script>
-    <script src="app.js?v=20260703z6"></script>
+    <!-- 비밀번호 변경 모달 -->
+    <div id="pwChangeOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;align-items:center;justify-content:center;padding:20px">
+        <div style="background:var(--white);max-width:400px;width:100%;padding:24px;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.2)">
+            <h3 style="font-size:18px;font-weight:800;margin:0 0 6px" id="pwModalTitle">비밀번호 변경</h3>
+            <p style="color:var(--gray-500);font-size:13px;margin:0 0 16px" id="pwModalDesc">새 비밀번호를 입력하세요.</p>
+            <div class="form-group"><label class="form-label">새 비밀번호</label><input type="password" class="form-input" id="pwNew" placeholder="8자 이상"></div>
+            <div class="form-group"><label class="form-label">새 비밀번호 확인</label><input type="password" class="form-input" id="pwConfirm" placeholder="한 번 더 입력"></div>
+            <div id="pwError" style="color:var(--red);font-size:13px;min-height:18px;margin:4px 0"></div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+                <button class="btn btn-ghost" id="pwCancelBtn" onclick="closePasswordModal()">취소</button>
+                <button class="btn btn-primary" id="pwSubmitBtn" onclick="submitPasswordChange()">변경</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=20260703z7"></script>
 </body>
 </html>

@@ -96,6 +96,7 @@ module.exports = async (req, res) => {
                 name: adminName, role: '관리자', email: adminEmail,
                 auth_user_id: newAuthId, company_id: companyId,
                 is_superadmin: false, sort_order: 10, is_active: true,
+                must_change_password: true,
             }),
         });
         if (!profRes.ok) {
