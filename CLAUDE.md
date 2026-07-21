@@ -81,6 +81,7 @@
 - **직원·담당자는 데이터**: 하드코딩 이름 제거. `companyPeople()`/`assigneeOptionList()`/`meetingStaffList()`/`planningAssigneesList()` 접근자가 KLP면 기존 고정값, 아니면 회사 profiles 기반. `isAdminUser/isExecUser`는 이름(KLP) + 역할 fallback(신규 회사). 임원/대표님 특수 컬럼은 `_isKlpCompany()` 게이팅.
 - **브랜딩·모듈**: 로그인 시 `loadCompanyContext()` → `applyCompanyBranding()`(회사명·`--blue`/`--klp-brand` 색) + `applyModuleGating()`(enabledModules 없는 사이드바 항목 숨김, `data-tab`→모듈키). KLP settings.primaryColor=null이라 색 불변.
 - **온보딩(수동)**: `profiles.is_superadmin`(김현호=true)만 "회사 관리" 탭(`tab-admin-companies`). `api/admin-create-company.js`(service role, 의존성 0)가 요청자 슈퍼관리자 검증 → 회사+관리자Auth계정+프로필 생성 → 임시비번 반환. **Vercel 환경변수 `SUPABASE_SERVICE_ROLE_KEY` 필수.**
+- **회사 설정(관리자 셀프서비스)**: 회사 관리자(role in ADMIN_ROLES)만 "회사 설정" 탭(`tab-company-settings`). 직원 추가(`api/company-add-user.js` — 요청자 관리자 검증 → 같은 회사에 계정 생성) / 직원 비활성(profiles.is_active) / 디자인(companies.settings brandName·primaryColor·logoUrl) / 모듈 토글. companies UPDATE는 `companies_admin_update` RLS(같은 회사 + 관리자역할). `saveModules`는 화면에 없는 기존 모듈(KLP 전체 등) 보존. migration 028.
 - **로그인**: 여전히 이름 기반(name→email 매핑). ⚠️ 한계 — 회사 간 동명이인이면 `.eq('name').single()` 충돌. 향후 이메일 로그인 전환 필요(2단계).
 - **범위 밖(다음 단계)**: 셀프 회원가입+자동 결제, 업종별 모듈팩(택배·문서생성 등), 랜딩. 설계·계획: `docs/superpowers/{specs,plans}/2026-07-20-multitenant-saas-*`.
 - **새 테넌트 테이블 추가 시**: `company_id bigint references companies(id) not null` + `set_company_id` 트리거 + 회사 스코프 RLS 필수.

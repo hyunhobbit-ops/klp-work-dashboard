@@ -217,6 +217,7 @@ function updateSidebarUser() {
     try { applyDeliveryPricePermission(); } catch (e) {}
     try { applyCashPermission(); } catch (e) {}
     try { applySuperadminNav(); } catch (e) {}
+    try { applyCompanySettingsNav(); } catch (e) {}
 }
 
 // 슈퍼관리자(운영자)에게만 '회사 관리' 메뉴 노출
@@ -224,6 +225,15 @@ function applySuperadminNav() {
     const show = !!(currentUser && currentUser.isSuperadmin);
     const nav = document.getElementById('navAdminCompanies');
     const grp = document.getElementById('navAdminGroup');
+    if (nav) nav.style.display = show ? '' : 'none';
+    if (grp) grp.style.display = show ? '' : 'none';
+}
+
+// 회사 관리자에게만 '회사 설정' 메뉴 노출
+function applyCompanySettingsNav() {
+    const show = (typeof isAdminUser === 'function') && isAdminUser();
+    const nav = document.getElementById('navCompanySettings');
+    const grp = document.getElementById('navCompanySettingsGroup');
     if (nav) nav.style.display = show ? '' : 'none';
     if (grp) grp.style.display = show ? '' : 'none';
 }
@@ -299,6 +309,137 @@ async function createCompany() {
     }
 }
 
+// ===== 회사 설정 (관리자 셀프서비스) =====
+async function renderCompanySettings() {
+    // 1) 직원 목록
+    const membersBox = document.getElementById('csMembers');
+    if (membersBox) {
+        membersBox.innerHTML = '<div style="color:var(--gray-500);font-size:13px">불러오는 중…</div>';
+        const { data: members, error } = await sb.from('profiles')
+            .select('id, name, role, email, is_active, sort_order').order('sort_order');
+        if (error) {
+            membersBox.innerHTML = `<div style="color:var(--red);font-size:13px">직원 목록 오류: ${escHtml(error.message)}</div>`;
+        } else {
+            membersBox.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:14px">
+                <thead><tr style="text-align:left;color:var(--gray-500);border-bottom:1px solid var(--gray-200)">
+                    <th style="padding:6px 4px">이름</th><th style="padding:6px 4px">이메일</th><th style="padding:6px 4px">권한</th><th style="padding:6px 4px">상태</th><th></th></tr></thead>
+                <tbody>${(members || []).map(m => `<tr style="border-bottom:1px solid var(--gray-100);${m.is_active === false ? 'opacity:.5' : ''}">
+                    <td style="padding:8px 4px">${escHtml(DISPLAY_NAME_MAP[m.name] || m.name)}</td>
+                    <td style="padding:8px 4px;color:var(--gray-600)">${escHtml(m.email || '')}</td>
+                    <td style="padding:8px 4px">${escHtml(m.role || '')}</td>
+                    <td style="padding:8px 4px">${m.is_active === false ? '비활성' : '활성'}</td>
+                    <td style="padding:8px 4px;text-align:right">${m.id === currentUser.id ? '<span style="color:var(--gray-400);font-size:12px">본인</span>'
+                        : `<button class="btn-ghost" style="font-size:12px;color:${m.is_active === false ? 'var(--blue)' : 'var(--red)'};background:none;border:none;cursor:pointer" onclick="toggleEmployeeActive(${m.id}, ${m.is_active === false})">${m.is_active === false ? '복구' : '내보내기'}</button>`}</td>
+                </tr>`).join('')}</tbody></table>`;
+        }
+    }
+    // 2) 디자인 필드
+    const s = (currentCompany && currentCompany.settings) || {};
+    const nameEl = document.getElementById('csBrandName');
+    const colorEl = document.getElementById('csPrimaryColor');
+    const logoEl = document.getElementById('csLogoUrl');
+    if (nameEl) nameEl.value = s.brandName || (currentCompany && currentCompany.name) || '';
+    if (colorEl) colorEl.value = s.primaryColor || '#3182f6';
+    if (logoEl) logoEl.value = s.logoUrl || '';
+    // 3) 메뉴 체크박스
+    const modBox = document.getElementById('csModules');
+    if (modBox) {
+        const enabled = Array.isArray(s.enabledModules) ? s.enabledModules : [];
+        modBox.innerHTML = AC_MODULE_OPTIONS.map(m =>
+            `<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" class="cs-mod" value="${m.key}" ${enabled.includes(m.key) ? 'checked' : ''} style="width:16px;height:16px">${m.label}
+            </label>`).join('');
+    }
+    const ar = document.getElementById('csAddResult');
+    if (ar) { ar.style.display = 'none'; ar.innerHTML = ''; }
+}
+
+async function addEmployee() {
+    const btn = document.getElementById('csAddBtn');
+    const result = document.getElementById('csAddResult');
+    const name = document.getElementById('csNewName').value.trim();
+    const email = document.getElementById('csNewEmail').value.trim();
+    const role = document.getElementById('csNewRole').value;
+    if (!name || !email) { showToast('이름과 이메일을 입력하세요'); return; }
+    btn.disabled = true; const old = btn.textContent; btn.textContent = '추가 중...';
+    try {
+        const { data: sess } = await sb.auth.getSession();
+        const token = sess && sess.session && sess.session.access_token;
+        if (!token) { showToast('세션이 만료됐습니다'); btn.disabled = false; btn.textContent = old; return; }
+        const res = await fetch('/api/company-add-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ name, email, role }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+            result.style.display = 'block'; result.style.background = 'var(--red-light)';
+            result.innerHTML = `❌ ${escHtml(data.error || ('오류 ' + res.status))}`;
+            btn.disabled = false; btn.textContent = old; return;
+        }
+        result.style.display = 'block'; result.style.background = 'var(--blue-light)';
+        result.innerHTML = `✅ <b>${escHtml(name)}</b> 추가 완료! 아래를 직원에게 전달하세요:<br>
+            • 로그인 이메일: <b style="user-select:all">${escHtml(email)}</b><br>
+            • 임시 비밀번호: <b style="user-select:all">${escHtml(data.tempPassword)}</b>`;
+        document.getElementById('csNewName').value = '';
+        document.getElementById('csNewEmail').value = '';
+        // 담당자 목록 최신화
+        try { const { data: p } = await sb.from('profiles').select('name, role, company_id, sort_order, is_active'); if (p) { allProfiles = p; cacheWrite('profiles', p); } } catch (_) {}
+        try { invalidateClientNamesCache && invalidateClientNamesCache(); } catch (_) {}
+        renderCompanySettings();
+        btn.disabled = false; btn.textContent = old;
+    } catch (e) {
+        console.error('addEmployee error', e);
+        result.style.display = 'block'; result.style.background = 'var(--red-light)';
+        result.innerHTML = '❌ 네트워크 오류: ' + escHtml((e && e.message) || String(e));
+        btn.disabled = false; btn.textContent = old;
+    }
+}
+
+async function toggleEmployeeActive(id, makeActive) {
+    if (!makeActive && !confirm('이 직원을 내보낼까요? (로그인은 유지되지만 담당자 목록에서 빠집니다)')) return;
+    const { error } = await sb.from('profiles').update({ is_active: makeActive }).eq('id', id);
+    if (error) { showToast('변경 실패: ' + error.message); return; }
+    showToast(makeActive ? '복구했습니다' : '내보냈습니다');
+    try { const { data: p } = await sb.from('profiles').select('name, role, company_id, sort_order, is_active'); if (p) { allProfiles = p; cacheWrite('profiles', p); } } catch (_) {}
+    renderCompanySettings();
+}
+
+async function saveBranding() {
+    const btn = document.getElementById('csSaveBrandBtn');
+    const brandName = document.getElementById('csBrandName').value.trim();
+    const primaryColor = document.getElementById('csPrimaryColor').value;
+    const logoUrl = document.getElementById('csLogoUrl').value.trim();
+    if (!brandName) { showToast('회사명을 입력하세요'); return; }
+    if (logoUrl && typeof isSafeUrl === 'function' && !isSafeUrl(logoUrl)) { showToast('로고 URL 형식이 올바르지 않습니다'); return; }
+    btn.disabled = true; const old = btn.textContent; btn.textContent = '저장 중...';
+    const newSettings = Object.assign({}, currentCompany.settings || {}, { brandName, primaryColor, logoUrl: logoUrl || null });
+    const { error } = await sb.from('companies').update({ settings: newSettings }).eq('id', currentCompany.id);
+    if (error) { showToast('저장 실패: ' + error.message); btn.disabled = false; btn.textContent = old; return; }
+    currentCompany.settings = newSettings;
+    try { applyCompanyBranding(); } catch (_) {}
+    showToast('디자인을 저장했습니다');
+    btn.disabled = false; btn.textContent = old;
+}
+
+async function saveModules() {
+    const btn = document.getElementById('csSaveModBtn');
+    const checked = Array.from(document.querySelectorAll('.cs-mod:checked')).map(c => c.value);
+    // 체크박스에 없는(=이 화면에서 관리 안 하는) 기존 모듈은 보존 (KLP 등 전체 모듈 회사 보호)
+    const acKeys = AC_MODULE_OPTIONS.map(m => m.key);
+    const existing = (currentCompany.settings && currentCompany.settings.enabledModules) || [];
+    const preserved = existing.filter(m => !acKeys.includes(m) && m !== 'home');
+    const enabledModules = ['home'].concat(preserved).concat(checked);
+    btn.disabled = true; const old = btn.textContent; btn.textContent = '저장 중...';
+    const newSettings = Object.assign({}, currentCompany.settings || {}, { enabledModules });
+    const { error } = await sb.from('companies').update({ settings: newSettings }).eq('id', currentCompany.id);
+    if (error) { showToast('저장 실패: ' + error.message); btn.disabled = false; btn.textContent = old; return; }
+    currentCompany.settings = newSettings;
+    try { applyModuleGating(); applyCompanySettingsNav(); } catch (_) {}
+    showToast('메뉴 설정을 저장했습니다');
+    btn.disabled = false; btn.textContent = old;
+}
+
 // ===== 멀티테넌트: 회사 컨텍스트 =====
 // 로그인/세션복원 두 경로 모두에서 호출. currentUser.companyId 기준으로 회사 설정 로드 후 브랜딩·메뉴 반영.
 async function loadCompanyContext() {
@@ -313,6 +454,7 @@ async function loadCompanyContext() {
     try { applyCompanyBranding(); } catch (e) { console.error(e); }
     try { applyModuleGating(); } catch (e) { console.error(e); }
     try { applySuperadminNav(); } catch (e) { console.error(e); } // 게이팅 이후 재적용(그룹 숨김 방지)
+    try { applyCompanySettingsNav(); } catch (e) { console.error(e); }
 }
 
 // 회사 브랜딩(회사명·로고·대표색) 적용. 설정이 비면 KLP 기본 유지.
@@ -344,7 +486,7 @@ function applyModuleGating() {
         'docs':'docs','manual':'manual','ceo-vision':'ceo-vision','clients':'clients',
         'clients-overseas':'clients-overseas','quotes':'quotes','margin-calc':'margin-calc','ad-studio':'ad-studio'
     };
-    const ALWAYS = new Set(['home', 'admin-companies']); // admin-companies는 슈퍼관리자 로직이 별도 제어
+    const ALWAYS = new Set(['home', 'admin-companies', 'company-settings']); // 관리자/슈퍼관리자 로직이 별도 제어
     document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
         const tab = btn.getAttribute('data-tab');
         if (ALWAYS.has(tab)) return;
@@ -652,6 +794,7 @@ let currentDeliveryMonth = String(new Date().getMonth() + 1).padStart(2, '0');
 const pageTitles = {
     home: '홈',
     'admin-companies': '회사 관리',
+    'company-settings': '회사 설정',
     planning: '프로젝트',
     'projects-temp': '매입매출 — 견적 의뢰',
     'projects-domestic': '매입매출 — 국내',
@@ -1258,6 +1401,8 @@ function switchTab(tabId, fromHistory = false) {
 
     // 회사 관리(운영자) 탭 진입 시 폼 렌더
     if (tabId === 'admin-companies') { try { renderAdminCompanies(); } catch (e) { console.error(e); } }
+    // 회사 설정(관리자) 탭 진입 시 렌더
+    if (tabId === 'company-settings') { try { renderCompanySettings(); } catch (e) { console.error(e); } }
 
     // Close mobile sidebar
     document.getElementById('sidebar').classList.remove('open');
