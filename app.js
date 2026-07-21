@@ -351,8 +351,20 @@ function applyModuleGating() {
         const mod = tabModule[tab] || tab;
         if (!enabled.includes(mod)) btn.style.display = 'none'; // 모듈 꺼진 것만 숨김(권한 숨김은 유지)
     });
-    // 하위 항목이 전부 숨은 그룹은 헤더째 숨김
+
+    // 신규 회사(KLP 아님): KLP 전용 외부 링크·URL 바로가기·홈 경영목표 배너 숨김
+    if (!_isKlpCompany()) {
+        document.querySelectorAll('.nav-external').forEach(el => { el.style.display = 'none'; });
+        const urlGrp = document.getElementById('urlShortcutsGroup');
+        if (urlGrp) urlGrp.style.display = 'none';
+        const custom = document.getElementById('customUrlCategories');
+        if (custom) custom.style.display = 'none';
+        document.querySelectorAll('.hero-banner').forEach(el => { el.style.display = 'none'; });
+    }
+
+    // 하위 항목이 전부 숨은 그룹은 헤더째 숨김 (숨겨진 외부링크 반영을 위해 위 처리 뒤에 실행)
     document.querySelectorAll('.nav-group').forEach(g => {
+        if (g.id === 'urlShortcutsGroup') return; // 위에서 이미 처리
         const items = g.querySelectorAll('.nav-item');
         if (items.length && !Array.from(items).some(i => i.style.display !== 'none')) g.style.display = 'none';
     });
@@ -462,7 +474,8 @@ async function handleLogout() {
     }
     localStorage.removeItem('klp_user');
     currentUser = null;
-    showLogin();
+    // 멀티테넌트: 다른 회사로 재로그인 시 이전 회사의 화면 상태(숨김 등)가 남지 않도록 새로고침
+    location.reload();
 }
 
 function showLogin() {
