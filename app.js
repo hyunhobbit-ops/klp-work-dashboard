@@ -225,10 +225,12 @@ function updateSidebarUser() {
 // 슈퍼관리자(운영자)에게만 '회사 관리' 메뉴 노출
 function applySuperadminNav() {
     const show = !!(currentUser && currentUser.isSuperadmin);
-    const nav = document.getElementById('navAdminCompanies');
     const grp = document.getElementById('navAdminGroup');
-    if (nav) nav.style.display = show ? '' : 'none';
+    const add = document.getElementById('navAdminAdd');
+    const manage = document.getElementById('navAdminManage');
     if (grp) grp.style.display = show ? '' : 'none';
+    if (add) add.style.display = show ? '' : 'none';
+    if (manage) manage.style.display = show ? '' : 'none';
 }
 
 // ===== 비밀번호 변경 =====
@@ -305,7 +307,7 @@ const AC_MODULE_OPTIONS = [
     { key: 'marketing', label: '마케팅' },
     { key: 'clients-overseas', label: '해외 거래처' },
 ];
-function renderAdminCompanies() {
+function renderAdminAddForm() {
     const box = document.getElementById('acModules');
     if (!box) return;
     box.innerHTML = AC_MODULE_OPTIONS.map(m =>
@@ -314,7 +316,6 @@ function renderAdminCompanies() {
         </label>`).join('');
     const r = document.getElementById('acResult');
     if (r) { r.style.display = 'none'; r.innerHTML = ''; }
-    loadAdminCompanyList();
 }
 
 // 슈퍼관리자: 기존 회사 목록 로드 + 삭제
@@ -427,27 +428,50 @@ async function renderCompanySettings() {
         if (error) {
             membersBox.innerHTML = `<div style="color:var(--red);font-size:13px">직원 목록 오류: ${escHtml(error.message)}</div>`;
         } else {
+            _csMembers = members || [];
+            const ROLE_OPTS = ['일반', '임원', '관리자'];
             membersBox.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:14px">
                 <thead><tr style="text-align:left;color:var(--gray-500);border-bottom:1px solid var(--gray-200)">
                     <th style="padding:6px 4px">이름</th><th style="padding:6px 4px">이메일</th><th style="padding:6px 4px">권한</th><th style="padding:6px 4px">상태</th><th></th></tr></thead>
-                <tbody>${(members || []).map(m => `<tr style="border-bottom:1px solid var(--gray-100);${m.is_active === false ? 'opacity:.5' : ''}">
-                    <td style="padding:8px 4px">${escHtml(DISPLAY_NAME_MAP[m.name] || m.name)}</td>
-                    <td style="padding:8px 4px;color:var(--gray-600)">${escHtml(m.email || '')}</td>
-                    <td style="padding:8px 4px">${escHtml(m.role || '')}</td>
-                    <td style="padding:8px 4px">${m.is_active === false ? '비활성' : '활성'}</td>
-                    <td style="padding:8px 4px;text-align:right">${m.id === currentUser.id ? '<span style="color:var(--gray-400);font-size:12px">본인</span>'
-                        : `<button class="btn-ghost" style="font-size:12px;color:${m.is_active === false ? 'var(--blue)' : 'var(--red)'};background:none;border:none;cursor:pointer" onclick="toggleEmployeeActive(${m.id}, ${m.is_active === false})">${m.is_active === false ? '복구' : '내보내기'}</button>`}</td>
-                </tr>`).join('')}</tbody></table>`;
+                <tbody>${_csMembers.map(m => {
+                    if (_editingMemberId === m.id) {
+                        return `<tr style="border-bottom:1px solid var(--gray-100)">
+                            <td style="padding:6px 4px"><input class="form-input" id="csEditName_${m.id}" value="${escHtml(m.name)}" style="width:110px;padding:4px 8px"></td>
+                            <td style="padding:6px 4px;color:var(--gray-600)">${escHtml(m.email || '')}</td>
+                            <td style="padding:6px 4px"><select class="form-select" id="csEditRole_${m.id}" style="width:100px;padding:4px 8px">${ROLE_OPTS.map(r => `<option ${m.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select></td>
+                            <td style="padding:6px 4px">${m.is_active === false ? '비활성' : '활성'}</td>
+                            <td style="padding:6px 4px;text-align:right;white-space:nowrap">
+                                <button class="btn-ghost" style="font-size:12px;color:var(--blue);background:none;border:none;cursor:pointer" onclick="saveMember(${m.id})">저장</button>
+                                <button class="btn-ghost" style="font-size:12px;color:var(--gray-500);background:none;border:none;cursor:pointer" onclick="cancelEditMember()">취소</button>
+                            </td></tr>`;
+                    }
+                    return `<tr style="border-bottom:1px solid var(--gray-100);${m.is_active === false ? 'opacity:.5' : ''}">
+                        <td style="padding:8px 4px">${escHtml(DISPLAY_NAME_MAP[m.name] || m.name)}</td>
+                        <td style="padding:8px 4px;color:var(--gray-600)">${escHtml(m.email || '')}</td>
+                        <td style="padding:8px 4px">${escHtml(m.role || '')}</td>
+                        <td style="padding:8px 4px">${m.is_active === false ? '비활성' : '활성'}</td>
+                        <td style="padding:8px 4px;text-align:right;white-space:nowrap">
+                            <button class="btn-ghost" style="font-size:12px;color:var(--gray-600);background:none;border:none;cursor:pointer" onclick="editMember(${m.id})">수정</button>
+                            ${m.id === currentUser.id ? '' : `<button class="btn-ghost" style="font-size:12px;color:${m.is_active === false ? 'var(--blue)' : 'var(--red)'};background:none;border:none;cursor:pointer;margin-left:6px" onclick="toggleEmployeeActive(${m.id}, ${m.is_active === false})">${m.is_active === false ? '복구' : '내보내기'}</button>`}
+                        </td></tr>`;
+                }).join('')}</tbody></table>`;
         }
     }
     // 2) 디자인 필드
     const s = (currentCompany && currentCompany.settings) || {};
     const nameEl = document.getElementById('csBrandName');
     const colorEl = document.getElementById('csPrimaryColor');
-    const logoEl = document.getElementById('csLogoUrl');
     if (nameEl) nameEl.value = s.brandName || (currentCompany && currentCompany.name) || '';
     if (colorEl) colorEl.value = s.primaryColor || '#3182f6';
-    if (logoEl) logoEl.value = s.logoUrl || '';
+    // 로고: 저장된 이미지 미리보기, 편집중 임시상태 초기화
+    _pendingLogo = undefined;
+    const prev = document.getElementById('csLogoPreview');
+    const fileInput = document.getElementById('csLogoFile');
+    if (fileInput) fileInput.value = '';
+    if (prev) {
+        if (s.logoUrl) { prev.src = s.logoUrl; prev.style.display = ''; }
+        else { prev.src = ''; prev.style.display = 'none'; }
+    }
     // 3) 메뉴 체크박스
     const modBox = document.getElementById('csModules');
     if (modBox) {
@@ -503,6 +527,26 @@ async function addEmployee() {
     }
 }
 
+// 직원 수정 (이름·권한) — 이메일은 로그인 계정이라 변경 불가
+let _csMembers = [];
+let _editingMemberId = null;
+function editMember(id) { _editingMemberId = id; renderCompanySettings(); }
+function cancelEditMember() { _editingMemberId = null; renderCompanySettings(); }
+async function saveMember(id) {
+    const nameEl = document.getElementById('csEditName_' + id);
+    const roleEl = document.getElementById('csEditRole_' + id);
+    if (!nameEl || !roleEl) return;
+    const name = nameEl.value.trim();
+    const role = roleEl.value;
+    if (!name) { showToast('이름을 입력하세요'); return; }
+    const { error } = await sb.from('profiles').update({ name, role }).eq('id', id);
+    if (error) { showToast('저장 실패: ' + error.message); return; }
+    _editingMemberId = null;
+    try { const { data: p } = await sb.from('profiles').select('name, role, company_id, sort_order, is_active'); if (p) { allProfiles = p; cacheWrite('profiles', p); } } catch (_) {}
+    showToast('수정했습니다');
+    renderCompanySettings();
+}
+
 async function toggleEmployeeActive(id, makeActive) {
     if (!makeActive && !confirm('이 직원을 내보낼까요? (로그인은 유지되지만 담당자 목록에서 빠집니다)')) return;
     const { error } = await sb.from('profiles').update({ is_active: makeActive }).eq('id', id);
@@ -512,18 +556,53 @@ async function toggleEmployeeActive(id, makeActive) {
     renderCompanySettings();
 }
 
+// 로고 파일 → 정사각형 축소(최대 256px) → data URL. _pendingLogo: undefined=변경없음, null=제거, string=새 이미지
+let _pendingLogo = undefined;
+function onLogoFileSelected(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!file.type || !file.type.startsWith('image/')) { showToast('이미지 파일만 넣을 수 있습니다'); e.target.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+            const max = 256;
+            let w = img.width, h = img.height;
+            if (w > max || h > max) { const r = Math.min(max / w, max / h); w = Math.round(w * r); h = Math.round(h * r); }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            _pendingLogo = canvas.toDataURL('image/png');
+            const prev = document.getElementById('csLogoPreview');
+            if (prev) { prev.src = _pendingLogo; prev.style.display = ''; }
+        };
+        img.onerror = () => showToast('이미지를 읽을 수 없습니다');
+        img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+}
+function clearLogo() {
+    _pendingLogo = null;
+    const prev = document.getElementById('csLogoPreview');
+    if (prev) { prev.src = ''; prev.style.display = 'none'; }
+    const fileInput = document.getElementById('csLogoFile');
+    if (fileInput) fileInput.value = '';
+}
+
 async function saveBranding() {
     const btn = document.getElementById('csSaveBrandBtn');
     const brandName = document.getElementById('csBrandName').value.trim();
     const primaryColor = document.getElementById('csPrimaryColor').value;
-    const logoUrl = document.getElementById('csLogoUrl').value.trim();
     if (!brandName) { showToast('회사명을 입력하세요'); return; }
-    if (logoUrl && typeof isSafeUrl === 'function' && !isSafeUrl(logoUrl)) { showToast('로고 URL 형식이 올바르지 않습니다'); return; }
+    // 로고: 임시상태 없으면 기존 유지, null이면 제거, 새 이미지면 교체
+    let logoUrl = (currentCompany.settings && currentCompany.settings.logoUrl) || null;
+    if (_pendingLogo !== undefined) logoUrl = _pendingLogo;
     btn.disabled = true; const old = btn.textContent; btn.textContent = '저장 중...';
-    const newSettings = Object.assign({}, currentCompany.settings || {}, { brandName, primaryColor, logoUrl: logoUrl || null });
+    const newSettings = Object.assign({}, currentCompany.settings || {}, { brandName, primaryColor, logoUrl });
     const { error } = await sb.from('companies').update({ settings: newSettings }).eq('id', currentCompany.id);
     if (error) { showToast('저장 실패: ' + error.message); btn.disabled = false; btn.textContent = old; return; }
     currentCompany.settings = newSettings;
+    _pendingLogo = undefined;
     try { applyCompanyBranding(); } catch (_) {}
     showToast('디자인을 저장했습니다');
     btn.disabled = false; btn.textContent = old;
@@ -576,8 +655,18 @@ function applyCompanyBranding() {
         root.setProperty('--blue', s.primaryColor);
         root.setProperty('--klp-brand', s.primaryColor);
     }
+    // 로고 이미지가 있으면 왼쪽 상단 로고를 이미지로, 없으면 글자 아이콘으로
     const logo = document.getElementById('sidebarLogo');
-    if (logo && s.logoUrl && typeof isSafeUrl === 'function' && isSafeUrl(s.logoUrl)) logo.src = s.logoUrl;
+    const icon = document.querySelector('.logo-icon');
+    const validLogo = s.logoUrl && (String(s.logoUrl).startsWith('data:image/')
+        || (typeof isSafeUrl === 'function' && isSafeUrl(s.logoUrl)));
+    if (logo && validLogo) {
+        logo.src = s.logoUrl; logo.style.display = '';
+        if (icon) icon.style.display = 'none';
+    } else {
+        if (logo) { logo.style.display = 'none'; logo.removeAttribute('src'); }
+        if (icon) icon.style.display = '';
+    }
 }
 
 // 회사가 켠 모듈만 사이드바에 노출. 설정 없으면(=KLP 기본) 전체 노출. 권한 기반 숨김과는 독립(모듈 꺼진 것만 추가로 숨김).
@@ -593,7 +682,7 @@ function applyModuleGating() {
         'docs':'docs','manual':'manual','ceo-vision':'ceo-vision','clients':'clients',
         'clients-overseas':'clients-overseas','quotes':'quotes','margin-calc':'margin-calc','ad-studio':'ad-studio'
     };
-    const ALWAYS = new Set(['home', 'admin-companies', 'company-settings']); // 관리자/슈퍼관리자 로직이 별도 제어
+    const ALWAYS = new Set(['home', 'admin-add', 'admin-manage', 'company-settings']); // 관리자/슈퍼관리자 로직이 별도 제어
     document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
         const tab = btn.getAttribute('data-tab');
         if (ALWAYS.has(tab)) return;
@@ -905,7 +994,8 @@ let currentDeliveryMonth = String(new Date().getMonth() + 1).padStart(2, '0');
 // ===== Page Titles =====
 const pageTitles = {
     home: '홈',
-    'admin-companies': '회사 관리',
+    'admin-add': '고객사 추가',
+    'admin-manage': '고객사 관리',
     'company-settings': '회사 설정',
     planning: '프로젝트',
     'projects-temp': '매입매출 — 견적 의뢰',
@@ -1511,8 +1601,9 @@ function switchTab(tabId, fromHistory = false) {
     // Update page title
     document.getElementById('pageTitle').textContent = pageTitles[tabId] || '';
 
-    // 회사 관리(운영자) 탭 진입 시 폼 렌더
-    if (tabId === 'admin-companies') { try { renderAdminCompanies(); } catch (e) { console.error(e); } }
+    // 고객사 추가/관리(운영자) 탭
+    if (tabId === 'admin-add') { try { renderAdminAddForm(); } catch (e) { console.error(e); } }
+    if (tabId === 'admin-manage') { try { loadAdminCompanyList(); } catch (e) { console.error(e); } }
     // 회사 설정(관리자) 탭 진입 시 렌더
     if (tabId === 'company-settings') { try { renderCompanySettings(); } catch (e) { console.error(e); } }
 
@@ -1618,7 +1709,15 @@ function switchTab(tabId, fromHistory = false) {
 }
 
 // 브라우저 뒤로/앞으로 → 모달 열려있으면 모달만 닫기, 아니면 탭 전환
+// closeModal 이 스스로 history.back() 을 호출해 발생시킨 popstate 는
+// "사용자가 뒤로가기를 누른 것"이 아니므로 탭 재전환(=상태 초기화)을 건너뛴다.
+// (모달을 프로그램적으로 닫을 때 목록 페이지/검색/필터가 1페이지로 리셋되던 문제 방지)
+let _suppressPopstateTabSwitch = false;
 window.addEventListener('popstate', () => {
+    if (_suppressPopstateTabSwitch) {
+        _suppressPopstateTabSwitch = false;
+        return;
+    }
     const modalOverlay = document.getElementById('modalOverlay');
     const detailOverlay = document.getElementById('detailOverlay');
     const modalOpen = modalOverlay && modalOverlay.classList.contains('show');
@@ -5325,6 +5424,7 @@ function closeModal(fromPopstate) {
     overlay.classList.remove('show');
     overlay.classList.remove('modal-wide');
     if (wasOpen && !fromPopstate && history.state && history.state.modal) {
+        _suppressPopstateTabSwitch = true;
         history.back();
     }
     currentPlanningQuill = null;
