@@ -282,7 +282,8 @@ async function createCompany() {
         result.style.background = 'var(--blue-light)';
         result.innerHTML = `✅ <b>${escHtml(companyName)}</b> 생성 완료!<br><br>
             아래 정보를 회사에 전달하세요 (첫 로그인 후 비밀번호 변경 안내):<br>
-            • 로그인 이메일: <b>${escHtml(adminEmail)}</b><br>
+            • 로그인 주소: <b>klp-work-dashboard.vercel.app</b><br>
+            • 로그인 이메일: <b style="user-select:all">${escHtml(adminEmail)}</b><br>
             • 임시 비밀번호: <b style="user-select:all">${escHtml(data.tempPassword)}</b><br>
             • 회사 번호: ${escHtml(String(data.companyId))}`;
         document.getElementById('acCompanyName').value = '';
