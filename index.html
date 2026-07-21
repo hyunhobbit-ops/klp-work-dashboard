@@ -68,6 +68,7 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-top">
                 <div class="logo">
+                    <img id="sidebarLogo" alt="" style="display:none;width:32px;height:32px;object-fit:contain;border-radius:8px">
                     <div class="logo-icon" data-brand-initial>K</div>
                     <span class="logo-text" data-brand-name>KLP KOREA</span>
                 </div>
@@ -303,12 +304,16 @@
                     </button>
                 </div>
 
-                <!-- 운영자(슈퍼관리자) 전용 -->
+                <!-- 운영자(슈퍼관리자) 전용 — 고객사 관리 -->
                 <div class="nav-group" id="navAdminGroup" style="display:none">
-                    <div class="nav-group-label">운영</div>
-                    <button class="nav-item" data-tab="admin-companies" id="navAdminCompanies" data-tip="새 회사 + 관리자 계정 생성 (운영자 전용)" style="display:none">
+                    <div class="nav-group-label">고객사 관리</div>
+                    <button class="nav-item" data-tab="admin-add" id="navAdminAdd" data-tip="새 고객사 + 관리자 계정 생성 (운영자 전용)">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                        <span>고객사 추가</span>
+                    </button>
+                    <button class="nav-item" data-tab="admin-manage" id="navAdminManage" data-tip="고객사 목록 조회·삭제 (운영자 전용)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9v.01M9 12v.01M9 15v.01M9 18v.01"/></svg>
-                        <span>회사 관리</span>
+                        <span>고객사 관리</span>
                     </button>
                 </div>
             </nav>
@@ -346,29 +351,32 @@
                 </div>
             </header>
 
-            <!-- ===== 회사 관리 (운영자 전용) ===== -->
-            <main class="content" id="tab-admin-companies">
-                <div style="max-width:720px">
-                    <h2 style="font-size:20px;font-weight:800;margin:0 0 6px">회사 관리 (운영자 전용)</h2>
-                    <p style="color:var(--gray-500);font-size:13px;margin:0 0 20px">새 회사와 첫 관리자 계정을 만들어 넘겨줍니다. 생성 후 나오는 임시 비밀번호를 회사에 전달하세요.</p>
-
-                    <!-- 기존 회사 목록 -->
-                    <div class="card" style="padding:20px;margin-bottom:18px">
-                        <h3 style="font-size:16px;font-weight:700;margin:0 0 12px">🏢 기존 회사</h3>
-                        <div id="acCompanyList"><div style="color:var(--gray-500);font-size:13px">불러오는 중…</div></div>
-                    </div>
-
+            <!-- ===== 고객사 추가 (운영자 전용) ===== -->
+            <main class="content" id="tab-admin-add">
+                <div style="max-width:640px">
+                    <h2 style="font-size:20px;font-weight:800;margin:0 0 6px">고객사 추가</h2>
+                    <p style="color:var(--gray-500);font-size:13px;margin:0 0 20px">새 고객사와 첫 관리자 계정을 만들어 넘겨줍니다. 생성 후 나오는 임시 비밀번호를 고객사에 전달하세요.</p>
                     <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:14px">
-                        <h3 style="font-size:16px;font-weight:700;margin:0">➕ 새 회사 만들기</h3>
-                        <div class="form-group"><label class="form-label">회사명</label><input type="text" class="form-input" id="acCompanyName" placeholder="예) (주)하나상사"></div>
+                        <div class="form-group"><label class="form-label">고객사명</label><input type="text" class="form-input" id="acCompanyName" placeholder="예) (주)하나상사"></div>
                         <div class="form-group"><label class="form-label">관리자 이름</label><input type="text" class="form-input" id="acAdminName" placeholder="예) 홍길동"></div>
                         <div class="form-group"><label class="form-label">관리자 이메일 (로그인 계정)</label><input type="email" class="form-input" id="acAdminEmail" placeholder="예) admin@hana.co.kr"></div>
                         <div class="form-group">
                             <label class="form-label">사용할 메뉴</label>
                             <div id="acModules" style="display:flex;flex-wrap:wrap;gap:10px 16px;font-size:14px"></div>
                         </div>
-                        <button class="btn btn-primary" id="acCreateBtn" onclick="createCompany()" style="align-self:flex-start">회사 생성</button>
+                        <button class="btn btn-primary" id="acCreateBtn" onclick="createCompany()" style="align-self:flex-start">고객사 생성</button>
                         <div id="acResult" style="display:none;padding:14px;border-radius:10px;background:var(--blue-light);font-size:14px;line-height:1.6"></div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- ===== 고객사 관리 (운영자 전용) ===== -->
+            <main class="content" id="tab-admin-manage">
+                <div style="max-width:720px">
+                    <h2 style="font-size:20px;font-weight:800;margin:0 0 6px">고객사 관리</h2>
+                    <p style="color:var(--gray-500);font-size:13px;margin:0 0 20px">등록된 고객사 목록입니다. 삭제하면 그 고객사의 모든 데이터와 로그인 계정이 영구 삭제됩니다.</p>
+                    <div class="card" style="padding:20px">
+                        <div id="acCompanyList"><div style="color:var(--gray-500);font-size:13px">불러오는 중…</div></div>
                     </div>
                 </div>
             </main>
@@ -400,8 +408,16 @@
                         <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end">
                             <div class="form-group" style="margin:0"><label class="form-label">회사명</label><input type="text" class="form-input" id="csBrandName" style="width:220px"></div>
                             <div class="form-group" style="margin:0"><label class="form-label">대표 색상</label><input type="color" id="csPrimaryColor" style="width:56px;height:40px;padding:2px;border:1px solid var(--gray-300);border-radius:8px;cursor:pointer"></div>
-                            <div class="form-group" style="margin:0"><label class="form-label">로고 이미지 URL (선택)</label><input type="text" class="form-input" id="csLogoUrl" placeholder="https://..." style="width:240px"></div>
                             <button class="btn btn-primary" id="csSaveBrandBtn" onclick="saveBranding()">디자인 저장</button>
+                        </div>
+                        <div class="form-group" style="margin:14px 0 0">
+                            <label class="form-label">로고 이미지 (선택)</label>
+                            <div style="display:flex;align-items:center;gap:10px">
+                                <img id="csLogoPreview" src="" alt="" style="display:none;width:48px;height:48px;object-fit:contain;border:1px solid var(--gray-200);border-radius:8px;background:var(--gray-50)">
+                                <input type="file" id="csLogoFile" accept="image/*" onchange="onLogoFileSelected(event)" style="font-size:13px">
+                                <button type="button" onclick="clearLogo()" style="font-size:12px;color:var(--red);background:none;border:none;cursor:pointer">제거</button>
+                            </div>
+                            <div style="color:var(--gray-500);font-size:12px;margin-top:6px">권장: <b>정사각형</b> (256×256px 이상, PNG·JPG). 큰 이미지는 자동으로 256px로 줄여 저장됩니다. 로고를 넣으면 왼쪽 상단 로고가 이미지로 바뀝니다.</div>
                         </div>
                     </div>
 
@@ -1727,6 +1743,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=20260703z8"></script>
+    <script src="app.js?v=20260703z9"></script>
 </body>
 </html>
