@@ -314,6 +314,59 @@ function renderAdminCompanies() {
         </label>`).join('');
     const r = document.getElementById('acResult');
     if (r) { r.style.display = 'none'; r.innerHTML = ''; }
+    loadAdminCompanyList();
+}
+
+// 슈퍼관리자: 기존 회사 목록 로드 + 삭제
+let _adminCompanies = [];
+async function loadAdminCompanyList() {
+    const el = document.getElementById('acCompanyList');
+    if (!el) return;
+    el.innerHTML = '<div style="color:var(--gray-500);font-size:13px">불러오는 중…</div>';
+    try {
+        const { data: sess } = await sb.auth.getSession();
+        const token = sess && sess.session && sess.session.access_token;
+        const res = await fetch('/api/admin-companies-manage', { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        if (!res.ok || !data.ok) { el.innerHTML = `<div style="color:var(--red);font-size:13px">${escHtml(data.error || '조회 실패')}</div>`; return; }
+        _adminCompanies = data.companies || [];
+        el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:14px">
+            <thead><tr style="text-align:left;color:var(--gray-500);border-bottom:1px solid var(--gray-200)">
+                <th style="padding:6px 4px">번호</th><th style="padding:6px 4px">회사명</th><th style="padding:6px 4px">직원</th><th></th></tr></thead>
+            <tbody>${_adminCompanies.map(c => `<tr style="border-bottom:1px solid var(--gray-100)">
+                <td style="padding:8px 4px">${c.id}</td>
+                <td style="padding:8px 4px">${escHtml(c.name)}${c.id === 1 ? ' <span style="color:var(--gray-400);font-size:12px">(운영 본사)</span>' : ''}</td>
+                <td style="padding:8px 4px">${c.memberCount}명</td>
+                <td style="padding:8px 4px;text-align:right">${c.id === 1 ? '<span style="color:var(--gray-400);font-size:12px">삭제 불가</span>'
+                    : `<button class="ac-del-btn" data-id="${c.id}" style="font-size:12px;color:var(--red);background:none;border:none;cursor:pointer">삭제</button>`}</td>
+            </tr>`).join('')}</tbody></table>`;
+        el.querySelectorAll('.ac-del-btn').forEach(b => b.addEventListener('click', () => deleteCompanyById(parseInt(b.dataset.id, 10))));
+    } catch (e) {
+        el.innerHTML = `<div style="color:var(--red);font-size:13px">오류: ${escHtml((e && e.message) || String(e))}</div>`;
+    }
+}
+
+async function deleteCompanyById(id) {
+    if (id === 1) { showToast('KLP(운영 본사)는 삭제할 수 없습니다'); return; }
+    const c = _adminCompanies.find(x => x.id === id);
+    const name = c ? c.name : ('회사 ' + id);
+    if (!confirm(`정말 "${name}" 회사를 삭제할까요?\n이 회사의 모든 데이터와 로그인 계정이 영구 삭제됩니다. 되돌릴 수 없습니다.`)) return;
+    if (!confirm(`한 번 더 확인합니다.\n"${name}" 를 완전히 삭제합니다. 계속할까요?`)) return;
+    try {
+        const { data: sess } = await sb.auth.getSession();
+        const token = sess && sess.session && sess.session.access_token;
+        const res = await fetch('/api/admin-companies-manage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ companyId: id }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) { showToast('삭제 실패: ' + (data.error || ('오류 ' + res.status))); return; }
+        showToast(`"${name}" 삭제 완료 (계정 ${data.deletedAccounts}개)`);
+        loadAdminCompanyList();
+    } catch (e) {
+        showToast('오류: ' + ((e && e.message) || e));
+    }
 }
 
 async function createCompany() {

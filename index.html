@@ -348,10 +348,18 @@
 
             <!-- ===== 회사 관리 (운영자 전용) ===== -->
             <main class="content" id="tab-admin-companies">
-                <div style="max-width:640px">
+                <div style="max-width:720px">
                     <h2 style="font-size:20px;font-weight:800;margin:0 0 6px">회사 관리 (운영자 전용)</h2>
                     <p style="color:var(--gray-500);font-size:13px;margin:0 0 20px">새 회사와 첫 관리자 계정을 만들어 넘겨줍니다. 생성 후 나오는 임시 비밀번호를 회사에 전달하세요.</p>
+
+                    <!-- 기존 회사 목록 -->
+                    <div class="card" style="padding:20px;margin-bottom:18px">
+                        <h3 style="font-size:16px;font-weight:700;margin:0 0 12px">🏢 기존 회사</h3>
+                        <div id="acCompanyList"><div style="color:var(--gray-500);font-size:13px">불러오는 중…</div></div>
+                    </div>
+
                     <div class="card" style="padding:20px;display:flex;flex-direction:column;gap:14px">
+                        <h3 style="font-size:16px;font-weight:700;margin:0">➕ 새 회사 만들기</h3>
                         <div class="form-group"><label class="form-label">회사명</label><input type="text" class="form-input" id="acCompanyName" placeholder="예) (주)하나상사"></div>
                         <div class="form-group"><label class="form-label">관리자 이름</label><input type="text" class="form-input" id="acAdminName" placeholder="예) 홍길동"></div>
                         <div class="form-group"><label class="form-label">관리자 이메일 (로그인 계정)</label><input type="email" class="form-input" id="acAdminEmail" placeholder="예) admin@hana.co.kr"></div>
@@ -1719,6 +1727,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=20260703z7"></script>
+    <script src="app.js?v=20260703z8"></script>
 </body>
 </html>
