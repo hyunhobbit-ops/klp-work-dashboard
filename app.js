@@ -17921,12 +17921,15 @@ function _meetingContentHtml(raw) {
     return planningSanitizeHtml(raw);
 }
 
-// 이 회의록을 고칠 수 있는가? (RLS의 UPDATE/DELETE 조건과 동일하게 맞춰야 한다)
-// 어긋나면 화면엔 저장 버튼이 보이는데 DB가 조용히 0건 처리해 수정분이 사라진다.
+// 이 회의록을 고칠 수 있는가? — 회사 구성원(로그인 사용자)이면 누구나 수정 가능.
+// (볼 수 있는 회의만 편집기에 뜨고, RLS UPDATE도 "볼 수 있으면 수정" 이라 화면·DB가 일치)
 function _meetingCanEdit() {
-    if (_meetingEditingId === null) return true;               // 새 회의록
-    if (!currentUser || !currentUser.name) return false;
-    if (!_meetingDraft) return false;
+    return !!(currentUser && currentUser.name);
+}
+// 삭제는 작성자·관리자만 (RLS meetings_delete 와 동일)
+function _meetingCanDelete() {
+    if (_meetingEditingId === null) return false;              // 새 회의록은 삭제 개념 없음
+    if (!currentUser || !currentUser.name || !_meetingDraft) return false;
     return _meetingDraft.author === currentUser.name || ADMIN_ROLES.includes(currentUser.role);
 }
 
@@ -18155,7 +18158,7 @@ function renderMeetingEditor() {
         <button class="btn-ghost" id="meetingBackBtn">← 목록</button>
         <div style="display:flex;gap:8px;align-items:center">
           ${canEdit ? '' : `<span style="font-size:13px;color:var(--gray-500)">읽기 전용 — 작성자(${escHtml(m.author || '?')})와 관리자만 수정할 수 있습니다</span>`}
-          ${(canEdit && _meetingEditingId) ? '<button class="btn-danger" id="meetingDeleteBtn">삭제</button>' : ''}
+          ${_meetingCanDelete() ? '<button class="btn-danger" id="meetingDeleteBtn">삭제</button>' : ''}
           ${canEdit ? '<button class="btn-primary" id="meetingSaveBtn">저장</button>' : ''}
         </div>
       </div>
@@ -18243,8 +18246,10 @@ function _bindMeetingEditor() {
     if (save) save.addEventListener('click', saveMeeting);
     const del = document.getElementById('meetingDeleteBtn');
     if (del) del.addEventListener('click', deleteMeeting);
+    // 삭제는 작성자·관리자만 — 그 외에는 삭제 버튼 숨김
+    if (del && !_meetingCanDelete()) del.style.display = 'none';
 
-    // 수정 권한이 없으면 입력 자체를 잠근다 (DB가 조용히 거부하는 것보다 낫다)
+    // 수정 권한이 없으면(비로그인 등) 입력 자체를 잠근다 (DB가 조용히 거부하는 것보다 낫다)
     if (!_meetingCanEdit()) {
         const box = document.getElementById('meetingsBody');
         box.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; });
