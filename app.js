@@ -17875,6 +17875,7 @@ let _meetingEditingId;         // undefined=목록, null=새 회의록, 숫자=�
 let _meetingDraft = null;      // 편집 중인 회의 객체
 let _meetingActions = [];      // 편집 중인 회의의 액션아이템
 let _meetingActionDone = {};   // { daily_task_id: true/false } — daily_tasks.done 사본
+let _meetingListRerender = {};  // { Agenda: fn, Decisions: fn } — 목록만 다시 그리는 함수(AI 채우기 등에서 사용)
 let _meetingsSearch = '';
 let _meetingDirty = false;     // 편집 중 저장하지 않은 변경이 있는가
 let _meetingDailyDate = '';    // 편집 화면 하단 일일계획표가 보여주는 날짜
@@ -18207,12 +18208,15 @@ function renderMeetingEditor() {
       </div>
 
       <div class="card" style="padding:20px;margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
           <h3 style="margin:0">논의 내용</h3>
-          <label class="btn-ghost" style="margin:0">
-            🖼 이미지 넣기
-            <input type="file" id="meetingImageFile" accept="image/*" multiple hidden>
-          </label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button type="button" class="btn-primary" id="meetingAiBtn" style="font-size:13px" title="논의 내용을 읽고 결정사항·액션아이템을 자동으로 정리합니다">🤖 AI로 결정·액션 뽑기</button>
+            <label class="btn-ghost" style="margin:0">
+              🖼 이미지 넣기
+              <input type="file" id="meetingImageFile" accept="image/*" multiple hidden>
+            </label>
+          </div>
         </div>
         <div id="meetingContent" class="meeting-content" contenteditable="true"
              data-placeholder="내용을 입력하세요. 이미지는 붙여넣기(Ctrl+V) 하거나 끌어다 놓으세요.">${_meetingContentHtml(m.content)}</div>
@@ -18302,6 +18306,7 @@ function _bindMeetingEditor() {
             listEl.innerHTML = _meetingListRowsHtml(kind, _meetingDraft[key], check);
             bindRows();
         };
+        _meetingListRerender[kind] = rerender; // 외부(AI 채우기)에서 이 목록만 다시 그릴 수 있게
 
         function bindRows() {
             if (!listEl) return;
@@ -18374,6 +18379,8 @@ function _bindMeetingEditor() {
     bindList('Agenda', 'agenda', true);
     bindList('Decisions', 'decisions', false);
     _bindMeetingContentImages();
+    const aiBtn = document.getElementById('meetingAiBtn');
+    if (aiBtn) aiBtn.addEventListener('click', aiFillMeeting);
 
     // 어디든 손대면 "미저장" 표시 (저장 시 해제).
     // #meetingsBody는 재렌더돼도 유지되므로 리스너는 딱 한 번만 단다.
@@ -18569,6 +18576,53 @@ async function loadMeetingActions(meetingId) {
     if (ids.length) {
         const { data: tasks } = await sb.from('daily_tasks').select('id, done').in('id', ids);
         (tasks || []).forEach(t => { _meetingActionDone[t.id] = !!t.done; });
+    }
+}
+
+// 🤖 논의 내용을 AI가 읽고 결정사항·액션아이템을 자동으로 채운다
+async function aiFillMeeting() {
+    const btn = document.getElementById('meetingAiBtn');
+    const ce = document.getElementById('meetingContent');
+    const content = ce ? (ce.innerText || '').trim() : '';
+    if (content.length < 5) { showToast('먼저 논의 내용을 작성해주세요'); return; }
+    const hasExisting = (_meetingDraft.decisions && _meetingDraft.decisions.some(d => (d || '').trim()))
+        || _meetingActions.some(a => (a.task || '').trim());
+    if (hasExisting && !confirm('AI가 정리한 결정사항·액션아이템을 기존 목록에 추가할까요?')) return;
+
+    btn.disabled = true; const old = btn.textContent; btn.textContent = '🤖 정리 중...';
+    try {
+        const { data: sess } = await sb.auth.getSession();
+        const token = sess && sess.session && sess.session.access_token;
+        if (!token) { showToast('세션이 만료됐습니다. 다시 로그인하세요'); btn.disabled = false; btn.textContent = old; return; }
+        const attendees = (_meetingDraft.attendees || []).slice();
+        const res = await fetch('/api/meeting-summarize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ content, attendees, today: getTodayStr() }),
+        });
+        const data = await res.json();
+        if (!res.ok) { showToast('AI 정리 실패: ' + (data.error || ('오류 ' + res.status))); btn.disabled = false; btn.textContent = old; return; }
+        const decisions = Array.isArray(data.decisions) ? data.decisions : [];
+        const actionItems = Array.isArray(data.actionItems) ? data.actionItems : [];
+        // 결정사항 추가 + 목록만 재렌더
+        if (!Array.isArray(_meetingDraft.decisions)) _meetingDraft.decisions = [];
+        decisions.forEach(d => { if (d && String(d).trim()) _meetingDraft.decisions.push(String(d).trim()); });
+        if (_meetingListRerender.Decisions) _meetingListRerender.Decisions();
+        // 액션아이템 추가 (담당자는 선택 옵션에 있는 이름만 채택, 없으면 빈칸)
+        const opts = new Set(assigneeOptionList());
+        actionItems.forEach(a => {
+            const assignee = opts.has(a.assignee) ? a.assignee : '';
+            _meetingActions.push({ id: null, task: a.task, assignee, dueDate: a.dueDate || '', dailyTaskId: null });
+        });
+        renderMeetingActions();
+        _meetingDirty = true;
+        if (!decisions.length && !actionItems.length) showToast('AI가 뽑을 결정·액션이 없다고 판단했습니다');
+        else showToast(`AI 정리 완료 — 결정 ${decisions.length}개, 액션 ${actionItems.length}개 추가됨`);
+        btn.disabled = false; btn.textContent = old;
+    } catch (e) {
+        console.error('aiFillMeeting error', e);
+        showToast('오류: ' + ((e && e.message) || e));
+        btn.disabled = false; btn.textContent = old;
     }
 }
 
