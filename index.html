@@ -859,10 +859,15 @@
                         <h2 style="font-size:20px;font-weight:800;color:var(--gray-900);margin-bottom:4px">상품 DB</h2>
                         <p style="font-size:13px;color:var(--gray-500);font-weight:500">제안서 작성에 사용할 상품을 등록·관리합니다</p>
                     </div>
-                    <button class="btn-primary" onclick="openModal('product')" title="F2">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
-                        상품 등록 (F2)
-                    </button>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <button class="btn-ghost" id="pdbCompressBtn" onclick="compressProductImages()" title="상품 이미지 용량을 줄여 데이터 전송량을 절감합니다 (관리자 전용)" style="display:none">
+                            🗜 이미지 용량 줄이기
+                        </button>
+                        <button class="btn-primary" onclick="openModal('product')" title="F2">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
+                            상품 등록 (F2)
+                        </button>
+                    </div>
                 </div>
 
                 <div class="summary-row">
@@ -1743,6 +1748,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=20260703z11"></script>
+    <script src="app.js?v=20260703z12"></script>
 </body>
 </html>

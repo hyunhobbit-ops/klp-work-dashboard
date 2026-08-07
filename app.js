@@ -8550,7 +8550,79 @@ async function dbDeleteProposal(id) {
     return true;
 }
 
+// data URL 이미지를 최대 변(maxPx) 기준으로 줄이고 JPEG로 재인코딩해 용량을 낮춘다.
+// 실패하면 원본을 그대로 돌려줘 데이터가 유실되지 않게 한다.
+function _shrinkDataUrl(dataUrl, maxPx, quality) {
+    return new Promise((resolve) => {
+        try {
+            const img = new Image();
+            img.onload = () => {
+                try {
+                    let w = img.width, h = img.height;
+                    if (!w || !h) { resolve(dataUrl); return; }
+                    if (w > maxPx || h > maxPx) {
+                        const r = Math.min(maxPx / w, maxPx / h);
+                        w = Math.round(w * r); h = Math.round(h * r);
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';           // 투명 PNG → JPEG 시 검게 되는 것 방지
+                    ctx.fillRect(0, 0, w, h);
+                    ctx.drawImage(img, 0, 0, w, h);
+                    const out = canvas.toDataURL('image/jpeg', quality);
+                    resolve(out && out.length < dataUrl.length ? out : dataUrl); // 더 커지면 원본 유지
+                } catch (_) { resolve(dataUrl); }
+            };
+            img.onerror = () => resolve(dataUrl);
+            img.src = dataUrl;
+        } catch (_) { resolve(dataUrl); }
+    });
+}
+
+// 🗜 상품 이미지 일괄 압축 (관리자 전용) — DB에 base64로 박힌 큰 이미지를 줄여 Egress 절감
+async function compressProductImages() {
+    if (!isAdminUser()) { showToast('관리자만 실행할 수 있습니다'); return; }
+    const btn = document.getElementById('pdbCompressBtn');
+    const MAX_PX = 900, QUALITY = 0.82, SKIP_UNDER = 150 * 1024; // 150KB 미만은 건너뜀
+    btn.disabled = true; const old = btn.textContent; btn.textContent = '🗜 불러오는 중...';
+    try {
+        const { data: rows, error } = await sb.from('products').select('id, name, image');
+        if (error) { showToast('불러오기 실패: ' + error.message); btn.disabled = false; btn.textContent = old; return; }
+        const targets = (rows || []).filter(r => typeof r.image === 'string' && r.image.startsWith('data:image/') && r.image.length > SKIP_UNDER);
+        if (!targets.length) { showToast('줄일 이미지가 없습니다 (이미 최적화됨)'); btn.disabled = false; btn.textContent = old; return; }
+        const beforeTotal = targets.reduce((s, r) => s + r.image.length, 0);
+        const mb = (n) => (n / 1024 / 1024).toFixed(1) + 'MB';
+        if (!confirm(`상품 ${targets.length}개의 이미지를 압축합니다.\n현재 약 ${mb(beforeTotal)} → 예상 1~2MB\n\n가로·세로 최대 ${MAX_PX}px로 줄이고 JPEG로 저장합니다. 계속할까요?`)) {
+            btn.disabled = false; btn.textContent = old; return;
+        }
+        let done = 0, failed = 0, afterTotal = 0;
+        for (const r of targets) {
+            btn.textContent = `🗜 압축 중... ${done + 1}/${targets.length}`;
+            const shrunk = await _shrinkDataUrl(r.image, MAX_PX, QUALITY);
+            if (shrunk === r.image) { failed++; afterTotal += r.image.length; continue; } // 변화 없음 → 건너뜀
+            const { error: uErr } = await sb.from('products').update({ image: shrunk }).eq('id', r.id);
+            if (uErr) { console.error('압축 저장 실패', r.id, uErr); failed++; afterTotal += r.image.length; continue; }
+            afterTotal += shrunk.length;
+            done++;
+            const local = productsDB.find(p => p.id === r.id);   // 화면 캐시도 갱신
+            if (local) local.image = shrunk;
+        }
+        try { cacheWrite('productsDB', productsDB); } catch (_) {}
+        try { renderProductDB(); } catch (_) {}
+        showToast(`압축 완료 — ${done}개 처리 (${mb(beforeTotal)} → ${mb(afterTotal)})${failed ? ` / 건너뜀 ${failed}개` : ''}`);
+        btn.disabled = false; btn.textContent = old;
+    } catch (e) {
+        console.error('compressProductImages error', e);
+        showToast('오류: ' + ((e && e.message) || e));
+        btn.disabled = false; btn.textContent = old;
+    }
+}
+
 function renderProductDB() {
+    // 압축 버튼은 관리자에게만
+    const cbtn = document.getElementById('pdbCompressBtn');
+    if (cbtn) cbtn.style.display = (typeof isAdminUser === 'function' && isAdminUser()) ? '' : 'none';
     // 이미지는 지연 로드 — 도착하면 한 번 더 그려서 채움
     if (!_productImagesLoaded) ensureProductImages().then(() => { try { renderProductDB(); } catch (_) {} });
     // 요약 카드
