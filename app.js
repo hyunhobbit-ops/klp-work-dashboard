@@ -18274,6 +18274,8 @@ function renderMeetingEditor() {
         <div id="meetingReviewBox" style="margin-top:12px"></div>
       </div>
 
+      <div class="card" style="padding:20px;margin-bottom:16px" id="meetingDailyCard"></div>
+
       <div class="card" style="padding:20px;margin-bottom:16px">
         <h3 style="margin:0 0 12px">안건</h3>
         ${listEditor('Agenda', m.agenda, true)}
@@ -18300,8 +18302,6 @@ function renderMeetingEditor() {
       </div>
 
       <div class="card" style="padding:20px;margin-bottom:16px" id="meetingActionsCard"></div>
-
-      <div class="card" style="padding:20px;margin-bottom:16px" id="meetingDailyCard"></div>
 
       <div class="card" style="padding:20px" id="meetingMonthlyCard"></div>`;
 
@@ -18788,7 +18788,7 @@ async function renderMeetingDailyBoard() {
 
     card.innerHTML = `
       <div class="meeting-daily-head">
-        <h3 style="margin:0">📋 일일계획표 <span style="font-weight:400;color:var(--gray-500);font-size:13px">— 오늘까지 밀린 미완료 + 선택한 날짜의 완료건</span></h3>
+        <h3 style="margin:0">📋 오늘 해야할 일 <span style="font-weight:400;color:var(--gray-500);font-size:13px">— 오늘까지 밀린 미완료 + 선택한 날짜의 완료건</span></h3>
         <div style="display:flex;gap:8px;align-items:center">
           <input type="date" id="meetingDailyDate" value="${escHtml(date)}">
           <button type="button" class="btn-ghost" id="meetingDailyToday">오늘</button>
@@ -18821,7 +18821,7 @@ async function renderMeetingDailyBoard() {
     const error = undone.error || doneToday.error;
     if (error) {
         console.error('renderMeetingDailyBoard failed', error);
-        board.innerHTML = `<div style="padding:24px;color:var(--red);font-size:13px">일일계획표를 불러오지 못했습니다 — ${escHtml(error.message)}</div>`;
+        board.innerHTML = `<div style="padding:24px;color:var(--red);font-size:13px">오늘 해야할 일을 불러오지 못했습니다 — ${escHtml(error.message)}</div>`;
         return;
     }
 
