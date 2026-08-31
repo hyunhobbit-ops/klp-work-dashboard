@@ -9309,12 +9309,14 @@ function openProposalEditor(id) {
     document.getElementById('proposalListView').style.display = 'none';
     document.getElementById('proposalEditorView').style.display = 'block';
     renderProposalEditor();
+    startProposalAutoSave();
     window.scrollTo(0, 0);
     const mainWrap = document.querySelector('.main-wrap');
     if (mainWrap) mainWrap.scrollTo(0, 0);
 }
 
 function closeProposalEditor() {
+    stopProposalAutoSave();
     editingProposal = null;
     document.getElementById('proposalEditorView').style.display = 'none';
     document.getElementById('proposalEditorView').innerHTML = '';
@@ -9369,6 +9371,7 @@ function renderProposalEditor() {
                 <button class="panel-link" style="padding:8px 14px;border:1px solid var(--gray-200);border-radius:8px;background:var(--white);color:var(--gray-700);font-weight:700" onclick="closeProposalEditor()">← 목록으로</button>
                 <button class="panel-link" style="padding:8px 14px;border:1px solid var(--gray-200);border-radius:8px;background:var(--white);color:var(--gray-700);font-weight:700" onclick="openProposalPreview()">👁 미리보기</button>
                 <button class="btn-primary" onclick="saveProposal()">💾 저장</button>
+                <span id="epAutoSaveStatus" style="font-size:12px;color:var(--gray-500)">30초마다 자동 저장됩니다</span>
             </div>
         </div>
 
@@ -10065,6 +10068,93 @@ function renderProposalPreview() {
             </div>
         </div>
     `;
+}
+
+// ===== 제안서 자동 저장 =====
+// 30초마다, 입력값이 바뀐 경우에만 조용히 저장 (화면 재렌더·목록 닫기 없음)
+const PROPOSAL_AUTOSAVE_MS = 30000;
+let _proposalAutoSaveTimer = null;
+let _proposalAutoSaving = false;
+let _proposalAutoSaveFails = 0;
+let _proposalLastSnapshot = null;
+
+function _epVal(id) { return (document.getElementById(id) || {}).value || ''; }
+function _proposalSnapshot() {
+    return JSON.stringify([
+        _epVal('epTitle'), _epVal('epClientName'), _epVal('epClientContact'), _epVal('epClientPhone'),
+        _epVal('epClientEmail'), _epVal('epValidUntil'), _epVal('epAssignee'), _epVal('epAssigneePhone'),
+        _epVal('epAssigneeEmail'), _epVal('epStatus'), _epVal('epDescription'),
+        (editingProposal && editingProposal.items) || []
+    ]);
+}
+function startProposalAutoSave() {
+    stopProposalAutoSave();
+    _proposalAutoSaveFails = 0;
+    _proposalLastSnapshot = null;
+    _proposalAutoSaveTimer = setInterval(() => { autoSaveProposal(); }, PROPOSAL_AUTOSAVE_MS);
+}
+function stopProposalAutoSave() {
+    if (_proposalAutoSaveTimer) { clearInterval(_proposalAutoSaveTimer); _proposalAutoSaveTimer = null; }
+}
+function _setProposalAutoSaveStatus(text, color) {
+    const el = document.getElementById('epAutoSaveStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = color || 'var(--gray-500)';
+}
+
+async function autoSaveProposal() {
+    if (!editingProposal || !document.getElementById('epTitle')) { stopProposalAutoSave(); return; }
+    if (_proposalAutoSaving) return;
+    const snap = _proposalSnapshot();
+    if (_proposalLastSnapshot === null) { _proposalLastSnapshot = snap; return; } // 첫 주기는 기준만 잡음
+    if (snap === _proposalLastSnapshot) return;                                    // 바뀐 게 없음
+    const title = _epVal('epTitle').trim();
+    const clientName = _epVal('epClientName').trim();
+    if (!title || !clientName) { _setProposalAutoSaveStatus('제목·거래처명을 입력하면 자동 저장됩니다'); return; }
+
+    _proposalAutoSaving = true;
+    _setProposalAutoSaveStatus('자동 저장 중…');
+    try {
+        // DOM → editingProposal (saveProposal 과 동일 필드)
+        editingProposal.title = title;
+        editingProposal.clientName = clientName;
+        editingProposal.clientContact = _epVal('epClientContact').trim();
+        editingProposal.clientPhone = _epVal('epClientPhone').trim();
+        editingProposal.clientEmail = _epVal('epClientEmail').trim();
+        editingProposal.validUntil = _epVal('epValidUntil');
+        editingProposal.assignee = _epVal('epAssignee');
+        editingProposal.assigneePhone = _epVal('epAssigneePhone');
+        editingProposal.assigneeEmail = _epVal('epAssigneeEmail');
+        const newStatus = _epVal('epStatus');
+        if (newStatus === '발송 완료' && !editingProposal.sentDate) editingProposal.sentDate = fmtDate(new Date());
+        editingProposal.status = newStatus;
+        editingProposal.description = _epVal('epDescription').trim();
+        recalcProposalTotal();
+
+        if (editingProposal.id) {
+            const updated = await dbUpdateProposal(editingProposal.id, editingProposal);
+            if (!updated) throw new Error('저장 실패');
+            const idx = proposals.findIndex(p => p.id === editingProposal.id);
+            if (idx >= 0) proposals[idx] = updated;
+        } else {
+            const inserted = await dbInsertProposal(editingProposal);
+            if (!inserted) throw new Error('등록 실패');
+            editingProposal.id = inserted.id;      // 다음 주기부터는 수정으로
+            proposals.unshift(inserted);
+        }
+        _proposalLastSnapshot = snap;
+        _proposalAutoSaveFails = 0;
+        const t = new Date();
+        _setProposalAutoSaveStatus(`자동 저장됨 ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`, 'var(--green)');
+    } catch (e) {
+        console.error('autoSaveProposal failed', e);
+        _proposalAutoSaveFails++;
+        _setProposalAutoSaveStatus('자동 저장 실패 — 저장 버튼을 눌러주세요', 'var(--red)');
+        if (_proposalAutoSaveFails >= 3) stopProposalAutoSave();
+    } finally {
+        _proposalAutoSaving = false;
+    }
 }
 
 async function saveProposal() {
@@ -18163,6 +18253,7 @@ async function _renderMeetingList() {
 async function openMeetingEditor(id) {
     _meetingEditingId = id; // null = 신규
     _meetingDirty = false;
+    startMeetingAutoSave();   // 편집 여는 동안 30초마다 자동 저장
     _meetingReviewId = null; // 회의 바뀌면 이행 점검 패널 접힘
     if (id === null) {
         const now = new Date();
@@ -18184,6 +18275,7 @@ async function openMeetingEditor(id) {
 
 function closeMeetingEditor() {
     if (_meetingDirty && !confirm('저장하지 않은 내용이 있습니다. 목록으로 나가면 사라집니다. 나가시겠어요?')) return;
+    stopMeetingAutoSave();
     _meetingDirty = false;
     _meetingEditingId = undefined;
     _meetingDraft = null;
@@ -18230,6 +18322,7 @@ function renderMeetingEditor() {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <button class="btn-ghost" id="meetingBackBtn">← 목록</button>
         <div style="display:flex;gap:8px;align-items:center">
+          ${canEdit ? '<span id="meetingAutoSaveStatus" style="font-size:12px;color:var(--gray-500)">30초마다 자동 저장됩니다</span>' : ''}
           ${canEdit ? '' : `<span style="font-size:13px;color:var(--gray-500)">읽기 전용 — 작성자(${escHtml(m.author || '?')})와 관리자만 수정할 수 있습니다</span>`}
           ${_meetingCanDelete() ? '<button class="btn-danger" id="meetingDeleteBtn">삭제</button>' : ''}
           ${canEdit ? '<button class="btn-primary" id="meetingSaveBtn">저장</button>' : ''}
@@ -18583,6 +18676,85 @@ function _readMeetingForm() {
     _meetingDraft.content = planningSanitizeHtml(
         (_meetingDraft.content || '').replace(/<span class="meeting-img-uploading"[^>]*>[\s\S]*?<\/span>/g, '')
     );
+}
+
+// ===== 회의록 자동 저장 =====
+// 30초마다, 바뀐 내용이 있을 때만 조용히 저장한다.
+// 화면을 다시 그리지 않는다 — 재렌더하면 입력 중 커서가 튄다.
+const MEETING_AUTOSAVE_MS = 30000;
+let _meetingAutoSaveTimer = null;
+let _meetingAutoSaving = false;
+let _meetingAutoSaveFails = 0;
+
+function startMeetingAutoSave() {
+    stopMeetingAutoSave();
+    _meetingAutoSaveFails = 0;
+    _meetingAutoSaveTimer = setInterval(() => { autoSaveMeeting(); }, MEETING_AUTOSAVE_MS);
+}
+function stopMeetingAutoSave() {
+    if (_meetingAutoSaveTimer) { clearInterval(_meetingAutoSaveTimer); _meetingAutoSaveTimer = null; }
+}
+function _setAutoSaveStatus(text, color) {
+    const el = document.getElementById('meetingAutoSaveStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = color || 'var(--gray-500)';
+}
+// 저장용 정리본을 만든다 — _meetingDraft 를 건드리지 않는다.
+// (빈 안건 행을 draft에서 지우면 화면의 입력칸과 인덱스가 어긋나 오작동한다)
+function _meetingCleanCopy() {
+    _readMeetingFields();
+    const d = _meetingDraft;
+    return Object.assign({}, d, {
+        title: (d.title || '').trim(),
+        location: (d.location || '').trim(),
+        externalAttendees: (d.externalAttendees || '').trim(),
+        client: (d.client || '').trim(),
+        agenda: (d.agenda || []).map(it => ({ text: ((it && it.text) || '').trim(), done: !!(it && it.done) })).filter(it => it.text),
+        decisions: (d.decisions || []).map(s => (s || '').trim()).filter(Boolean),
+        content: planningSanitizeHtml((d.content || '').replace(/<span class="meeting-img-uploading"[^>]*>[\s\S]*?<\/span>/g, '')),
+    });
+}
+
+async function autoSaveMeeting() {
+    if (_meetingEditingId === undefined || !_meetingDraft) { stopMeetingAutoSave(); return; }
+    if (_meetingAutoSaving || !_meetingDirty) return;
+    if (!currentUser || !currentUser.name || !_meetingCanEdit()) return;
+    if (document.querySelector('#meetingContent .meeting-img-uploading')) return; // 이미지 업로드 끝나면 다음 주기에
+    const clean = _meetingCleanCopy();
+    if (!clean.title) { _setAutoSaveStatus('제목을 입력하면 자동 저장됩니다'); return; }
+
+    _meetingAutoSaving = true;
+    _setAutoSaveStatus('자동 저장 중…');
+    try {
+        if (!clean.author) clean.author = (currentUser && currentUser.name) || '';
+        const payload = _meetingToDb(clean);
+        if (_meetingEditingId) {
+            const { data, error } = await sb.from('meetings').update(payload).eq('id', _meetingEditingId).select('id');
+            if (error) throw error;
+            if (!data || !data.length) throw new Error('수정 권한 없음');
+        } else {
+            const { data, error } = await sb.from('meetings').insert(payload).select().single();
+            if (error) throw error;
+            _meetingEditingId = data.id;
+            _meetingDraft.id = data.id;
+            if (!_meetingDraft.author) _meetingDraft.author = clean.author;
+        }
+        await saveMeetingActions();
+        _meetingDirty = false;
+        _meetingAutoSaveFails = 0;
+        const t = new Date();
+        const hh = String(t.getHours()).padStart(2, '0'), mm = String(t.getMinutes()).padStart(2, '0');
+        _setAutoSaveStatus(`자동 저장됨 ${hh}:${mm}`, 'var(--green)');
+    } catch (e) {
+        console.error('autoSaveMeeting failed', e);
+        _meetingAutoSaveFails++;
+        _setAutoSaveStatus('자동 저장 실패 — 저장 버튼을 눌러주세요', 'var(--red)');
+        // 계속 실패하면(DB 차단 등) 그만 두드린다
+        if (_meetingAutoSaveFails >= 3) stopMeetingAutoSave();
+    } finally {
+        _meetingAutoSaving = false;
+    }
 }
 
 async function saveMeeting() {
