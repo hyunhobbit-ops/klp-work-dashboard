@@ -7501,8 +7501,11 @@ function handleMarketingImageUpload(ev) {
     if (!file.type.startsWith('image/')) { showToast('이미지 파일만 업로드 가능합니다'); return; }
     if (file.size > 4 * 1024 * 1024) { showToast('4MB 이하 파일만 업로드 가능합니다'); return; }
     const reader = new FileReader();
-    reader.onload = (e) => {
-        const dataUrl = e.target.result;
+    reader.onload = async (e) => {
+        const raw = e.target.result;
+        // 업로드 시 자동 압축 (최대 900px · JPEG)
+        const dataUrl = await _shrinkDataUrl(raw, 900, 0.82);
+        _toastIfShrunk(raw, dataUrl);
         const hidden = document.getElementById('mktImage');
         if (hidden) hidden.value = dataUrl;
         const preview = document.getElementById('mktImagePreview');
@@ -9028,8 +9031,11 @@ function handleProductImageUpload(ev) {
     if (!file.type.startsWith('image/')) { showToast('이미지 파일만 업로드 가능합니다'); return; }
     if (file.size > 4 * 1024 * 1024) { showToast('4MB 이하 파일만 업로드 가능합니다'); return; }
     const reader = new FileReader();
-    reader.onload = (e) => {
-        const dataUrl = e.target.result;
+    reader.onload = async (e) => {
+        const raw = e.target.result;
+        // 업로드 시 자동 압축 (최대 900px · JPEG) — 원본 그대로 넣으면 DB·전송량이 폭증한다
+        const dataUrl = await _shrinkDataUrl(raw, 900, 0.82);
+        _toastIfShrunk(raw, dataUrl);
         const hidden = document.getElementById('productImage');
         if (hidden) hidden.value = dataUrl;
         const preview = document.getElementById('productImagePreview');
@@ -9037,6 +9043,13 @@ function handleProductImageUpload(ev) {
     };
     reader.onerror = () => showToast('이미지 읽기 실패');
     reader.readAsDataURL(file);
+}
+
+// 눈에 띄게 줄었을 때만 살짝 알려준다 (자동 압축이 됐다는 안심용)
+function _toastIfShrunk(before, after) {
+    if (!before || !after || after.length >= before.length * 0.7) return;
+    const mb = (n) => n >= 1024 * 1024 ? (n / 1024 / 1024).toFixed(1) + 'MB' : Math.round(n / 1024) + 'KB';
+    showToast(`이미지 자동 압축: ${mb(before.length)} → ${mb(after.length)}`);
 }
 
 function clearProductImage() {
