@@ -2653,7 +2653,7 @@ function renderDaily() {
             itemsHtml += `<div class="daily-item overdue-item" onclick="openEditTask(${t.id})" style="cursor:pointer">
                 <div class="daily-checkbox" onclick="event.stopPropagation();toggleTask(${t.id})">${checkSvg}</div>
                 <div class="daily-info">
-                    <div class="daily-title">${t.task}</div>
+                    <div class="daily-title">${big3Star(t)} ${t.task}</div>
                     <div class="daily-meta">
                         <span class="daily-tag ${tagClass}">${tagLabel}</span>
                         ${labelStr}
@@ -2693,7 +2693,7 @@ function renderDaily() {
             itemsHtml += `<div class="daily-item ${t.done ? 'completed' : ''} ${isDeadline ? 'deadline-item' : ''}" onclick="openEditTask(${t.id})" style="cursor:pointer;${isCarry ? 'box-shadow:inset 3px 0 0 #E8590C;' : ''}">
                 <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">${checkSvg}</div>
                 <div class="daily-info">
-                    <div class="daily-title">${t.task}</div>
+                    <div class="daily-title">${big3Star(t)} ${t.task}</div>
                     <div class="daily-meta">
                         <span class="daily-tag ${tagClass}">${tagLabel}</span>
                         ${labelStr}
@@ -2759,7 +2759,7 @@ function renderDaily() {
             return `<div class="daily-item daily-common-item ${t.done ? 'completed' : ''} ${isDeadline ? 'deadline-item' : ''}" onclick="openEditTask(${t.id})" style="cursor:pointer;${isCarry ? 'box-shadow:inset 3px 0 0 #E8590C;' : ''}">
                 <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">${checkSvg}</div>
                 <div class="daily-info">
-                    <div class="daily-title">${t.task}</div>
+                    <div class="daily-title">${big3Star(t)} ${t.task}</div>
                     <div class="daily-meta">
                         <span class="daily-tag ${tagClass}">${tagLabel}</span>
                         ${labelStr}
@@ -2933,7 +2933,7 @@ function renderWeeklyKanban(person) {
                     <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">
                         <svg width="12" height="12" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
                     </div>
-                    <span class="wk-task-name">${t.task}</span>
+                    <span class="wk-task-name">${big3Star(t)} ${t.task}</span>
                 </div>
                 <div class="wk-task-tags">
                     <span class="wk-common-label ${cssClass === 'wk-task-exec' ? 'wk-exec-label' : ''}">${labelText}</span>
@@ -2961,7 +2961,7 @@ function renderWeeklyKanban(person) {
                     <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">
                         <svg width="12" height="12" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
                     </div>
-                    <span class="wk-task-name">${t.task}</span>
+                    <span class="wk-task-name">${big3Star(t)} ${t.task}</span>
                 </div>
                 <div class="wk-task-tags">
                     <span class="daily-tag ${tagClass}">${tagLabel}</span>
@@ -3148,7 +3148,7 @@ function renderMonthlyCalendar(person) {
             return `<div class="mc-task ${cssClass} ${t.done ? 'mc-task-done' : ''} ${isDeadline ? 'mc-task-deadline' : ''}" onclick="event.stopPropagation();openEditTask(${t.id})">
                 <div class="${checkClass}" onclick="event.stopPropagation();toggleTask(${t.id})"><svg width="8" height="8" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
                 <span class="mc-common-label ${cssClass === 'mc-task-exec' ? 'mc-exec-label' : ''}">${labelText}</span>
-                <span class="mc-task-text">${t.task.replace(/\s*\(마감일\)\s*$/, '')}</span>
+                <span class="mc-task-text">${t.big3Rank != null ? '⭐ ' : ''}${t.task.replace(/\s*\(마감일\)\s*$/, '')}</span>
                 ${isDeadline ? '<span class="mc-deadline-badge">🔥 마감일</span>' : ''}
             </div>`;
         }
@@ -3168,7 +3168,7 @@ function renderMonthlyCalendar(person) {
             const checkClass = t.done ? 'mc-check checked' : 'mc-check';
             tasksHtml += `<div class="mc-task ${t.done ? 'mc-task-done' : ''} ${isDeadline ? 'mc-task-deadline' : ''}" onclick="event.stopPropagation();openEditTask(${t.id})">
                 <div class="${checkClass}" onclick="event.stopPropagation();toggleTask(${t.id})"><svg width="8" height="8" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
-                <span class="mc-task-text">${t.task.replace(/\s*\(마감일\)\s*$/, '')}</span>
+                <span class="mc-task-text">${t.big3Rank != null ? '⭐ ' : ''}${t.task.replace(/\s*\(마감일\)\s*$/, '')}</span>
                 ${isDeadline ? '<span class="mc-deadline-badge">🔥 마감일</span>' : ''}
             </div>`;
         });
@@ -5894,8 +5894,40 @@ function taskFromDb(r) {
         isDeadlineCopy: !!r.is_deadline_copy,
         projectId: r.project_id || null,
         completedAt: r.completed_at || null,
-        note: r.note || ''
+        note: r.note || '',
+        // 타임박스(내 하루) 공유 필드
+        startMin: (r.start_min !== undefined ? r.start_min : null),
+        durationMin: (r.duration_min !== undefined ? r.duration_min : null),
+        big3Rank: (r.big3_rank !== undefined ? r.big3_rank : null),
+        category: r.category || null
     };
+}
+
+// ===== BIG 3 (일일계획표 ↔ 타임박스 공유) =====
+// 할 일 제목 앞 별 — 클릭으로 BIG 3 지정/해제
+function big3Star(t) {
+    const on = t.big3Rank != null;
+    return `<span class="daily-big3 ${on ? 'on' : ''}" title="${on ? 'BIG 3 해제' : '오늘 꼭 마쳐야 할 일(BIG 3)로 지정'}" onclick="event.stopPropagation();toggleBig3(${t.id})">${on ? '⭐' : '☆'}</span>`;
+}
+async function toggleBig3(id) {
+    const t = dailyTasks.find(x => x.id === id);
+    if (!t) return;
+    let rank = null;
+    if (t.big3Rank == null) {
+        // 그 담당자의 오늘 활성 BIG 3 개수 (미완료 이월분 + 오늘 것)
+        const today = getTodayStr();
+        const mine = dailyTasks.filter(x => x.assignee === t.assignee && x.big3Rank != null && (!x.done || x.date === today));
+        if (mine.length >= 3) { showToast(`${t.assignee}의 BIG 3가 이미 가득 찼어요 — 하나를 해제하고 지정해주세요`); return; }
+        const used = mine.map(x => x.big3Rank);
+        rank = 1; while (used.includes(rank) && rank < 3) rank++;
+    }
+    const { data, error } = await sb.from('daily_tasks').update({ big3_rank: rank }).eq('id', id).select('id');
+    if (error || !data || !data.length) { showToast('저장 실패' + (error ? ': ' + error.message : '')); return; }
+    t.big3Rank = rank;
+    try { if (typeof _tbxTasks !== 'undefined') { const x = _tbxTasks.find(y => y.id === id); if (x) x.big3_rank = rank; } } catch (_) {}
+    renderDaily();
+    try { if (typeof tbxRenderAll === 'function') tbxRenderAll(); } catch (_) {}
+    showToast(rank != null ? `⭐ BIG 3 ${rank}순위로 지정` : 'BIG 3 해제됨');
 }
 async function loadDailyTasksFromDb() {
     try {
