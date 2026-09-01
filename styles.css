@@ -4005,3 +4005,9 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .daily-big3{cursor:pointer; font-size:12px; opacity:.35; filter:grayscale(1); transition:opacity .12s}
 .daily-big3:hover{opacity:.9; filter:none}
 .daily-big3.on{opacity:1; filter:none}
+.tbx-datenav{display:flex; align-items:center; gap:6px; background:var(--gray-100); border-radius:12px; padding:5px 8px}
+.tbx-datenav button{border:none; background:none; cursor:pointer; font-family:inherit; font-size:13px; color:var(--gray-600); padding:3px 7px; border-radius:8px}
+.tbx-datenav button:hover{background:var(--white); color:var(--gray-900)}
+.tbx-datenav b{font-size:13.5px; min-width:96px; text-align:center}
+.tbx-todaybtn{color:var(--blue) !important; font-weight:700}
+.tbx-routine-badge{flex:none; font-size:11px}

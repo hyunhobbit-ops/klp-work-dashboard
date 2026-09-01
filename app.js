@@ -2634,6 +2634,7 @@ function renderDaily() {
     // 미완료(어제 이전까지) 컬럼 — 개인 탭에서만 노출 (전체 공통 업무는 전체 컬럼에 계속 남김)
     function renderOverdueColumn(person) {
         const overdue = dailyTasks.filter(t =>
+            t.category !== 'me' &&
             t.assignee === person &&
             t.date && t.date < todayStr &&
             !t.done &&
@@ -2738,6 +2739,7 @@ function renderDaily() {
     const renderCommonBar = () => {
         if (!showCommonColumn) return '';
         const commonTasks = dailyTasks.filter(t =>
+            t.category !== 'me' &&
             t.assignee === '전체' &&
             (t.date === todayStr || (t.date && t.date < todayStr && !t.done))
         );
@@ -2795,17 +2797,17 @@ function renderDaily() {
     const renderCommonCols = (includeCeo) => {
         let h = '';
         if (showExecColumn) {
-            const execTasks = dailyTasks.filter(t => t.assignee === '임원' && (t.date === todayStr || isOverdueOpen(t)));
+            const execTasks = dailyTasks.filter(t => t.category !== 'me' && t.assignee === '임원' && (t.date === todayStr || isOverdueOpen(t)));
             h += renderColumn('임원', execTasks, '임원');
         }
         if (includeCeo && showCeoColumn) {
-            const ceoTasks = dailyTasks.filter(t => t.assignee === '대표님' && (t.date === todayStr || isOverdueOpen(t)));
+            const ceoTasks = dailyTasks.filter(t => t.category !== 'me' && t.assignee === '대표님' && (t.date === todayStr || isOverdueOpen(t)));
             h += renderColumn('대표님', ceoTasks, '대표님');
         }
         return h;
     };
     const renderPersonalCols = () => displayPeople.map(person => {
-        const tasks = dailyTasks.filter(t => t.assignee === person && (t.date === todayStr || isOverdueOpen(t)));
+        const tasks = dailyTasks.filter(t => t.category !== 'me' && t.assignee === person && (t.date === todayStr || isOverdueOpen(t)));
         return renderColumn(person, tasks, person);
     }).join('');
 
@@ -2814,7 +2816,7 @@ function renderDaily() {
 
     if (currentPersonFilter === 'ceo') {
         // 대표님 탭: 대표님 컬럼을 맨 앞에, 그 다음 임원 + 미완료
-        const ceoTasks = dailyTasks.filter(t => t.assignee === '대표님' && (t.date === todayStr || isOverdueOpen(t)));
+        const ceoTasks = dailyTasks.filter(t => t.category !== 'me' && t.assignee === '대표님' && (t.date === todayStr || isOverdueOpen(t)));
         html += renderColumn('대표님', ceoTasks, '대표님');
         html += renderCommonCols(false);
         html += renderOverdueColumn('대표님');
@@ -2913,9 +2915,9 @@ function renderWeeklyKanban(person) {
         const isWeekend = i >= 5;
 
         // 전체 할 일 (맨 위) + 임원 할 일 + 개인 할 일
-        const commonTasks = showCommonInKanban ? dailyTasks.filter(t => t.date === dateStr && t.assignee === '전체') : [];
-        const execTasks = showExecInKanban ? dailyTasks.filter(t => t.date === dateStr && t.assignee === '임원') : [];
-        const personalTasks = dailyTasks.filter(t => t.date === dateStr && t.assignee === person);
+        const commonTasks = showCommonInKanban ? dailyTasks.filter(t => t.category !== 'me' && t.date === dateStr && t.assignee === '전체') : [];
+        const execTasks = showExecInKanban ? dailyTasks.filter(t => t.category !== 'me' && t.date === dateStr && t.assignee === '임원') : [];
+        const personalTasks = dailyTasks.filter(t => t.category !== 'me' && t.date === dateStr && t.assignee === person);
         const sortedCommon = [...commonTasks].sort((a, b) => a.done - b.done);
         const sortedExec = [...execTasks].sort((a, b) => a.done - b.done);
         const sortedPersonal = [...personalTasks].sort((a, b) => a.done - b.done);
@@ -3133,9 +3135,9 @@ function renderMonthlyCalendar(person) {
         const isToday = dateStr === todayStr;
         const isWeekend = i % 7 >= 5;
 
-        const commonTasks = showCommonInCalendar ? dailyTasks.filter(t => t.date === dateStr && t.assignee === '전체') : [];
-        const execTasks = showExecInCalendar ? dailyTasks.filter(t => t.date === dateStr && t.assignee === '임원') : [];
-        const personalTasks = dailyTasks.filter(t => t.date === dateStr && t.assignee === person);
+        const commonTasks = showCommonInCalendar ? dailyTasks.filter(t => t.category !== 'me' && t.date === dateStr && t.assignee === '전체') : [];
+        const execTasks = showExecInCalendar ? dailyTasks.filter(t => t.category !== 'me' && t.date === dateStr && t.assignee === '임원') : [];
+        const personalTasks = dailyTasks.filter(t => t.category !== 'me' && t.date === dateStr && t.assignee === person);
         const allTasks = [...commonTasks, ...execTasks, ...personalTasks];
         const doneCount = allTasks.filter(t => t.done).length;
 
@@ -19468,9 +19470,35 @@ const TBX_DAY_START = 6 * 60, TBX_DAY_END = 24 * 60;
 const TBX_CATS = { work: '회사', client: '미팅', meet: '회의', me: '개인' };
 const TBX_CAT_VAR = { work: 'var(--tbx-work)', client: 'var(--tbx-client)', meet: 'var(--tbx-meet)', me: 'var(--tbx-me)' };
 const TBX_CAT_LABEL = { work: '회사 업무', client: '거래처 업무', meet: '회사 업무', me: '개인' };
-let _tbxTasks = [];      // 내 할 일 (오늘 전체 + 밀린 미완료)
+let _tbxTasks = [];      // 내 할 일 (보는 날짜 전체 + 밀린 미완료)
 let _tbxGran = 60;
 let _tbxTimer = null;
+let _tbxDate = null;     // 보고 있는 날짜(YYYY-MM-DD). null=오늘
+let _tbxRoutines = [];   // 내 루틴 (매일 자동 생성)
+
+function tbxViewDate() { return _tbxDate || getTodayStr(); }
+function tbxIsToday() { return tbxViewDate() === getTodayStr(); }
+function tbxFmtMD(ds) { return ds ? (Number(ds.slice(5,7)) + '/' + Number(ds.slice(8,10))) : ''; }
+function tbxShiftDate(delta) {
+    const d = new Date(tbxViewDate() + 'T00:00:00');
+    d.setDate(d.getDate() + delta);
+    _tbxDate = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    if (_tbxDate === getTodayStr()) _tbxDate = null;
+    tbxEnter();
+}
+function tbxGoToday() { _tbxDate = null; tbxEnter(); }
+function tbxRenderDateLabel() {
+    const el = document.getElementById('tbxDateLabel');
+    const btn = document.getElementById('tbxTodayBtn');
+    if (!el) return;
+    const vd = tbxViewDate(), today = getTodayStr();
+    const d = new Date(vd + 'T00:00:00');
+    const dow = '일월화수목금토'[d.getDay()];
+    const diff = Math.round((d - new Date(today + 'T00:00:00')) / 86400000);
+    const rel = diff === 0 ? '오늘' : diff === -1 ? '어제' : diff === 1 ? '내일' : diff === -2 ? '그제' : (diff < 0 ? (-diff) + '일 전' : diff + '일 후');
+    el.textContent = tbxFmtMD(vd) + ' (' + dow + ') ' + rel;
+    if (btn) btn.style.display = tbxIsToday() ? 'none' : '';
+}
 
 function tbxPxPerMin() { return _tbxGran === 60 ? 0.9 : 1.15; }
 function tbxY(min) { return (min - TBX_DAY_START) * tbxPxPerMin(); }
@@ -19495,14 +19523,20 @@ function tbxParse(raw) {
 }
 
 // 파생 뷰: 오늘 블록 / 미배정(브레인덤프) — 과거 날짜의 start_min은 그날의 것이므로 무시
-function tbxBlocks() { return _tbxTasks.filter(t => t.date === getTodayStr() && t.start_min != null); }
-function tbxInboxTasks() { return _tbxTasks.filter(t => !t.done && !(t.date === getTodayStr() && t.start_min != null)); }
-function tbxTopCount() { return _tbxTasks.filter(t => t.big3_rank != null && (!t.done || (t.date === getTodayStr() && t.start_min != null))).length; }
+function tbxBlocks() { return _tbxTasks.filter(t => t.date === tbxViewDate() && t.start_min != null); }
+function tbxInboxTasks() {
+    if (tbxIsToday()) return _tbxTasks.filter(t => !t.done && !(t.date === getTodayStr() && t.start_min != null));
+    return _tbxTasks.filter(t => t.date === tbxViewDate() && t.start_min == null && !t.done);
+}
+function tbxTopCount() { return _tbxTasks.filter(t => t.big3_rank != null && (!t.done || (t.date === tbxViewDate() && t.start_min != null))).length; }
 function tbxDur(t) { return t.duration_min || 60; }
 function tbxCat(t) { return TBX_CAT_VAR[t.category] || TBX_CAT_VAR.work; }
 
 async function tbxEnter() {
     await tbxLoad();
+    await tbxLoadRoutines();
+    await tbxMaterializeRoutines();
+    tbxRenderDateLabel();
     tbxRenderAll();
     if (_tbxTimer) clearInterval(_tbxTimer);
     _tbxTimer = setInterval(() => {
@@ -19516,14 +19550,22 @@ async function tbxLoad() {
     if (!currentUser || !currentUser.name) return;
     const today = getTodayStr();
     // 내 것: (미완료 & 오늘 이전 포함) + (오늘 것 전부) — 미래 예정은 그 날이 오면 자연히 포함됨
+    const COLS = 'id, task, date, done, start_min, duration_min, big3_rank, category, assignee, routine_id';
     const { data, error } = await sb.from('daily_tasks')
-        .select('id, task, date, done, start_min, duration_min, big3_rank, category, assignee')
+        .select(COLS)
         .eq('assignee', currentUser.name)
         .lte('date', today)
         .or(`done.eq.false,date.eq.${today}`)
         .order('id');
     if (error) { console.error('타임박스 로드 실패', error); showToast('불러오기 실패: ' + error.message); return; }
     _tbxTasks = data || [];
+    // 다른 날짜를 보는 중이면 그 날짜의 행(완료 포함)을 추가로 가져와 병합
+    const vd = tbxViewDate();
+    if (vd !== today) {
+        const { data: extra } = await sb.from('daily_tasks').select(COLS)
+            .eq('assignee', currentUser.name).eq('date', vd).order('id');
+        (extra || []).forEach(r => { if (!_tbxTasks.find(x => x.id === r.id)) _tbxTasks.push(r); });
+    }
 }
 
 // 일일계획표·홈 화면도 함께 갱신 (직접 push하면 realtime이 중복으로 무시해 재렌더가 안 됨)
@@ -19552,10 +19594,10 @@ function tbxRenderAll() { tbxRenderTop3(); tbxRenderInbox(); tbxRenderGrid(); tb
 function tbxRenderTop3() {
     const list = document.getElementById('tbxTop3List');
     if (!list) return;
-    const today = getTodayStr();
-    const pending = _tbxTasks.filter(t => t.big3_rank != null && !t.done && !(t.date === today && t.start_min != null))
+    const vday = tbxViewDate();
+    const pending = _tbxTasks.filter(t => t.big3_rank != null && !t.done && !(t.date === vday && t.start_min != null) && (tbxIsToday() || t.date === vday))
         .sort((a, b) => a.big3_rank - b.big3_rank);
-    const scheduled = _tbxTasks.filter(t => t.big3_rank != null && t.date === today && t.start_min != null)
+    const scheduled = _tbxTasks.filter(t => t.big3_rank != null && t.date === vday && t.start_min != null)
         .sort((a, b) => a.start_min - b.start_min);
     const total = pending.length + scheduled.length;
     document.getElementById('tbxTop3Count').textContent = `${total}/3`;
@@ -19593,12 +19635,15 @@ function tbxRenderInbox() {
     const list = document.getElementById('tbxInbox');
     if (!list) return;
     const today = getTodayStr();
-    const items = tbxInboxTasks().filter(t => t.big3_rank == null);
+    // 작성(예정) 날짜가 오래된 순으로 — 이월된 일이 위로 쌓인다
+    const items = tbxInboxTasks().filter(t => t.big3_rank == null)
+        .sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.id - b.id);
     if (!items.length) { list.innerHTML = '<div class="tbx-empty">목록이 비었습니다 🎉<br>모든 일이 자리를 찾았어요.</div>'; return; }
     list.innerHTML = items.map(t => `
         <div class="tbx-task" draggable="true" data-tbxdrag="${t.id}" style="border-left-color:${tbxCat(t)}">
             <button class="tbx-btn tbx-star" data-tbxstar="${t.id}" title="BIG 3로 올리기">⭐</button>
-            ${t.date < today ? `<span class="tbx-fromplan" title="${escHtml(t.date)}부터 밀려온 일">📅</span>` : ''}
+            ${t.routine_id != null ? '<span class="tbx-routine-badge" title="루틴에서 자동 추가된 일">🔁</span>' : ''}
+            ${t.date < today ? `<span class="tbx-fromplan" title="${escHtml(t.date)}부터 밀려온 일">📅 <span class="tbx-when tbx-mono">${tbxFmtMD(t.date)}</span></span>` : ''}
             <span class="tbx-title">${escHtml(t.task)}</span>
             <button class="tbx-catchip" data-tbxcat="${t.id}" title="클릭해서 카테고리 변경"><i style="background:${tbxCat(t)}"></i>${TBX_CATS[t.category] || '회사'}</button>
             <button class="tbx-est tbx-mono" data-tbxest="${t.id}" title="예상 시간 (클릭해서 변경)">${tbxDur(t)}m</button>
@@ -19652,7 +19697,7 @@ async function tbxAutoPlace(id) {
     const t = _tbxTasks.find(x => x.id === id); if (!t) return;
     const s = tbxFindFree(tbxDur(t), Math.max(tbxNowMin(), TBX_DAY_START));
     if (s < 0) { showToast('오늘은 빈 시간이 부족해요 — 블록을 정리해보세요'); return; }
-    if (await tbxUpdate(id, { start_min: s, date: getTodayStr() })) {
+    if (await tbxUpdate(id, { start_min: s, date: tbxViewDate() })) {
         tbxRenderAll();
         showToast(`"${t.task}" → ${tbxFmt(s)} 에 배정됨`);
     }
@@ -19676,9 +19721,10 @@ function tbxRenderGrid() {
         grid.appendChild(hit);
     }
     const nm = tbxNowMin();
+    const isToday = tbxIsToday();
     tbxBlocks().forEach(b => {
         const el = document.createElement('div');
-        el.className = 'tbx-block' + (b.done ? ' done' : '') + (!b.done && nm >= b.start_min && nm < b.start_min + tbxDur(b) ? ' now' : '');
+        el.className = 'tbx-block' + (b.done ? ' done' : '') + (isToday && !b.done && nm >= b.start_min && nm < b.start_min + tbxDur(b) ? ' now' : '');
         el.dataset.id = b.id; el.draggable = true;
         el.style.setProperty('--c', tbxCat(b));
         el.style.top = tbxY(b.start_min) + 'px';
@@ -19724,7 +19770,7 @@ function tbxRenderGrid() {
             document.addEventListener('mouseup', up);
         });
     });
-    if (nm >= TBX_DAY_START && nm <= TBX_DAY_END) {
+    if (isToday && nm >= TBX_DAY_START && nm <= TBX_DAY_END) {
         const nl = document.createElement('div');
         nl.className = 'tbx-nowline'; nl.style.top = tbxY(nm) + 'px';
         grid.appendChild(nl);
@@ -19753,6 +19799,15 @@ function tbxRenderStats() {
 }
 
 function tbxRenderNow() {
+    if (!tbxIsToday()) {
+        const t1 = document.getElementById('tbxNowTitle');
+        const t2 = document.getElementById('tbxNowSub');
+        const ck = document.getElementById('tbxNowClock');
+        if (ck) ck.textContent = tbxFmtMD(tbxViewDate());
+        if (t1) t1.textContent = '다른 날짜 보는 중';
+        if (t2) t2.textContent = '오늘로 돌아가려면 [오늘로]를 누르세요';
+        return;
+    }
     const nm = tbxNowMin();
     const clock = document.getElementById('tbxNowClock');
     if (clock) clock.textContent = tbxFmt(nm);
@@ -19775,7 +19830,7 @@ async function tbxAddTask() {
     const inp = document.getElementById('tbxNewTask');
     const v = (inp.value || '').trim(); if (!v) return;
     const p = tbxParse(v);
-    const row = { task: p.title, date: getTodayStr(), assignee: currentUser.name, done: false,
+    const row = { task: p.title, date: tbxViewDate(), assignee: currentUser.name, done: false,
         category: p.cat, duration_min: p.est, label: TBX_CAT_LABEL[p.cat] };
     const { data, error } = await sb.from('daily_tasks').insert(row).select().single();
     if (error) { showToast('추가 실패: ' + error.message); return; }
@@ -19784,6 +19839,68 @@ async function tbxAddTask() {
     tbxSyncViews();
     inp.value = '';
     tbxRenderInbox();
+}
+
+// ===== 루틴: 매일 자동으로 '할 일'에 추가 =====
+async function tbxLoadRoutines() {
+    if (!currentUser || !currentUser.name) return;
+    const { data, error } = await sb.from('routines').select('*')
+        .eq('assignee', currentUser.name).eq('active', true).order('id');
+    if (error) { console.error('루틴 로드 실패', error); return; }
+    _tbxRoutines = data || [];
+    tbxRenderRoutines();
+}
+// 오늘 날짜에 아직 안 만들어진 루틴을 할 일로 생성 (routine_id로 하루 1회 중복 방지)
+async function tbxMaterializeRoutines() {
+    if (!tbxIsToday() || !_tbxRoutines.length) return;
+    const today = getTodayStr();
+    const have = new Set(_tbxTasks.filter(t => t.routine_id != null && t.date === today).map(t => t.routine_id));
+    let made = 0;
+    for (const r of _tbxRoutines) {
+        if (have.has(r.id)) continue;
+        const row = { task: r.title, date: today, assignee: currentUser.name, done: false,
+            category: r.category || 'work', duration_min: r.duration_min || 60,
+            label: TBX_CAT_LABEL[r.category || 'work'], routine_id: r.id };
+        const { data, error } = await sb.from('daily_tasks').insert(row).select().single();
+        if (!error && data) {
+            _tbxTasks.push(data); made++;
+            try { if (typeof dailyTasks !== 'undefined' && !dailyTasks.find(x => x.id === data.id)) dailyTasks.push(taskFromDb(data)); } catch (_) {}
+        }
+    }
+    if (made) { tbxSyncViews(); showToast('🔁 루틴 ' + made + '건이 오늘 할 일에 추가됐어요'); }
+}
+function tbxRenderRoutines() {
+    const list = document.getElementById('tbxRoutines');
+    if (!list) return;
+    if (!_tbxRoutines.length) { list.innerHTML = '<div class="tbx-empty">루틴이 없습니다.<br>매일 반복할 일을 등록해보세요.</div>'; return; }
+    list.innerHTML = _tbxRoutines.map(r => `
+        <div class="tbx-task" style="border-left-color:${TBX_CAT_VAR[r.category] || TBX_CAT_VAR.work};cursor:default">
+            <span class="tbx-routine-badge">🔁</span>
+            <span class="tbx-title">${escHtml(r.title)}</span>
+            <span class="tbx-est tbx-mono" style="cursor:default">${r.duration_min || 60}m</span>
+            <button class="tbx-btn tbx-del" data-rdel="${r.id}" title="루틴 삭제">✕</button>
+        </div>`).join('');
+    list.querySelectorAll('[data-rdel]').forEach(b => b.addEventListener('click', async () => {
+        if (!confirm('이 루틴을 삭제할까요? (이미 만들어진 할 일은 남습니다)')) return;
+        const { error } = await sb.from('routines').delete().eq('id', Number(b.dataset.rdel));
+        if (error) { showToast('삭제 실패: ' + error.message); return; }
+        _tbxRoutines = _tbxRoutines.filter(r => r.id !== Number(b.dataset.rdel));
+        tbxRenderRoutines();
+    }));
+}
+async function tbxAddRoutine() {
+    const inp = document.getElementById('tbxNewRoutine');
+    const v = (inp.value || '').trim(); if (!v) return;
+    const p = tbxParse(v);
+    const { data, error } = await sb.from('routines').insert({
+        assignee: currentUser.name, title: p.title, category: p.cat, duration_min: p.est
+    }).select().single();
+    if (error) { showToast('루틴 추가 실패: ' + error.message); return; }
+    _tbxRoutines.push(data);
+    inp.value = '';
+    tbxRenderRoutines();
+    await tbxMaterializeRoutines();
+    tbxRenderAll();
 }
 
 function tbxSetGran(g) {
@@ -19807,15 +19924,23 @@ function tbxSetGran(g) {
             e.preventDefault();
             grid.querySelectorAll('.tbx-slot.droptarget').forEach(x => x.classList.remove('droptarget'));
             const data = e.dataTransfer.getData('text/plain'); if (!data) return;
-            const rect = grid.getBoundingClientRect();
-            const dropMin = tbxSnap(tbxMinOfY(e.clientY - rect.top));
+            // 드래그 중 파랗게 표시된 바로 그 칸에 놓는다 (커서 위치 반올림 오차 제거)
+            const hitSlot = e.target.closest && e.target.closest('.tbx-slot');
+            let dropMin;
+            if (hitSlot) dropMin = Number(hitSlot.dataset.min);
+            else {
+                const rect = grid.getBoundingClientRect();
+                const raw = tbxMinOfY(e.clientY - rect.top);
+                dropMin = TBX_DAY_START + Math.floor((raw - TBX_DAY_START) / _tbxGran) * _tbxGran;
+                dropMin = Math.max(TBX_DAY_START, Math.min(TBX_DAY_END - _tbxGran, dropMin));
+            }
             const [kind, idStr] = data.split(':'); const id = Number(idStr);
             const t = _tbxTasks.find(x => x.id === id); if (!t) return;
             const dur = tbxDur(t);
             if (dropMin + dur > TBX_DAY_END) { showToast('하루를 넘어갑니다'); return; }
             if (kind === 'tbx' || kind === 'tbxblk') {
                 if (tbxOverlaps(dropMin, dur, kind === 'tbxblk' ? id : -1)) { showToast('그 시간엔 이미 블록이 있어요'); return; }
-                if (await tbxUpdate(id, { start_min: dropMin, date: getTodayStr() })) tbxRenderAll();
+                if (await tbxUpdate(id, { start_min: dropMin, date: tbxViewDate() })) tbxRenderAll();
             }
         });
         // 빈 칸 클릭 → 그 자리에서 바로 추가
@@ -19838,7 +19963,7 @@ function tbxSetGran(g) {
             let dur = p.est;
             while (tbxOverlaps(qaMin, dur, -1) && dur > 30) dur -= 30;
             if (tbxOverlaps(qaMin, dur, -1)) { showToast('그 시간엔 이미 블록이 있어요'); qa.style.display = 'none'; return; }
-            const row = { task: p.title, date: getTodayStr(), assignee: currentUser.name, done: false,
+            const row = { task: p.title, date: tbxViewDate(), assignee: currentUser.name, done: false,
                 category: p.cat, duration_min: dur, start_min: qaMin, label: TBX_CAT_LABEL[p.cat] };
             const { data, error } = await sb.from('daily_tasks').insert(row).select().single();
             if (error) { showToast('추가 실패: ' + error.message); return; }

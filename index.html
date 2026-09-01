@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260703v">
+    <link rel="stylesheet" href="styles.css?v=20260703w">
     <link rel="stylesheet" href="mobile.css?v=20260507e" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -443,6 +443,12 @@
                         <b id="tbxNowTitle">…</b>
                         <span id="tbxNowSub" class="tbx-now-sub"></span>
                     </div>
+                    <div class="tbx-datenav">
+                        <button onclick="tbxShiftDate(-1)" title="이전 날">◀</button>
+                        <b id="tbxDateLabel">오늘</b>
+                        <button onclick="tbxShiftDate(1)" title="다음 날">▶</button>
+                        <button class="tbx-todaybtn" id="tbxTodayBtn" onclick="tbxGoToday()" style="display:none">오늘로</button>
+                    </div>
                     <div class="tbx-tools">
                         <span class="tbx-chip">계획 <b id="tbxChipPlanned">0시간</b></span>
                         <span class="tbx-chip">완료 <b id="tbxChipDone">0/0</b></span>
@@ -465,7 +471,15 @@
                                 <button class="btn-primary" onclick="tbxAddTask()">추가</button>
                             </div>
                             <div class="tbx-inbox" id="tbxInbox"></div>
-                            <div class="tbx-hint">💡 글자만 쓰고 Enter — 시간·카테고리는 자동(기본 1시간·회사). 카드의 색 점·시간을 클릭해 변경, "보고서 30분"처럼 적어도 인식. ⭐=BIG 3. 일일계획표에 <b>미래 날짜로 적어둔 일은 그 날 아침 여기로</b> 들어옵니다.</div>
+                            <div class="tbx-hint">💡 글자만 쓰고 Enter — 시간·카테고리는 자동(기본 1시간·회사). 카드의 색 점·시간을 클릭해 변경, "보고서 30분"처럼 적어도 인식. ⭐=BIG 3. 일일계획표에 <b>미래 날짜로 적어둔 일은 그 날 아침 여기로</b> 들어옵니다. <b>개인 카테고리는 일일계획표에 표시되지 않습니다.</b></div>
+                        </div>
+                        <div class="card">
+                            <div class="tbx-ph"><h3>🔁 루틴</h3><span class="tbx-sub">매일 자동으로 할 일에 추가</span></div>
+                            <div class="tbx-addrow">
+                                <input type="text" id="tbxNewRoutine" placeholder="예) 아침 이메일 확인 30분" maxlength="80">
+                                <button class="btn-primary" onclick="tbxAddRoutine()">추가</button>
+                            </div>
+                            <div class="tbx-inbox" id="tbxRoutines"></div>
                         </div>
                     </aside>
                     <section class="card tbx-center">
@@ -1826,6 +1840,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=20260703z19"></script>
+    <script src="app.js?v=20260703z20"></script>
 </body>
 </html>
