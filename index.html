@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260703r">
+    <link rel="stylesheet" href="styles.css?v=20260703t">
     <link rel="stylesheet" href="mobile.css?v=20260507e" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -119,6 +119,10 @@
                     <button class="nav-item" data-tab="daily" data-tip="담당자별 일일 업무 — 전체·임원·대표·개인 탭">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span>일일계획표</span>
+                    </button>
+                    <button class="nav-item" data-tab="timebox" data-tip="내 하루를 시간 블록으로 — Brain dump → BIG 3 → 타임라인">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h4M8 16h7"/></svg>
+                        <span>내 하루 (타임박스)</span>
                     </button>
                     <button class="nav-item" data-tab="meetings" data-tip="회의 기록 + 액션아이템을 일일계획표로 전송">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
@@ -428,6 +432,51 @@
                         <div id="csModules" style="display:flex;flex-wrap:wrap;gap:10px 16px;font-size:14px;margin-bottom:14px"></div>
                         <button class="btn btn-primary" id="csSaveModBtn" onclick="saveModules()">메뉴 저장</button>
                     </div>
+                </div>
+            </main>
+
+            <!-- ===== 내 하루 (타임박스) ===== -->
+            <main class="content" id="tab-timebox">
+                <div class="tbx-toolbar">
+                    <div class="tbx-now card" id="tbxNowCard">
+                        <span class="tbx-now-label">NOW <span id="tbxNowClock" class="tbx-mono">--:--</span></span>
+                        <b id="tbxNowTitle">…</b>
+                        <span id="tbxNowSub" class="tbx-now-sub"></span>
+                    </div>
+                    <div class="tbx-tools">
+                        <span class="tbx-chip">계획 <b id="tbxChipPlanned">0시간</b></span>
+                        <span class="tbx-chip">완료 <b id="tbxChipDone">0/0</b></span>
+                        <div class="tbx-gran">
+                            <button id="tbxGran60" class="on" onclick="tbxSetGran(60)">1시간</button>
+                            <button id="tbxGran30" onclick="tbxSetGran(30)">30분</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="tbx-wrap">
+                    <aside class="tbx-left">
+                        <div class="card tbx-top3card">
+                            <div class="tbx-ph"><h3>⭐ 오늘 꼭 마쳐야 할 일 3가지(BIG 3)</h3><span class="tbx-sub" id="tbxTop3Count">0/3</span></div>
+                            <div class="tbx-top3list" id="tbxTop3List"></div>
+                        </div>
+                        <div class="card">
+                            <div class="tbx-ph"><h3>📥 할 일(Brain dump)</h3></div>
+                            <div class="tbx-addrow">
+                                <input type="text" id="tbxNewTask" placeholder="떠오르는 일을 전부 입력 후 Enter" maxlength="80">
+                                <button class="btn-primary" onclick="tbxAddTask()">추가</button>
+                            </div>
+                            <div class="tbx-inbox" id="tbxInbox"></div>
+                            <div class="tbx-hint">💡 글자만 쓰고 Enter — 시간·카테고리는 자동(기본 1시간·회사). 카드의 색 점·시간을 클릭해 변경, "보고서 30분"처럼 적어도 인식. ⭐=BIG 3. 일일계획표에 <b>미래 날짜로 적어둔 일은 그 날 아침 여기로</b> 들어옵니다.</div>
+                        </div>
+                    </aside>
+                    <section class="card tbx-center">
+                        <div class="tbx-ph"><h3>🗓 오늘의 타임라인 <span class="tbx-sub">06:00–24:00 · 빈 칸 클릭 = 바로 추가</span></h3></div>
+                        <div class="tbx-grid" id="tbxGrid">
+                            <div class="tbx-quickadd" id="tbxQuickAdd">
+                                <input type="text" id="tbxQuickInput" placeholder="이 시간에 할 일 입력 후 Enter" maxlength="80">
+                                <button class="btn-primary" onclick="tbxQuickCommit()">추가</button>
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </main>
 
@@ -1748,6 +1797,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=20260703z15"></script>
+    <script src="app.js?v=20260703z16"></script>
 </body>
 </html>

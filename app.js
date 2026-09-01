@@ -677,7 +677,7 @@ function applyModuleGating() {
     const tabModule = {
         'planning':'planning','planning-company':'planning','planning-personal':'planning','planning-funding':'planning',
         'projects-temp':'projects','projects-domestic':'projects','projects-overseas':'projects',
-        'daily':'daily','meetings':'meetings','delivery':'delivery','marketing':'marketing',
+        'daily':'daily','timebox':'daily','meetings':'meetings','delivery':'delivery','marketing':'marketing',
         'marketdb':'marketdb','cash':'cash','product-db':'product-db','proposals':'proposals',
         'docs':'docs','manual':'manual','ceo-vision':'ceo-vision','clients':'clients',
         'clients-overseas':'clients-overseas','quotes':'quotes','margin-calc':'margin-calc','ad-studio':'ad-studio'
@@ -994,6 +994,7 @@ let currentDeliveryMonth = String(new Date().getMonth() + 1).padStart(2, '0');
 // ===== Page Titles =====
 const pageTitles = {
     home: '홈',
+    timebox: '내 하루 (타임박스)',
     'admin-add': '고객사 추가',
     'admin-manage': '고객사 관리',
     'company-settings': '회사 설정',
@@ -1606,6 +1607,8 @@ function switchTab(tabId, fromHistory = false) {
     if (tabId === 'admin-manage') { try { loadAdminCompanyList(); } catch (e) { console.error(e); } }
     // 회사 설정(관리자) 탭 진입 시 렌더
     if (tabId === 'company-settings') { try { renderCompanySettings(); } catch (e) { console.error(e); } }
+    // 내 하루(타임박스) 탭 진입 시 로드+렌더
+    if (tabId === 'timebox') { try { tbxEnter(); } catch (e) { console.error(e); } }
 
     // Close mobile sidebar
     document.getElementById('sidebar').classList.remove('open');
@@ -19422,3 +19425,379 @@ document.addEventListener('click', (e) => {
     _meetingDraft = null;
     _meetingActions = [];
 }, true);
+
+
+// ============================================================
+// 내 하루 (타임박스) — Brain dump → BIG 3 → 타임라인
+// 데이터는 daily_tasks 공유: start_min(자정 기준 분, null=미배정), duration_min, big3_rank, category
+// 일일계획표에 미래 날짜로 적은 일 = 예정 → 그 날짜가 되면 여기 Brain dump에 자동 표시
+// ============================================================
+const TBX_DAY_START = 6 * 60, TBX_DAY_END = 24 * 60;
+const TBX_CATS = { work: '회사', client: '미팅', meet: '회의', me: '개인' };
+const TBX_CAT_VAR = { work: 'var(--tbx-work)', client: 'var(--tbx-client)', meet: 'var(--tbx-meet)', me: 'var(--tbx-me)' };
+const TBX_CAT_LABEL = { work: '회사 업무', client: '거래처 업무', meet: '회사 업무', me: '개인' };
+let _tbxTasks = [];      // 내 할 일 (오늘 전체 + 밀린 미완료)
+let _tbxGran = 60;
+let _tbxTimer = null;
+
+function tbxPxPerMin() { return _tbxGran === 60 ? 0.9 : 1.15; }
+function tbxY(min) { return (min - TBX_DAY_START) * tbxPxPerMin(); }
+function tbxMinOfY(y) { return TBX_DAY_START + Math.round(y / tbxPxPerMin()); }
+function tbxSnap(min) { return Math.max(TBX_DAY_START, Math.min(TBX_DAY_END - _tbxGran, Math.round(min / _tbxGran) * _tbxGran)); }
+function tbxFmt(min) { return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`; }
+function tbxNowMin() { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
+
+// "보고서 30분" → {title:'보고서', est:30, cat}. 카테고리는 단어로 추측, 기본 회사·1시간
+function tbxParse(raw) {
+    let title = raw.trim(), est = 60;
+    const mh = title.match(/(\d+(?:\.\d+)?)\s*시간\s*$/);
+    const mm = title.match(/(\d+)\s*분\s*$/);
+    if (mh) { est = Math.round(parseFloat(mh[1]) * 60); title = title.slice(0, mh.index).trim(); }
+    else if (mm) { est = parseInt(mm[1], 10); title = title.slice(0, mm.index).trim(); }
+    est = Math.max(15, Math.min(240, Math.round(est / 15) * 15));
+    let cat = 'work';
+    if (/회의/.test(title)) cat = 'meet';
+    else if (/미팅|방문|상담/.test(title)) cat = 'client';
+    else if (/점심|저녁|운동|산책|병원|휴식|개인/.test(title)) cat = 'me';
+    return { title: title || raw.trim(), est, cat };
+}
+
+// 파생 뷰: 오늘 블록 / 미배정(브레인덤프) — 과거 날짜의 start_min은 그날의 것이므로 무시
+function tbxBlocks() { return _tbxTasks.filter(t => t.date === getTodayStr() && t.start_min != null); }
+function tbxInboxTasks() { return _tbxTasks.filter(t => !t.done && !(t.date === getTodayStr() && t.start_min != null)); }
+function tbxTopCount() { return _tbxTasks.filter(t => t.big3_rank != null && (!t.done || (t.date === getTodayStr() && t.start_min != null))).length; }
+function tbxDur(t) { return t.duration_min || 60; }
+function tbxCat(t) { return TBX_CAT_VAR[t.category] || TBX_CAT_VAR.work; }
+
+async function tbxEnter() {
+    await tbxLoad();
+    tbxRenderAll();
+    if (_tbxTimer) clearInterval(_tbxTimer);
+    _tbxTimer = setInterval(() => {
+        const tab = document.getElementById('tab-timebox');
+        if (!tab || !tab.classList.contains('active')) { clearInterval(_tbxTimer); _tbxTimer = null; return; }
+        tbxRenderGrid(); tbxRenderNow();
+    }, 60000);
+}
+
+async function tbxLoad() {
+    if (!currentUser || !currentUser.name) return;
+    const today = getTodayStr();
+    // 내 것: (미완료 & 오늘 이전 포함) + (오늘 것 전부) — 미래 예정은 그 날이 오면 자연히 포함됨
+    const { data, error } = await sb.from('daily_tasks')
+        .select('id, task, date, done, start_min, duration_min, big3_rank, category, assignee')
+        .eq('assignee', currentUser.name)
+        .lte('date', today)
+        .or(`done.eq.false,date.eq.${today}`)
+        .order('id');
+    if (error) { console.error('타임박스 로드 실패', error); showToast('불러오기 실패: ' + error.message); return; }
+    _tbxTasks = data || [];
+}
+
+// DB 업데이트 + 로컬/전역 캐시 동기화 (일일계획표 화면과 어긋나지 않게)
+async function tbxUpdate(id, patch) {
+    const { data, error } = await sb.from('daily_tasks').update(patch).eq('id', id).select('id');
+    if (error || !data || !data.length) { showToast('저장 실패' + (error ? ': ' + error.message : '')); return false; }
+    const t = _tbxTasks.find(x => x.id === id);
+    if (t) Object.assign(t, patch);
+    try {
+        const g = (typeof dailyTasks !== 'undefined') ? dailyTasks.find(x => x.id === id) : null;
+        if (g) { if ('done' in patch) g.done = patch.done; if ('date' in patch) g.date = patch.date; }
+    } catch (_) {}
+    return true;
+}
+
+function tbxRenderAll() { tbxRenderTop3(); tbxRenderInbox(); tbxRenderGrid(); tbxRenderStats(); tbxRenderNow(); }
+
+// ===== BIG 3 =====
+function tbxRenderTop3() {
+    const list = document.getElementById('tbxTop3List');
+    if (!list) return;
+    const today = getTodayStr();
+    const pending = _tbxTasks.filter(t => t.big3_rank != null && !t.done && !(t.date === today && t.start_min != null))
+        .sort((a, b) => a.big3_rank - b.big3_rank);
+    const scheduled = _tbxTasks.filter(t => t.big3_rank != null && t.date === today && t.start_min != null)
+        .sort((a, b) => a.start_min - b.start_min);
+    const total = pending.length + scheduled.length;
+    document.getElementById('tbxTop3Count').textContent = `${total}/3`;
+    let rank = 1, html = '';
+    pending.forEach(t => {
+        html += `<div class="tbx-top3item" draggable="true" data-tbxdrag="${t.id}">
+            <span class="tbx-rank">${rank++}</span>
+            <span class="tbx-title">${escHtml(t.task)}</span>
+            <span class="tbx-when tbx-mono">${tbxDur(t)}m</span>
+            <button class="tbx-place" data-tbxplace="${t.id}">배정</button>
+            <button class="tbx-btn" data-tbxunstar="${t.id}" title="목록으로 내리기">↓</button>
+        </div>`;
+    });
+    scheduled.forEach(t => {
+        html += `<div class="tbx-top3item scheduled${t.done ? ' done-item' : ''}">
+            <span class="tbx-rank">${rank++}</span>
+            <span class="tbx-title">${escHtml(t.task)}</span>
+            <span class="tbx-when tbx-mono">${tbxFmt(t.start_min)}</span>
+            <span class="tbx-when">${t.done ? '✅ 완료' : '⏱ 배정됨'}</span>
+        </div>`;
+    });
+    for (let i = total; i < 3; i++) html += `<div class="tbx-top3slot">${i + 1}순위 — 아래 목록에서 ⭐를 눌러 올리세요</div>`;
+    list.innerHTML = html;
+    list.querySelectorAll('[data-tbxdrag]').forEach(el => el.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', 'tbx:' + el.dataset.tbxdrag);
+    }));
+    list.querySelectorAll('[data-tbxplace]').forEach(b => b.addEventListener('click', () => tbxAutoPlace(Number(b.dataset.tbxplace))));
+    list.querySelectorAll('[data-tbxunstar]').forEach(b => b.addEventListener('click', async () => {
+        if (await tbxUpdate(Number(b.dataset.tbxunstar), { big3_rank: null })) tbxRenderAll();
+    }));
+}
+
+// ===== Brain dump =====
+function tbxRenderInbox() {
+    const list = document.getElementById('tbxInbox');
+    if (!list) return;
+    const today = getTodayStr();
+    const items = tbxInboxTasks().filter(t => t.big3_rank == null);
+    if (!items.length) { list.innerHTML = '<div class="tbx-empty">목록이 비었습니다 🎉<br>모든 일이 자리를 찾았어요.</div>'; return; }
+    list.innerHTML = items.map(t => `
+        <div class="tbx-task" draggable="true" data-tbxdrag="${t.id}" style="border-left-color:${tbxCat(t)}">
+            <button class="tbx-btn tbx-star" data-tbxstar="${t.id}" title="BIG 3로 올리기">⭐</button>
+            ${t.date < today ? `<span class="tbx-fromplan" title="${escHtml(t.date)}부터 밀려온 일">📅</span>` : ''}
+            <span class="tbx-title">${escHtml(t.task)}</span>
+            <button class="tbx-catdot" data-tbxcat="${t.id}" title="카테고리: ${TBX_CATS[t.category] || '회사'} (클릭해서 변경)" style="background:${tbxCat(t)}"></button>
+            <button class="tbx-est tbx-mono" data-tbxest="${t.id}" title="예상 시간 (클릭해서 변경)">${tbxDur(t)}m</button>
+            <button class="tbx-place" data-tbxplace="${t.id}">배정</button>
+            <button class="tbx-btn tbx-del" data-tbxdel="${t.id}" title="삭제">✕</button>
+        </div>`).join('');
+    list.querySelectorAll('[data-tbxdrag]').forEach(el => el.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', 'tbx:' + el.dataset.tbxdrag);
+    }));
+    list.querySelectorAll('[data-tbxstar]').forEach(b => b.addEventListener('click', async () => {
+        if (tbxTopCount() >= 3) { showToast('BIG 3가 이미 가득 찼어요 — 하나를 내리고 올려주세요'); return; }
+        const used = _tbxTasks.filter(t => t.big3_rank != null).map(t => t.big3_rank);
+        let rank = 1; while (used.includes(rank) && rank < 3) rank++;
+        if (await tbxUpdate(Number(b.dataset.tbxstar), { big3_rank: rank })) tbxRenderAll();
+    }));
+    const CAT_CYCLE = ['work', 'client', 'meet', 'me'];
+    const EST_CYCLE = [30, 60, 90, 120, 180];
+    list.querySelectorAll('[data-tbxcat]').forEach(b => b.addEventListener('click', async () => {
+        const t = _tbxTasks.find(x => x.id === Number(b.dataset.tbxcat)); if (!t) return;
+        const next = CAT_CYCLE[(CAT_CYCLE.indexOf(t.category) + 1 + CAT_CYCLE.length) % CAT_CYCLE.length] || 'work';
+        if (await tbxUpdate(t.id, { category: next, label: TBX_CAT_LABEL[next] })) tbxRenderInbox();
+    }));
+    list.querySelectorAll('[data-tbxest]').forEach(b => b.addEventListener('click', async () => {
+        const t = _tbxTasks.find(x => x.id === Number(b.dataset.tbxest)); if (!t) return;
+        const i = EST_CYCLE.indexOf(tbxDur(t));
+        const next = EST_CYCLE[(i < 0 ? 1 : i + 1) % EST_CYCLE.length];
+        if (await tbxUpdate(t.id, { duration_min: next })) tbxRenderInbox();
+    }));
+    list.querySelectorAll('[data-tbxplace]').forEach(b => b.addEventListener('click', () => tbxAutoPlace(Number(b.dataset.tbxplace))));
+    list.querySelectorAll('[data-tbxdel]').forEach(b => b.addEventListener('click', async () => {
+        if (!confirm('이 할 일을 삭제할까요?')) return;
+        const { error } = await sb.from('daily_tasks').delete().eq('id', Number(b.dataset.tbxdel));
+        if (error) { showToast('삭제 실패: ' + error.message); return; }
+        _tbxTasks = _tbxTasks.filter(x => x.id !== Number(b.dataset.tbxdel));
+        try { if (typeof dailyTasks !== 'undefined') { const i = dailyTasks.findIndex(x => x.id === Number(b.dataset.tbxdel)); if (i >= 0) dailyTasks.splice(i, 1); } } catch (_) {}
+        tbxRenderAll();
+    }));
+}
+
+// ===== 배치 =====
+function tbxOverlaps(s, d, ignoreId) {
+    return tbxBlocks().some(b => b.id !== ignoreId && s < b.start_min + tbxDur(b) && s + d > b.start_min);
+}
+function tbxFindFree(dur, fromMin) {
+    let s = tbxSnap(Math.max(TBX_DAY_START, fromMin));
+    while (s + dur <= TBX_DAY_END) { if (!tbxOverlaps(s, dur, -1)) return s; s += _tbxGran; }
+    return -1;
+}
+async function tbxAutoPlace(id) {
+    const t = _tbxTasks.find(x => x.id === id); if (!t) return;
+    const s = tbxFindFree(tbxDur(t), Math.max(tbxNowMin(), TBX_DAY_START));
+    if (s < 0) { showToast('오늘은 빈 시간이 부족해요 — 블록을 정리해보세요'); return; }
+    if (await tbxUpdate(id, { start_min: s, date: getTodayStr() })) {
+        tbxRenderAll();
+        showToast(`"${t.task}" → ${tbxFmt(s)} 에 배정됨`);
+    }
+}
+
+// ===== 타임라인 =====
+function tbxRenderGrid() {
+    const grid = document.getElementById('tbxGrid');
+    if (!grid) return;
+    grid.style.height = ((TBX_DAY_END - TBX_DAY_START) * tbxPxPerMin() + 14) + 'px';
+    grid.querySelectorAll('.tbx-hrow,.tbx-slot,.tbx-block,.tbx-nowline').forEach(el => el.remove());
+    for (let m = TBX_DAY_START; m < TBX_DAY_END; m += _tbxGran) {
+        const r = document.createElement('div');
+        if (m % 60 === 0) { r.className = 'tbx-hrow'; r.innerHTML = `<span class="tbx-hlabel tbx-mono">${tbxFmt(m)}</span>`; }
+        else r.className = 'tbx-hrow sub';
+        r.style.top = tbxY(m) + 'px';
+        grid.appendChild(r);
+        const hit = document.createElement('div');
+        hit.className = 'tbx-slot'; hit.dataset.min = m;
+        hit.style.top = tbxY(m) + 'px'; hit.style.height = (_tbxGran * tbxPxPerMin()) + 'px';
+        grid.appendChild(hit);
+    }
+    const nm = tbxNowMin();
+    tbxBlocks().forEach(b => {
+        const el = document.createElement('div');
+        el.className = 'tbx-block' + (b.done ? ' done' : '') + (!b.done && nm >= b.start_min && nm < b.start_min + tbxDur(b) ? ' now' : '');
+        el.dataset.id = b.id; el.draggable = true;
+        el.style.setProperty('--c', tbxCat(b));
+        el.style.top = tbxY(b.start_min) + 'px';
+        el.style.height = Math.max(20, tbxDur(b) * tbxPxPerMin() - 3) + 'px';
+        el.innerHTML = `<div class="tbx-btop">
+            <span class="tbx-btitle">${b.big3_rank != null ? '⭐ ' : ''}${escHtml(b.task)}</span>
+            <span class="tbx-btime tbx-mono">${tbxFmt(b.start_min)}–${tbxFmt(b.start_min + tbxDur(b))}</span>
+            <button class="tbx-bbtn tbx-bdone" title="완료 표시">✓</button>
+            <button class="tbx-bbtn tbx-bx" title="목록으로 되돌리기">↩</button>
+        </div><div class="tbx-resize" title="끌어서 길이 조절"></div>`;
+        grid.appendChild(el);
+        el.querySelector('.tbx-bdone').addEventListener('click', async e => {
+            e.stopPropagation();
+            const done = !b.done;
+            if (await tbxUpdate(b.id, { done, completed_at: done ? new Date().toISOString() : null })) tbxRenderAll();
+        });
+        el.querySelector('.tbx-bx').addEventListener('click', async e => {
+            e.stopPropagation();
+            if (await tbxUpdate(b.id, { start_min: null })) { tbxRenderAll(); showToast('목록으로 되돌렸습니다'); }
+        });
+        el.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', 'tbxblk:' + b.id));
+        el.querySelector('.tbx-resize').addEventListener('mousedown', e => {
+            e.preventDefault(); e.stopPropagation();
+            el.draggable = false;
+            const startY = e.clientY, startDur = tbxDur(b);
+            let nd = startDur;
+            const move = (ev) => {
+                nd = Math.max(_tbxGran, Math.round((startDur + (ev.clientY - startY) / tbxPxPerMin()) / _tbxGran) * _tbxGran);
+                nd = Math.min(TBX_DAY_END - b.start_min, nd);
+                if (!tbxOverlaps(b.start_min, nd, b.id)) {
+                    el.style.height = Math.max(20, nd * tbxPxPerMin() - 3) + 'px';
+                    el.querySelector('.tbx-btime').textContent = `${tbxFmt(b.start_min)}–${tbxFmt(b.start_min + nd)}`;
+                }
+            };
+            const up = async () => {
+                document.removeEventListener('mousemove', move);
+                document.removeEventListener('mouseup', up);
+                el.draggable = true;
+                if (nd !== startDur && !tbxOverlaps(b.start_min, nd, b.id)) await tbxUpdate(b.id, { duration_min: nd });
+                tbxRenderAll();
+            };
+            document.addEventListener('mousemove', move);
+            document.addEventListener('mouseup', up);
+        });
+    });
+    if (nm >= TBX_DAY_START && nm <= TBX_DAY_END) {
+        const nl = document.createElement('div');
+        nl.className = 'tbx-nowline'; nl.style.top = tbxY(nm) + 'px';
+        grid.appendChild(nl);
+    }
+}
+
+function tbxRenderStats() {
+    const blocks = tbxBlocks();
+    const planned = blocks.reduce((s, b) => s + tbxDur(b), 0);
+    const done = blocks.filter(b => b.done).length;
+    const el1 = document.getElementById('tbxChipPlanned');
+    const el2 = document.getElementById('tbxChipDone');
+    if (el1) el1.textContent = (planned / 60).toFixed(1).replace(/\.0$/, '') + '시간';
+    if (el2) el2.textContent = `${done}/${blocks.length}`;
+}
+
+function tbxRenderNow() {
+    const nm = tbxNowMin();
+    const clock = document.getElementById('tbxNowClock');
+    if (clock) clock.textContent = tbxFmt(nm);
+    const cur = tbxBlocks().find(b => !b.done && nm >= b.start_min && nm < b.start_min + tbxDur(b));
+    const titleEl = document.getElementById('tbxNowTitle');
+    const subEl = document.getElementById('tbxNowSub');
+    if (!titleEl || !subEl) return;
+    if (cur) {
+        titleEl.textContent = cur.task;
+        subEl.textContent = `${tbxFmt(cur.start_min)}–${tbxFmt(cur.start_min + tbxDur(cur))} · ${cur.start_min + tbxDur(cur) - nm}분 남음`;
+    } else {
+        const next = tbxBlocks().filter(b => !b.done && b.start_min > nm).sort((a, b) => a.start_min - b.start_min)[0];
+        titleEl.textContent = '지금은 빈 시간';
+        subEl.textContent = next ? `다음: ${tbxFmt(next.start_min)} "${next.task}"` : '남은 블록 없음';
+    }
+}
+
+// ===== 추가/토글 =====
+async function tbxAddTask() {
+    const inp = document.getElementById('tbxNewTask');
+    const v = (inp.value || '').trim(); if (!v) return;
+    const p = tbxParse(v);
+    const row = { task: p.title, date: getTodayStr(), assignee: currentUser.name, done: false,
+        category: p.cat, duration_min: p.est, label: TBX_CAT_LABEL[p.cat] };
+    const { data, error } = await sb.from('daily_tasks').insert(row).select().single();
+    if (error) { showToast('추가 실패: ' + error.message); return; }
+    _tbxTasks.push(data);
+    try { if (typeof dailyTasks !== 'undefined' && typeof taskFromDb === 'function') dailyTasks.push(taskFromDb(data)); } catch (_) {}
+    inp.value = '';
+    tbxRenderInbox();
+}
+
+function tbxSetGran(g) {
+    _tbxGran = g;
+    document.getElementById('tbxGran60').classList.toggle('on', g === 60);
+    document.getElementById('tbxGran30').classList.toggle('on', g === 30);
+    tbxRenderGrid();
+}
+
+// ===== 그리드 상호작용 (드롭 / 빈칸 클릭) =====
+(function tbxBindGridOnce() {
+    document.addEventListener('DOMContentLoaded', () => {
+        const grid = document.getElementById('tbxGrid');
+        if (!grid) return;
+        grid.addEventListener('dragover', e => {
+            e.preventDefault();
+            grid.querySelectorAll('.tbx-slot.droptarget').forEach(x => x.classList.remove('droptarget'));
+            const hit = e.target.closest('.tbx-slot'); if (hit) hit.classList.add('droptarget');
+        });
+        grid.addEventListener('drop', async e => {
+            e.preventDefault();
+            grid.querySelectorAll('.tbx-slot.droptarget').forEach(x => x.classList.remove('droptarget'));
+            const data = e.dataTransfer.getData('text/plain'); if (!data) return;
+            const rect = grid.getBoundingClientRect();
+            const dropMin = tbxSnap(tbxMinOfY(e.clientY - rect.top));
+            const [kind, idStr] = data.split(':'); const id = Number(idStr);
+            const t = _tbxTasks.find(x => x.id === id); if (!t) return;
+            const dur = tbxDur(t);
+            if (dropMin + dur > TBX_DAY_END) { showToast('하루를 넘어갑니다'); return; }
+            if (kind === 'tbx' || kind === 'tbxblk') {
+                if (tbxOverlaps(dropMin, dur, kind === 'tbxblk' ? id : -1)) { showToast('그 시간엔 이미 블록이 있어요'); return; }
+                if (await tbxUpdate(id, { start_min: dropMin, date: getTodayStr() })) tbxRenderAll();
+            }
+        });
+        // 빈 칸 클릭 → 그 자리에서 바로 추가
+        const qa = document.getElementById('tbxQuickAdd');
+        let qaMin = null;
+        grid.addEventListener('click', e => {
+            const hit = e.target.closest('.tbx-slot');
+            if (!hit) { if (!e.target.closest('.tbx-quickadd')) { qa.style.display = 'none'; qaMin = null; } return; }
+            qaMin = Number(hit.dataset.min);
+            qa.style.display = 'flex';
+            qa.style.top = tbxY(qaMin) + 'px';
+            const qi = document.getElementById('tbxQuickInput');
+            qi.value = ''; qi.focus();
+        });
+        window.tbxQuickCommit = async function () {
+            const qi = document.getElementById('tbxQuickInput');
+            const v = (qi.value || '').trim();
+            if (!v || qaMin === null) { qa.style.display = 'none'; qaMin = null; return; }
+            const p = tbxParse(v);
+            let dur = p.est;
+            while (tbxOverlaps(qaMin, dur, -1) && dur > 30) dur -= 30;
+            if (tbxOverlaps(qaMin, dur, -1)) { showToast('그 시간엔 이미 블록이 있어요'); qa.style.display = 'none'; return; }
+            const row = { task: p.title, date: getTodayStr(), assignee: currentUser.name, done: false,
+                category: p.cat, duration_min: dur, start_min: qaMin, label: TBX_CAT_LABEL[p.cat] };
+            const { data, error } = await sb.from('daily_tasks').insert(row).select().single();
+            if (error) { showToast('추가 실패: ' + error.message); return; }
+            _tbxTasks.push(data);
+            qa.style.display = 'none'; qaMin = null;
+            tbxRenderAll();
+        };
+        document.getElementById('tbxQuickInput').addEventListener('keydown', e => {
+            if (e.key === 'Enter') window.tbxQuickCommit();
+            if (e.key === 'Escape') { qa.style.display = 'none'; qaMin = null; }
+        });
+        document.getElementById('tbxNewTask').addEventListener('keydown', e => { if (e.key === 'Enter') tbxAddTask(); });
+    });
+})();
