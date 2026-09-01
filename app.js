@@ -19568,7 +19568,7 @@ function tbxRenderInbox() {
             <button class="tbx-btn tbx-star" data-tbxstar="${t.id}" title="BIG 3로 올리기">⭐</button>
             ${t.date < today ? `<span class="tbx-fromplan" title="${escHtml(t.date)}부터 밀려온 일">📅</span>` : ''}
             <span class="tbx-title">${escHtml(t.task)}</span>
-            <button class="tbx-catdot" data-tbxcat="${t.id}" title="카테고리: ${TBX_CATS[t.category] || '회사'} (클릭해서 변경)" style="background:${tbxCat(t)}"></button>
+            <button class="tbx-catchip" data-tbxcat="${t.id}" title="클릭해서 카테고리 변경"><i style="background:${tbxCat(t)}"></i>${TBX_CATS[t.category] || '회사'}</button>
             <button class="tbx-est tbx-mono" data-tbxest="${t.id}" title="예상 시간 (클릭해서 변경)">${tbxDur(t)}m</button>
             <button class="tbx-place" data-tbxplace="${t.id}">배정</button>
             <button class="tbx-btn tbx-del" data-tbxdel="${t.id}" title="삭제">✕</button>
@@ -19703,10 +19703,21 @@ function tbxRenderStats() {
     const blocks = tbxBlocks();
     const planned = blocks.reduce((s, b) => s + tbxDur(b), 0);
     const done = blocks.filter(b => b.done).length;
+    const h = (m) => (m / 60).toFixed(1).replace(/\.0$/, '') + 'h';
     const el1 = document.getElementById('tbxChipPlanned');
     const el2 = document.getElementById('tbxChipDone');
     if (el1) el1.textContent = (planned / 60).toFixed(1).replace(/\.0$/, '') + '시간';
     if (el2) el2.textContent = `${done}/${blocks.length}`;
+    // 오른쪽 '오늘 요약' 패널
+    const sp = document.getElementById('tbxStPlanned');
+    const sf = document.getElementById('tbxStFree');
+    if (sp) sp.textContent = h(planned);
+    if (sf) sf.textContent = h((TBX_DAY_END - TBX_DAY_START) - planned);
+    const pct = blocks.length ? Math.round(done / blocks.length * 100) : 0;
+    const pf = document.getElementById('tbxProgFill');
+    const pt = document.getElementById('tbxProgText');
+    if (pf) pf.style.width = pct + '%';
+    if (pt) pt.textContent = pct + '%';
 }
 
 function tbxRenderNow() {
