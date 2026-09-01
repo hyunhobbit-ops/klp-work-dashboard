@@ -19494,6 +19494,12 @@ async function tbxLoad() {
     _tbxTasks = data || [];
 }
 
+// 일일계획표·홈 화면도 함께 갱신 (직접 push하면 realtime이 중복으로 무시해 재렌더가 안 됨)
+function tbxSyncViews() {
+    try { renderDaily(); } catch (_) {}
+    try { renderHome(); } catch (_) {}
+}
+
 // DB 업데이트 + 로컬/전역 캐시 동기화 (일일계획표 화면과 어긋나지 않게)
 async function tbxUpdate(id, patch) {
     const { data, error } = await sb.from('daily_tasks').update(patch).eq('id', id).select('id');
@@ -19504,6 +19510,7 @@ async function tbxUpdate(id, patch) {
         const g = (typeof dailyTasks !== 'undefined') ? dailyTasks.find(x => x.id === id) : null;
         if (g) { if ('done' in patch) g.done = patch.done; if ('date' in patch) g.date = patch.date; }
     } catch (_) {}
+    tbxSyncViews();
     return true;
 }
 
@@ -19595,6 +19602,7 @@ function tbxRenderInbox() {
         if (error) { showToast('삭제 실패: ' + error.message); return; }
         _tbxTasks = _tbxTasks.filter(x => x.id !== Number(b.dataset.tbxdel));
         try { if (typeof dailyTasks !== 'undefined') { const i = dailyTasks.findIndex(x => x.id === Number(b.dataset.tbxdel)); if (i >= 0) dailyTasks.splice(i, 1); } } catch (_) {}
+        tbxSyncViews();
         tbxRenderAll();
     }));
 }
@@ -19730,6 +19738,7 @@ async function tbxAddTask() {
     if (error) { showToast('추가 실패: ' + error.message); return; }
     _tbxTasks.push(data);
     try { if (typeof dailyTasks !== 'undefined' && typeof taskFromDb === 'function') dailyTasks.push(taskFromDb(data)); } catch (_) {}
+    tbxSyncViews();
     inp.value = '';
     tbxRenderInbox();
 }
@@ -19791,6 +19800,8 @@ function tbxSetGran(g) {
             const { data, error } = await sb.from('daily_tasks').insert(row).select().single();
             if (error) { showToast('추가 실패: ' + error.message); return; }
             _tbxTasks.push(data);
+            try { if (typeof dailyTasks !== 'undefined' && typeof taskFromDb === 'function' && !dailyTasks.find(x => x.id === data.id)) dailyTasks.push(taskFromDb(data)); } catch (_) {}
+            tbxSyncViews();
             qa.style.display = 'none'; qaMin = null;
             tbxRenderAll();
         };
