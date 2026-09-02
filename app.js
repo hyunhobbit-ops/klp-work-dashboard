@@ -19877,9 +19877,39 @@ function tbxRenderRoutines() {
         <div class="tbx-task" style="border-left-color:${TBX_CAT_VAR[r.category] || TBX_CAT_VAR.work};cursor:default">
             <span class="tbx-routine-badge">🔁</span>
             <span class="tbx-title">${escHtml(r.title)}</span>
-            <span class="tbx-est tbx-mono" style="cursor:default">${r.duration_min || 60}m</span>
+            <button class="tbx-catchip" data-rcat="${r.id}" title="클릭해서 카테고리 변경"><i style="background:${TBX_CAT_VAR[r.category] || TBX_CAT_VAR.work}"></i>${TBX_CATS[r.category] || '회사'}</button>
+            <button class="tbx-est tbx-mono" data-rest="${r.id}" title="예상 시간 (클릭해서 변경)">${r.duration_min || 60}m</button>
             <button class="tbx-btn tbx-del" data-rdel="${r.id}" title="루틴 삭제">✕</button>
         </div>`).join('');
+    const R_CAT_CYCLE = ['work', 'client', 'meet', 'me'];
+    const R_EST_CYCLE = [30, 60, 90, 120, 180];
+    // 루틴의 시간/카테고리 변경 → 루틴 자체 + 오늘 이미 만들어진 할 일에도 반영
+    async function _tbxRoutinePatch(id, patch) {
+        const { error } = await sb.from('routines').update(patch).eq('id', id);
+        if (error) { showToast('루틴 수정 실패: ' + error.message); return false; }
+        const r = _tbxRoutines.find(x => x.id === id);
+        if (r) Object.assign(r, patch);
+        const todayTask = _tbxTasks.find(t => t.routine_id === id && t.date === getTodayStr());
+        if (todayTask) {
+            const tp = {};
+            if (patch.duration_min != null) tp.duration_min = patch.duration_min;
+            if (patch.category != null) { tp.category = patch.category; tp.label = TBX_CAT_LABEL[patch.category]; }
+            await tbxUpdate(todayTask.id, tp);
+        }
+        tbxRenderRoutines();
+        tbxRenderAll();
+        return true;
+    }
+    list.querySelectorAll('[data-rcat]').forEach(b => b.addEventListener('click', () => {
+        const r = _tbxRoutines.find(x => x.id === Number(b.dataset.rcat)); if (!r) return;
+        const next = R_CAT_CYCLE[(R_CAT_CYCLE.indexOf(r.category) + 1 + R_CAT_CYCLE.length) % R_CAT_CYCLE.length] || 'work';
+        _tbxRoutinePatch(r.id, { category: next });
+    }));
+    list.querySelectorAll('[data-rest]').forEach(b => b.addEventListener('click', () => {
+        const r = _tbxRoutines.find(x => x.id === Number(b.dataset.rest)); if (!r) return;
+        const i = R_EST_CYCLE.indexOf(r.duration_min || 60);
+        _tbxRoutinePatch(r.id, { duration_min: R_EST_CYCLE[(i < 0 ? 1 : i + 1) % R_EST_CYCLE.length] });
+    }));
     list.querySelectorAll('[data-rdel]').forEach(b => b.addEventListener('click', async () => {
         if (!confirm('이 루틴을 삭제할까요? (이미 만들어진 할 일은 남습니다)')) return;
         const { error } = await sb.from('routines').delete().eq('id', Number(b.dataset.rdel));
