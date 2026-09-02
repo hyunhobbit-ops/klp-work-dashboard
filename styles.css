@@ -4012,3 +4012,8 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .tbx-datenav b{font-size:13.5px; min-width:96px; text-align:center}
 .tbx-todaybtn{color:var(--blue) !important; font-weight:700}
 .tbx-routine-badge{flex:none; font-size:11px}
+
+/* 타임박스: 상단 설명문 + 재정렬 표시 */
+.tbx-philo-top{font-size:12.5px; color:var(--gray-600); line-height:1.75; margin:0 0 12px; padding:10px 14px; background:var(--gray-50); border:1px solid var(--gray-200); border-radius:12px}
+.tbx-philo-top b{color:var(--gray-800)}
+.tbx-task.reorder-hint{box-shadow:0 -2.5px 0 0 var(--blue)}

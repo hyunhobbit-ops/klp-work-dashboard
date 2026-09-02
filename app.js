@@ -19550,7 +19550,7 @@ async function tbxLoad() {
     if (!currentUser || !currentUser.name) return;
     const today = getTodayStr();
     // 내 것: (미완료 & 오늘 이전 포함) + (오늘 것 전부) — 미래 예정은 그 날이 오면 자연히 포함됨
-    const COLS = 'id, task, date, done, start_min, duration_min, big3_rank, category, assignee, routine_id';
+    const COLS = 'id, task, date, done, start_min, duration_min, big3_rank, category, assignee, routine_id, sort_order';
     const { data, error } = await sb.from('daily_tasks')
         .select(COLS)
         .eq('assignee', currentUser.name)
@@ -19630,14 +19630,65 @@ function tbxRenderTop3() {
     }));
 }
 
+// ===== 목록 내 드래그 재정렬 공통 =====
+function _tbxOrderCmp(a, b) {
+    const ao = a.sort_order, bo = b.sort_order;
+    if (ao != null && bo != null && ao !== bo) return ao - bo;
+    if (ao != null && bo == null) return -1;
+    if (ao == null && bo != null) return 1;
+    return (a.date || '').localeCompare(b.date || '') || a.id - b.id;
+}
+// 컨테이너에서 드롭 위치(몇 번째 앞인지) 계산
+function _tbxDropIndex(container, y) {
+    const items = Array.from(container.querySelectorAll('.tbx-task'));
+    for (let i = 0; i < items.length; i++) {
+        const r = items[i].getBoundingClientRect();
+        if (y < r.top + r.height / 2) return i;
+    }
+    return items.length;
+}
+// 목록 컨테이너에 재정렬 드롭 바인딩 (1회만). getOrdered()=현재 표시 순서 배열, apply(newIds)=순서 저장
+function _tbxBindReorder(container, prefix, getOrdered, apply) {
+    if (container._reorderBound) return;
+    container._reorderBound = true;
+    container.addEventListener('dragover', e => {
+        const data = e.dataTransfer.types.includes('text/plain');
+        if (!data) return;
+        e.preventDefault();
+        container.querySelectorAll('.tbx-task.reorder-hint').forEach(x => x.classList.remove('reorder-hint'));
+        const items = Array.from(container.querySelectorAll('.tbx-task'));
+        const idx = _tbxDropIndex(container, e.clientY);
+        const mark = items[idx] || items[items.length - 1];
+        if (mark) mark.classList.add('reorder-hint');
+    });
+    container.addEventListener('dragleave', e => {
+        if (!container.contains(e.relatedTarget)) container.querySelectorAll('.tbx-task.reorder-hint').forEach(x => x.classList.remove('reorder-hint'));
+    });
+    container.addEventListener('drop', async e => {
+        container.querySelectorAll('.tbx-task.reorder-hint').forEach(x => x.classList.remove('reorder-hint'));
+        const data = e.dataTransfer.getData('text/plain');
+        if (!data || !data.startsWith(prefix + ':')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const id = Number(data.split(':')[1]);
+        const ordered = getOrdered().map(x => x.id);
+        const from = ordered.indexOf(id);
+        if (from < 0) return;
+        let to = _tbxDropIndex(container, e.clientY);
+        ordered.splice(from, 1);
+        if (to > from) to--;
+        ordered.splice(to, 0, id);
+        await apply(ordered);
+    });
+}
+
 // ===== Brain dump =====
 function tbxRenderInbox() {
     const list = document.getElementById('tbxInbox');
     if (!list) return;
     const today = getTodayStr();
-    // 작성(예정) 날짜가 오래된 순으로 — 이월된 일이 위로 쌓인다
-    const items = tbxInboxTasks().filter(t => t.big3_rank == null)
-        .sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.id - b.id);
+    // 수동 순서(sort_order)가 있으면 우선, 없으면 오래된 날짜순 — 이월된 일이 위로 쌓인다
+    const items = tbxInboxTasks().filter(t => t.big3_rank == null).sort(_tbxOrderCmp);
     if (!items.length) { list.innerHTML = '<div class="tbx-empty">목록이 비었습니다 🎉<br>모든 일이 자리를 찾았어요.</div>'; return; }
     list.innerHTML = items.map(t => `
         <div class="tbx-task" draggable="true" data-tbxdrag="${t.id}" style="border-left-color:${tbxCat(t)}">
@@ -19682,6 +19733,19 @@ function tbxRenderInbox() {
         tbxSyncViews();
         tbxRenderAll();
     }));
+    // 목록 안에서 드래그해서 순서 바꾸기
+    _tbxBindReorder(list, 'tbx',
+        () => tbxInboxTasks().filter(t => t.big3_rank == null).sort(_tbxOrderCmp),
+        async (ids) => {
+            await Promise.all(ids.map((id, i) => {
+                const t = _tbxTasks.find(x => x.id === id);
+                const so = (i + 1) * 10;
+                if (!t || t.sort_order === so) return null;
+                t.sort_order = so;
+                return sb.from('daily_tasks').update({ sort_order: so }).eq('id', id);
+            }));
+            tbxRenderInbox();
+        });
 }
 
 // ===== 배치 =====
@@ -19847,7 +19911,12 @@ async function tbxLoadRoutines() {
     const { data, error } = await sb.from('routines').select('*')
         .eq('assignee', currentUser.name).eq('active', true).order('id');
     if (error) { console.error('루틴 로드 실패', error); return; }
-    _tbxRoutines = data || [];
+    _tbxRoutines = (data || []).sort((a, b) => {
+        if (a.sort_order != null && b.sort_order != null && a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+        if (a.sort_order != null && b.sort_order == null) return -1;
+        if (a.sort_order == null && b.sort_order != null) return 1;
+        return a.id - b.id;
+    });
     tbxRenderRoutines();
 }
 // 오늘 날짜에 아직 안 만들어진 루틴을 할 일로 생성 (routine_id로 하루 1회 중복 방지)
@@ -19874,7 +19943,7 @@ function tbxRenderRoutines() {
     if (!list) return;
     if (!_tbxRoutines.length) { list.innerHTML = '<div class="tbx-empty">루틴이 없습니다.<br>매일 반복할 일을 등록해보세요.</div>'; return; }
     list.innerHTML = _tbxRoutines.map(r => `
-        <div class="tbx-task" style="border-left-color:${TBX_CAT_VAR[r.category] || TBX_CAT_VAR.work};cursor:default">
+        <div class="tbx-task" draggable="true" data-rdrag="${r.id}" style="border-left-color:${TBX_CAT_VAR[r.category] || TBX_CAT_VAR.work}">
             <span class="tbx-routine-badge">🔁</span>
             <span class="tbx-title">${escHtml(r.title)}</span>
             <button class="tbx-catchip" data-rcat="${r.id}" title="클릭해서 카테고리 변경"><i style="background:${TBX_CAT_VAR[r.category] || TBX_CAT_VAR.work}"></i>${TBX_CATS[r.category] || '회사'}</button>
@@ -19917,6 +19986,23 @@ function tbxRenderRoutines() {
         _tbxRoutines = _tbxRoutines.filter(r => r.id !== Number(b.dataset.rdel));
         tbxRenderRoutines();
     }));
+    list.querySelectorAll('[data-rdrag]').forEach(el => el.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', 'rtn:' + el.dataset.rdrag);
+    }));
+    // 루틴도 드래그로 순서 바꾸기
+    _tbxBindReorder(list, 'rtn',
+        () => _tbxRoutines.slice(),
+        async (ids) => {
+            _tbxRoutines.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+            await Promise.all(ids.map((id, i) => {
+                const r = _tbxRoutines.find(x => x.id === id);
+                const so = (i + 1) * 10;
+                if (!r || r.sort_order === so) return null;
+                r.sort_order = so;
+                return sb.from('routines').update({ sort_order: so }).eq('id', id);
+            }));
+            tbxRenderRoutines();
+        });
 }
 async function tbxAddRoutine() {
     const inp = document.getElementById('tbxNewRoutine');

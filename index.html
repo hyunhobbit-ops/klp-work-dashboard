@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260703y">
+    <link rel="stylesheet" href="styles.css?v=20260703z">
     <link rel="stylesheet" href="mobile.css?v=20260507e" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -437,6 +437,7 @@
 
             <!-- ===== 내 하루 (타임박스) ===== -->
             <main class="content" id="tab-timebox">
+                <div class="tbx-philo-top">🚀 <b>머스크식 타임박싱</b> — 할 일을 목록이 아니라 <b>시간표 위에</b> 둔다 · 하루를 잘게 쪼개면 시간의 가치를 매번 스스로 묻게 된다 · 못 끝낸 일은 자책 대신 <b>재배치</b> · 빈 시간이 보이면 "이 시간을 쓸 가치가 있는 일인가"를 먼저 · 매 블록마다 <b>"지금 이 시간은 무엇을 위한 시간인가?"</b></div>
                 <div class="tbx-toolbar">
                     <div class="tbx-now card" id="tbxNowCard">
                         <span class="tbx-now-label">NOW <span id="tbxNowClock" class="tbx-mono">--:--</span></span>
@@ -508,16 +509,6 @@
                                 <span><i style="background:var(--tbx-meet)"></i>회의</span>
                                 <span><i style="background:var(--tbx-me)"></i>개인</span>
                             </div>
-                        </div>
-                        <div class="card">
-                            <div class="tbx-ph"><h3>🚀 머스크식 타임박싱</h3></div>
-                            <ul class="tbx-philo">
-                                <li>할 일을 <b>목록이 아니라 시간표 위에</b> 둔다 — 모든 일에 '시간 자리'를 준다.</li>
-                                <li>하루를 잘게 쪼개면 시간의 가치를 매번 스스로 묻게 된다.</li>
-                                <li>못 끝낸 일은 자책 대신 <b>재배치</b> — 목록으로 되돌려 다시 배정.</li>
-                                <li>빈 시간이 보이면 "이 시간을 쓸 가치가 있는 일인가"를 먼저 묻는다.</li>
-                                <li>매 블록마다: <b>"지금 이 시간은 무엇을 위한 시간인가?"</b></li>
-                            </ul>
                         </div>
                     </aside>
                 </div>
@@ -1840,6 +1831,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=20260703z21"></script>
+    <script src="app.js?v=20260703z22"></script>
 </body>
 </html>
