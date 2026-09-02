@@ -4025,3 +4025,8 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .tbx-philo-top ul li{position:relative; padding-left:14px}
 .tbx-philo-top ul li::before{content:''; position:absolute; left:0; top:7px; width:5px; height:5px; border-radius:50%; background:var(--blue)}
 @media (max-width:900px){ .tbx-philo-top{flex-direction:column; gap:8px} }
+
+/* 타임라인 블록: BIG 3 별표 버튼 — 다른 버튼과 달리 항상 보인다 */
+.tbx-block .tbx-bstar{display:inline-flex; width:18px; height:18px; font-size:12px; background:transparent; border-color:transparent; opacity:.45}
+.tbx-block .tbx-bstar:hover{opacity:1; background:var(--white); border-color:var(--gray-300)}
+.tbx-block .tbx-bstar.on{opacity:1}

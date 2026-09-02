@@ -5919,7 +5919,7 @@ async function toggleBig3(id) {
         // 그 담당자의 오늘 활성 BIG 3 개수 (미완료 이월분 + 오늘 것)
         const today = getTodayStr();
         const mine = dailyTasks.filter(x => x.assignee === t.assignee && x.big3Rank != null && (!x.done || x.date === today));
-        if (mine.length >= 3) { showToast(`${t.assignee}의 BIG 3가 이미 가득 찼어요 — 하나를 해제하고 지정해주세요`); return; }
+        if (mine.length >= 3) { alert(`⭐ ${t.assignee}의 BIG 3가 이미 3개로 가득 찼습니다.\n\n"${t.task}"은(는) 등록되지 않았습니다.\n먼저 기존 BIG 3 중 하나의 ⭐를 눌러 해제한 뒤 다시 시도해주세요.`); return; }
         const used = mine.map(x => x.big3Rank);
         rank = 1; while (used.includes(rank) && rank < 3) rank++;
     }
@@ -19529,6 +19529,21 @@ function tbxInboxTasks() {
     return _tbxTasks.filter(t => t.date === tbxViewDate() && t.start_min == null && !t.done);
 }
 function tbxTopCount() { return _tbxTasks.filter(t => t.big3_rank != null && (!t.done || (t.date === tbxViewDate() && t.start_min != null))).length; }
+// ⭐ BIG 3 올리기/내리기 — 할 일 목록·타임라인 블록 공용 (배정된 일도 올릴 수 있다)
+async function tbxToggleBig3(id) {
+    const t = _tbxTasks.find(x => x.id === id); if (!t) return;
+    if (t.big3_rank != null) {
+        if (await tbxUpdate(id, { big3_rank: null })) { tbxRenderAll(); showToast('BIG 3에서 내렸습니다'); }
+        return;
+    }
+    if (tbxTopCount() >= 3) {
+        alert('⭐ 오늘의 BIG 3가 이미 3개로 가득 찼습니다.\n\n"' + t.task + '"은(는) 등록되지 않았습니다.\n먼저 기존 BIG 3 중 하나의 ⭐를 눌러 내린 뒤 다시 시도해주세요.');
+        return;
+    }
+    const used = _tbxTasks.filter(x => x.big3_rank != null).map(x => x.big3_rank);
+    let rank = 1; while (used.includes(rank) && rank < 3) rank++;
+    if (await tbxUpdate(id, { big3_rank: rank })) { tbxRenderAll(); showToast(`⭐ BIG 3 ${rank}순위로 지정`); }
+}
 function tbxDur(t) { return t.duration_min || 60; }
 function tbxCat(t) { return TBX_CAT_VAR[t.category] || TBX_CAT_VAR.work; }
 
@@ -19704,12 +19719,7 @@ function tbxRenderInbox() {
     list.querySelectorAll('[data-tbxdrag]').forEach(el => el.addEventListener('dragstart', e => {
         e.dataTransfer.setData('text/plain', 'tbx:' + el.dataset.tbxdrag);
     }));
-    list.querySelectorAll('[data-tbxstar]').forEach(b => b.addEventListener('click', async () => {
-        if (tbxTopCount() >= 3) { showToast('BIG 3가 이미 가득 찼어요 — 하나를 내리고 올려주세요'); return; }
-        const used = _tbxTasks.filter(t => t.big3_rank != null).map(t => t.big3_rank);
-        let rank = 1; while (used.includes(rank) && rank < 3) rank++;
-        if (await tbxUpdate(Number(b.dataset.tbxstar), { big3_rank: rank })) tbxRenderAll();
-    }));
+    list.querySelectorAll('[data-tbxstar]').forEach(b => b.addEventListener('click', () => tbxToggleBig3(Number(b.dataset.tbxstar))));
     const CAT_CYCLE = ['work', 'client', 'meet', 'me'];
     const EST_CYCLE = [30, 60, 90, 120, 180];
     list.querySelectorAll('[data-tbxcat]').forEach(b => b.addEventListener('click', async () => {
@@ -19794,12 +19804,17 @@ function tbxRenderGrid() {
         el.style.top = tbxY(b.start_min) + 'px';
         el.style.height = Math.max(20, tbxDur(b) * tbxPxPerMin() - 3) + 'px';
         el.innerHTML = `<div class="tbx-btop">
-            <span class="tbx-btitle">${b.big3_rank != null ? '⭐ ' : ''}${escHtml(b.task)}</span>
+            <button class="tbx-bbtn tbx-bstar${b.big3_rank != null ? ' on' : ''}" title="${b.big3_rank != null ? 'BIG 3에서 내리기' : 'BIG 3로 올리기'}">${b.big3_rank != null ? '⭐' : '☆'}</button>
+            <span class="tbx-btitle">${escHtml(b.task)}</span>
             <span class="tbx-btime tbx-mono">${tbxFmt(b.start_min)}–${tbxFmt(b.start_min + tbxDur(b))}</span>
             <button class="tbx-bbtn tbx-bdone" title="완료 표시">✓</button>
             <button class="tbx-bbtn tbx-bx" title="목록으로 되돌리기">↩</button>
         </div><div class="tbx-resize" title="끌어서 길이 조절"></div>`;
         grid.appendChild(el);
+        el.querySelector('.tbx-bstar').addEventListener('click', e => {
+            e.stopPropagation();
+            tbxToggleBig3(b.id);
+        });
         el.querySelector('.tbx-bdone').addEventListener('click', async e => {
             e.stopPropagation();
             const done = !b.done;
