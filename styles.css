@@ -3919,9 +3919,9 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .tbx-gran{display:flex; background:var(--gray-100); border-radius:10px; padding:3px}
 .tbx-gran button{padding:5px 13px; border:none; background:none; border-radius:8px; font-size:12.5px; font-weight:700; color:var(--gray-500); cursor:pointer; font-family:inherit}
 .tbx-gran button.on{background:var(--white); color:var(--blue); box-shadow:0 1px 4px rgba(0,0,0,.08)}
-.tbx-wrap{display:grid; grid-template-columns:440px minmax(0,1fr) 280px; gap:16px; align-items:start}
-@media (max-width:1400px){ .tbx-wrap{grid-template-columns:380px minmax(0,1fr) 260px} }
-@media (max-width:1250px){ .tbx-wrap{grid-template-columns:380px minmax(0,1fr)} .tbx-right{grid-column:1 / -1} }
+.tbx-wrap{display:grid; grid-template-columns:600px minmax(0,1fr) 280px; gap:16px; align-items:start}
+@media (max-width:1500px){ .tbx-wrap{grid-template-columns:480px minmax(0,1fr) 260px} }
+@media (max-width:1250px){ .tbx-wrap{grid-template-columns:420px minmax(0,1fr)} .tbx-right{grid-column:1 / -1} }
 @media (max-width:1000px){ .tbx-wrap{grid-template-columns:1fr} }
 .tbx-ph{display:flex; justify-content:space-between; align-items:center; padding:14px 16px 8px}
 .tbx-ph h3{font-size:14.5px; font-weight:800; margin:0}
