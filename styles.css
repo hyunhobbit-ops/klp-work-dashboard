@@ -4017,3 +4017,11 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .tbx-philo-top{font-size:12.5px; color:var(--gray-600); line-height:1.75; margin:0 0 12px; padding:10px 14px; background:var(--gray-50); border:1px solid var(--gray-200); border-radius:12px}
 .tbx-philo-top b{color:var(--gray-800)}
 .tbx-task.reorder-hint{box-shadow:0 -2.5px 0 0 var(--blue)}
+
+/* 타임박스 상단 설명문: 줄바꿈 목록형 */
+.tbx-philo-top{display:flex; gap:20px; align-items:flex-start}
+.tbx-philo-title{font-weight:800; font-size:13px; color:var(--gray-800); white-space:nowrap; padding-top:1px}
+.tbx-philo-top ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:3px}
+.tbx-philo-top ul li{position:relative; padding-left:14px}
+.tbx-philo-top ul li::before{content:''; position:absolute; left:0; top:7px; width:5px; height:5px; border-radius:50%; background:var(--blue)}
+@media (max-width:900px){ .tbx-philo-top{flex-direction:column; gap:8px} }

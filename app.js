@@ -20094,5 +20094,6 @@ function tbxSetGran(g) {
             if (e.key === 'Escape') { qa.style.display = 'none'; qaMin = null; }
         });
         document.getElementById('tbxNewTask').addEventListener('keydown', e => { if (e.key === 'Enter') tbxAddTask(); });
+        document.getElementById('tbxNewRoutine').addEventListener('keydown', e => { if (e.key === 'Enter') tbxAddRoutine(); });
     });
 })();
