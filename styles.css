@@ -3919,8 +3919,9 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .tbx-gran{display:flex; background:var(--gray-100); border-radius:10px; padding:3px}
 .tbx-gran button{padding:5px 13px; border:none; background:none; border-radius:8px; font-size:12.5px; font-weight:700; color:var(--gray-500); cursor:pointer; font-family:inherit}
 .tbx-gran button.on{background:var(--white); color:var(--blue); box-shadow:0 1px 4px rgba(0,0,0,.08)}
-.tbx-wrap{display:grid; grid-template-columns:330px minmax(0,1fr) 280px; gap:16px; align-items:start}
-@media (max-width:1250px){ .tbx-wrap{grid-template-columns:330px minmax(0,1fr)} .tbx-right{grid-column:1 / -1} }
+.tbx-wrap{display:grid; grid-template-columns:440px minmax(0,1fr) 280px; gap:16px; align-items:start}
+@media (max-width:1400px){ .tbx-wrap{grid-template-columns:380px minmax(0,1fr) 260px} }
+@media (max-width:1250px){ .tbx-wrap{grid-template-columns:380px minmax(0,1fr)} .tbx-right{grid-column:1 / -1} }
 @media (max-width:1000px){ .tbx-wrap{grid-template-columns:1fr} }
 .tbx-ph{display:flex; justify-content:space-between; align-items:center; padding:14px 16px 8px}
 .tbx-ph h3{font-size:14.5px; font-weight:800; margin:0}
@@ -3934,7 +3935,7 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .tbx-top3item.done-item .tbx-title{text-decoration:line-through}
 .tbx-rank{flex:none; width:22px; height:22px; border-radius:50%; background:var(--orange); color:#fff; font-size:12px; font-weight:900; display:inline-flex; align-items:center; justify-content:center}
 .tbx-top3slot{border:1.5px dashed var(--gray-300); border-radius:12px; padding:10px; font-size:12px; color:var(--gray-500); text-align:center}
-.tbx-title{flex:1; font-weight:700; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.tbx-title{flex:1; font-weight:700; font-size:13.5px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; word-break:break-all; line-height:1.35}
 .tbx-when{font-size:11px; color:var(--gray-500); flex:none}
 .tbx-addrow{display:flex; gap:8px; padding:0 16px 12px}
 .tbx-addrow input{flex:1; padding:9px 12px; border:1.5px solid var(--gray-300); border-radius:10px; background:var(--white); color:var(--gray-900); outline:none; font-family:inherit; font-size:14px}
