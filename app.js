@@ -2109,14 +2109,25 @@ function renderHome() {
     });
     document.getElementById('urgentList').innerHTML = urgentHtml || empty('긴급 항목이 없습니다');
 
-    // Today schedule — 로그인 사용자 본인 할 일만
-    const sorted = [...myTodayItems].sort((a, b) => a.done - b.done);
+    // Today schedule — 로그인 사용자 본인 할 일 (지연된 이월분 먼저, 그 다음 오늘)
+    const myOverdue = myName ? dailyTasks.filter(t => t.assignee === myName && !t.done && t.date < todayStr) : [];
+    const sorted = [
+        ...myOverdue.sort((a, b) => (a.date || '').localeCompare(b.date || '')),
+        ...myTodayItems.sort((a, b) => (a.done - b.done) || ((a.startMin ?? 9999) - (b.startMin ?? 9999)))
+    ];
     let taskHtml = '';
     sorted.forEach(t => {
-        taskHtml += `<div class="dash-task-item ${t.done ? 'completed' : ''}">
+        const late = (!t.done && t.date < todayStr)
+            ? Math.round((new Date(todayStr + 'T00:00:00') - new Date(t.date + 'T00:00:00')) / 86400000) : 0;
+        let when = '<span class="dash-task-when muted">—</span>';
+        if (late > 0) when = `<span class="dash-task-when late">${late}일 지연</span>`;
+        else if (t.done) when = '<span class="dash-task-when muted">완료</span>';
+        else if (t.startMin != null) when = `<span class="dash-task-when tbx-mono">${tbxFmt(t.startMin)}</span>`;
+        taskHtml += `<div class="dash-task-item ${t.done ? 'completed' : ''}" ${late > 0 ? 'data-late="1"' : ''}>
             <div class="dash-task-check ${t.done ? 'done' : ''}"></div>
-            <span class="dash-task-name">${t.task}</span>
-            <span class="dash-task-person">${t.assignee}</span>
+            <span class="dash-task-name">${t.big3Rank != null ? '⭐ ' : ''}${escHtml(t.task)}</span>
+            ${when}
+            <span class="dash-task-person">${escHtml(t.assignee)}</span>
         </div>`;
     });
     document.getElementById('todaySchedule').innerHTML = taskHtml || empty('오늘 할 일이 없습니다');

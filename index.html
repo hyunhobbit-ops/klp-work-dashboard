@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260904c">
+    <link rel="stylesheet" href="styles.css?v=20260904e">
     <link rel="stylesheet" href="mobile.css?v=20260507e" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -664,6 +664,16 @@
                             </div>
                             <div class="panel-body" id="todaySchedule"></div>
                         </div>
+                    </div>
+                    <!-- 가운데: 매입매출 현황 + 긴급 항목 -->
+                    <div class="dash-col-mid">
+                        <div class="dash-panel">
+                            <div class="panel-header">
+                                <h2 class="panel-title">매입매출 현황</h2>
+                                <button class="panel-link" onclick="switchTab('projects-domestic')">전체보기 &rarr;</button>
+                            </div>
+                            <div class="panel-body" id="dashProjects"></div>
+                        </div>
                         <div class="dash-panel">
                             <div class="panel-header">
                                 <h2 class="panel-title">긴급 항목</h2>
@@ -672,15 +682,8 @@
                             <div class="panel-body" id="urgentList"></div>
                         </div>
                     </div>
-                    <!-- 우측 (좁음): 매입매출 현황 + 바로가기 -->
+                    <!-- 우측 (좁음): 바로가기 -->
                     <div class="dash-col-right">
-                        <div class="dash-panel">
-                            <div class="panel-header">
-                                <h2 class="panel-title">매입매출 현황</h2>
-                                <button class="panel-link" onclick="switchTab('projects-domestic')">전체보기 &rarr;</button>
-                            </div>
-                            <div class="panel-body" id="dashProjects"></div>
-                        </div>
                         <div class="dash-panel">
                             <div class="panel-header">
                                 <h2 class="panel-title">바로가기</h2>
@@ -1841,6 +1844,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=20260904b"></script>
+    <script src="app.js?v=20260904c"></script>
 </body>
 </html>
