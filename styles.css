@@ -4206,3 +4206,63 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .dash-col-left, .dash-col-right{gap:16px}
 @media (max-width:1500px){ .dash-grid-async{grid-template-columns:1.4fr 1fr} .dash-col-right{grid-column:1 / -1} }
 @media (max-width:1100px){ .dash-grid-async{grid-template-columns:1fr} .dash-col-right{grid-column:auto} }
+
+/* ============================================================
+   리뉴얼 v4 — 보완이 아니라 실제 리뉴얼
+   걷어낼 것: 파스텔 아이콘 타일 · 장식 그라데이션 원 · 큼직한 사이드바 · 16px 라디우스
+   ============================================================ */
+:root{
+    --sidebar-w:230px;
+    --topbar-h:52px;
+    --radius:10px;
+    --radius-sm:9px;
+    --radius-xs:7px;
+}
+
+/* 1. KPI 스트립: 파스텔 아이콘 타일을 없애고 숫자를 주인공으로 */
+.kpi-strip .summary-icon{display:none}
+.kpi-strip .summary-card{flex-direction:column; align-items:flex-start; gap:0; padding:14px 18px}
+.kpi-strip .summary-info{gap:7px}
+.kpi-strip .summary-label{font-size:11.5px; font-weight:700; color:var(--label); letter-spacing:0}
+.kpi-strip .summary-value{font-size:27px; font-weight:900; letter-spacing:-1.2px; line-height:1}
+
+/* 2. 사이드바: 압축하고 그룹 라벨을 작은 캡션으로 (제목처럼 크던 것을 정리) */
+.sidebar-top{padding:15px 13px 11px}
+.sidebar-nav{padding:4px 10px; gap:1px}
+.nav-item{padding:7px 11px; font-size:13px; font-weight:600; gap:11px; border-radius:7px}
+.nav-item.active{background:var(--blue-light); box-shadow:inset 2px 0 0 var(--blue)}
+.nav-group{margin-top:0}
+.nav-group-label{font-size:10.5px; font-weight:800; color:var(--gray-400);
+    letter-spacing:.09em; padding:16px 11px 5px}
+.nav-group-label::after{display:none}
+.nav-group-line{display:none}
+.nav-sub-label{font-size:13px; font-weight:600; padding:7px 11px 2px}
+.nav-sub-item{padding-left:40px !important; font-size:12.5px !important}
+.sidebar-footer{padding:9px 10px}
+
+/* 3. 탑바 압축 */
+.topbar{padding:0 22px}
+.page-title{font-size:16px; letter-spacing:-.4px}
+.topbar-date{font-size:12.5px}
+
+/* 4. 경영목표 배너: 장식 원 제거 + 높이 절반으로 */
+.home-hero{padding:15px 20px; border-radius:10px; margin-bottom:16px}
+.home-hero::before, .home-hero::after{display:none}
+.hero-brand{gap:13px}
+.hero-logo{width:34px; height:34px; border-radius:9px; font-size:15px}
+.hero-company{font-size:16px}
+
+/* 5. 인사말 압축 */
+.home-greeting{margin-bottom:14px}
+.greeting-title{font-size:19px}
+.greeting-sub{font-size:12.5px}
+
+/* 6. 바로가기: 컬러 타일 축소 */
+.quick-mini-icon{width:30px; height:30px; border-radius:8px}
+.quick-mini-card{padding:11px 13px}
+.quick-icon{width:36px; height:36px; border-radius:10px}
+.quick-card{padding:14px 12px}
+
+/* 7. 패널 헤더를 카드 안에서 명확히 분리 */
+.dash-panel .panel-header{border-bottom:1px solid var(--border-soft); padding:12px 16px; margin-bottom:2px}
+.dash-panel .panel-body{padding:4px 16px 12px}
