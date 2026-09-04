@@ -19709,7 +19709,7 @@ function tbxRenderInbox() {
         <div class="tbx-task" draggable="true" data-tbxdrag="${t.id}" style="border-left-color:${tbxCat(t)}">
             <button class="tbx-btn tbx-star" data-tbxstar="${t.id}" title="BIG 3로 올리기">⭐</button>
             ${t.routine_id != null ? '<span class="tbx-routine-badge" title="루틴에서 자동 추가된 일">🔁</span>' : ''}
-            ${t.date < today ? `<span class="tbx-fromplan" title="${escHtml(t.date)}부터 밀려온 일">📅 <span class="tbx-when tbx-mono">${tbxFmtMD(t.date)}</span></span>` : ''}
+            ${t.date < today ? `<span class="tbx-fromplan tbx-mono" title="${escHtml(t.date)}부터 밀려온 일">${tbxFmtMD(t.date)}</span>` : ''}
             <span class="tbx-title">${escHtml(t.task)}</span>
             <button class="tbx-catchip" data-tbxcat="${t.id}" title="클릭해서 카테고리 변경"><i style="background:${tbxCat(t)}"></i>${TBX_CATS[t.category] || '회사'}</button>
             <button class="tbx-est tbx-mono" data-tbxest="${t.id}" title="예상 시간 (클릭해서 변경)">${tbxDur(t)}m</button>

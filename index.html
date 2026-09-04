@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260704c">
+    <link rel="stylesheet" href="styles.css?v=20260904b">
     <link rel="stylesheet" href="mobile.css?v=20260507e" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -437,8 +437,12 @@
 
             <!-- ===== 내 하루 (타임박스) ===== -->
             <main class="content" id="tab-timebox">
-                <div class="tbx-philo-top">
-                    <div class="tbx-philo-title">🚀 머스크식 타임박싱</div>
+                <details class="tbx-philo-top">
+                    <summary>
+                        <span class="tbx-philo-title">머스크식 타임박싱</span>
+                        <span class="tbx-philo-lead">할 일을 목록이 아니라 시간표 위에 둔다 — 모든 일에 '시간 자리'를 준다.</span>
+                        <span class="tbx-philo-more">5가지 원칙 보기</span>
+                    </summary>
                     <ul>
                         <li>할 일을 목록이 아니라 <b>시간표 위에</b> 둔다 — 모든 일에 '시간 자리'를 준다.</li>
                         <li>하루를 잘게 쪼개면 시간의 가치를 매번 스스로 묻게 된다.</li>
@@ -446,13 +450,8 @@
                         <li>빈 시간이 보이면 "이 시간을 쓸 가치가 있는 일인가"를 먼저 묻는다.</li>
                         <li>매 블록마다: <b>"지금 이 시간은 무엇을 위한 시간인가?"</b></li>
                     </ul>
-                </div>
+                </details>
                 <div class="tbx-toolbar">
-                    <div class="tbx-now card" id="tbxNowCard">
-                        <span class="tbx-now-label">NOW <span id="tbxNowClock" class="tbx-mono">--:--</span></span>
-                        <b id="tbxNowTitle">…</b>
-                        <span id="tbxNowSub" class="tbx-now-sub"></span>
-                    </div>
                     <div class="tbx-datenav">
                         <button onclick="tbxShiftDate(-1)" title="이전 날">◀</button>
                         <b id="tbxDateLabel">오늘</b>
@@ -467,6 +466,11 @@
                             <button id="tbxGran30" onclick="tbxSetGran(30)">30분</button>
                         </div>
                     </div>
+                </div>
+                <div class="tbx-now" id="tbxNowCard">
+                    <span class="tbx-now-label">NOW <span id="tbxNowClock" class="tbx-mono">--:--</span></span>
+                    <b id="tbxNowTitle">…</b>
+                    <span id="tbxNowSub" class="tbx-now-sub"></span>
                 </div>
                 <div class="tbx-wrap">
                     <aside class="tbx-left">
@@ -1840,6 +1844,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=20260703z24"></script>
+    <script src="app.js?v=20260904a"></script>
 </body>
 </html>

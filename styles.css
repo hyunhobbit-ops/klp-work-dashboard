@@ -4030,3 +4030,148 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 .tbx-block .tbx-bstar{display:inline-flex; width:18px; height:18px; font-size:12px; background:transparent; border-color:transparent; opacity:.45}
 .tbx-block .tbx-bstar:hover{opacity:1; background:var(--white); border-color:var(--gray-300)}
 .tbx-block .tbx-bstar.on{opacity:1}
+
+/* ============================================================
+   리뉴얼 v3 — 1단계: 공통 토큰 (가독성 기반)
+   원인: 그림자 알파가 0.04라 카드가 배경에서 안 떨어지고,
+        섹션 제목과 카드 제목 크기가 거의 같아 계층이 없었음
+   ============================================================ */
+:root {
+    --border: #dde2e7;       /* 카드 테두리 — 배경과 확실히 분리 */
+    --border-soft: #eceff2;  /* 카드 내부 구분선 */
+    --label: #6b7684;        /* 라벨 기본색 (기존 gray-500보다 진하게) */
+}
+[data-theme="dark"] {
+    --border: #3a4757;
+    --border-soft: #29343f;
+    --label: #b0b8c1;
+}
+
+/* 카드 표면: 보이지 않는 그림자 → 실선 테두리 */
+.summary-card,
+.dash-panel,
+.deadline-card,
+.deadline-soon-panel,
+.quick-card,
+.quick-mini-card,
+.marketing-card {
+    border: 1px solid var(--border);
+    box-shadow: none;
+}
+.summary-card:hover,
+.quick-card:hover,
+.marketing-card:hover {
+    transform: none;
+    border-color: var(--gray-400);
+    box-shadow: none;
+}
+
+/* 타이포 계층 벌리기 */
+.page-title { font-size: 22px; }
+.home-section-title { font-size: 18px; margin-bottom: 12px; letter-spacing: -0.4px; }
+.panel-title { font-size: 15px; font-weight: 800; letter-spacing: -0.3px; }
+.deadline-soon-title { font-size: 14px; }
+
+/* 라벨 대비 올리기 (회색 위 회색 해소) */
+.summary-label,
+.panel-link,
+.deadline-soon-sub,
+.deadline-soon-client { color: var(--label); font-weight: 600; }
+.topbar-date { color: var(--label); font-weight: 600; }
+
+/* 숫자는 자릿수가 흔들리지 않게 */
+.summary-value,
+.deadline-soon-dday,
+.deadline-soon-date,
+.panel-badge,
+.tbx-mono { font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   리뉴얼 v3 — 2단계: 내 하루 (타임박스) — 오늘 집중형
+   ============================================================ */
+
+/* 머스크식 원칙: 한 줄로 접어두고 필요할 때 펼치기 */
+.tbx-philo-top{padding:0; background:var(--gray-50); border:1px solid var(--border-soft); border-radius:10px; margin:0 0 12px}
+.tbx-philo-top > summary{list-style:none; cursor:pointer; display:flex; align-items:center; gap:11px; padding:9px 16px}
+.tbx-philo-top > summary::-webkit-details-marker{display:none}
+.tbx-philo-top .tbx-philo-title{font-size:11.5px; font-weight:800; color:var(--gray-700); flex:none}
+.tbx-philo-top .tbx-philo-lead{font-size:12px; font-weight:500; color:var(--gray-500); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.tbx-philo-top .tbx-philo-more{font-size:11.5px; font-weight:700; color:var(--gray-500); flex:none}
+.tbx-philo-top[open] .tbx-philo-lead{display:none}
+.tbx-philo-top[open] .tbx-philo-more::after{content:' ▲'}
+.tbx-philo-top .tbx-philo-more::after{content:' ▼'}
+.tbx-philo-top > ul{padding:2px 16px 14px}
+
+/* NOW: 검은 배너로 승격 — "지금 뭐 하는 중"이 가장 먼저 읽히게 */
+.tbx-now{display:flex; align-items:center; gap:14px; padding:13px 18px; margin-bottom:14px;
+    background:var(--gray-900); border-radius:12px; border:none}
+.tbx-now-label{font-size:11px; font-weight:800; letter-spacing:.06em; color:var(--gray-400); flex:none}
+.tbx-now b{font-size:16px; font-weight:800; color:var(--white); letter-spacing:-.3px}
+.tbx-now-sub{font-size:12.5px; font-weight:600; color:var(--gray-400)}
+/* 다크에서는 검정이 배경에 묻히므로 브랜드색 틴트로 대비 확보 */
+[data-theme="dark"] .tbx-now{background:color-mix(in srgb, var(--blue) 17%, var(--white));
+    border:1px solid color-mix(in srgb, var(--blue) 40%, transparent)}
+[data-theme="dark"] .tbx-now b{color:var(--gray-900)}
+[data-theme="dark"] .tbx-now-label{color:var(--blue)}
+[data-theme="dark"] .tbx-now-sub{color:var(--gray-600)}
+
+/* 툴바: NOW가 빠져서 날짜 네비와 도구만 */
+.tbx-toolbar{justify-content:space-between; margin-bottom:12px}
+
+/* BIG 3: 순위를 번호 원형으로 승격 */
+.tbx-rank{flex:none; width:22px; height:22px; border-radius:50%; background:var(--gray-900); color:var(--white);
+    font-size:11.5px; font-weight:800; display:flex; align-items:center; justify-content:center; font-variant-numeric:tabular-nums}
+[data-theme="dark"] .tbx-rank{background:var(--blue); color:#fff}
+.tbx-top3item{background:var(--white); border-color:var(--border); padding:11px 13px; gap:11px}
+.tbx-top3item .tbx-title{font-size:14.5px; font-weight:700; letter-spacing:-.2px}
+.tbx-top3slot{border-color:var(--gray-300); padding:11px; font-size:12.5px}
+
+/* 할 일: 카테고리 칩을 가볍게 — 제목이 길게 보이도록 */
+.tbx-catchip{border:none; background:none; padding:3px 4px; color:var(--label); font-weight:700}
+.tbx-catchip:hover{background:var(--gray-100); border-radius:6px}
+.tbx-catchip i{width:7px; height:7px}
+.tbx-task{border-color:var(--border-soft); border-left-width:3px; padding:9px 12px}
+.tbx-task .tbx-title{font-size:13.5px}
+
+/* 이월된 일: 날짜를 배지로 확실히 */
+.tbx-fromplan{flex:none; font-size:11px; font-weight:800; color:#9a3412;
+    background:var(--orange-light); padding:2px 7px; border-radius:5px}
+[data-theme="dark"] .tbx-fromplan{color:var(--orange)}
+
+/* 별표는 항상 보이되 조용하게 */
+.tbx-star{opacity:.35}
+.tbx-star:hover{opacity:1}
+
+/* ============================================================
+   리뉴얼 v3 — 3단계: 홈 — 데이터 콘솔형
+   ============================================================ */
+
+/* 지표 카드 3개 → 한 줄로 이어진 띠 (Motion/Plane 패턴) */
+.summary-row{gap:0; background:var(--white); border:1px solid var(--border);
+    border-radius:12px; overflow:hidden; margin-bottom:20px}
+.summary-card{border:none; border-right:1px solid var(--border-soft); border-radius:0;
+    padding:14px 18px; gap:13px}
+.summary-card:last-child{border-right:none}
+.summary-card:hover{border-color:transparent; border-right-color:var(--border-soft); background:var(--gray-50)}
+.summary-card:last-child:hover{border-right-color:transparent}
+.summary-icon{width:38px; height:38px; border-radius:11px}
+.summary-value{font-size:23px; letter-spacing:-.8px}
+.summary-label{font-size:12px}
+
+/* 마감 카드: 여백을 줄여 한 화면에 더 들어오게 */
+.deadline-cards{gap:12px; margin-bottom:20px}
+.deadline-card{padding:13px 16px; min-height:0; gap:8px; border-top-width:3px}
+
+/* 패널: 헤더/본문 여백 축소 + 행 밀도 상향 */
+.deadline-soon-panel{padding:14px 18px; margin-bottom:20px}
+.deadline-soon-item{padding:8px 4px}
+.panel-header{padding:14px 18px 8px}
+.panel-body{padding:0 18px 14px}
+
+/* 바로가기: 카드 크기 축소 */
+.quick-card{padding:16px 14px; gap:8px}
+.quick-icon{width:42px; height:42px; border-radius:13px}
+.quick-label{font-size:13px}
+
+/* 본문 여백 */
+.content{padding:20px 28px 32px}

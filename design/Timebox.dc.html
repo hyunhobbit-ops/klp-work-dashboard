@@ -1,0 +1,392 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Pretendard', 'Noto Sans KR', -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #2b6cb0; text-decoration: none; } a:hover { color: #1b4e85; }
+    .num { font-variant-numeric: tabular-nums; }
+  </style>
+</helmet>
+
+<div style="width: 1600px; height: 980px; display: flex; background: #ffffff; color: #191f28; overflow: hidden;">
+
+  <!-- ============ SIDEBAR ============ -->
+  <div style="width: 236px; flex: none; background: #fafbfc; border-right: 1px solid #eceff2; display: flex; flex-direction: column;">
+    <div style="padding: 18px 16px 14px; display: flex; align-items: center; gap: 9px;">
+      <div style="width: 26px; height: 26px; border-radius: 7px; background: #191f28; display: flex; align-items: center; justify-content: center;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-6 9 6v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+      </div>
+      <div style="font-size: 14px; font-weight: 700; letter-spacing: -0.3px;">케이엘피코리아</div>
+    </div>
+
+    <div style="flex: 1; padding: 6px 10px; display: flex; flex-direction: column; gap: 2px; overflow: hidden;">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-6 9 6v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">홈</span>
+      </div>
+
+      <div style="font-size: 10.5px; font-weight: 800; color: #b0b8c1; letter-spacing: 0.7px; padding: 14px 10px 5px;">업무</div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18"></path></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">일일계획표</span>
+        <span class="num" style="font-size: 11px; font-weight: 800; color: #f04452; background: #fff0f0; padding: 1px 6px; border-radius: 20px;">2</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px; background: #191f28;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+        <span style="font-size: 13px; font-weight: 700; color: #ffffff;">내 하루</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"></path></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">회의록</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3z"></path><path d="M3 11h18"></path></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">매입매출</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h13l3 5v7H4z"></path><circle cx="8" cy="18" r="1.6"></circle><circle cx="17" cy="18" r="1.6"></circle></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">택배 관리</span>
+      </div>
+
+      <div style="font-size: 10.5px; font-weight: 800; color: #b0b8c1; letter-spacing: 0.7px; padding: 14px 10px 5px;">제안서</div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"></path><path d="M14 3v5h5"></path></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">제안서 관리</span>
+      </div>
+    </div>
+
+    <div style="padding: 10px; display: flex; align-items: center; gap: 9px;">
+      <div style="width: 28px; height: 28px; border-radius: 50%; background: #191f28; color: #ffffff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;">현호</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 12.5px; font-weight: 700;">김현호</div>
+        <div style="font-size: 11px; color: #8b95a1; font-weight: 500;">관리자</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MAIN ============ -->
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 26px 32px 22px; gap: 16px;">
+
+    <!-- header -->
+    <div style="flex: none; display: flex; align-items: flex-end; gap: 20px;">
+      <div style="flex: 1; min-width: 0;">
+        <div class="num" style="font-size: 12.5px; font-weight: 700; color: #8b95a1; letter-spacing: 0.2px;">2026년 9월 4일 금요일</div>
+        <div style="font-size: 27px; font-weight: 900; letter-spacing: -1.1px; margin-top: 5px; line-height: 1.2;">내 하루</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 2px; height: 34px; padding: 0 4px; border: 1px solid #e5e8eb; border-radius: 9px; background: #ffffff;">
+          <div style="width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4e5968" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+          </div>
+          <span class="num" style="font-size: 13px; font-weight: 800; padding: 0 8px;">9/4 (금) 오늘</span>
+          <div style="width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4e5968" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"></path></svg>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; height: 34px; padding: 3px; border: 1px solid #e5e8eb; border-radius: 9px; background: #f7f8fa;">
+          <div style="padding: 0 12px; height: 26px; border-radius: 6px; background: #ffffff; display: flex; align-items: center; box-shadow: 0 1px 2px rgba(16,24,40,0.06);"><span style="font-size: 12.5px; font-weight: 700;">1시간</span></div>
+          <div style="padding: 0 12px; height: 26px; display: flex; align-items: center;"><span style="font-size: 12.5px; font-weight: 600; color: #8b95a1;">30분</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOW banner -->
+    <div style="flex: none; display: flex; align-items: center; gap: 16px; padding: 13px 18px; border-radius: 12px; background: #191f28; color: #ffffff;">
+      <span class="num" style="font-size: 11px; font-weight: 800; letter-spacing: 0.8px; color: #8b95a1;">NOW 14:31</span>
+      <div style="width: 1px; height: 16px; background: #3a4552;"></div>
+      <span style="font-size: 15px; font-weight: 800; letter-spacing: -0.3px;">옥탄 최종 샘플 3D 프린팅</span>
+      <span class="num" style="font-size: 12.5px; font-weight: 600; color: #b0b8c1;">15:00까지 · 29분 남음</span>
+      <div style="flex: 1; max-width: 260px; height: 5px; border-radius: 3px; background: #3a4552; overflow: hidden;">
+        <div style="width: 52%; height: 100%; background: #ffffff; border-radius: 3px;"></div>
+      </div>
+      <div style="flex: 1;"></div>
+      <span class="num" style="font-size: 12.5px; font-weight: 700; color: #b0b8c1;">계획 3시간 · 완료 2/6</span>
+    </div>
+
+    <!-- philosophy strip (collapsed) -->
+    <div style="flex: none; display: flex; align-items: center; gap: 11px; padding: 9px 16px; border: 1px solid #eceff2; border-radius: 10px; background: #fbfbfc;">
+      <span style="font-size: 11.5px; font-weight: 800; color: #6b7684; letter-spacing: -0.1px; flex: none;">머스크식 타임박싱</span>
+      <span style="width: 3px; height: 3px; border-radius: 50%; background: #d1d6db; flex: none;"></span>
+      <span style="font-size: 12px; font-weight: 500; color: #8b95a1; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">할 일을 목록이 아니라 시간표 위에 둔다 — 모든 일에 '시간 자리'를 준다.</span>
+      <div style="display: flex; align-items: center; gap: 4px; flex: none;">
+        <span style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">5가지 원칙 보기</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+      </div>
+    </div>
+
+    <!-- main grid -->
+    <div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 520px minmax(0, 1fr) 246px; gap: 20px;">
+
+      <!-- LEFT -->
+      <div style="min-width: 0; display: flex; flex-direction: column; gap: 20px; overflow: hidden;">
+
+        <!-- BIG 3 -->
+        <div style="flex: none;">
+          <div style="display: flex; align-items: center; gap: 9px; margin-bottom: 10px;">
+            <span style="font-size: 14.5px; font-weight: 800; letter-spacing: -0.3px;">오늘 꼭 마쳐야 할 일</span>
+            <span class="num" style="font-size: 12px; font-weight: 800; color: #8b95a1;">2 / 3</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <div style="display: flex; align-items: center; gap: 13px; padding: 12px 15px; border: 1px solid #e5e8eb; border-radius: 11px; background: #ffffff;">
+              <span class="num" style="width: 22px; height: 22px; flex: none; border-radius: 50%; background: #191f28; color: #ffffff; font-size: 11.5px; font-weight: 800; display: flex; align-items: center; justify-content: center;">1</span>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 14.5px; font-weight: 700; letter-spacing: -0.2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">옥탄 최종 샘플 3D 프린터로 뽑아보기</div>
+              </div>
+              <span class="num" style="font-size: 11.5px; font-weight: 800; color: #1b64da; background: #eef5ff; padding: 4px 9px; border-radius: 7px; flex: none;">14:00 진행 중</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 13px; padding: 12px 15px; border: 1px solid #e5e8eb; border-radius: 11px; background: #ffffff;">
+              <span class="num" style="width: 22px; height: 22px; flex: none; border-radius: 50%; background: #191f28; color: #ffffff; font-size: 11.5px; font-weight: 800; display: flex; align-items: center; justify-content: center;">2</span>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 14.5px; font-weight: 700; letter-spacing: -0.2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">유튜브 회중시계 영상 업로드</div>
+              </div>
+              <span class="num" style="font-size: 11.5px; font-weight: 800; color: #6b7684; background: #f2f4f6; padding: 4px 9px; border-radius: 7px; flex: none;">16:00 배정됨</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 13px; padding: 12px 15px; border: 1px dashed #d1d6db; border-radius: 11px; background: #fbfbfc;">
+              <span class="num" style="width: 22px; height: 22px; flex: none; border-radius: 50%; border: 1.5px dashed #d1d6db; color: #b0b8c1; font-size: 11.5px; font-weight: 800; display: flex; align-items: center; justify-content: center;">3</span>
+              <div style="flex: 1; font-size: 13px; font-weight: 600; color: #b0b8c1;">아래 목록에서 ☆를 눌러 올리세요</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Brain dump -->
+        <div style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+          <div style="display: flex; align-items: center; gap: 9px; margin-bottom: 10px;">
+            <span style="font-size: 14.5px; font-weight: 800; letter-spacing: -0.3px;">할 일</span>
+            <span class="num" style="font-size: 12px; font-weight: 800; color: #8b95a1;">4</span>
+            <div style="flex: 1;"></div>
+            <span style="font-size: 11.5px; font-weight: 600; color: #b0b8c1;">개인 항목은 일일계획표에 표시되지 않습니다</span>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 14px; border: 1px solid #e5e8eb; border-radius: 10px; background: #ffffff; margin-bottom: 8px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#b0b8c1" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+            <span style="font-size: 13.5px; font-weight: 500; color: #b0b8c1; flex: 1;">떠오르는 일을 적고 Enter — "보고서 30분"처럼 시간도 함께</span>
+          </div>
+
+          <div style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; gap: 11px; padding: 10px 14px; border-radius: 9px; border: 1px solid #f2f4f6; background: #ffffff; margin-bottom: 5px; box-shadow: inset 3px 0 0 #f97316;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d1d6db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3 6.8.8-5 4.7 1.3 6.8L12 17.3 6 20.6l1.3-6.8-5-4.7 6.8-.8z"></path></svg>
+              <span class="num" style="font-size: 11px; font-weight: 800; color: #9a3412; background: #fff7ed; padding: 2px 7px; border-radius: 5px; flex: none;">8/29</span>
+              <span style="flex: 1; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">옥탄 최종 샘플 DLP 프린팅 외주 요청</span>
+              <span style="font-size: 11.5px; font-weight: 700; color: #6b7684; flex: none;">회의</span>
+              <span class="num" style="font-size: 11.5px; font-weight: 700; color: #8b95a1; flex: none;">60m</span>
+              <span style="font-size: 11.5px; font-weight: 800; color: #1b64da; background: #eef5ff; padding: 3px 9px; border-radius: 6px; flex: none;">배정</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 11px; padding: 10px 14px; border-radius: 9px; border: 1px solid #f2f4f6; background: #ffffff; margin-bottom: 5px; box-shadow: inset 3px 0 0 #3182f6;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d1d6db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3 6.8.8-5 4.7 1.3 6.8L12 17.3 6 20.6l1.3-6.8-5-4.7 6.8-.8z"></path></svg>
+              <span style="flex: 1; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ETSY 및 굿즈덕 페덱스 발송 준비</span>
+              <span style="font-size: 11.5px; font-weight: 700; color: #6b7684; flex: none;">회사</span>
+              <span class="num" style="font-size: 11.5px; font-weight: 700; color: #8b95a1; flex: none;">30m</span>
+              <span style="font-size: 11.5px; font-weight: 800; color: #1b64da; background: #eef5ff; padding: 3px 9px; border-radius: 6px; flex: none;">배정</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 11px; padding: 10px 14px; border-radius: 9px; border: 1px solid #f2f4f6; background: #ffffff; margin-bottom: 5px; box-shadow: inset 3px 0 0 #8b5cf6;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d1d6db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3 6.8.8-5 4.7 1.3 6.8L12 17.3 6 20.6l1.3-6.8-5-4.7 6.8-.8z"></path></svg>
+              <span style="flex: 1; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">치과 예약 잡기</span>
+              <span style="font-size: 11.5px; font-weight: 700; color: #6b7684; flex: none;">개인</span>
+              <span class="num" style="font-size: 11.5px; font-weight: 700; color: #8b95a1; flex: none;">30m</span>
+              <span style="font-size: 11.5px; font-weight: 800; color: #1b64da; background: #eef5ff; padding: 3px 9px; border-radius: 6px; flex: none;">배정</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 11px; padding: 10px 14px; border-radius: 9px; border: 1px solid #f2f4f6; background: #ffffff; box-shadow: inset 3px 0 0 #3182f6;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d1d6db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3 6.8.8-5 4.7 1.3 6.8L12 17.3 6 20.6l1.3-6.8-5-4.7 6.8-.8z"></path></svg>
+              <span style="flex: 1; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">4분기 사은품 견적 회신</span>
+              <span style="font-size: 11.5px; font-weight: 700; color: #6b7684; flex: none;">회사</span>
+              <span class="num" style="font-size: 11.5px; font-weight: 700; color: #8b95a1; flex: none;">60m</span>
+              <span style="font-size: 11.5px; font-weight: 800; color: #1b64da; background: #eef5ff; padding: 3px 9px; border-radius: 6px; flex: none;">배정</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 루틴 -->
+        <div style="flex: none;">
+          <div style="display: flex; align-items: center; gap: 9px; margin-bottom: 10px;">
+            <span style="font-size: 14.5px; font-weight: 800; letter-spacing: -0.3px;">루틴</span>
+            <span class="num" style="font-size: 12px; font-weight: 800; color: #8b95a1;">2</span>
+            <div style="flex: 1;"></div>
+            <span style="font-size: 11.5px; font-weight: 600; color: #b0b8c1;">매일 아침 할 일에 자동 추가</span>
+          </div>
+          <div style="display: flex; gap: 7px;">
+            <div style="flex: 1; display: flex; align-items: center; gap: 9px; padding: 9px 13px; border-radius: 9px; border: 1px solid #f2f4f6; background: #ffffff; box-shadow: inset 3px 0 0 #3182f6; min-width: 0;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"></path><path d="M21 3v6h-6"></path></svg>
+              <span style="flex: 1; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">아침 이메일 확인</span>
+              <span class="num" style="font-size: 11.5px; font-weight: 700; color: #8b95a1; flex: none;">30m</span>
+            </div>
+            <div style="flex: 1; display: flex; align-items: center; gap: 9px; padding: 9px 13px; border-radius: 9px; border: 1px solid #f2f4f6; background: #ffffff; box-shadow: inset 3px 0 0 #30c85e; min-width: 0;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"></path><path d="M21 3v6h-6"></path></svg>
+              <span style="flex: 1; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">발송 현황 점검</span>
+              <span class="num" style="font-size: 11.5px; font-weight: 700; color: #8b95a1; flex: none;">30m</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CENTER: timeline -->
+      <div style="min-width: 0; border: 1px solid #e5e8eb; border-radius: 13px; background: #ffffff; display: flex; flex-direction: column; overflow: hidden;">
+        <div style="flex: none; padding: 12px 18px; border-bottom: 1px solid #eceff2; display: flex; align-items: center; gap: 9px;">
+          <span style="font-size: 14px; font-weight: 800; letter-spacing: -0.3px;">오늘의 타임라인</span>
+          <div style="flex: 1;"></div>
+          <span style="font-size: 11.5px; font-weight: 600; color: #b0b8c1;">빈 칸을 누르면 바로 추가</span>
+        </div>
+
+        <div style="flex: 1; min-height: 0; padding: 8px 0; position: relative;">
+          <div style="display: grid; grid-template-columns: 50px 1fr; gap: 6px; height: 74px;">
+            <span class="num" style="font-size: 11px; font-weight: 700; color: #c4cbd3; text-align: right;">11:00</span>
+            <div style="border-top: 1px solid #f2f4f6; padding-right: 16px;"></div>
+          </div>
+          <div style="display: grid; grid-template-columns: 50px 1fr; gap: 6px; height: 74px;">
+            <span class="num" style="font-size: 11px; font-weight: 700; color: #c4cbd3; text-align: right;">12:00</span>
+            <div style="border-top: 1px solid #f2f4f6; padding: 4px 16px 0 0;">
+              <div style="height: 62px; border-radius: 9px; background: #f7f8fa; border-left: 3px solid #c4cbd3; padding: 9px 13px;">
+                <div style="font-size: 13px; font-weight: 700; color: #8b95a1;">점심</div>
+                <div class="num" style="font-size: 11.5px; font-weight: 600; color: #b0b8c1; margin-top: 3px;">12:00 – 13:00</div>
+              </div>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 50px 1fr; gap: 6px; height: 74px;">
+            <span class="num" style="font-size: 11px; font-weight: 700; color: #c4cbd3; text-align: right;">13:00</span>
+            <div style="border-top: 1px solid #f2f4f6; padding: 4px 16px 0 0;">
+              <div style="height: 62px; border-radius: 9px; background: #fff7ed; border-left: 3px solid #f97316; padding: 9px 13px;">
+                <div style="display: flex; align-items: center; gap: 7px;">
+                  <span style="font-size: 13px; font-weight: 700; color: #9a3412;">9월 1주차 주간회의</span>
+                  <span style="font-size: 11px; font-weight: 700; color: #c2703a;">회의</span>
+                </div>
+                <div class="num" style="font-size: 11.5px; font-weight: 600; color: #c2703a; margin-top: 3px;">13:00 – 14:00 · 완료</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- current block + now line -->
+          <div style="display: grid; grid-template-columns: 50px 1fr; gap: 6px; height: 74px; position: relative;">
+            <span class="num" style="font-size: 11px; font-weight: 800; color: #f04452; text-align: right;">14:00</span>
+            <div style="border-top: 1px solid #f2f4f6; padding: 4px 16px 0 0;">
+              <div style="height: 62px; border-radius: 9px; background: #eef5ff; border: 1px solid #3182f6; border-left: 3px solid #3182f6; padding: 9px 13px; box-shadow: 0 2px 8px rgba(49,130,246,0.16);">
+                <div style="display: flex; align-items: center; gap: 7px;">
+                  <span class="num" style="width: 16px; height: 16px; border-radius: 50%; background: #191f28; color: #ffffff; font-size: 9.5px; font-weight: 800; display: flex; align-items: center; justify-content: center;">1</span>
+                  <span style="font-size: 13px; font-weight: 800; color: #1b4e85;">옥탄 최종 샘플 3D 프린팅</span>
+                </div>
+                <div class="num" style="font-size: 11.5px; font-weight: 600; color: #5a8ec7; margin-top: 3px;">14:00 – 15:00 · 29분 남음</div>
+              </div>
+            </div>
+            <div style="position: absolute; left: 50px; right: 16px; top: 42px; height: 2px; background: #f04452; border-radius: 2px; z-index: 3;">
+              <div style="position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: #f04452;"></div>
+              <div class="num" style="position: absolute; right: 0; top: -17px; font-size: 10.5px; font-weight: 800; color: #f04452;">14:31</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 50px 1fr; gap: 6px; height: 74px;">
+            <span class="num" style="font-size: 11px; font-weight: 700; color: #c4cbd3; text-align: right;">15:00</span>
+            <div style="border-top: 1px solid #f2f4f6; padding-right: 16px;"></div>
+          </div>
+          <div style="display: grid; grid-template-columns: 50px 1fr; gap: 6px; height: 148px;">
+            <span class="num" style="font-size: 11px; font-weight: 700; color: #c4cbd3; text-align: right;">16:00</span>
+            <div style="border-top: 1px solid #f2f4f6; padding: 4px 16px 0 0;">
+              <div style="height: 136px; border-radius: 9px; background: #eef5ff; border-left: 3px solid #3182f6; padding: 9px 13px;">
+                <div style="display: flex; align-items: center; gap: 7px;">
+                  <span class="num" style="width: 16px; height: 16px; border-radius: 50%; background: #191f28; color: #ffffff; font-size: 9.5px; font-weight: 800; display: flex; align-items: center; justify-content: center;">2</span>
+                  <span style="font-size: 13px; font-weight: 700; color: #1b4e85;">유튜브 회중시계 영상 업로드</span>
+                </div>
+                <div class="num" style="font-size: 11.5px; font-weight: 600; color: #5a8ec7; margin-top: 3px;">16:00 – 18:00</div>
+              </div>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: 50px 1fr; gap: 6px; height: 74px;">
+            <span class="num" style="font-size: 11px; font-weight: 700; color: #c4cbd3; text-align: right;">18:00</span>
+            <div style="border-top: 1px solid #f2f4f6; padding-right: 16px;"></div>
+          </div>
+          <div style="display: grid; grid-template-columns: 50px 1fr; gap: 6px; height: 40px;">
+            <span class="num" style="font-size: 11px; font-weight: 700; color: #c4cbd3; text-align: right;">19:00</span>
+            <div style="border-top: 1px solid #f2f4f6; padding-right: 16px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: 오늘 요약 -->
+      <div style="min-width: 0; display: flex; flex-direction: column; gap: 14px;">
+        <div style="border: 1px solid #e5e8eb; border-radius: 13px; background: #ffffff; padding: 16px; display: flex; flex-direction: column; gap: 15px;">
+          <span style="font-size: 14px; font-weight: 800; letter-spacing: -0.3px;">오늘 요약</span>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="padding: 11px 12px; border-radius: 10px; background: #f7f8fa;">
+              <div class="num" style="font-size: 21px; font-weight: 900; letter-spacing: -0.8px; line-height: 1;">3h</div>
+              <div style="font-size: 11px; font-weight: 700; color: #8b95a1; margin-top: 4px;">계획된 시간</div>
+            </div>
+            <div style="padding: 11px 12px; border-radius: 10px; background: #f7f8fa;">
+              <div class="num" style="font-size: 21px; font-weight: 900; letter-spacing: -0.8px; line-height: 1;">5h</div>
+              <div style="font-size: 11px; font-weight: 700; color: #8b95a1; margin-top: 4px;">남은 빈 시간</div>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 7px;">
+            <div style="display: flex; align-items: baseline; justify-content: space-between;">
+              <span style="font-size: 12px; font-weight: 700; color: #6b7684;">블록 완료율</span>
+              <span class="num" style="font-size: 12.5px; font-weight: 800;">33%</span>
+            </div>
+            <div style="height: 7px; background: #f2f4f6; border-radius: 4px; overflow: hidden;">
+              <div style="width: 33%; height: 100%; background: #191f28;"></div>
+            </div>
+          </div>
+
+          <div style="height: 1px; background: #f2f4f6;"></div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="width: 9px; height: 9px; border-radius: 3px; background: #3182f6;"></span>
+              <span style="font-size: 12px; font-weight: 600; color: #4e5968; flex: 1;">회사 업무</span>
+              <span class="num" style="font-size: 12px; font-weight: 700; color: #8b95a1;">3h</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="width: 9px; height: 9px; border-radius: 3px; background: #30c85e;"></span>
+              <span style="font-size: 12px; font-weight: 600; color: #4e5968; flex: 1;">거래처 미팅</span>
+              <span class="num" style="font-size: 12px; font-weight: 700; color: #b0b8c1;">—</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="width: 9px; height: 9px; border-radius: 3px; background: #f97316;"></span>
+              <span style="font-size: 12px; font-weight: 600; color: #4e5968; flex: 1;">회의</span>
+              <span class="num" style="font-size: 12px; font-weight: 700; color: #8b95a1;">1h</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="width: 9px; height: 9px; border-radius: 3px; background: #8b5cf6;"></span>
+              <span style="font-size: 12px; font-weight: 600; color: #4e5968; flex: 1;">개인</span>
+              <span class="num" style="font-size: 12px; font-weight: 700; color: #b0b8c1;">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="border: 1px solid #e5e8eb; border-radius: 13px; background: #fbfbfc; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+          <span style="font-size: 14px; font-weight: 800; letter-spacing: -0.3px;">이번 주</span>
+          <div style="display: flex; align-items: flex-end; gap: 7px; height: 62px;">
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;">
+              <div style="width: 100%; height: 38px; background: #e5e8eb; border-radius: 4px;"></div>
+              <span style="font-size: 10.5px; font-weight: 700; color: #b0b8c1;">월</span>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;">
+              <div style="width: 100%; height: 46px; background: #e5e8eb; border-radius: 4px;"></div>
+              <span style="font-size: 10.5px; font-weight: 700; color: #b0b8c1;">화</span>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;">
+              <div style="width: 100%; height: 28px; background: #e5e8eb; border-radius: 4px;"></div>
+              <span style="font-size: 10.5px; font-weight: 700; color: #b0b8c1;">수</span>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;">
+              <div style="width: 100%; height: 42px; background: #e5e8eb; border-radius: 4px;"></div>
+              <span style="font-size: 10.5px; font-weight: 700; color: #b0b8c1;">목</span>
+            </div>
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;">
+              <div style="width: 100%; height: 22px; background: #191f28; border-radius: 4px;"></div>
+              <span style="font-size: 10.5px; font-weight: 800; color: #191f28;">금</span>
+            </div>
+          </div>
+          <span style="font-size: 11.5px; font-weight: 600; color: #8b95a1; line-height: 1.5;">하루 평균 <strong style="font-weight: 800; color: #4e5968;">3.4시간</strong>을 시간표에 올렸습니다</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

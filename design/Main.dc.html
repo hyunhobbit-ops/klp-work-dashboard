@@ -1,0 +1,423 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Pretendard', 'Noto Sans KR', -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #2b6cb0; text-decoration: none; } a:hover { color: #1b4e85; }
+    .num { font-variant-numeric: tabular-nums; }
+  </style>
+</helmet>
+
+<div style="width: 1600px; height: 980px; display: flex; background: #fbfbfc; color: #191f28; overflow: hidden;">
+
+  <!-- ============ SIDEBAR ============ -->
+  <div style="width: 236px; flex: none; background: #ffffff; border-right: 1px solid #e5e8eb; display: flex; flex-direction: column;">
+    <div style="padding: 18px 16px 14px; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid #f2f4f6;">
+      <div style="width: 26px; height: 26px; border-radius: 7px; background: #3182f6; display: flex; align-items: center; justify-content: center;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-6 9 6v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+      </div>
+      <div style="font-size: 14px; font-weight: 700; letter-spacing: -0.3px;">케이엘피코리아</div>
+    </div>
+
+    <div style="flex: 1; padding: 10px 10px; display: flex; flex-direction: column; gap: 2px; overflow: hidden;">
+
+      <div style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px; background: #eef5ff; box-shadow: inset 2px 0 0 #3182f6;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3182f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-6 9 6v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+        <span style="font-size: 13px; font-weight: 700; color: #1b64da;">홈</span>
+      </div>
+
+      <div style="font-size: 10.5px; font-weight: 800; color: #a2abb6; letter-spacing: 0.7px; padding: 14px 10px 5px;">업무</div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M8 2v4M16 2v4M3 10h18"></path></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">일일계획표</span>
+        <span class="num" style="font-size: 11px; font-weight: 700; color: #f04452; background: #fff0f0; padding: 1px 6px; border-radius: 20px;">3</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">내 하루 (타임박스)</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"></path></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">회의록</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v12H3z"></path><path d="M3 11h18"></path></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">매입매출</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h13l3 5v7H4z"></path><circle cx="8" cy="18" r="1.6"></circle><circle cx="17" cy="18" r="1.6"></circle></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">택배 관리</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"></path></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">자금확인</span>
+      </div>
+
+      <div style="font-size: 10.5px; font-weight: 800; color: #a2abb6; letter-spacing: 0.7px; padding: 14px 10px 5px;">제안서</div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">상품 DB</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"></path><path d="M14 3v5h5"></path></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">제안서 관리</span>
+      </div>
+
+      <div style="font-size: 10.5px; font-weight: 800; color: #a2abb6; letter-spacing: 0.7px; padding: 14px 10px 5px;">자료실</div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l2-3h5l2 3h9v12H3z"></path></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">국내 거래처 DB</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 7px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8b95a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5z"></path><path d="M3 13l9 5 9-5"></path></svg>
+        <span style="font-size: 13px; font-weight: 600; color: #4e5968; flex: 1;">경영목표</span>
+      </div>
+    </div>
+
+    <div style="padding: 10px; border-top: 1px solid #f2f4f6; display: flex; align-items: center; gap: 9px;">
+      <div style="width: 28px; height: 28px; border-radius: 50%; background: #191f28; color: #ffffff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center;">현호</div>
+      <div style="flex: 1; min-width: 0;">
+        <div style="font-size: 12.5px; font-weight: 700;">김현호</div>
+        <div style="font-size: 11px; color: #8b95a1; font-weight: 500;">관리자</div>
+      </div>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#b0b8c1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path></svg>
+    </div>
+  </div>
+
+  <!-- ============ MAIN ============ -->
+  <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+
+    <!-- topbar -->
+    <div style="height: 52px; flex: none; background: #ffffff; border-bottom: 1px solid #e5e8eb; display: flex; align-items: center; gap: 16px; padding: 0 24px;">
+      <div style="font-size: 16px; font-weight: 800; letter-spacing: -0.4px;">홈</div>
+      <div style="width: 1px; height: 16px; background: #e5e8eb;"></div>
+      <div style="font-size: 12.5px; color: #6b7684; font-weight: 600;">2026년 9월 4일 (금) · 오후 2:31</div>
+      <div style="flex: 1;"></div>
+      <div style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 11px; border: 1px solid #e5e8eb; border-radius: 7px; background: #fbfbfc; width: 200px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b0b8c1" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <span style="font-size: 12.5px; color: #b0b8c1; font-weight: 500;">검색</span>
+      </div>
+      <div style="position: relative; width: 30px; height: 30px; border: 1px solid #e5e8eb; border-radius: 7px; display: flex; align-items: center; justify-content: center; background: #ffffff;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4e5968" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
+        <div style="position: absolute; top: -3px; right: -3px; min-width: 15px; height: 15px; border-radius: 8px; background: #f04452; color: #ffffff; font-size: 9.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; padding: 0 4px; border: 1.5px solid #ffffff;">3</div>
+      </div>
+    </div>
+
+    <!-- content -->
+    <div style="flex: 1; min-height: 0; padding: 16px 24px 24px; display: flex; flex-direction: column; gap: 14px;">
+
+      <!-- KPI strip -->
+      <div style="flex: none; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); background: #ffffff; border: 1px solid #e5e8eb; border-radius: 10px; overflow: hidden;">
+        <div style="padding: 13px 16px; border-right: 1px solid #f2f4f6; display: flex; flex-direction: column; gap: 3px;">
+          <div style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">지연된 업무</div>
+          <div style="display: flex; align-items: baseline; gap: 6px;">
+            <span class="num" style="font-size: 25px; font-weight: 900; color: #f04452; letter-spacing: -1px; line-height: 1;">3</span>
+            <span style="font-size: 11.5px; font-weight: 700; color: #f04452;">건</span>
+          </div>
+        </div>
+        <div style="padding: 13px 16px; border-right: 1px solid #f2f4f6; display: flex; flex-direction: column; gap: 3px;">
+          <div style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">오늘 할 일</div>
+          <div style="display: flex; align-items: baseline; gap: 6px;">
+            <span class="num" style="font-size: 25px; font-weight: 900; letter-spacing: -1px; line-height: 1;">6</span>
+            <span class="num" style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">/ 2 완료</span>
+          </div>
+        </div>
+        <div style="padding: 13px 16px; border-right: 1px solid #f2f4f6; display: flex; flex-direction: column; gap: 3px;">
+          <div style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">이번 주 마감</div>
+          <div style="display: flex; align-items: baseline; gap: 6px;">
+            <span class="num" style="font-size: 25px; font-weight: 900; color: #f97316; letter-spacing: -1px; line-height: 1;">2</span>
+            <span style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">건</span>
+          </div>
+        </div>
+        <div style="padding: 13px 16px; border-right: 1px solid #f2f4f6; display: flex; flex-direction: column; gap: 3px;">
+          <div style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">진행 프로젝트</div>
+          <div style="display: flex; align-items: baseline; gap: 6px;">
+            <span class="num" style="font-size: 25px; font-weight: 900; letter-spacing: -1px; line-height: 1;">8</span>
+            <span style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">건</span>
+          </div>
+        </div>
+        <div style="padding: 13px 16px; border-right: 1px solid #f2f4f6; display: flex; flex-direction: column; gap: 3px;">
+          <div style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">9월 매출</div>
+          <div style="display: flex; align-items: baseline; gap: 5px;">
+            <span class="num" style="font-size: 25px; font-weight: 900; letter-spacing: -1px; line-height: 1;">2,840</span>
+            <span style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">만원</span>
+          </div>
+        </div>
+        <div style="padding: 13px 16px; display: flex; flex-direction: column; gap: 3px;">
+          <div style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">미수금</div>
+          <div style="display: flex; align-items: baseline; gap: 5px;">
+            <span class="num" style="font-size: 25px; font-weight: 900; letter-spacing: -1px; line-height: 1;">620</span>
+            <span style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">만원</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3-column row -->
+      <div style="flex: none; display: grid; grid-template-columns: 1.35fr 1fr 1fr; gap: 14px;">
+
+        <!-- 오늘 할 일 -->
+        <div style="background: #ffffff; border: 1px solid #e5e8eb; border-radius: 10px; overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 11px 16px; border-bottom: 1px solid #f2f4f6;">
+            <span style="font-size: 13.5px; font-weight: 800;">오늘 할 일</span>
+            <span class="num" style="font-size: 11.5px; font-weight: 800; color: #6b7684; background: #f2f4f6; padding: 1px 7px; border-radius: 20px;">6</span>
+            <div style="flex: 1;"></div>
+            <span style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">전체 보기</span>
+          </div>
+          <div style="display: flex; flex-direction: column;">
+            <div style="display: grid; grid-template-columns: 16px 1fr 52px 46px; gap: 10px; align-items: center; padding: 8px 16px; border-bottom: 1px solid #f7f8fa;">
+              <div style="width: 15px; height: 15px; border: 1.8px solid #d1d6db; border-radius: 4px;"></div>
+              <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                <div style="width: 5px; height: 5px; border-radius: 50%; background: #f04452; flex: none;"></div>
+                <span style="font-size: 13px; font-weight: 600; color: #191f28; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">옥탄 최종 샘플 3D 프린터로 뽑아보기</span>
+              </div>
+              <span style="font-size: 11.5px; font-weight: 700; color: #f04452;">2일 지연</span>
+              <span class="num" style="font-size: 11.5px; font-weight: 600; color: #8b95a1; text-align: right;">김현호</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 16px 1fr 52px 46px; gap: 10px; align-items: center; padding: 8px 16px; border-bottom: 1px solid #f7f8fa;">
+              <div style="width: 15px; height: 15px; border: 1.8px solid #d1d6db; border-radius: 4px;"></div>
+              <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                <div style="width: 5px; height: 5px; border-radius: 50%; background: #f04452; flex: none;"></div>
+                <span style="font-size: 13px; font-weight: 600; color: #191f28; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">옥탄 최종 샘플 DLP 프린팅 외주 요청</span>
+              </div>
+              <span style="font-size: 11.5px; font-weight: 700; color: #f04452;">1일 지연</span>
+              <span style="font-size: 11.5px; font-weight: 600; color: #8b95a1; text-align: right;">구정두</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 16px 1fr 52px 46px; gap: 10px; align-items: center; padding: 8px 16px; border-bottom: 1px solid #f7f8fa;">
+              <div style="width: 15px; height: 15px; border: 1.8px solid #d1d6db; border-radius: 4px;"></div>
+              <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                <div style="width: 5px; height: 5px; border-radius: 50%; background: #3182f6; flex: none;"></div>
+                <span style="font-size: 13px; font-weight: 600; color: #191f28; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">유튜브 회중시계 영상 업로드 및 상품 등록</span>
+              </div>
+              <span class="num" style="font-size: 11.5px; font-weight: 600; color: #6b7684;">15:00</span>
+              <span style="font-size: 11.5px; font-weight: 600; color: #8b95a1; text-align: right;">김현호</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 16px 1fr 52px 46px; gap: 10px; align-items: center; padding: 8px 16px; border-bottom: 1px solid #f7f8fa;">
+              <div style="width: 15px; height: 15px; border: 1.8px solid #d1d6db; border-radius: 4px;"></div>
+              <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                <div style="width: 5px; height: 5px; border-radius: 50%; background: #3182f6; flex: none;"></div>
+                <span style="font-size: 13px; font-weight: 600; color: #191f28; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ETSY 및 굿즈덕 페덱스 발송 준비</span>
+              </div>
+              <span class="num" style="font-size: 11.5px; font-weight: 600; color: #6b7684;">16:00</span>
+              <span style="font-size: 11.5px; font-weight: 600; color: #8b95a1; text-align: right;">이현주</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 16px 1fr 52px 46px; gap: 10px; align-items: center; padding: 8px 16px; border-bottom: 1px solid #f7f8fa; opacity: 0.5;">
+              <div style="width: 15px; height: 15px; border-radius: 4px; background: #30c85e; display: flex; align-items: center; justify-content: center;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+              </div>
+              <span style="font-size: 13px; font-weight: 600; text-decoration: line-through; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">페덱스 비용확인 후 결제하기</span>
+              <span style="font-size: 11.5px; font-weight: 600; color: #8b95a1;">완료</span>
+              <span style="font-size: 11.5px; font-weight: 600; color: #8b95a1; text-align: right;">유지은</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 16px 1fr 52px 46px; gap: 10px; align-items: center; padding: 8px 16px; opacity: 0.5;">
+              <div style="width: 15px; height: 15px; border-radius: 4px; background: #30c85e; display: flex; align-items: center; justify-content: center;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+              </div>
+              <span style="font-size: 13px; font-weight: 600; text-decoration: line-through; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">유튜브 시계 강의 기획하기</span>
+              <span style="font-size: 11.5px; font-weight: 600; color: #8b95a1;">완료</span>
+              <span style="font-size: 11.5px; font-weight: 600; color: #8b95a1; text-align: right;">김현호</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 마감 임박 -->
+        <div style="background: #ffffff; border: 1px solid #e5e8eb; border-radius: 10px; overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 11px 16px; border-bottom: 1px solid #f2f4f6;">
+            <span style="font-size: 13.5px; font-weight: 800;">마감 임박</span>
+            <span class="num" style="font-size: 11.5px; font-weight: 800; color: #f97316; background: #fff7ed; padding: 1px 7px; border-radius: 20px;">4</span>
+          </div>
+          <div style="display: flex; flex-direction: column;">
+            <div style="display: grid; grid-template-columns: 38px 1fr auto; gap: 10px; align-items: center; padding: 9px 16px; border-bottom: 1px solid #f7f8fa;">
+              <span class="num" style="font-size: 11px; font-weight: 800; color: #f04452; background: #fff0f0; padding: 3px 0; border-radius: 5px; text-align: center;">D-1</span>
+              <div style="min-width: 0;">
+                <div style="font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">옥탄 시계 샘플 승인</div>
+                <div style="font-size: 11px; font-weight: 600; color: #8b95a1;">굿즈덕</div>
+              </div>
+              <span class="num" style="font-size: 11.5px; font-weight: 700; color: #6b7684;">9/5</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 38px 1fr auto; gap: 10px; align-items: center; padding: 9px 16px; border-bottom: 1px solid #f7f8fa;">
+              <span class="num" style="font-size: 11px; font-weight: 800; color: #f97316; background: #fff7ed; padding: 3px 0; border-radius: 5px; text-align: center;">D-3</span>
+              <div style="min-width: 0;">
+                <div style="font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">회중시계 상세페이지</div>
+                <div style="font-size: 11px; font-weight: 600; color: #8b95a1;">스마트스토어</div>
+              </div>
+              <span class="num" style="font-size: 11.5px; font-weight: 700; color: #6b7684;">9/7</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 38px 1fr auto; gap: 10px; align-items: center; padding: 9px 16px; border-bottom: 1px solid #f7f8fa;">
+              <span class="num" style="font-size: 11px; font-weight: 800; color: #6b7684; background: #f2f4f6; padding: 3px 0; border-radius: 5px; text-align: center;">D-6</span>
+              <div style="min-width: 0;">
+                <div style="font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ETSY 9월 발송분 정산</div>
+                <div style="font-size: 11px; font-weight: 600; color: #8b95a1;">ETSY</div>
+              </div>
+              <span class="num" style="font-size: 11.5px; font-weight: 700; color: #6b7684;">9/10</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 38px 1fr auto; gap: 10px; align-items: center; padding: 9px 16px;">
+              <span class="num" style="font-size: 11px; font-weight: 800; color: #6b7684; background: #f2f4f6; padding: 3px 0; border-radius: 5px; text-align: center;">D-9</span>
+              <div style="min-width: 0;">
+                <div style="font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">시계 강의 1차 촬영</div>
+                <div style="font-size: 11px; font-weight: 600; color: #8b95a1;">내부</div>
+              </div>
+              <span class="num" style="font-size: 11.5px; font-weight: 700; color: #6b7684;">9/13</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 이번 달 매입매출 -->
+        <div style="background: #ffffff; border: 1px solid #e5e8eb; border-radius: 10px; overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 11px 16px; border-bottom: 1px solid #f2f4f6;">
+            <span style="font-size: 13.5px; font-weight: 800;">9월 매입매출</span>
+            <div style="flex: 1;"></div>
+            <span style="font-size: 11.5px; font-weight: 700; color: #30c85e;">+12%</span>
+          </div>
+          <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 11px;">
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between;">
+                <span style="font-size: 11.5px; font-weight: 700; color: #6b7684;">매출</span>
+                <span class="num" style="font-size: 15px; font-weight: 800;">2,840만</span>
+              </div>
+              <div style="height: 6px; background: #f2f4f6; border-radius: 3px; overflow: hidden;">
+                <div style="width: 78%; height: 100%; background: #3182f6;"></div>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between;">
+                <span style="font-size: 11.5px; font-weight: 700; color: #6b7684;">매입</span>
+                <span class="num" style="font-size: 15px; font-weight: 800;">1,910만</span>
+              </div>
+              <div style="height: 6px; background: #f2f4f6; border-radius: 3px; overflow: hidden;">
+                <div style="width: 52%; height: 100%; background: #b0b8c1;"></div>
+              </div>
+            </div>
+            <div style="height: 1px; background: #f2f4f6;"></div>
+            <div style="display: flex; align-items: baseline; justify-content: space-between;">
+              <span style="font-size: 12px; font-weight: 800;">마진</span>
+              <div style="display: flex; align-items: baseline; gap: 6px;">
+                <span class="num" style="font-size: 19px; font-weight: 900; color: #30c85e; letter-spacing: -0.5px;">930만</span>
+                <span class="num" style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">32.7%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- bottom row -->
+      <div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px;">
+
+        <!-- 진행 중 프로젝트 -->
+        <div style="background: #ffffff; border: 1px solid #e5e8eb; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column;">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 11px 16px; border-bottom: 1px solid #f2f4f6;">
+            <span style="font-size: 13.5px; font-weight: 800;">진행 중인 프로젝트</span>
+            <span class="num" style="font-size: 11.5px; font-weight: 800; color: #6b7684; background: #f2f4f6; padding: 1px 7px; border-radius: 20px;">8</span>
+            <div style="flex: 1;"></div>
+            <span style="font-size: 11.5px; font-weight: 700; color: #8b95a1;">전체 보기</span>
+          </div>
+          <div style="display: grid; grid-template-columns: 1.5fr 90px 74px 80px 66px; gap: 10px; padding: 7px 16px; background: #fbfbfc; border-bottom: 1px solid #f2f4f6;">
+            <span style="font-size: 11px; font-weight: 800; color: #8b95a1;">프로젝트</span>
+            <span style="font-size: 11px; font-weight: 800; color: #8b95a1;">거래처</span>
+            <span style="font-size: 11px; font-weight: 800; color: #8b95a1; text-align: right;">매출</span>
+            <span style="font-size: 11px; font-weight: 800; color: #8b95a1;">진행</span>
+            <span style="font-size: 11px; font-weight: 800; color: #8b95a1; text-align: right;">담당</span>
+          </div>
+          <div style="flex: 1; display: flex; flex-direction: column;">
+            <div style="display: grid; grid-template-columns: 1.5fr 90px 74px 80px 66px; gap: 10px; align-items: center; padding: 9px 16px; border-bottom: 1px solid #f7f8fa;">
+              <span style="font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">옥탄 시계 샘플 제작</span>
+              <span style="font-size: 12px; font-weight: 600; color: #6b7684;">굿즈덕</span>
+              <span class="num" style="font-size: 12px; font-weight: 700; text-align: right;">820만</span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <div style="flex: 1; height: 4px; background: #f2f4f6; border-radius: 2px; overflow: hidden;"><div style="width: 85%; height: 100%; background: #3182f6;"></div></div>
+                <span class="num" style="font-size: 10.5px; font-weight: 700; color: #8b95a1;">85%</span>
+              </div>
+              <span style="font-size: 12px; font-weight: 600; color: #6b7684; text-align: right;">김현호</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1.5fr 90px 74px 80px 66px; gap: 10px; align-items: center; padding: 9px 16px; border-bottom: 1px solid #f7f8fa;">
+              <span style="font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">회중시계 스마트스토어 런칭</span>
+              <span style="font-size: 12px; font-weight: 600; color: #6b7684;">스마트스토어</span>
+              <span class="num" style="font-size: 12px; font-weight: 700; text-align: right;">640만</span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <div style="flex: 1; height: 4px; background: #f2f4f6; border-radius: 2px; overflow: hidden;"><div style="width: 60%; height: 100%; background: #3182f6;"></div></div>
+                <span class="num" style="font-size: 10.5px; font-weight: 700; color: #8b95a1;">60%</span>
+              </div>
+              <span style="font-size: 12px; font-weight: 600; color: #6b7684; text-align: right;">이현주</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1.5fr 90px 74px 80px 66px; gap: 10px; align-items: center; padding: 9px 16px; border-bottom: 1px solid #f7f8fa;">
+              <span style="font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ETSY 9월 발송분</span>
+              <span style="font-size: 12px; font-weight: 600; color: #6b7684;">ETSY</span>
+              <span class="num" style="font-size: 12px; font-weight: 700; text-align: right;">410만</span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <div style="flex: 1; height: 4px; background: #f2f4f6; border-radius: 2px; overflow: hidden;"><div style="width: 40%; height: 100%; background: #3182f6;"></div></div>
+                <span class="num" style="font-size: 10.5px; font-weight: 700; color: #8b95a1;">40%</span>
+              </div>
+              <span style="font-size: 12px; font-weight: 600; color: #6b7684; text-align: right;">유지은</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1.5fr 90px 74px 80px 66px; gap: 10px; align-items: center; padding: 9px 16px; border-bottom: 1px solid #f7f8fa;">
+              <span style="font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">시계 강의 콘텐츠 제작</span>
+              <span style="font-size: 12px; font-weight: 600; color: #6b7684;">내부</span>
+              <span class="num" style="font-size: 12px; font-weight: 700; text-align: right; color: #b0b8c1;">—</span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <div style="flex: 1; height: 4px; background: #f2f4f6; border-radius: 2px; overflow: hidden;"><div style="width: 20%; height: 100%; background: #3182f6;"></div></div>
+                <span class="num" style="font-size: 10.5px; font-weight: 700; color: #8b95a1;">20%</span>
+              </div>
+              <span style="font-size: 12px; font-weight: 600; color: #6b7684; text-align: right;">김현호</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1.5fr 90px 74px 80px 66px; gap: 10px; align-items: center; padding: 9px 16px;">
+              <span style="font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">4분기 사은품 견적 회신</span>
+              <span style="font-size: 12px; font-weight: 600; color: #6b7684;">[거래처명]</span>
+              <span class="num" style="font-size: 12px; font-weight: 700; text-align: right;">970만</span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <div style="flex: 1; height: 4px; background: #f2f4f6; border-radius: 2px; overflow: hidden;"><div style="width: 10%; height: 100%; background: #3182f6;"></div></div>
+                <span class="num" style="font-size: 10.5px; font-weight: 700; color: #8b95a1;">10%</span>
+              </div>
+              <span style="font-size: 12px; font-weight: 600; color: #6b7684; text-align: right;">구정두</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 최근 활동 -->
+        <div style="background: #ffffff; border: 1px solid #e5e8eb; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column;">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 11px 16px; border-bottom: 1px solid #f2f4f6;">
+            <span style="font-size: 13.5px; font-weight: 800;">최근 활동</span>
+          </div>
+          <div style="flex: 1; padding: 4px 16px; display: flex; flex-direction: column;">
+            <div style="display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid #f7f8fa;">
+              <div style="width: 5px; height: 5px; border-radius: 50%; background: #3182f6; margin-top: 5px; flex: none;"></div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 12.5px; font-weight: 600; line-height: 1.45;"><strong style="font-weight: 800;">이현주</strong>님이 회의록 <strong style="font-weight: 800;">9월 1주차 주간회의</strong>를 저장했습니다</div>
+                <div class="num" style="font-size: 11px; font-weight: 600; color: #8b95a1; margin-top: 2px;">12분 전</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid #f7f8fa;">
+              <div style="width: 5px; height: 5px; border-radius: 50%; background: #30c85e; margin-top: 5px; flex: none;"></div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 12.5px; font-weight: 600; line-height: 1.45;"><strong style="font-weight: 800;">유지은</strong>님이 <strong style="font-weight: 800;">페덱스 비용확인 후 결제하기</strong>를 완료했습니다</div>
+                <div class="num" style="font-size: 11px; font-weight: 600; color: #8b95a1; margin-top: 2px;">1시간 전</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid #f7f8fa;">
+              <div style="width: 5px; height: 5px; border-radius: 50%; background: #8b5cf6; margin-top: 5px; flex: none;"></div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 12.5px; font-weight: 600; line-height: 1.45;"><strong style="font-weight: 800;">구정두</strong>님이 제안서 <strong style="font-weight: 800;">4분기 사은품 제안</strong>을 발송했습니다</div>
+                <div class="num" style="font-size: 11px; font-weight: 600; color: #8b95a1; margin-top: 2px;">3시간 전</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px; padding: 9px 0;">
+              <div style="width: 5px; height: 5px; border-radius: 50%; background: #f97316; margin-top: 5px; flex: none;"></div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 12.5px; font-weight: 600; line-height: 1.45;">택배 <strong style="font-weight: 800;">12건</strong>이 로젠택배로 접수되었습니다</div>
+                <div class="num" style="font-size: 11px; font-weight: 600; color: #8b95a1; margin-top: 2px;">어제 17:40</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
