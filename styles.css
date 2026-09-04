@@ -4146,17 +4146,24 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
    리뉴얼 v3 — 3단계: 홈 — 데이터 콘솔형
    ============================================================ */
 
-/* 지표 카드 3개 → 한 줄로 이어진 띠 (Motion/Plane 패턴) */
-.summary-row{gap:0; background:var(--white); border:1px solid var(--border);
+/* 지표 카드 → 한 줄로 이어진 띠 (Motion/Plane 패턴)
+   gap 1px가 행 배경색을 드러내 구분선이 된다 — 몇 칸으로 줄바꿈되든 깨지지 않음 */
+.summary-row{gap:1px; background:var(--border-soft); border:1px solid var(--border);
     border-radius:12px; overflow:hidden; margin-bottom:20px}
-.summary-card{border:none; border-right:1px solid var(--border-soft); border-radius:0;
-    padding:14px 18px; gap:13px}
-.summary-card:last-child{border-right:none}
-.summary-card:hover{border-color:transparent; border-right-color:var(--border-soft); background:var(--gray-50)}
-.summary-card:last-child:hover{border-right-color:transparent}
+.summary-card{border:none; border-radius:0; background:var(--white); padding:14px 18px; gap:13px}
+.summary-card:hover{border-color:transparent; background:var(--gray-50)}
 .summary-icon{width:38px; height:38px; border-radius:11px}
 .summary-value{font-size:23px; letter-spacing:-.8px}
 .summary-label{font-size:12px}
+
+/* 홈 KPI 스트립: 업무 3 + 프로젝트 3을 한 줄 6칸으로 */
+.summary-row.kpi-strip{grid-template-columns:repeat(6, minmax(0, 1fr))}
+.kpi-strip .summary-card{padding:12px 14px; gap:10px}
+.kpi-strip .summary-icon{width:32px; height:32px; border-radius:9px}
+.kpi-strip .summary-icon svg{width:17px; height:17px}
+.kpi-strip .summary-value{font-size:21px}
+.kpi-strip .summary-label{font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+@media (max-width:1560px){ .summary-row.kpi-strip{grid-template-columns:repeat(3, minmax(0, 1fr))} }
 
 /* 마감 카드: 여백을 줄여 한 화면에 더 들어오게 */
 .deadline-cards{gap:12px; margin-bottom:20px}

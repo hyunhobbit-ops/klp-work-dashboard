@@ -12658,6 +12658,8 @@ function applyPlanningPermission() {
     if (group) group.style.display = planningCanAccess() ? '' : 'none';
     const homeSec = document.getElementById('homePlanningSection');
     if (homeSec) homeSec.style.display = planningCanAccess() ? '' : 'none';
+    // KPI 스트립에 합쳐진 프로젝트 지표 3칸도 같이 토글
+    document.querySelectorAll('.kpi-planning').forEach(el => { el.style.display = planningCanAccess() ? '' : 'none'; });
 }
 
 function planningCurrentOwner() {

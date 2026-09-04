@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260904b">
+    <link rel="stylesheet" href="styles.css?v=20260904c">
     <link rel="stylesheet" href="mobile.css?v=20260507e" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -583,8 +583,8 @@
                     </div>
                 </div>
 
-                <!-- Summary Row -->
-                <div class="summary-row">
+                <!-- KPI 스트립 (업무 3 + 프로젝트 3) -->
+                <div class="summary-row kpi-strip">
                     <div class="summary-card">
                         <div class="summary-icon blue">
                             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
@@ -612,13 +612,7 @@
                             <span class="summary-value" id="completionRate">0%</span>
                         </div>
                     </div>
-                </div>
-
-                <!-- 프로젝트 섹션 -->
-                <div id="homePlanningSection" style="display:none">
-                <div class="home-section-title" style="margin-top:24px">프로젝트</div>
-                <div class="summary-row">
-                    <div class="summary-card">
+                    <div class="summary-card kpi-planning">
                         <div class="summary-icon blue">
                             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                         </div>
@@ -627,7 +621,7 @@
                             <span class="summary-value" id="planningTotalCount">0</span>
                         </div>
                     </div>
-                    <div class="summary-card">
+                    <div class="summary-card kpi-planning">
                         <div class="summary-icon orange">
                             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
@@ -636,7 +630,7 @@
                             <span class="summary-value" id="planningMyTodo">0</span>
                         </div>
                     </div>
-                    <div class="summary-card">
+                    <div class="summary-card kpi-planning">
                         <div class="summary-icon green">
                             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
@@ -646,7 +640,10 @@
                         </div>
                     </div>
                 </div>
-                <div class="dash-panel" style="margin-top:12px">
+
+                <!-- 프로젝트 섹션 -->
+                <div id="homePlanningSection" style="display:none">
+                <div class="dash-panel" style="margin-top:16px">
                     <div class="panel-header">
                         <h2 class="panel-title">내 프로젝트 · 할 일</h2>
                         <button class="panel-link" onclick="switchTab('planning')">전체보기 &rarr;</button>
@@ -1844,6 +1841,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=20260904a"></script>
+    <script src="app.js?v=20260904b"></script>
 </body>
 </html>
