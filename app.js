@@ -2159,14 +2159,16 @@ function renderHome() {
             ddayHtml = `<span class="dash-proj-dday" style="background:var(--gray-100);color:var(--gray-500)">미정</span>`;
         }
         projHtml += `<div class="dash-proj-item" onclick="showProjectDetail(${p.id})">
-            <div class="dash-proj-info">
-                <div class="dash-proj-name">${p.name}</div>
-                <div class="dash-proj-meta">담당 ${owner}${p.deadline ? ' · 마감 ' + fmtDisplay(p.deadline) : ''}</div>
-            </div>
+            <span class="dash-proj-name">${escHtml(p.name)}</span>
+            <span class="dash-proj-client">${escHtml(p.client || '-')}</span>
+            <span class="dash-proj-owner">${escHtml(owner)}</span>
             ${ddayHtml}
         </div>`;
     });
-    document.getElementById('dashProjects').innerHTML = projHtml || empty('진행 중 매입매출 없음');
+    const projHead = `<div class="dash-proj-head">
+        <span>프로젝트</span><span>거래처</span><span>담당</span><span>마감</span>
+    </div>`;
+    document.getElementById('dashProjects').innerHTML = projHtml ? projHead + projHtml : empty('진행 중 매입매출 없음');
 }
 
 // =====================================
@@ -12880,7 +12882,11 @@ async function renderPlanningHomeSection() {
         const weekEl = document.getElementById('planningWeekDue');
         if (totalEl) totalEl.textContent = visible.length;
         if (todoEl) todoEl.textContent = myTodo;
-        if (weekEl) weekEl.textContent = weekDue;
+        if (weekEl) {
+            weekEl.textContent = weekDue;
+            // 마감이 남아 있으면 숫자만 주황으로 (색은 상태 표시에만)
+            weekEl.closest('.summary-card')?.classList.toggle('is-warn', weekDue > 0);
+        }
         const listEl = document.getElementById('planningHomeList');
         if (!listEl) return;
         if (!rows.length) {
