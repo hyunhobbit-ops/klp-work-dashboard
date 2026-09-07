@@ -4381,3 +4381,7 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
     .lbl-name, .lbl-price, .lbl-code{color:#000 !important}
     .lbl-code{color:#555 !important}
 }
+
+/* 라벨 출력 버튼 — 선택 전에는 흐리게, 그래도 항상 보인다 */
+#pdbLabelBtn.is-dim{opacity:.6}
+#pdbLabelBtn:hover{opacity:1}

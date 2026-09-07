@@ -8756,6 +8756,7 @@ function renderProductDB() {
             <td><span class="badge ${productStatusBadge(p.status)}">${p.status}</span></td>
             <td onclick="event.stopPropagation()" style="cursor:default">
                 <div style="display:flex;gap:4px;flex-wrap:wrap">
+                    <button class="edit-btn" style="font-size:11px;padding:5px 8px" onclick="printOneLabel(${p.id})" title="이 상품만 라벨 출력">🏷 라벨</button>
                     <button class="edit-btn" style="font-size:11px;padding:5px 8px" onclick="duplicateProduct(${p.id})" title="복제">📋 복제</button>
                     <button class="form-delete-btn" style="font-size:11px;padding:5px 8px" onclick="deleteProduct(${p.id})" title="삭제">🗑️ 삭제</button>
                 </div>
@@ -20201,7 +20202,8 @@ function updateLabelBtn() {
     const cnt = document.getElementById('pdbLabelCount');
     if (!btn) return;
     const n = _labelSelected.size;
-    btn.style.display = n ? '' : 'none';
+    btn.style.display = '';                       // 항상 보이게 (예전엔 선택해야만 나타나 찾기 어려웠음)
+    btn.classList.toggle('is-dim', n === 0);
     if (cnt) cnt.textContent = n ? `(${n})` : '';
     const all = document.getElementById('pdbCheckAll');
     if (all) {
@@ -20236,8 +20238,24 @@ function bindProductChecks() {
     updateLabelBtn();
 }
 
+// 행의 🏷 라벨 버튼 — 그 상품 하나만 바로 출력
+function printOneLabel(id) {
+    _labelSelected = new Set([id]);
+    document.querySelectorAll('.pdb-check').forEach(b => { b.checked = Number(b.dataset.pid) === id; });
+    updateLabelBtn();
+    openLabelSheet();
+}
+
 function openLabelSheet() {
-    if (!_labelSelected.size) { showToast('라벨을 출력할 상품을 먼저 선택해주세요'); return; }
+    if (!_labelSelected.size) {
+        // 아무것도 안 골랐으면 지금 목록에 보이는 상품 전체로
+        const visible = Array.from(document.querySelectorAll('.pdb-check')).map(b => Number(b.dataset.pid));
+        if (!visible.length) { showToast('등록된 상품이 없습니다'); return; }
+        if (!confirm(`선택한 상품이 없습니다.\n지금 목록에 보이는 ${visible.length}개 상품 전체로 라벨을 만들까요?`)) return;
+        _labelSelected = new Set(visible);
+        document.querySelectorAll('.pdb-check').forEach(b => { b.checked = true; });
+        updateLabelBtn();
+    }
     document.getElementById('labelOverlay').classList.add('open');
     document.body.style.overflow = 'hidden';
     renderLabelSheet();
