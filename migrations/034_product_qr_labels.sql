@@ -159,3 +159,14 @@ revoke all on function get_public_product(text) from public;
 revoke all on function log_product_scan(text) from public;
 grant execute on function get_public_product(text) to anon, authenticated;
 grant execute on function log_product_scan(text) to anon, authenticated;
+
+-- ============================================================
+-- 034b: 필드 개편 (2026-09-04)
+--   입고일(날짜) -> 제작기간(일수), 재고 위치 사진, 거래처 DB 연동, VAT 구분
+-- ============================================================
+alter table product_costs add column if not exists production_days integer default 0;
+alter table product_costs drop column if exists stocked_at;
+alter table product_costs add column if not exists stock_photo text default ;
+alter table product_costs add column if not exists supplier_client_id bigint references clients(id) on delete set null;
+alter table product_costs add column if not exists cost_vat_included boolean default false;
+alter table product_costs add column if not exists min_price_vat_included boolean default false;

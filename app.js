@@ -9021,24 +9021,37 @@ async function openProductDBModal(editId) {
             <span style="font-size:10.5px;font-weight:800;color:var(--blue);background:var(--blue-light);padding:2px 7px;border-radius:5px">직원 전용</span>
             <span style="font-size:11.5px;font-weight:600;color:var(--gray-500)">QR 공개 페이지에는 표시되지 않습니다</span>
         </div>
-        <div class="form-row">
-            <div class="form-group"><label class="form-label">공급처</label>
-                <input type="text" class="form-input" id="pcSupplier" placeholder="공급처명"></div>
-            <div class="form-group"><label class="form-label">공급가 (원)</label>
-                <input type="text" inputmode="numeric" class="form-input" id="pcCost" placeholder="0" oninput="fmtProjectNumberInput(this)"></div>
+        <div class="form-group"><label class="form-label">공급처</label>
+            <input type="text" class="form-input" id="pcSupplier" list="pcSupplierList" placeholder="거래처 DB에서 고르거나 직접 입력" oninput="onSupplierInput()">
+            <datalist id="pcSupplierList"></datalist>
+            <input type="hidden" id="pcSupplierClientId" value="">
+            <div id="pcSupplierHint" style="font-size:11.5px;font-weight:600;color:var(--gray-500);margin-top:6px"></div>
         </div>
         <div class="form-row">
+            <div class="form-group"><label class="form-label">공급가 (원)</label>
+                <input type="text" inputmode="numeric" class="form-input" id="pcCost" placeholder="0" oninput="fmtProjectNumberInput(this)">
+                <label style="display:flex;align-items:center;gap:7px;margin-top:7px;font-size:12.5px;font-weight:600;color:var(--gray-700)">
+                    <input type="checkbox" id="pcCostVat"> VAT 포함가</label></div>
             <div class="form-group"><label class="form-label">최저판매가 (원)</label>
-                <input type="text" inputmode="numeric" class="form-input" id="pcMinPrice" placeholder="0" oninput="fmtProjectNumberInput(this)"></div>
+                <input type="text" inputmode="numeric" class="form-input" id="pcMinPrice" placeholder="0" oninput="fmtProjectNumberInput(this)">
+                <label style="display:flex;align-items:center;gap:7px;margin-top:7px;font-size:12.5px;font-weight:600;color:var(--gray-700)">
+                    <input type="checkbox" id="pcMinPriceVat"> VAT 포함가</label></div>
+        </div>
+        <div class="form-row">
             <div class="form-group"><label class="form-label">재고 수량</label>
                 <input type="number" class="form-input" id="pcStockQty" placeholder="0" min="0"></div>
+            <div class="form-group"><label class="form-label">제작기간 (일)</label>
+                <input type="number" class="form-input" id="pcProdDays" placeholder="0" min="0" oninput="document.getElementById('pcProdDaysEcho').textContent = (this.value || 0)">
+                <div style="font-size:11.5px;font-weight:600;color:var(--gray-500);margin-top:6px">주문 후 <b id="pcProdDaysEcho">0</b>일 소요로 표시됩니다</div></div>
         </div>
-        <div class="form-row">
-            <div class="form-group"><label class="form-label">재고 위치</label>
-                <input type="text" class="form-input" id="pcStockLoc" placeholder="예) A동 2층 선반 3"></div>
-            <div class="form-group"><label class="form-label">입고일</label>
-                <input type="date" class="form-input" id="pcStockedAt"></div>
-        </div>
+        <div class="form-group"><label class="form-label">재고 위치</label>
+            <input type="text" class="form-input" id="pcStockLoc" placeholder="예) A동 2층 선반 3"></div>
+        <div class="form-group"><label class="form-label">재고 위치 사진</label>
+            <input type="file" accept="image/*" id="pcStockPhotoFile" onchange="handleStockPhotoUpload(event)" style="font-size:13px">
+            <input type="hidden" id="pcStockPhoto" value="">
+            <div id="pcStockPhotoPreview" style="margin-top:10px"></div>
+            <div style="font-size:11.5px;font-weight:600;color:var(--gray-500);margin-top:6px">
+                창고에서 물건을 바로 찾을 수 있게 보관 위치를 찍어두세요 (업로드 시 자동 압축)</div></div>
         <div class="form-group"><label class="form-label">내부 메모</label>
             <input type="text" class="form-input" id="pcMemo" placeholder="단가 협의 조건 등"></div>
         <div id="pcQrRow" style="display:none"></div>
@@ -9106,6 +9119,7 @@ async function openProductDBModal(editId) {
     const mb = document.getElementById('modalBody');
     if (mb) mb.scrollTop = 0;
     // 원가·재고 + 공개 QR 주소 (로그인 사용자만 읽힌다 — RLS)
+    fillSupplierDatalist();
     loadProductCosts(editId || 0, p ? (p.publicCode || '') : '');
 }
 
@@ -20324,12 +20338,91 @@ async function loadProductCosts(productId, publicCode) {
     if (!data) return;
     _editingCosts = data;
     setV('pcSupplier', data.supplier_name || '');
+    setV('pcSupplierClientId', data.supplier_client_id || '');
     setV('pcCost', data.cost_price ? Number(data.cost_price).toLocaleString() : '');
     setV('pcMinPrice', data.min_sale_price ? Number(data.min_sale_price).toLocaleString() : '');
     setV('pcStockQty', data.stock_qty != null ? data.stock_qty : '');
+    setV('pcProdDays', data.production_days != null ? data.production_days : '');
     setV('pcStockLoc', data.stock_location || '');
-    setV('pcStockedAt', data.stocked_at || '');
+    setV('pcStockPhoto', data.stock_photo || '');
     setV('pcMemo', data.memo || '');
+    const cv = document.getElementById('pcCostVat'); if (cv) cv.checked = !!data.cost_vat_included;
+    const mv = document.getElementById('pcMinPriceVat'); if (mv) mv.checked = !!data.min_price_vat_included;
+    const echo = document.getElementById('pcProdDaysEcho'); if (echo) echo.textContent = data.production_days || 0;
+    renderStockPhotoPreview();
+    onSupplierInput();
+}
+
+// 공급처 datalist — 거래처 DB(매입처·서비스 우선)에서 채운다. 직접 입력도 허용
+function fillSupplierDatalist() {
+    const dl = document.getElementById('pcSupplierList');
+    if (!dl) return;
+    const rank = c => (c.category === '매입처' ? 0 : c.category === '서비스(비용)' ? 1 : 2);
+    const list = (clients || [])
+        .filter(c => c.companyName)
+        .sort((a, b) => rank(a) - rank(b) || String(a.companyName).localeCompare(String(b.companyName)));
+    dl.innerHTML = list.map(c =>
+        `<option value="${escHtml(c.companyName)}">${escHtml(c.category || '')}${c.staffName ? ' · ' + escHtml(c.staffName) : ''}</option>`
+    ).join('');
+}
+
+// 입력값이 거래처 DB와 일치하면 id를 연결하고 담당자 정보를 보여준다
+function onSupplierInput() {
+    const inp = document.getElementById('pcSupplier');
+    const hid = document.getElementById('pcSupplierClientId');
+    const hint = document.getElementById('pcSupplierHint');
+    if (!inp || !hid || !hint) return;
+    const name = inp.value.trim();
+    const hit = (clients || []).find(c => c.companyName === name);
+    if (hit) {
+        hid.value = hit.id;
+        const bits = [hit.category, hit.staffName, hit.staffMobile || hit.phone].filter(Boolean);
+        hint.innerHTML = `<span style="color:var(--blue);font-weight:800">거래처 DB 연동됨</span> · ${escHtml(bits.join(' · '))}`;
+    } else {
+        hid.value = '';
+        hint.innerHTML = name
+            ? '거래처 DB에 없는 이름입니다 — 직접 입력으로 저장됩니다'
+            : '';
+    }
+}
+
+// 재고 위치 사진 업로드 (기존 상품 이미지와 같은 압축 사용)
+async function handleStockPhotoUpload(ev) {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { showToast('이미지 파일만 업로드 가능합니다'); return; }
+    if (file.size > 8 * 1024 * 1024) { showToast('8MB 이하 파일만 업로드 가능합니다'); return; }
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const shrunk = await _shrinkDataUrl(e.target.result, 900, 0.8);
+            document.getElementById('pcStockPhoto').value = shrunk;
+            renderStockPhotoPreview();
+            showToast('재고 위치 사진이 첨부됐습니다');
+        } catch (err) {
+            showToast('사진 처리 실패: ' + err.message);
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+function renderStockPhotoPreview() {
+    const box = document.getElementById('pcStockPhotoPreview');
+    const val = document.getElementById('pcStockPhoto');
+    if (!box || !val) return;
+    if (!val.value) { box.innerHTML = ''; return; }
+    box.innerHTML = `<div style="position:relative;display:inline-block">
+        <img src="${escHtml(val.value)}" alt="재고 위치" style="max-width:220px;border-radius:10px;border:1px solid var(--border);display:block">
+        <button type="button" onclick="clearStockPhoto()" title="사진 제거"
+            style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;border:none;
+                   background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:13px;line-height:1">×</button>
+    </div>`;
+}
+
+function clearStockPhoto() {
+    document.getElementById('pcStockPhoto').value = '';
+    const f = document.getElementById('pcStockPhotoFile'); if (f) f.value = '';
+    renderStockPhotoPreview();
 }
 
 function copyProductQrUrl() {
@@ -20346,19 +20439,25 @@ async function saveProductCosts(productId) {
     const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
     const n = (id) => Number(String(g(id)).replace(/[^0-9-]/g, '')) || 0;
 
+    const chk = (id) => { const el = document.getElementById(id); return !!(el && el.checked); };
     const payload = {
         product_id: productId,
         supplier_name: g('pcSupplier'),
+        supplier_client_id: Number(g('pcSupplierClientId')) || null,
         cost_price: n('pcCost'),
+        cost_vat_included: chk('pcCostVat'),
         min_sale_price: n('pcMinPrice'),
+        min_price_vat_included: chk('pcMinPriceVat'),
         stock_qty: n('pcStockQty'),
+        production_days: n('pcProdDays'),
         stock_location: g('pcStockLoc'),
-        stocked_at: g('pcStockedAt') || null,
+        stock_photo: g('pcStockPhoto'),
         memo: g('pcMemo'),
         updated_at: new Date().toISOString()
     };
     const isEmpty = !payload.supplier_name && !payload.cost_price && !payload.min_sale_price
-        && !payload.stock_qty && !payload.stock_location && !payload.stocked_at && !payload.memo;
+        && !payload.stock_qty && !payload.production_days && !payload.stock_location
+        && !payload.stock_photo && !payload.memo;
     if (isEmpty && !_editingCosts) return;   // 아무것도 안 적었고 기존 행도 없으면 만들지 않음
 
     if (_editingCosts) {

@@ -51,6 +51,9 @@ h1{font-size:21px; font-weight:800; letter-spacing:-.6px; margin:8px 0 0; line-h
 .row{display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border-soft)}
 .row .k{font-size:12.5px; font-weight:700; color:var(--gray-500); width:88px; flex:none}
 .row .v{font-size:13px; font-weight:600; flex:1; text-align:right}
+.vat{display:inline-block; font-size:10.5px; font-weight:800; color:var(--gray-600);
+    background:var(--gray-100); padding:2px 6px; border-radius:5px; margin-left:4px;
+    vertical-align:middle}
 
 .sec-title{display:flex; align-items:center; gap:8px; font-size:13px; font-weight:800;
     color:var(--gray-700); margin:0 0 10px}
@@ -191,8 +194,10 @@ async function loadInternal(){
 function renderInternal(c){
     const slot = document.getElementById('internalSlot');
     if (!slot) return;
-    const price = Number(_product.unit_price) || 0;
-    const cost = c ? Number(c.cost_price) || 0 : 0;
+    // 마진율은 VAT 포함 기준으로 통일해 비교한다 (별도면 1.1을 곱함)
+    const toVat = (v, included) => (Number(v) || 0) * (included ? 1 : 1.1);
+    const price = toVat(_product.unit_price, _product.vat_included);
+    const cost = c ? toVat(c.cost_price, c.cost_vat_included) : 0;
     const margin = (price && cost) ? Math.round(((price - cost) / price) * 1000) / 10 : null;
 
     slot.innerHTML = `
@@ -201,15 +206,19 @@ function renderInternal(c){
           <div class="sec-title">내부 정보 <span class="lock">직원 전용</span></div>
           ${c ? `
           <div class="rows" style="margin-top:0;border-top:none">
-            <div class="row"><span class="k">공급처</span><span class="v">${escHtml(c.supplier_name || '-')}</span></div>
-            <div class="row"><span class="k">공급가</span><span class="v num">${won(c.cost_price)}원</span></div>
+            <div class="row"><span class="k">공급처</span><span class="v">${escHtml(c.supplier_name || '-')}${c.supplier_client_id ? ' <span class="vat">거래처 DB</span>' : ''}</span></div>
+            <div class="row"><span class="k">공급가</span><span class="v num">${won(c.cost_price)}원 <span class="vat">${c.cost_vat_included ? 'VAT 포함' : 'VAT 별도'}</span></span></div>
             <div class="row"><span class="k">마진율</span><span class="v num" style="color:${margin != null && margin >= 0 ? 'var(--green)' : 'var(--red)'}">${margin != null ? margin + '%' : '-'}</span></div>
-            <div class="row"><span class="k">최저판매가</span><span class="v num">${won(c.min_sale_price)}원</span></div>
+            <div class="row"><span class="k">최저판매가</span><span class="v num">${won(c.min_sale_price)}원 <span class="vat">${c.min_price_vat_included ? 'VAT 포함' : 'VAT 별도'}</span></span></div>
+            <div class="row"><span class="k">제작기간</span><span class="v num">${c.production_days ? c.production_days + '일 소요' : '-'}</span></div>
             <div class="row"><span class="k">재고 수량</span><span class="v num" id="stockQty">${won(c.stock_qty)}개</span></div>
             <div class="row"><span class="k">재고 위치</span><span class="v">${escHtml(c.stock_location || '-')}</span></div>
-            <div class="row"><span class="k">입고일</span><span class="v num">${escHtml(c.stocked_at || '-')}</span></div>
             ${c.memo ? `<div class="row"><span class="k">메모</span><span class="v" style="font-weight:600">${escHtml(c.memo)}</span></div>` : ''}
           </div>
+          ${c.stock_photo ? `<div style="margin-top:14px">
+            <div style="font-size:12px;font-weight:700;color:var(--gray-500);margin-bottom:7px">재고 위치 사진</div>
+            <img src="${escHtml(c.stock_photo)}" alt="재고 위치" style="width:100%;border-radius:10px;border:1px solid var(--border);display:block">
+          </div>` : ''}
           <button class="btn btn-ghost" id="minusBtn" style="margin-top:14px">재고 차감 (-1)</button>
           ` : `<div style="font-size:13px;color:var(--gray-500);font-weight:600;line-height:1.7">
                  아직 원가·재고가 등록되지 않았습니다.<br>대시보드 → 상품 DB에서 등록해주세요.
