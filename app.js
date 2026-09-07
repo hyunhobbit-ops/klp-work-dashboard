@@ -8402,6 +8402,7 @@ function productFromDb(r) {
         labels: Array.isArray(r.labels) ? r.labels.map(_normLabelRow) : [],
         bulkPrices: Array.isArray(r.bulk_prices) ? r.bulk_prices.map(_normBulkPriceRow) : [],
         status: r.status || '판매 중',
+        publicCode: r.public_code || '',
         createdAt: r.created_at || new Date().toISOString(),
     };
 }
@@ -8435,7 +8436,7 @@ function productToDb(p) {
     return row;
 }
 // 목록 로드 시 image(base64, 매우 큼) 컬럼 제외 — Egress 절감의 핵심
-const PRODUCT_LIST_COLUMNS = 'id,name,description,category,unit_price,vat_included,prints,packagings,labels,bulk_prices,status,created_at';
+const PRODUCT_LIST_COLUMNS = 'id,name,description,category,unit_price,vat_included,prints,packagings,labels,bulk_prices,status,created_at,public_code';
 
 // 상품 이미지 지연 로드 — 이미지가 실제로 보이는 화면(상품DB/상세/픽커/제안서 미리보기)
 // 에서만 id,image 만 별도로 받아 메모리에 합친다. 세션당 1회.
@@ -8739,6 +8740,9 @@ function renderProductDB() {
         const labels = p.labels || [];
 
         tableHtml += `<tr onclick="openProductDBModal(${p.id})" style="cursor:pointer">
+            <td onclick="event.stopPropagation()" style="cursor:default">
+                <input type="checkbox" class="pdb-check" data-pid="${p.id}" ${_labelSelected.has(p.id) ? 'checked' : ''}>
+            </td>
             <td>${productThumb(p)}</td>
             <td>
                 <div style="font-weight:700;color:var(--gray-900)">${escHtml(p.name)}</div>
@@ -8783,9 +8787,10 @@ function renderProductDB() {
     });
 
     if (!tableHtml) {
-        tableHtml = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--gray-500)">등록된 상품이 없습니다</td></tr>`;
+        tableHtml = `<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--gray-500)">등록된 상품이 없습니다</td></tr>`;
     }
     document.getElementById('productTableBody').innerHTML = tableHtml;
+    bindProductChecks();
     document.getElementById('productCardGrid').innerHTML = cardHtml;
 
     // Phase 3 #10: 더 보기 버튼
@@ -20131,3 +20136,123 @@ function tbxSetGran(g) {
         document.getElementById('tbxNewRoutine').addEventListener('keydown', e => { if (e.key === 'Enter') tbxAddRoutine(); });
     });
 })();
+
+// =====================================
+// QR 라벨 출력 (상품 DB → A4 라벨지)
+// 이 앱은 바닐라 JS라 qrcode.react 대신 qrcodejs(CDN) 사용
+// =====================================
+let _labelSelected = new Set();
+
+// 폼텍 A4 라벨지 규격 (mm). 실제 인쇄 전 시험 출력 권장
+const LABEL_SPECS = {
+    '3100': { name: '폼텍 3100', cols: 3, rows: 8, w: 63.5, h: 33.9, mt: 12.9, ml: 7.25, gx: 2.54, gy: 0, qr: 26 },
+    '3108': { name: '폼텍 3108', cols: 2, rows: 6, w: 96.5, h: 42.3, mt: 12.7, ml: 7.75, gx: 2.5, gy: 0, qr: 33 }
+};
+
+// 체크박스 상태 → 버튼 노출/카운트
+function updateLabelBtn() {
+    const btn = document.getElementById('pdbLabelBtn');
+    const cnt = document.getElementById('pdbLabelCount');
+    if (!btn) return;
+    const n = _labelSelected.size;
+    btn.style.display = n ? '' : 'none';
+    if (cnt) cnt.textContent = n ? `(${n})` : '';
+    const all = document.getElementById('pdbCheckAll');
+    if (all) {
+        const boxes = document.querySelectorAll('.pdb-check');
+        const checked = document.querySelectorAll('.pdb-check:checked');
+        all.checked = boxes.length > 0 && boxes.length === checked.length;
+        all.indeterminate = checked.length > 0 && checked.length < boxes.length;
+    }
+}
+
+// renderProductDB 이후 체크박스 리스너 부착
+function bindProductChecks() {
+    document.querySelectorAll('.pdb-check').forEach(box => {
+        box.addEventListener('change', () => {
+            const id = Number(box.dataset.pid);
+            if (box.checked) _labelSelected.add(id); else _labelSelected.delete(id);
+            updateLabelBtn();
+        });
+    });
+    const all = document.getElementById('pdbCheckAll');
+    if (all && !all._bound) {
+        all._bound = true;
+        all.addEventListener('change', () => {
+            document.querySelectorAll('.pdb-check').forEach(box => {
+                box.checked = all.checked;
+                const id = Number(box.dataset.pid);
+                if (all.checked) _labelSelected.add(id); else _labelSelected.delete(id);
+            });
+            updateLabelBtn();
+        });
+    }
+    updateLabelBtn();
+}
+
+function openLabelSheet() {
+    if (!_labelSelected.size) { showToast('라벨을 출력할 상품을 먼저 선택해주세요'); return; }
+    document.getElementById('labelOverlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+    renderLabelSheet();
+}
+
+function closeLabelSheet() {
+    document.getElementById('labelOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function renderLabelSheet() {
+    const spec = LABEL_SPECS[document.getElementById('labelSpec').value] || LABEL_SPECS['3100'];
+    const perPage = spec.cols * spec.rows;
+    const startEl = document.getElementById('labelStart');
+    let start = Math.max(1, Math.min(perPage, parseInt(startEl.value, 10) || 1));
+    startEl.value = start;
+    startEl.max = perPage;
+
+    const items = productsDB.filter(p => _labelSelected.has(p.id));
+    document.getElementById('labelBarCount').textContent = `${items.length}개 상품`;
+
+    // 시작 칸만큼 앞을 빈 칸으로 채운 뒤 페이지 단위로 자른다
+    const cells = new Array(start - 1).fill(null).concat(items);
+    const pages = [];
+    for (let i = 0; i < cells.length; i += perPage) pages.push(cells.slice(i, i + perPage));
+    if (!pages.length) pages.push([]);
+
+    const base = location.origin;
+    const scroll = document.getElementById('labelScroll');
+    scroll.innerHTML = pages.map(page => {
+        const cellHtml = [];
+        for (let i = 0; i < perPage; i++) {
+            const p = page[i];
+            if (!p) { cellHtml.push('<div class="lbl lbl-empty"></div>'); continue; }
+            const price = (p.unitPrice != null ? p.unitPrice : p.unit_price) || 0;
+            const code = p.publicCode || p.public_code || '';
+            cellHtml.push(`<div class="lbl">
+                <div class="lbl-qr" data-url="${escHtml(base + '/p/' + code)}" data-size="${spec.qr}"></div>
+                <div class="lbl-txt">
+                    <div class="lbl-name">${escHtml(p.name)}</div>
+                    <div class="lbl-price">${Number(price).toLocaleString('ko-KR')}원</div>
+                    <div class="lbl-code">${escHtml(code)}</div>
+                </div>
+            </div>`);
+        }
+        return `<div class="lbl-sheet" style="padding:${spec.mt}mm ${spec.ml}mm;grid-template-columns:repeat(${spec.cols}, ${spec.w}mm);grid-auto-rows:${spec.h}mm;column-gap:${spec.gx}mm;row-gap:${spec.gy}mm">${cellHtml.join('')}</div>`;
+    }).join('');
+
+    // QR 렌더 (qrcodejs는 컨테이너에 직접 그린다)
+    scroll.querySelectorAll('.lbl-qr').forEach(el => {
+        el.innerHTML = '';
+        const px = Math.round(Number(el.dataset.size) * 3.78); // mm → px (96dpi)
+        try {
+            new QRCode(el, {
+                text: el.dataset.url,
+                width: px, height: px,
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        } catch (e) {
+            el.textContent = 'QR 오류';
+            console.error('QR 생성 실패', e);
+        }
+    });
+}

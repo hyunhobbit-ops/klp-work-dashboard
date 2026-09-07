@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260904g">
+    <link rel="stylesheet" href="styles.css?v=20260904h">
     <link rel="stylesheet" href="mobile.css?v=20260507e" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -24,6 +24,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+    <!-- QR 라벨 생성 (바닐라 JS — 이 앱은 React가 아니라 qrcode.react 대신 사용) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
         // 다크모드 FOUC 방지 — 페인트 전에 즉시 적용
         try {
@@ -956,6 +958,10 @@
                         <p style="font-size:13px;color:var(--gray-500);font-weight:500">제안서 작성에 사용할 상품을 등록·관리합니다</p>
                     </div>
                     <div style="display:flex;gap:8px;align-items:center">
+                        <button class="btn-ghost" id="pdbLabelBtn" onclick="openLabelSheet()" title="선택한 상품의 QR 라벨을 A4 라벨지로 출력합니다" style="display:none">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 19h2v2h-2z"/></svg>
+                            라벨 출력 <span id="pdbLabelCount"></span>
+                        </button>
                         <button class="btn-ghost" id="pdbCompressBtn" onclick="compressProductImages()" title="상품 이미지 용량을 줄여 데이터 전송량을 절감합니다 (관리자 전용)" style="display:none">
                             🗜 이미지 용량 줄이기
                         </button>
@@ -994,6 +1000,7 @@
                     <table class="data-table" id="productTable">
                         <thead>
                             <tr>
+                                <th style="width:38px"><input type="checkbox" id="pdbCheckAll" title="전체 선택"></th>
                                 <th style="width:64px">이미지</th>
                                 <th>상품명</th>
                                 <th style="width:90px">카테고리</th>
@@ -1844,6 +1851,35 @@
         </div>
     </div>
 
-    <script src="app.js?v=20260904d"></script>
+    <!-- ===== QR 라벨 출력 오버레이 ===== -->
+    <div class="label-overlay" id="labelOverlay">
+        <div class="label-bar">
+            <b>QR 라벨 출력</b>
+            <span class="label-bar-sub" id="labelBarCount">0개 상품</span>
+            <div class="label-bar-spacer"></div>
+            <label class="label-bar-field">
+                라벨지
+                <select id="labelSpec" onchange="renderLabelSheet()">
+                    <option value="3100">폼텍 3100 · 24칸 (63.5×33.9mm)</option>
+                    <option value="3108">폼텍 3108 · 12칸 (96.5×42.3mm)</option>
+                </select>
+            </label>
+            <label class="label-bar-field">
+                시작 칸
+                <input type="number" id="labelStart" min="1" value="1" onchange="renderLabelSheet()" title="쓰다 남은 라벨지의 빈 칸부터 시작할 때">
+            </label>
+            <button class="btn btn-primary" onclick="window.print()">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z"/></svg>
+                인쇄
+            </button>
+            <button class="btn btn-ghost" onclick="closeLabelSheet()">닫기</button>
+        </div>
+        <div class="label-hint">
+            💡 인쇄 대화상자에서 <b>여백 없음</b>, <b>배율 100%</b>로 맞춰주세요. 처음에는 일반 A4에 시험 인쇄해 위치를 확인하시길 권합니다.
+        </div>
+        <div class="label-scroll" id="labelScroll"></div>
+    </div>
+
+    <script src="app.js?v=20260904e"></script>
 </body>
 </html>
