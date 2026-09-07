@@ -9015,6 +9015,34 @@ async function openProductDBModal(editId) {
             </div>
         </div>
 
+        <!-- 원가·재고 (내부 전용 — 공개 상품 페이지에 노출되지 않음) -->
+        <div class="form-section-title" style="display:flex;align-items:center;gap:8px">
+            원가 · 재고
+            <span style="font-size:10.5px;font-weight:800;color:var(--blue);background:var(--blue-light);padding:2px 7px;border-radius:5px">직원 전용</span>
+            <span style="font-size:11.5px;font-weight:600;color:var(--gray-500)">QR 공개 페이지에는 표시되지 않습니다</span>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">공급처</label>
+                <input type="text" class="form-input" id="pcSupplier" placeholder="공급처명"></div>
+            <div class="form-group"><label class="form-label">공급가 (원)</label>
+                <input type="text" inputmode="numeric" class="form-input" id="pcCost" placeholder="0" oninput="fmtProjectNumberInput(this)"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">최저판매가 (원)</label>
+                <input type="text" inputmode="numeric" class="form-input" id="pcMinPrice" placeholder="0" oninput="fmtProjectNumberInput(this)"></div>
+            <div class="form-group"><label class="form-label">재고 수량</label>
+                <input type="number" class="form-input" id="pcStockQty" placeholder="0" min="0"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">재고 위치</label>
+                <input type="text" class="form-input" id="pcStockLoc" placeholder="예) A동 2층 선반 3"></div>
+            <div class="form-group"><label class="form-label">입고일</label>
+                <input type="date" class="form-input" id="pcStockedAt"></div>
+        </div>
+        <div class="form-group"><label class="form-label">내부 메모</label>
+            <input type="text" class="form-input" id="pcMemo" placeholder="단가 협의 조건 등"></div>
+        <div id="pcQrRow" style="display:none"></div>
+
         <!-- 수량별 단가 (선택) — 수량 구간별 단가 -->
         <div class="form-group" style="margin-top:8px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -9077,6 +9105,8 @@ async function openProductDBModal(editId) {
     overlay.classList.add('show'); openModalHistory();
     const mb = document.getElementById('modalBody');
     if (mb) mb.scrollTop = 0;
+    // 원가·재고 + 공개 QR 주소 (로그인 사용자만 읽힌다 — RLS)
+    loadProductCosts(editId || 0, p ? (p.publicCode || '') : '');
 }
 
 // 이미지 파일 업로드 → base64 data URL로 hidden input에 저장 + 미리보기 갱신
@@ -9146,11 +9176,13 @@ async function saveProduct() {
         if (!updated) return;                          // DB 실패 시 모달 유지
         const idx = productsDB.findIndex(p => p.id === editId);
         if (idx >= 0) productsDB[idx] = updated;
+        await saveProductCosts(editId);                // 원가·재고 (내부 전용)
         showToast('상품이 수정되었습니다');
     } else {
         const inserted = await dbInsertProduct(data);
         if (!inserted) return;
         productsDB.unshift(inserted);
+        await saveProductCosts(inserted.id);
         showToast('상품이 등록되었습니다');
     }
     closeModal();
@@ -20255,4 +20287,85 @@ function renderLabelSheet() {
             console.error('QR 생성 실패', e);
         }
     });
+}
+
+// =====================================
+// 상품 원가·재고 (product_costs) — 로그인 사용자만 접근 가능 (RLS)
+// =====================================
+let _editingCosts = null;   // 편집 중 상품의 기존 원가 행 (없으면 null)
+
+// 모달이 열린 뒤 호출 — 기존 값 채우기 + QR 링크 표시
+async function loadProductCosts(productId, publicCode) {
+    _editingCosts = null;
+    const setV = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+
+    // QR 공개 링크 (편집일 때만)
+    const qrRow = document.getElementById('pcQrRow');
+    if (qrRow && publicCode) {
+        const url = location.origin + '/p/' + publicCode;
+        qrRow.style.display = '';
+        qrRow.innerHTML = `<div class="form-group"><label class="form-label">공개 QR 주소</label>
+            <div style="display:flex;gap:8px;align-items:center">
+                <input type="text" class="form-input" id="pcQrUrl" readonly value="${escHtml(url)}" style="font-family:'SF Mono','Fira Code',monospace;font-size:12.5px">
+                <button type="button" class="btn-ghost" onclick="copyProductQrUrl()" style="white-space:nowrap">복사</button>
+                <a class="btn-ghost" href="${escHtml(url)}" target="_blank" rel="noopener" style="white-space:nowrap;text-decoration:none">열기</a>
+            </div>
+            <div style="font-size:11.5px;color:var(--gray-500);font-weight:600;margin-top:6px">
+                라벨의 QR을 찍으면 이 주소로 연결됩니다 · 코드 <b>${escHtml(publicCode)}</b>
+            </div></div>`;
+    } else if (qrRow) {
+        qrRow.style.display = 'none';
+        qrRow.innerHTML = '';
+    }
+
+    if (!productId) return;
+    const { data, error } = await sb.from('product_costs').select('*').eq('product_id', productId).maybeSingle();
+    if (error) { console.error('원가 로드 실패', error); return; }
+    if (!data) return;
+    _editingCosts = data;
+    setV('pcSupplier', data.supplier_name || '');
+    setV('pcCost', data.cost_price ? Number(data.cost_price).toLocaleString() : '');
+    setV('pcMinPrice', data.min_sale_price ? Number(data.min_sale_price).toLocaleString() : '');
+    setV('pcStockQty', data.stock_qty != null ? data.stock_qty : '');
+    setV('pcStockLoc', data.stock_location || '');
+    setV('pcStockedAt', data.stocked_at || '');
+    setV('pcMemo', data.memo || '');
+}
+
+function copyProductQrUrl() {
+    const el = document.getElementById('pcQrUrl');
+    if (!el) return;
+    navigator.clipboard.writeText(el.value)
+        .then(() => showToast('QR 주소를 복사했습니다'))
+        .catch(() => { el.select(); document.execCommand('copy'); showToast('QR 주소를 복사했습니다'); });
+}
+
+// saveProduct 뒤에 호출 — 입력이 하나라도 있으면 upsert, 전부 비었고 기존 행도 없으면 건너뜀
+async function saveProductCosts(productId) {
+    if (!productId) return;
+    const g = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const n = (id) => Number(String(g(id)).replace(/[^0-9-]/g, '')) || 0;
+
+    const payload = {
+        product_id: productId,
+        supplier_name: g('pcSupplier'),
+        cost_price: n('pcCost'),
+        min_sale_price: n('pcMinPrice'),
+        stock_qty: n('pcStockQty'),
+        stock_location: g('pcStockLoc'),
+        stocked_at: g('pcStockedAt') || null,
+        memo: g('pcMemo'),
+        updated_at: new Date().toISOString()
+    };
+    const isEmpty = !payload.supplier_name && !payload.cost_price && !payload.min_sale_price
+        && !payload.stock_qty && !payload.stock_location && !payload.stocked_at && !payload.memo;
+    if (isEmpty && !_editingCosts) return;   // 아무것도 안 적었고 기존 행도 없으면 만들지 않음
+
+    if (_editingCosts) {
+        const { error } = await sb.from('product_costs').update(payload).eq('id', _editingCosts.id);
+        if (error) showToast('원가 저장 실패: ' + error.message);
+    } else {
+        const { error } = await sb.from('product_costs').insert(payload);   // company_id는 트리거가 채움
+        if (error) showToast('원가 저장 실패: ' + error.message);
+    }
 }
