@@ -166,7 +166,7 @@ grant execute on function log_product_scan(text) to anon, authenticated;
 -- ============================================================
 alter table product_costs add column if not exists production_days integer default 0;
 alter table product_costs drop column if exists stocked_at;
-alter table product_costs add column if not exists stock_photo text default ;
+alter table product_costs add column if not exists stock_photo text default '';
 alter table product_costs add column if not exists supplier_client_id bigint references clients(id) on delete set null;
 alter table product_costs add column if not exists cost_vat_included boolean default false;
 alter table product_costs add column if not exists min_price_vat_included boolean default false;
