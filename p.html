@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>상품 정보</title>
+<link rel="icon" href="/icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+    --bg:#f7f8fa; --white:#fff;
+    --gray-100:#f2f4f6; --gray-200:#e5e8eb; --gray-300:#d1d6db; --gray-400:#b0b8c1;
+    --gray-500:#8b95a1; --gray-600:#6b7684; --gray-700:#4e5968; --gray-900:#191f28;
+    --blue:#3182f6; --blue-light:#e8f3ff; --blue-dark:#1b64da;
+    --red:#f04452; --red-light:#fff0f0;
+    --green:#30c85e; --green-light:#e8faf0;
+    --orange:#f97316; --orange-light:#fff7ed;
+    --border:#dde2e7; --border-soft:#eceff2;
+}
+*{box-sizing:border-box}
+body{margin:0; background:var(--bg); color:var(--gray-900);
+    font-family:'Pretendard',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:560px; margin:0 auto; padding:20px 16px 48px}
+
+.topbar{display:flex; align-items:center; gap:10px; padding:14px 16px;
+    background:var(--white); border-bottom:1px solid var(--border)}
+.topbar .logo{width:26px; height:26px; border-radius:7px; background:var(--blue);
+    display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:13px}
+.topbar .brand{font-size:14px; font-weight:700; letter-spacing:-.3px}
+
+.card{background:var(--white); border:1px solid var(--border); border-radius:12px; overflow:hidden}
+.photo{width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:var(--gray-100)}
+.photo-empty{width:100%; aspect-ratio:1/1; background:var(--gray-100); display:flex;
+    align-items:center; justify-content:center; color:var(--gray-400); font-size:13px; font-weight:600}
+.pad{padding:18px}
+
+.badge{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:800;
+    padding:4px 9px; border-radius:6px}
+.badge.on{background:var(--green-light); color:#1a8a41}
+.badge.off{background:var(--gray-100); color:var(--gray-600)}
+.cat{font-size:12px; font-weight:700; color:var(--gray-500)}
+h1{font-size:21px; font-weight:800; letter-spacing:-.6px; margin:8px 0 0; line-height:1.35}
+.price{display:flex; align-items:baseline; gap:7px; margin-top:14px}
+.price b{font-size:27px; font-weight:900; letter-spacing:-1.2px}
+.price span{font-size:12.5px; font-weight:600; color:var(--gray-500)}
+.desc{margin-top:14px; font-size:13.5px; line-height:1.7; color:var(--gray-700); white-space:pre-line}
+
+.rows{margin-top:16px; border-top:1px solid var(--border-soft)}
+.row{display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border-soft)}
+.row .k{font-size:12.5px; font-weight:700; color:var(--gray-500); width:88px; flex:none}
+.row .v{font-size:13px; font-weight:600; flex:1; text-align:right}
+
+.sec-title{display:flex; align-items:center; gap:8px; font-size:13px; font-weight:800;
+    color:var(--gray-700); margin:0 0 10px}
+.lock{font-size:10.5px; font-weight:800; color:var(--blue); background:var(--blue-light);
+    padding:2px 7px; border-radius:5px}
+
+.btn{display:flex; align-items:center; justify-content:center; gap:7px; width:100%;
+    height:46px; border-radius:10px; border:none; cursor:pointer; font-family:inherit;
+    font-size:14px; font-weight:700; text-decoration:none}
+.btn-primary{background:var(--blue); color:#fff}
+.btn-ghost{background:var(--white); border:1px solid var(--border); color:var(--gray-700)}
+.btn:disabled{opacity:.5; cursor:default}
+
+.code{margin-top:18px; text-align:center; font-size:11.5px; font-weight:700;
+    color:var(--gray-400); letter-spacing:.14em}
+.state{padding:60px 20px; text-align:center; color:var(--gray-500); font-size:14px; font-weight:600}
+.toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    background:var(--gray-900); color:#fff; padding:11px 18px; border-radius:10px;
+    font-size:13px; font-weight:600; opacity:0; pointer-events:none; transition:opacity .2s; z-index:50}
+.toast.show{opacity:1}
+@media (prefers-color-scheme: dark){
+    :root{ --bg:#0f141b; --white:#1a222e; --gray-100:#263240; --gray-200:#34404f;
+        --gray-300:#475262; --gray-400:#6b7684; --gray-500:#8b95a1; --gray-600:#b0b8c1;
+        --gray-700:#d1d6db; --gray-900:#f2f4f6; --border:#3a4757; --border-soft:#29343f;
+        --blue-light:#1a2f4d; --green-light:#15302a; --red-light:#3a1d1f; --orange-light:#3a2818; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+    <div class="logo" id="brandLogo">K</div>
+    <div class="brand" id="brandName">상품 정보</div>
+</div>
+
+<div class="wrap" id="root">
+    <div class="state">불러오는 중…</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://vtulmuxkriklpiibiues.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function escHtml(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function won(n){ return (Number(n)||0).toLocaleString('ko-KR'); }
+function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+// /p/ABCD1234 또는 ?code=ABCD1234 둘 다 지원
+function readCode(){
+    const m = location.pathname.match(/\/p\/([A-Za-z0-9]{4,16})/);
+    if (m) return m[1].toUpperCase();
+    const q = new URLSearchParams(location.search).get('code');
+    return q ? q.trim().toUpperCase() : '';
+}
+
+let _product = null, _code = '', _session = null;
+
+async function init(){
+    _code = readCode();
+    const root = document.getElementById('root');
+    if (!_code) { root.innerHTML = '<div class="state">상품 코드가 없습니다.<br>라벨의 QR을 다시 스캔해주세요.</div>'; return; }
+
+    // 로그인 세션이 있으면 내부 정보까지 (없으면 공개 정보만)
+    try { const { data } = await sb.auth.getSession(); _session = data ? data.session : null; } catch (_) {}
+
+    const { data, error } = await sb.rpc('get_public_product', { p_code: _code });
+    if (error) { root.innerHTML = `<div class="state">불러오지 못했습니다.<br>${escHtml(error.message)}</div>`; return; }
+    _product = (data && data.length) ? data[0] : null;
+    if (!_product) { root.innerHTML = '<div class="state">해당 코드의 상품을 찾을 수 없습니다.<br><span class="code">' + escHtml(_code) + '</span></div>'; return; }
+
+    document.title = _product.name + ' · 상품 정보';
+    render();
+    // 스캔 기록은 실패해도 페이지에 영향 없게 (rpc는 thenable이라 .catch가 없다)
+    try { await sb.rpc('log_product_scan', { p_code: _code }); } catch (_) {}
+    if (_session) { try { await loadInternal(); } catch (e) { console.error('내부 정보 로드 실패', e); } }
+}
+
+function render(){
+    const p = _product;
+    const onSale = (p.status || '').indexOf('판매') === 0;
+    const img = p.image
+        ? `<img class="photo" src="${escHtml(p.image)}" alt="${escHtml(p.name)}">`
+        : '<div class="photo-empty">이미지 없음</div>';
+
+    // 구성품 = 인쇄/포장/라벨 옵션
+    const comps = [];
+    (p.prints || []).forEach(x => { if (x && x.type && x.type !== '불가') comps.push(['인쇄', x.type, x.fee]); });
+    (p.packagings || []).forEach(x => { if (x && x.type) comps.push(['포장', x.type, x.fee]); });
+    (p.labels || []).forEach(x => { if (x && x.type) comps.push(['라벨', x.type, x.fee]); });
+    const compHtml = comps.length ? `<div class="rows">` + comps.map(([k, v, fee]) =>
+        `<div class="row"><span class="k">${escHtml(k)}</span><span class="v">${escHtml(v)}${fee ? ` <span style="color:var(--gray-500);font-weight:600">+${won(fee)}원</span>` : ''}</span></div>`
+    ).join('') + `</div>` : '';
+
+    document.getElementById('root').innerHTML = `
+      <div class="card">
+        ${img}
+        <div class="pad">
+          <div style="display:flex;align-items:center;gap:9px">
+            <span class="badge ${onSale ? 'on' : 'off'}">${escHtml(p.status || '판매 중')}</span>
+            <span class="cat">${escHtml(p.category || '기타')}</span>
+          </div>
+          <h1>${escHtml(p.name)}</h1>
+          <div class="price">
+            <b class="num">${won(p.unit_price)}원</b>
+            <span>${p.vat_included ? 'VAT 포함' : 'VAT 별도'}</span>
+          </div>
+          ${p.description ? `<div class="desc">${escHtml(p.description)}</div>` : ''}
+          ${compHtml}
+        </div>
+      </div>
+
+      <div id="internalSlot"></div>
+
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:9px">
+        <a class="btn btn-primary" href="tel:0269506100">구매 문의하기</a>
+        ${_session ? '' : '<a class="btn btn-ghost" href="/index.html">직원 로그인</a>'}
+      </div>
+      <div class="code">${escHtml(p.public_code)}</div>
+    `;
+}
+
+// 로그인 상태에서만 호출 — RLS가 막으면 아무것도 안 나온다
+async function loadInternal(){
+    const { data: prow } = await sb.from('products').select('id').eq('public_code', _code).maybeSingle();
+    if (!prow) return;
+    _product._id = prow.id;
+    const { data: c } = await sb.from('product_costs').select('*').eq('product_id', prow.id).maybeSingle();
+    renderInternal(c);
+}
+
+function renderInternal(c){
+    const slot = document.getElementById('internalSlot');
+    if (!slot) return;
+    const price = Number(_product.unit_price) || 0;
+    const cost = c ? Number(c.cost_price) || 0 : 0;
+    const margin = (price && cost) ? Math.round(((price - cost) / price) * 1000) / 10 : null;
+
+    slot.innerHTML = `
+      <div class="card" style="margin-top:14px">
+        <div class="pad">
+          <div class="sec-title">내부 정보 <span class="lock">직원 전용</span></div>
+          ${c ? `
+          <div class="rows" style="margin-top:0;border-top:none">
+            <div class="row"><span class="k">공급처</span><span class="v">${escHtml(c.supplier_name || '-')}</span></div>
+            <div class="row"><span class="k">공급가</span><span class="v num">${won(c.cost_price)}원</span></div>
+            <div class="row"><span class="k">마진율</span><span class="v num" style="color:${margin != null && margin >= 0 ? 'var(--green)' : 'var(--red)'}">${margin != null ? margin + '%' : '-'}</span></div>
+            <div class="row"><span class="k">최저판매가</span><span class="v num">${won(c.min_sale_price)}원</span></div>
+            <div class="row"><span class="k">재고 수량</span><span class="v num" id="stockQty">${won(c.stock_qty)}개</span></div>
+            <div class="row"><span class="k">재고 위치</span><span class="v">${escHtml(c.stock_location || '-')}</span></div>
+            <div class="row"><span class="k">입고일</span><span class="v num">${escHtml(c.stocked_at || '-')}</span></div>
+            ${c.memo ? `<div class="row"><span class="k">메모</span><span class="v" style="font-weight:600">${escHtml(c.memo)}</span></div>` : ''}
+          </div>
+          <button class="btn btn-ghost" id="minusBtn" style="margin-top:14px">재고 차감 (-1)</button>
+          ` : `<div style="font-size:13px;color:var(--gray-500);font-weight:600;line-height:1.7">
+                 아직 원가·재고가 등록되지 않았습니다.<br>대시보드 → 상품 DB에서 등록해주세요.
+               </div>`}
+        </div>
+      </div>`;
+
+    const btn = document.getElementById('minusBtn');
+    if (btn) btn.addEventListener('click', () => decStock(c));
+}
+
+async function decStock(c){
+    const btn = document.getElementById('minusBtn');
+    const cur = Number(c.stock_qty) || 0;
+    if (cur <= 0) { showToast('재고가 이미 0입니다'); return; }
+    btn.disabled = true;
+    const { data, error } = await sb.from('product_costs')
+        .update({ stock_qty: cur - 1, updated_at: new Date().toISOString() })
+        .eq('id', c.id).select().single();
+    btn.disabled = false;
+    if (error) { showToast('차감 실패: ' + error.message); return; }
+    c.stock_qty = data.stock_qty;
+    document.getElementById('stockQty').textContent = won(data.stock_qty) + '개';
+    showToast(`재고 차감 완료 · 남은 수량 ${won(data.stock_qty)}개`);
+}
+
+init();
+</script>
+</body>
+</html>
