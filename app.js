@@ -20486,3 +20486,94 @@ async function saveProductCosts(productId) {
         if (error) showToast('원가 저장 실패: ' + error.message);
     }
 }
+
+// =====================================
+// 국내 거래처 DB — 엑셀 내보내기
+// 화면에 적용된 구분(매출처/매입처/서비스/공란) + 검색어 그대로 반영해서 내보낸다
+// =====================================
+function exportClientsToExcel(mode) {
+    if (typeof XLSX === 'undefined') { showToast('엑셀 모듈을 불러오지 못했습니다'); return; }
+
+    const CAT_SET = ['매출처', '매입처', '서비스(비용)'];
+    const catLabel = (c) => CAT_SET.includes(c.category || '') ? c.category : '공란';
+
+    // mode: 'current'(화면 그대로) | 'bycat'(구분별 시트 분리) | 특정 카테고리명
+    let sheets = [];
+    if (mode === 'bycat') {
+        const all = clients.slice();
+        ['매출처', '매입처', '서비스(비용)', '공란'].forEach(cat => {
+            const rows = all.filter(c => catLabel(c) === cat);
+            if (rows.length) sheets.push({ name: cat === '서비스(비용)' ? '서비스(비용)' : cat, rows });
+        });
+        if (!sheets.length) { showToast('내보낼 거래처가 없습니다'); return; }
+    } else if (CAT_SET.includes(mode) || mode === '공란') {
+        const rows = clients.filter(c => catLabel(c) === mode);
+        if (!rows.length) { showToast(mode + ' 거래처가 없습니다'); return; }
+        sheets = [{ name: mode, rows }];
+    } else {
+        const rows = filterClients();
+        if (!rows.length) { showToast('내보낼 거래처가 없습니다'); return; }
+        const label = clientCategoryFilter === 'all' ? '전체' : clientCategoryFilter;
+        sheets = [{ name: label, rows }];
+    }
+
+    const header = ['구분', '회사명', '사업자번호', '대표자', '전화번호', '팩스', '휴대폰',
+                    '이메일', '우편번호', '주소', '업태', '종목',
+                    '담당직원', '담당직원 연락처', '담당직원 이메일', '등급'];
+    const cols = [{ wch: 11 }, { wch: 30 }, { wch: 14 }, { wch: 10 }, { wch: 15 }, { wch: 15 },
+                  { wch: 15 }, { wch: 26 }, { wch: 10 }, { wch: 44 }, { wch: 14 }, { wch: 22 },
+                  { wch: 12 }, { wch: 15 }, { wch: 24 }, { wch: 8 }];
+
+    const wb = XLSX.utils.book_new();
+    let total = 0;
+    sheets.forEach(sh => {
+        const body = sh.rows.map(c => [
+            catLabel(c), c.companyName || '', c.businessNo || '', c.ceo || '',
+            c.phone || '', c.fax || '', c.mobile || '', c.email || '',
+            c.zipcode || '', c.address || '', c.bizType || '', c.bizItem || '',
+            c.staffName || '', c.staffMobile || '', c.staffEmail || '', c.grade || ''
+        ]);
+        const ws = XLSX.utils.aoa_to_sheet([header, ...body]);
+        ws['!cols'] = cols;
+        ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: body.length, c: header.length - 1 } }) };
+        ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+        // 시트명에 엑셀이 못 쓰는 문자 제거 (서비스(비용) 의 괄호는 허용됨)
+        const safe = String(sh.name).replace(/[\\\/\?\*\[\]:]/g, '').slice(0, 28) || '거래처';
+        XLSX.utils.book_append_sheet(wb, ws, safe + '(' + body.length + ')');
+        total += body.length;
+    });
+
+    const d = new Date();
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const suffix = mode === 'bycat' ? '구분별' : (sheets[0] ? sheets[0].name : '전체');
+    XLSX.writeFile(wb, `국내거래처_${suffix}_${stamp}.xlsx`);
+    showToast(`${total}곳을 엑셀로 내보냈습니다`);
+    closeClientExportMenu();
+}
+
+function toggleClientExportMenu(ev) {
+    if (ev) ev.stopPropagation();
+    const m = document.getElementById('clientExportMenu');
+    if (!m) return;
+    const open = m.classList.toggle('show');
+    if (open) {
+        // 현재 필터 기준 건수를 버튼에 표시
+        const n = filterClients().length;
+        const label = clientCategoryFilter === 'all' ? '전체' : clientCategoryFilter;
+        const cur = document.getElementById('cxCurrent');
+        if (cur) cur.textContent = `지금 화면 그대로 (${label} ${n}곳)`;
+        const CAT_SET = ['매출처', '매입처', '서비스(비용)'];
+        const cnt = (cat) => clients.filter(c =>
+            cat === '공란' ? !CAT_SET.includes(c.category || '') : (c.category || '') === cat).length;
+        ['매출처', '매입처', '서비스(비용)', '공란'].forEach(cat => {
+            const el = document.getElementById('cxCnt_' + cat);
+            if (el) el.textContent = cnt(cat) + '곳';
+        });
+        setTimeout(() => document.addEventListener('click', closeClientExportMenu, { once: true }), 0);
+    }
+}
+
+function closeClientExportMenu() {
+    const m = document.getElementById('clientExportMenu');
+    if (m) m.classList.remove('show');
+}

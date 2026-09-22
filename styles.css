@@ -4385,3 +4385,18 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
 /* 라벨 출력 버튼 — 선택 전에는 흐리게, 그래도 항상 보인다 */
 #pdbLabelBtn.is-dim{opacity:.6}
 #pdbLabelBtn:hover{opacity:1}
+
+/* 거래처 엑셀 내보내기 드롭다운 */
+.cx-wrap{position:relative; display:inline-block}
+.cx-menu{position:absolute; right:0; top:calc(100% + 6px); min-width:262px; z-index:120;
+    background:var(--white); border:1px solid var(--border); border-radius:11px;
+    box-shadow:0 8px 28px rgba(16,24,40,.14); padding:6px; display:none}
+.cx-menu.show{display:block}
+.cx-menu button{display:flex; align-items:center; justify-content:space-between; gap:10px;
+    width:100%; text-align:left; border:none; background:none; cursor:pointer; font-family:inherit;
+    font-size:13px; font-weight:600; color:var(--gray-800); padding:9px 11px; border-radius:8px;
+    flex-wrap:wrap}
+.cx-menu button:hover{background:var(--gray-50)}
+.cx-menu button b{font-size:12px; font-weight:800; color:var(--gray-500)}
+.cx-menu .cx-hint{flex-basis:100%; font-size:11.5px; font-weight:500; color:var(--gray-500); margin-top:2px}
+.cx-sep{height:1px; background:var(--border-soft); margin:5px 8px}
