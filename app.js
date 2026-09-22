@@ -20491,27 +20491,63 @@ async function saveProductCosts(productId) {
 // 국내 거래처 DB — 엑셀 내보내기
 // 화면에 적용된 구분(매출처/매입처/서비스/공란) + 검색어 그대로 반영해서 내보낸다
 // =====================================
-function exportClientsToExcel(mode) {
+// 목록 화면은 500곳만 로드해두므로, 내보내기는 DB에서 전체를 다시 받아온다
+async function fetchAllClients() {
+    const PAGE = 1000;
+    const out = [];
+    for (let from = 0; ; from += PAGE) {
+        const { data, error } = await sb.from('clients')
+            .select('*').order('company_name', { ascending: true })
+            .range(from, from + PAGE - 1);
+        if (error) throw new Error(error.message);
+        (data || []).forEach(r => out.push(clientFromDb(r)));
+        if (!data || data.length < PAGE) break;
+    }
+    return out;
+}
+
+async function exportClientsToExcel(mode) {
     if (typeof XLSX === 'undefined') { showToast('엑셀 모듈을 불러오지 못했습니다'); return; }
 
     const CAT_SET = ['매출처', '매입처', '서비스(비용)'];
     const catLabel = (c) => CAT_SET.includes(c.category || '') ? c.category : '공란';
 
-    // mode: 'current'(화면 그대로) | 'bycat'(구분별 시트 분리) | 특정 카테고리명
+    showToast('전체 거래처를 불러오는 중…');
+    let all;
+    try { all = await fetchAllClients(); }
+    catch (e) { showToast('불러오기 실패: ' + e.message); return; }
+
+    // mode: 'current'(화면 필터 그대로) | 'bycat'(구분별 시트 분리) | 특정 카테고리명
     let sheets = [];
     if (mode === 'bycat') {
-        const all = clients.slice();
         ['매출처', '매입처', '서비스(비용)', '공란'].forEach(cat => {
             const rows = all.filter(c => catLabel(c) === cat);
-            if (rows.length) sheets.push({ name: cat === '서비스(비용)' ? '서비스(비용)' : cat, rows });
+            if (rows.length) sheets.push({ name: cat, rows });
         });
         if (!sheets.length) { showToast('내보낼 거래처가 없습니다'); return; }
     } else if (CAT_SET.includes(mode) || mode === '공란') {
-        const rows = clients.filter(c => catLabel(c) === mode);
+        const rows = all.filter(c => catLabel(c) === mode);
         if (!rows.length) { showToast(mode + ' 거래처가 없습니다'); return; }
         sheets = [{ name: mode, rows }];
     } else {
-        const rows = filterClients();
+        // 화면의 구분 칩 + 검색어를 전체 데이터에 그대로 적용
+        let rows = all;
+        if (CAT_SET.includes(clientCategoryFilter)) {
+            rows = rows.filter(c => (c.category || '') === clientCategoryFilter);
+        } else if (clientCategoryFilter === '공란') {
+            rows = rows.filter(c => !CAT_SET.includes(c.category || ''));
+        }
+        if (clientSearch) {
+            const q = clientSearch.toLowerCase();
+            rows = rows.filter(c =>
+                (c.companyName || '').toLowerCase().includes(q) ||
+                (c.ceo || '').toLowerCase().includes(q) ||
+                (c.phone || '').toLowerCase().includes(q) ||
+                (c.mobile || '').toLowerCase().includes(q) ||
+                (c.staffName || '').toLowerCase().includes(q) ||
+                (c.address || '').toLowerCase().includes(q) ||
+                (c.email || '').toLowerCase().includes(q));
+        }
         if (!rows.length) { showToast('내보낼 거래처가 없습니다'); return; }
         const label = clientCategoryFilter === 'all' ? '전체' : clientCategoryFilter;
         sheets = [{ name: label, rows }];
@@ -20551,25 +20587,39 @@ function exportClientsToExcel(mode) {
     closeClientExportMenu();
 }
 
-function toggleClientExportMenu(ev) {
+async function toggleClientExportMenu(ev) {
     if (ev) ev.stopPropagation();
     const m = document.getElementById('clientExportMenu');
     if (!m) return;
     const open = m.classList.toggle('show');
-    if (open) {
-        // 현재 필터 기준 건수를 버튼에 표시
-        const n = filterClients().length;
-        const label = clientCategoryFilter === 'all' ? '전체' : clientCategoryFilter;
-        const cur = document.getElementById('cxCurrent');
-        if (cur) cur.textContent = `지금 화면 그대로 (${label} ${n}곳)`;
+    if (!open) return;
+    setTimeout(() => document.addEventListener('click', closeClientExportMenu, { once: true }), 0);
+
+    const label = clientCategoryFilter === 'all' ? '전체' : clientCategoryFilter;
+    const cur = document.getElementById('cxCurrent');
+    const CATS = ['매출처', '매입처', '서비스(비용)', '공란'];
+    if (cur) cur.textContent = `지금 화면 그대로 (${label}) — 세는 중…`;
+    CATS.forEach(c => { const el = document.getElementById('cxCnt_' + c); if (el) el.textContent = '…'; });
+
+    // 화면에 500곳만 로드돼 있으므로 건수는 DB 전체에서 센다
+    try {
         const CAT_SET = ['매출처', '매입처', '서비스(비용)'];
-        const cnt = (cat) => clients.filter(c =>
-            cat === '공란' ? !CAT_SET.includes(c.category || '') : (c.category || '') === cat).length;
-        ['매출처', '매입처', '서비스(비용)', '공란'].forEach(cat => {
-            const el = document.getElementById('cxCnt_' + cat);
-            if (el) el.textContent = cnt(cat) + '곳';
-        });
-        setTimeout(() => document.addEventListener('click', closeClientExportMenu, { once: true }), 0);
+        const counts = {};
+        for (const cat of CAT_SET) {
+            const { count } = await sb.from('clients').select('id', { count: 'exact', head: true }).eq('category', cat);
+            counts[cat] = count || 0;
+        }
+        const { count: total } = await sb.from('clients').select('id', { count: 'exact', head: true });
+        counts['공란'] = (total || 0) - CAT_SET.reduce((a, c) => a + counts[c], 0);
+
+        CATS.forEach(c => { const el = document.getElementById('cxCnt_' + c); if (el) el.textContent = counts[c] + '곳'; });
+        const shown = clientCategoryFilter === 'all' ? (total || 0) : (counts[clientCategoryFilter] || 0);
+        if (cur) cur.textContent = clientSearch
+            ? `지금 화면 그대로 (${label} + 검색어)`
+            : `지금 화면 그대로 (${label} ${shown}곳)`;
+    } catch (e) {
+        if (cur) cur.textContent = `지금 화면 그대로 (${label})`;
+        CATS.forEach(c => { const el = document.getElementById('cxCnt_' + c); if (el) el.textContent = ''; });
     }
 }
 
