@@ -21735,7 +21735,7 @@ async function inqAiExtract() {
         const token = sess && sess.session && sess.session.access_token;
         if (!token) throw new Error('no session');
         const s = (currentCompany && currentCompany.settings) || {};
-        const res = await fetch('/api/inquiry-extract', {
+        const res = await fetch('/api/meeting-summarize?kind=inquiry', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
             body: JSON.stringify({ content, ourCompany: s.brandName || (currentCompany && currentCompany.name) || '' })

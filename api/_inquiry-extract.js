@@ -1,5 +1,5 @@
 // 고객 문의(메일·카톡·홈페이지) → 거래처·담당자·부서·직함·연락처·이메일·문의 한 줄 요약 추출
-// (Vercel 서버리스, CommonJS, 의존성 0 — api/meeting-summarize.js 와 같은 구조)
+// (CommonJS, 의존성 0. '_'로 시작해 별도 함수로 안 잡힘 — /api/meeting-summarize?kind=inquiry 로 호출)
 // 흐름: 클라이언트가 붙여넣은 문의 원문 + Supabase access_token 전송 →
 //       1) 토큰 검증(로그인 직원만) → 2) Anthropic 호출(도구로 JSON 강제) → 3) 필드 반환
 //
