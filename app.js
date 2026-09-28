@@ -20854,7 +20854,7 @@ async function inqRenderDetail() {
             <div>왼쪽에서 상담을 고르거나 <b>새 상담</b>을 등록하세요</div></div>`;
         return;
     }
-    const people = companyPeople();
+    const people = inqPeople();
     const assigneeOpts = `<option value="">-</option>` + inqOpt(people.includes(x.assignee) || !x.assignee ? people : people.concat([x.assignee]), x.assignee);
     el.innerHTML = `
       <div class="inq-head">
@@ -21389,7 +21389,7 @@ function inqOpenNew() {
 function inqRenderNewForm() {
     const el = document.getElementById('inqDetail');
     if (!el) return;
-    const people = companyPeople();
+    const people = inqPeople();
     const me = currentUser && currentUser.name;
     _inqNewImages.length = 0;
     el.innerHTML = `
@@ -21924,9 +21924,11 @@ async function inqAiExtract() {
 // inquiries.next_action / next_action_date 는 목록·정렬용 요약('가장 급한 미완료 할 일 외 N건')
 let _inqTodos = [];
 
+// 상담 담당자·할 일 담당자 목록 — 회의록과 같은 기준(KLP는 대표님 포함). companyPeople()은 실무자 4명뿐이라 대표님이 빠짐
+function inqPeople() { return meetingStaffList(); }
 function inqMe() { const n = (currentUser && currentUser.name) || ''; return DISPLAY_NAME_MAP[n] || n; }
 function inqPeopleOpts(v) {
-    const p = companyPeople().slice();
+    const p = inqPeople().slice();
     if (v && !p.includes(v)) p.push(v);
     return inqOpt(p, v);
 }
