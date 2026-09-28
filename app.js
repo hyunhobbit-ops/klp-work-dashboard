@@ -20872,6 +20872,23 @@ async function inqRenderDetail() {
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
           </button>
         </div>
+      <div class="inq-cust">
+          <div class="inq-cinfo">
+            <span class="inq-ci-lab">고객</span>
+            <div class="inq-ci-sum" id="inqCISum">${inqContactSummary(x)}</div>
+            <button type="button" class="inq-mini" id="inqCIToggle">${ciOpen ? '접기' : '편집'}</button>
+          </div>
+          <div class="inq-fields" id="inqFields" ${ciOpen ? '' : 'hidden'}>
+            <label><span>고객 담당자</span><input id="inqFCName" value="${escHtml(x.contact_name || x.client_contact || '')}" placeholder="이름"></label>
+            <label><span>직함</span><input id="inqFCTitle" value="${escHtml(x.contact_title || '')}" placeholder="예) 과장"></label>
+            <label><span>부서</span><input id="inqFCDept" value="${escHtml(x.contact_dept || '')}" placeholder="예) 총무팀"></label>
+            <label><span>연락처</span><input id="inqFCPhone" inputmode="tel" value="${escHtml(x.contact_phone || '')}" placeholder="010-0000-0000"></label>
+            <label><span>이메일</span><input id="inqFCEmail" type="email" value="${escHtml(x.contact_email || '')}" placeholder="name@company.com"></label>
+            <label><span>문의 경로</span><select id="inqFChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select></label>
+            <label><span>우리 담당</span><select id="inqFAssignee">${assigneeOpts}</select></label>
+            <label><span>상담 시작일</span><input type="date" id="inqFStarted" value="${escHtml(x.started_at || '')}"></label>
+          </div>
+      </div>
         <div class="inq-stage" id="inqStage"></div>
         ${x.status === '실패' && x.fail_reason ? `<div class="inq-fail">실패 사유 · ${escHtml(x.fail_reason)}</div>` : ''}
       </div>
@@ -20901,23 +20918,6 @@ async function inqRenderDetail() {
         </div>
         <aside class="inq-side">
           <div id="inqNow"></div>
-          <section class="inq-card">
-            <div class="inq-cinfo">
-              <span class="inq-ci-lab">고객</span>
-              <div class="inq-ci-sum" id="inqCISum">${inqContactSummary(x)}</div>
-              <button type="button" class="inq-mini" id="inqCIToggle">${ciOpen ? '접기' : '편집'}</button>
-            </div>
-            <div class="inq-fields" id="inqFields" ${ciOpen ? '' : 'hidden'}>
-              <label><span>고객 담당자</span><input id="inqFCName" value="${escHtml(x.contact_name || x.client_contact || '')}" placeholder="이름"></label>
-              <label><span>직함</span><input id="inqFCTitle" value="${escHtml(x.contact_title || '')}" placeholder="예) 과장"></label>
-              <label><span>부서</span><input id="inqFCDept" value="${escHtml(x.contact_dept || '')}" placeholder="예) 총무팀"></label>
-              <label><span>연락처</span><input id="inqFCPhone" inputmode="tel" value="${escHtml(x.contact_phone || '')}" placeholder="010-0000-0000"></label>
-              <label><span>이메일</span><input id="inqFCEmail" type="email" value="${escHtml(x.contact_email || '')}" placeholder="name@company.com"></label>
-              <label><span>문의 경로</span><select id="inqFChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select></label>
-              <label><span>우리 담당</span><select id="inqFAssignee">${assigneeOpts}</select></label>
-              <label><span>상담 시작일</span><input type="date" id="inqFStarted" value="${escHtml(x.started_at || '')}"></label>
-            </div>
-          </section>
           <section class="inq-card"><div class="inq-todos" id="inqTodos"><div class="inq-todo-head"><b>다음 할 일</b><em>불러오는 중…</em></div></div></section>
           <section class="inq-card inq-pre" id="inqPre"></section>
           <section class="inq-card inq-quotes" id="inqQuotes"></section>
