@@ -20867,56 +20867,62 @@ async function inqRenderDetail() {
         <div class="inq-head-row">
           <input class="inq-h-client" id="inqFClient" list="tempClientList" value="${escHtml(x.client || '')}" placeholder="거래처">
           <select class="inq-h-status ${INQ_STATUS_CLS[x.status] || ''}" id="inqFStatus">${inqOpt(INQ_STATUSES, x.status)}</select>
-          <div class="inq-spacer"></div>
+          <input class="inq-h-title" id="inqFTitle" value="${escHtml(x.title || '')}" placeholder="무엇을 문의했나요? 예) 손목시계 300개 각인 견적">
           <button class="inq-icon-btn" id="inqFDelete" title="상담 삭제">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
           </button>
         </div>
-        <input class="inq-h-title" id="inqFTitle" value="${escHtml(x.title || '')}" placeholder="무엇을 문의했나요? 예) 손목시계 300개 각인 견적">
         <div class="inq-stage" id="inqStage"></div>
-        <div class="inq-cinfo">
-          <span class="inq-ci-lab">고객</span>
-          <div class="inq-ci-sum" id="inqCISum">${inqContactSummary(x)}</div>
-          <button type="button" class="inq-mini" id="inqCIToggle">${ciOpen ? '접기' : '편집'}</button>
-        </div>
-        <div class="inq-fields" id="inqFields" ${ciOpen ? '' : 'hidden'}>
-          <label><span>고객 담당자</span><input id="inqFCName" value="${escHtml(x.contact_name || x.client_contact || '')}" placeholder="이름"></label>
-          <label><span>직함</span><input id="inqFCTitle" value="${escHtml(x.contact_title || '')}" placeholder="예) 과장"></label>
-          <label><span>부서</span><input id="inqFCDept" value="${escHtml(x.contact_dept || '')}" placeholder="예) 총무팀"></label>
-          <label><span>연락처</span><input id="inqFCPhone" inputmode="tel" value="${escHtml(x.contact_phone || '')}" placeholder="010-0000-0000"></label>
-          <label><span>이메일</span><input id="inqFCEmail" type="email" value="${escHtml(x.contact_email || '')}" placeholder="name@company.com"></label>
-          <label><span>문의 경로</span><select id="inqFChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select></label>
-          <label><span>우리 담당</span><select id="inqFAssignee">${assigneeOpts}</select></label>
-          <label><span>상담 시작일</span><input type="date" id="inqFStarted" value="${escHtml(x.started_at || '')}"></label>
-        </div>
-        <div class="inq-todos" id="inqTodos"><div class="inq-todo-head"><b>다음 할 일</b><em>불러오는 중…</em></div></div>
         ${x.status === '실패' && x.fail_reason ? `<div class="inq-fail">실패 사유 · ${escHtml(x.fail_reason)}</div>` : ''}
       </div>
-      <div class="inq-flow">
-        <div class="inq-pre" id="inqPre"></div>
-        <div class="inq-quotes" id="inqQuotes"></div>
-        <div class="inq-projs" id="inqProjs"></div>
-      </div>
-      <div class="inq-timeline" id="inqTimeline"><div class="inq-empty">불러오는 중…</div></div>
-      <div class="inq-composer">
-        <div class="inq-comp-top">
-          <div class="inq-dir" id="inqDir">
-            <button data-dir="in">고객</button><button data-dir="out">우리 답변</button><button data-dir="memo">내부 메모</button>
+      <div class="inq-body2">
+        <div class="inq-main">
+          <div class="inq-timeline" id="inqTimeline"><div class="inq-empty">불러오는 중…</div></div>
+          <div class="inq-composer">
+            <div class="inq-comp-top">
+              <div class="inq-dir" id="inqDir">
+                <button data-dir="in">고객</button><button data-dir="out">우리 답변</button><button data-dir="memo">내부 메모</button>
+              </div>
+              <select id="inqCChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select>
+              <label class="inq-attach" title="사진 첨부 (Ctrl+V로 붙여넣기도 됩니다)">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 16l-5-5-8 8"/></svg>
+                <input type="file" accept="image/*" multiple id="inqCFile" hidden>
+              </label>
+              <div class="inq-spacer"></div>
+              <span class="inq-comp-hint">사진은 Ctrl+V · Ctrl+Enter 저장</span>
+            </div>
+            <div class="inq-comp-body">
+              <textarea id="inqCBody" rows="2" placeholder="오간 내용을 그대로 적거나 카톡 대화를 붙여넣으세요"></textarea>
+              <button class="btn-primary" id="inqCSave">기록</button>
+            </div>
+            <div class="inq-img-notice" id="inqCImgNotice" hidden></div>
+            <div class="inq-thumbs" id="inqCThumbs"></div>
           </div>
-          <select id="inqCChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select>
-          <label class="inq-attach" title="사진 첨부 (Ctrl+V로 붙여넣기도 됩니다)">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 16l-5-5-8 8"/></svg>
-            <input type="file" accept="image/*" multiple id="inqCFile" hidden>
-          </label>
-          <div class="inq-spacer"></div>
-          <span class="inq-comp-hint">사진은 Ctrl+V · Ctrl+Enter 저장</span>
         </div>
-        <div class="inq-comp-body">
-          <textarea id="inqCBody" rows="2" placeholder="오간 내용을 그대로 적거나 카톡 대화를 붙여넣으세요"></textarea>
-          <button class="btn-primary" id="inqCSave">기록</button>
-        </div>
-        <div class="inq-img-notice" id="inqCImgNotice" hidden></div>
-        <div class="inq-thumbs" id="inqCThumbs"></div>
+        <aside class="inq-side">
+          <div id="inqNow"></div>
+          <section class="inq-card">
+            <div class="inq-cinfo">
+              <span class="inq-ci-lab">고객</span>
+              <div class="inq-ci-sum" id="inqCISum">${inqContactSummary(x)}</div>
+              <button type="button" class="inq-mini" id="inqCIToggle">${ciOpen ? '접기' : '편집'}</button>
+            </div>
+            <div class="inq-fields" id="inqFields" ${ciOpen ? '' : 'hidden'}>
+              <label><span>고객 담당자</span><input id="inqFCName" value="${escHtml(x.contact_name || x.client_contact || '')}" placeholder="이름"></label>
+              <label><span>직함</span><input id="inqFCTitle" value="${escHtml(x.contact_title || '')}" placeholder="예) 과장"></label>
+              <label><span>부서</span><input id="inqFCDept" value="${escHtml(x.contact_dept || '')}" placeholder="예) 총무팀"></label>
+              <label><span>연락처</span><input id="inqFCPhone" inputmode="tel" value="${escHtml(x.contact_phone || '')}" placeholder="010-0000-0000"></label>
+              <label><span>이메일</span><input id="inqFCEmail" type="email" value="${escHtml(x.contact_email || '')}" placeholder="name@company.com"></label>
+              <label><span>문의 경로</span><select id="inqFChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select></label>
+              <label><span>우리 담당</span><select id="inqFAssignee">${assigneeOpts}</select></label>
+              <label><span>상담 시작일</span><input type="date" id="inqFStarted" value="${escHtml(x.started_at || '')}"></label>
+            </div>
+          </section>
+          <section class="inq-card"><div class="inq-todos" id="inqTodos"><div class="inq-todo-head"><b>다음 할 일</b><em>불러오는 중…</em></div></div></section>
+          <section class="inq-card inq-pre" id="inqPre"></section>
+          <section class="inq-card inq-quotes" id="inqQuotes"></section>
+          <section class="inq-card inq-projs" id="inqProjs"></section>
+        </aside>
       </div>`;
     _inqComposerImages.length = 0;
     _inqTodos = [];
@@ -21246,11 +21252,11 @@ function inqRenderQuotes(x) {
     try { open = localStorage.getItem('inq_q_open') !== '0'; } catch (_) {}
     const won = n => Number(n || 0).toLocaleString() + '원';
     const dash = '<span class="inq-qt-dash">-</span>';
-    const vatTag = v => `<small class="${v === 'VAT 포함' ? 'inc' : ''}">${v === 'VAT 포함' ? 'VAT포함' : 'VAT별도'}</small>`;
+    const unitTag = (n, v) => `<small>단가 ${won(n)}</small><small class="${v === 'VAT 포함' ? 'inc' : ''}">${v === 'VAT 포함' ? 'VAT포함' : 'VAT별도'}</small>`;
     const marginCell = (r, s) => {
         if (!s) return dash;
         const m = r - s, pct = r > 0 ? Math.round(m / r * 100) : 0;
-        return `<b class="${m >= 0 ? 'pos' : 'neg'}">${won(m)}</b><small>${pct}%</small>`;
+        return `<b class="${m >= 0 ? 'pos' : 'neg'}">${won(m)}</b><small>${pct}%</small>`;   // 카드에서는 % 가 아래 작은 글씨
     };
     const sub = lines => lines.length ? `<div class="inq-qt-sub">${lines.map(l => `<div>+ ${escHtml(l)}</div>`).join('')}</div>` : '';
 
@@ -21268,29 +21274,26 @@ function inqRenderQuotes(x) {
             <button class="inq-mini" data-qedit="${escHtml(g.key)}">편집</button>
             <button class="inq-mini" data-qdoc="${escHtml(g.key)}">견적서</button>
           </div>
-          <div class="inq-qt-wrap"><table class="inq-qt">
-            <thead><tr>
-              <th class="l">품목</th><th>수량</th><th>매출 단가</th><th>매출액<small>VAT포함</small></th>
-              <th class="l">매입처</th><th>매입 단가</th><th>매입액<small>VAT포함</small></th><th>마진</th>
-            </tr></thead>
-            <tbody>${g.items.map(p => {
-                const r = calcTempRevenueWithVat(p), s = calcTempSupRevenueWithVat(p);
-                return `<tr>
-                  <td class="l"><b>${escHtml(p.item || '-')}</b>${sub(inqFeeLines(p, false))}</td>
-                  <td>${p.qty ? p.qty.toLocaleString() + '개' : dash}</td>
-                  <td>${p.unitPrice ? won(p.unitPrice) + vatTag(p.unitPriceVat) : dash}</td>
-                  <td><b class="rev">${won(r)}</b></td>
-                  <td class="l">${p.supplier ? `<b>${escHtml(p.supplier)}</b>` : dash}${p.supplierContact ? `<small>${escHtml(p.supplierContact)}</small>` : ''}${sub(inqFeeLines(p, true))}</td>
-                  <td>${p.supplierUnitPrice ? won(p.supplierUnitPrice) + vatTag(p.supplierUnitPriceVat) : dash}</td>
-                  <td>${s ? `<b class="sup">${won(s)}</b>` : dash}</td>
-                  <td>${marginCell(r, s)}</td>
-                </tr>`;
-            }).join('')}</tbody>
-            ${g.items.length > 1 ? `<tfoot><tr>
-              <td class="l">합계</td><td></td><td></td><td><b class="rev">${won(gRev)}</b></td>
-              <td></td><td></td><td>${gSup ? `<b class="sup">${won(gSup)}</b>` : dash}</td><td>${marginCell(gRev, gSup)}</td>
-            </tr></tfoot>` : ''}
-          </table></div>
+          <div class="inq-qi-list">${g.items.map(p => {
+              const r = calcTempRevenueWithVat(p), sp = calcTempSupRevenueWithVat(p);
+              const vt = v => v === 'VAT 포함' ? 'VAT포함' : 'VAT별도';
+              const fees = inqFeeLines(p, false).map(l => '매출 ' + l).concat(inqFeeLines(p, true).map(l => '매입 ' + l));
+              return `<div class="inq-qi">
+                <div class="inq-qi-top"><b>${escHtml(p.item || '-')}</b>${p.qty ? `<span>${p.qty.toLocaleString()}개</span>` : ''}</div>
+                <div class="inq-qi-nums">
+                  <div><em>매출</em><b class="rev">${won(r)}</b>${p.unitPrice ? `<small>단가 ${won(p.unitPrice)} · ${vt(p.unitPriceVat)}</small>` : ''}</div>
+                  <div><em>매입</em>${sp ? `<b class="sup">${won(sp)}</b>` : dash}${p.supplier || p.supplierUnitPrice ? `<small>${escHtml(p.supplier || '')}${p.supplierUnitPrice ? `${p.supplier ? ' · ' : ''}단가 ${won(p.supplierUnitPrice)}` : ''}</small>` : ''}</div>
+                  <div><em>마진</em>${marginCell(r, sp)}</div>
+                </div>
+                ${fees.length ? `<div class="inq-qi-fees">${fees.map(l => `<span>+ ${escHtml(l)}</span>`).join('')}</div>` : ''}
+              </div>`;
+          }).join('')}
+          ${g.items.length > 1 ? `<div class="inq-qi inq-qi-total"><div class="inq-qi-nums">
+              <div><em>합계 매출</em><b class="rev">${won(gRev)}</b></div>
+              <div><em>합계 매입</em>${gSup ? `<b class="sup">${won(gSup)}</b>` : dash}</div>
+              <div><em>합계 마진</em>${marginCell(gRev, gSup)}</div>
+          </div></div>` : ''}
+          </div>
           ${g.note ? `<div class="inq-qg-note"><span>견적 메모</span>${escHtml(g.note)}</div>` : ''}
         </div>`;
     }).join('');
@@ -22028,7 +22031,7 @@ function inqRenderTodos(x) {
         <input type="date" data-k="due_date" value="${escHtml(t.due_date || '')}" title="할 날짜">
         <select data-k="assignee" title="담당자">${inqPeopleOpts(t.assignee || '')}</select>
         ${t.daily_task_id
-            ? '<span class="inq-todo-linked" title="담당자 일일계획표에 등록됨">일일계획표 ✓</span>'
+            ? '<span class="inq-todo-linked" title="담당자 일일계획표에 등록됨">계획표 ✓</span>'
             : '<button type="button" class="inq-todo-link" data-link title="담당자 일일계획표에 등록">+ 일일계획표</button>'}
         <button type="button" class="inq-todo-del" data-del title="삭제">×</button>
       </div>`).join('')}
@@ -22281,14 +22284,17 @@ function inqRenderStage(x) {
         msg = `납품·잔금·계산서·공급처 송금을 확인하세요${projs.length > 1 ? ` · ${p.product_name || ''}` : ''}`;
         lack.forEach(k => { const it = CHECK_ITEMS.find(c => c.key === k); if (it) btns.push([`chk:${p.id}:${k}`, it.label + ' ✓']); });
     }
-    el.innerHTML = bar + `
+    const nowHtml = `
       <div class="inq-now ${stopped ? 'stopped' : !cur ? 'done' : ''}">
         <span class="inq-now-lab">지금 할 일</span>
         <span class="inq-now-msg">${escHtml(msg)}</span>
         <div class="inq-spacer"></div>
         ${btns.map(([a, l, pri]) => `<button class="inq-mini ${pri ? 'primary' : ''}" data-act="${escHtml(a)}">${escHtml(l)}</button>`).join('')}
       </div>`;
-    el.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => inqDealAction(x, b.dataset.act, b)));
+    const nowEl = document.getElementById('inqNow');
+    if (nowEl) { el.innerHTML = bar; nowEl.innerHTML = nowHtml; }
+    else el.innerHTML = bar + nowHtml;
+    [el, nowEl].forEach(box => { if (box) box.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => inqDealAction(x, b.dataset.act, b))); });
 }
 
 // 국내 프로젝트가 전역 projects 배열에 없으면(페이지 밖) 넣어준다 — 문서 만들기·상세 모달이 projects를 쓰기 때문
@@ -22346,9 +22352,10 @@ function inqRenderProjs(x) {
     const projs = _inqProjsFor === x.id ? _inqProjs : [];
     if (!projs.length) { el.innerHTML = ''; return; }
     const won = n => Number(n || 0).toLocaleString() + '원';
+    const open = inqCardOpen('pj');
     el.innerHTML = `
-      <div class="inq-q-head"><b>국내 진행</b><span class="inq-q-sum"><em>${projs.length}건 · 매출 <b class="rev">${won(projs.reduce((s, p) => s + (p.revenue || 0), 0))}</b></em></span></div>
-      <div class="inq-pj-list">${projs.map(p => {
+      <div class="inq-q-head">${inqCardToggleBtn('pj', open)}<b>국내 진행</b><span class="inq-q-sum"><em>${projs.length}건 · 매출 <b class="rev">${won(projs.reduce((s, p) => s + (p.revenue || 0), 0))}</b></em></span></div>
+      ${open ? `<div class="inq-pj-list">${projs.map(p => {
           const cd = p.check_dates || {};
           const done = CHECK_ITEMS.filter(it => p.checks && p.checks[it.key]).length;
           return `
@@ -22370,7 +22377,8 @@ function inqRenderProjs(x) {
                   <i>${on ? '✓' : ''}</i>${escHtml(it.label)}${d ? `<em>${d}</em>` : ''}</button>`;
           }).join('')}</div>
         </div>`;
-      }).join('')}</div>`;
+      }).join('')}</div>` : ''}`;
+    inqBindCardToggle(el, 'pj', () => inqRenderProjs(x));
     el.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => inqDealAction(x, b.dataset.act, b)));
 }
 
@@ -22379,7 +22387,7 @@ function inqContactSummary(x) {
     const who = [x.contact_name || x.client_contact, [x.contact_dept, x.contact_title].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
     const parts = [who, x.contact_phone, x.contact_email].filter(Boolean);
     const meta = [x.channel ? inqJosaRo(x.channel) + ' 문의' : '', x.assignee ? '담당 ' + x.assignee : '', x.started_at ? inqMD(x.started_at) + ' 시작' : ''].filter(Boolean);
-    return `<span class="inq-ci-main">${parts.length ? parts.map(escHtml).join('<i>·</i>') : '<em>고객 연락처 없음</em>'}</span><span class="inq-ci-meta">${meta.map(escHtml).join(' · ')}</span>`;
+    return `<span class="inq-ci-main">${parts.length ? parts.map(v => `<span>${escHtml(v)}</span>`).join('<i>·</i>') : '<em>고객 연락처 없음</em>'}</span><span class="inq-ci-meta">${meta.map(escHtml).join(' · ')}</span>`;
 }
 
 // ---------- 가견적 — 디자인 확정 전 예상가 범위 안내 (migration 039) ----------
@@ -22394,6 +22402,12 @@ function inqPreRange(a, b) {
     a = a || 0; b = b || 0;
     if (a && b && a !== b) return `${Number(Math.min(a, b)).toLocaleString()} ~ ${inqPreWon(Math.max(a, b))}`;
     return inqPreWon(a || b);
+}
+// 화면용 — '~' 앞에서만 줄바꿈 (좁은 칸에서 숫자가 쪼개지지 않게)
+function inqPreRangeHtml(a, b) {
+    a = a || 0; b = b || 0;
+    if (a && b && a !== b) return `<span class="nw">${Number(Math.min(a, b)).toLocaleString()} ~</span> <span class="nw">${inqPreWon(Math.max(a, b))}</span>`;
+    return `<span class="nw">${inqPreWon(a || b)}</span>`;
 }
 function inqPreTotals(pe) {
     let lo = 0, hi = 0;
@@ -22435,11 +22449,13 @@ function inqRenderPre(x) {
     if (!pe || !(pe.items || []).length) { el.innerHTML = ''; return; }
     const vat = pe.vat || 'VAT 별도';
     const t = inqPreTotals(pe);
+    const open = inqCardOpen('pre');
     el.innerHTML = `
       <div class="inq-q-head">
+        ${inqCardToggleBtn('pre', open)}
         <b>가견적</b>
         <span class="inq-q-sum">
-          <em>예상 합계 <b class="pre">${inqPreRange(t.lo, t.hi)}</b> (${escHtml(vat)})</em>
+          <em>예상 합계 <b class="pre">${inqPreRangeHtml(t.lo, t.hi)}</b> (${escHtml(vat)})</em>
           ${pe.sent_at ? `<em class="inq-pre-sent">${inqMD(inqDateOf(pe.sent_at))} 안내함${pe.sent_count > 1 ? ` · ${pe.sent_count}회` : ''}</em>` : '<em class="inq-pre-unsent">아직 안내 안 함</em>'}
         </span>
         <div class="inq-spacer"></div>
@@ -22447,18 +22463,17 @@ function inqRenderPre(x) {
         <button class="inq-mini" data-pre="send">${pe.sent_at ? '다시 안내 기록' : '안내 기록'}</button>
         <button class="inq-mini" data-pre="edit">수정</button>
       </div>
-      <div class="inq-qg inq-pre-box">
-        <div class="inq-qt-wrap"><table class="inq-qt">
-          <thead><tr><th class="l">품목</th><th>수량</th><th>예상 단가<small>${escHtml(vat)}</small></th><th>예상 합계</th></tr></thead>
-          <tbody>${pe.items.map(it => `<tr>
-            <td class="l"><b>${escHtml(it.item || '-')}</b></td>
-            <td>${it.qty ? Number(it.qty).toLocaleString() + '개' : '<span class="inq-qt-dash">-</span>'}</td>
-            <td><b class="pre">${inqPreRange(it.min, it.max)}</b></td>
-            <td>${it.qty ? inqPreRange(it.qty * (it.min || it.max), it.qty * (it.max || it.min)) : '<span class="inq-qt-dash">-</span>'}</td>
-          </tr>`).join('')}</tbody>
-        </table></div>
+      ${open ? `<div class="inq-qg inq-pre-box">
+        <div class="inq-qi-list">${pe.items.map(it => `<div class="inq-qi">
+          <div class="inq-qi-top"><b>${escHtml(it.item || '-')}</b>${it.qty ? `<span>${Number(it.qty).toLocaleString()}개</span>` : ''}</div>
+          <div class="inq-qi-nums two">
+            <div><em>개당 예상 (${escHtml(vat)})</em><b class="pre">${inqPreRangeHtml(it.min, it.max)}</b></div>
+            <div><em>예상 합계</em>${it.qty ? `<b>${inqPreRangeHtml(it.qty * (it.min || it.max), it.qty * (it.max || it.min))}</b>` : '<span class="inq-qt-dash">-</span>'}</div>
+          </div>
+        </div>`).join('')}</div>
         ${pe.lead || pe.note ? `<div class="inq-qg-note">${pe.lead ? `<span>제작기간</span>${escHtml(pe.lead)}<br>` : ''}<span>안내</span>${escHtml(pe.note || INQ_PRE_NOTE)}</div>` : ''}
-      </div>`;
+      </div>` : ''}`;
+    inqBindCardToggle(el, 'pre', () => inqRenderPre(x));
     el.querySelectorAll('[data-pre]').forEach(b => b.addEventListener('click', () => inqPreAction(x, b.dataset.pre)));
 }
 
@@ -22586,4 +22601,19 @@ async function inqPreAction(x, act) {
         if (up) { up.value = ''; up.placeholder = `확정 단가 (가견적 ${inqPreRange(it.min, it.max)})`; up.focus(); }
         showToast(pe.items.length > 1 ? `첫 품목을 채웠어요. 나머지 ${pe.items.length - 1}개 품목도 추가해주세요` : '가견적 품목을 채웠어요 — 확정 단가를 입력하세요');
     }
+}
+
+// ---------- 오른쪽 거래 패널 카드 접기/펴기 (사람마다 브라우저에 기억) ----------
+function inqCardOpen(key) { try { return localStorage.getItem('inq_card_' + key) !== '0'; } catch (_) { return true; } }
+function inqCardToggleBtn(key, open) {
+    return `<button type="button" class="inq-q-toggle ${open ? 'on' : ''}" data-cardtoggle="${key}" title="${open ? '접기' : '펼치기'}">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>`;
+}
+function inqBindCardToggle(el, key, rerender) {
+    const b = el.querySelector(`[data-cardtoggle="${key}"]`);
+    if (!b) return;
+    b.addEventListener('click', () => {
+        try { localStorage.setItem('inq_card_' + key, inqCardOpen(key) ? '0' : '1'); } catch (_) {}
+        rerender();
+    });
 }

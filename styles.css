@@ -4883,3 +4883,114 @@ textarea.inq-drop{border-color:var(--blue) !important; background:var(--blue-lig
 .inq-pre-opts label.grow{flex:1}
 .inq-pre-note{margin-top:10px}
 .inq-pre-note textarea{height:auto; padding:8px 10px; line-height:1.5; resize:vertical}
+
+
+/* ==== 상담 상세 2단 배치 — 왼쪽 대화 기록(화면 높이 전체) · 오른쪽 거래 패널(따로 스크롤) ==== */
+.inq-detail{overflow:hidden}
+.inq-head{padding:12px 18px 12px}
+.inq-head-row .inq-h-client{width:auto; max-width:260px; flex:none}
+.inq-head-row .inq-h-title{flex:1; width:auto; min-width:0; margin:0; font-size:14px; font-weight:700; color:var(--gray-600)}
+.inq-head .inq-stage{margin-top:10px}
+
+.inq-body2{flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) clamp(430px, 42%, 700px)}
+.inq-main{display:flex; flex-direction:column; min-height:0; min-width:0; border-right:1px solid var(--border)}
+.inq-main .inq-timeline{flex:1; min-height:0; overflow-y:auto; padding:16px 22px}
+.inq-main .inq-msg{max-width:82%}
+.inq-main .inq-msg-body{font-size:14px; line-height:1.7}
+.inq-main .inq-composer{position:static}
+
+.inq-side{min-height:0; overflow-y:auto; background:var(--gray-50); padding:12px; display:flex; flex-direction:column; gap:10px}
+.inq-side > #inqNow:empty{display:none}
+.inq-side .inq-now{margin-top:0}
+.inq-card{flex:none; background:var(--white); border:1px solid var(--border); border-radius:10px; min-width:0}
+.inq-side .inq-card:empty{display:none}
+.inq-side .inq-cinfo{margin:0; border:none; padding:9px 12px; align-items:flex-start}
+.inq-side .inq-ci-lab{padding-top:5px}
+.inq-side .inq-ci-sum{row-gap:2px}
+.inq-side .inq-fields{grid-template-columns:repeat(2, minmax(0,1fr)); padding:2px 12px 12px; margin-top:0}
+.inq-side .inq-todos{margin-top:0; border:none; background:none; padding:10px 12px}
+.inq-side .inq-todo{grid-template-columns:18px minmax(0,1fr) 128px 96px auto 22px; gap:6px}
+.inq-side .inq-todo.add{grid-template-columns:18px minmax(0,1fr) 128px 96px auto}
+.inq-side .inq-todo-head em{display:none}
+.inq-side .inq-pre, .inq-side .inq-quotes, .inq-side .inq-projs{padding:10px 12px; max-height:none; overflow:visible; border-bottom:none; background:var(--white)}
+.inq-side .inq-q-head{font-size:13px}
+.inq-side .inq-q-head > b{font-size:13.5px}
+.inq-side .inq-q-body{margin-top:10px; gap:10px}
+.inq-side .inq-qg{border-color:var(--border-soft)}
+.inq-side .inq-qg-head{flex-wrap:wrap; row-gap:6px; padding:8px 10px}
+.inq-side .inq-qt th, .inq-side .inq-qt td{padding:8px 9px}
+.inq-side .inq-qt td.l:first-child{min-width:130px}
+.inq-side .inq-qt td small{white-space:nowrap}
+.inq-side .inq-pj-list{margin-top:8px}
+.inq-side .inq-pj{padding:9px 10px}
+.inq-side .inq-pj-checks{gap:5px}
+.inq-side .inq-ck{height:28px; padding:0 8px; font-size:11.5px}
+.inq-side .inq-pre-head, .inq-side .inq-pre-row{grid-template-columns:minmax(0,1fr) 64px 92px 10px 92px 20px; gap:6px}
+.inq-side .inq-pre-opts{flex-wrap:wrap}
+
+@media (max-width:1100px){
+    .inq-detail{overflow-y:auto}
+    .inq-body2{display:flex; flex-direction:column}
+    .inq-main{border-right:none; border-bottom:1px solid var(--border)}
+    .inq-main .inq-timeline{min-height:320px; max-height:60vh}
+    .inq-side{overflow:visible}
+    .inq-head-row{flex-wrap:wrap}
+    .inq-head-row .inq-h-title{flex-basis:100%; order:5}
+}
+
+/* 2단 배치 다듬기 — 오른쪽 패널이 좁을 때도 읽히게 */
+.inq-wrap{grid-template-columns:clamp(280px, 19vw, 360px) minmax(0,1fr)}
+.inq-body2{grid-template-columns:minmax(0,1fr) clamp(390px, 38%, 640px)}
+.inq-ci-main span{white-space:nowrap}
+.inq-side .inq-qt td{white-space:normal}
+.inq-side .inq-qt td.l:first-child{min-width:0; width:34%}
+/* 할 일: 첫 줄 = 체크 + 할 일, 둘째 줄 = 날짜 · 담당 · 일일계획표 · 삭제 */
+.inq-side .inq-todo, .inq-side .inq-todo.add{display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; padding:6px 2px}
+.inq-side .inq-todo > input[type="checkbox"], .inq-side .inq-todo-plus{flex:none; width:18px}
+.inq-side .inq-todo .inq-todo-task{flex:1 1 calc(100% - 30px)}
+.inq-side .inq-todo input[type="date"]{flex:none; width:132px; margin-left:24px}
+.inq-side .inq-todo select{flex:none; width:108px}
+.inq-side .inq-todo-del{margin-left:auto}
+.inq-side .inq-todo.add .inq-mini{margin-left:auto}
+.inq-side .inq-todo:not(.add) input:not([type="checkbox"]), .inq-side .inq-todo:not(.add) select{height:28px}
+@media (max-width:1100px){
+    .inq-wrap{grid-template-columns:1fr}
+}
+.inq-search{min-width:0}
+.inq-new-btn{flex:none}
+.inq-side .inq-qt td small{white-space:normal}
+.inq-side .inq-todo input[type="date"]{width:124px}
+.inq-side .inq-todo select{width:98px}
+.inq-wrap{grid-template-columns:clamp(300px, 19vw, 360px) minmax(0,1fr)}
+@media (max-width:1100px){ .inq-wrap{grid-template-columns:1fr} }
+.inq-qt .nw{display:inline-block; white-space:nowrap}
+.inq-side .inq-qt{font-size:12.5px}
+.inq-side .inq-qt th, .inq-side .inq-qt td{padding:7px 7px}
+.inq-side .inq-qt td{white-space:nowrap}
+.inq-side .inq-qt td.l{white-space:normal}
+.inq-side .inq-qt td small{white-space:nowrap}
+.inq-side .inq-qt-sub{white-space:normal; min-width:120px}
+
+/* 견적·가견적 품목 카드 (표 대신) — 좁은 패널에서도 숫자 한 줄 */
+.inq-qi-list{display:flex; flex-direction:column}
+.inq-qi{padding:10px 12px; border-top:1px solid var(--border-soft)}
+.inq-qi-list > .inq-qi:first-child{border-top:none}
+.inq-qi-top{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap}
+.inq-qi-top b{font-size:13.5px; font-weight:800; color:var(--gray-900)}
+.inq-qi-top span{font-size:12.5px; font-weight:700; color:var(--gray-500); font-variant-numeric:tabular-nums}
+.inq-qi-nums{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:6px 10px; margin-top:7px}
+.inq-qi-nums.two{grid-template-columns:repeat(2, minmax(0,1fr))}
+.inq-qi-nums > div{display:flex; flex-direction:column; gap:1px; min-width:0; font-variant-numeric:tabular-nums}
+.inq-qi-nums em{font-style:normal; font-size:11px; font-weight:700; color:var(--label)}
+.inq-qi-nums b{font-size:14px; font-weight:800; color:var(--gray-900); line-height:1.35}
+.inq-qi-nums small{font-size:11px; font-weight:600; color:var(--gray-400); line-height:1.4}
+.inq-qi-nums b.rev{color:#1B64DA}
+.inq-qi-nums b.sup{color:#E67E22}
+.inq-qi-nums b.pos{color:#12B76A}
+.inq-qi-nums b.neg{color:var(--red)}
+.inq-qi-nums b.pre{color:#BE185D}
+[data-theme="dark"] .inq-qi-nums b.rev{color:#5B9BFF}
+[data-theme="dark"] .inq-qi-nums b.pre{color:#F9A8D4}
+.inq-qi-fees{display:flex; flex-wrap:wrap; gap:3px 12px; margin-top:6px; font-size:11.5px; font-weight:500; color:var(--gray-500)}
+.inq-qi-total{background:var(--gray-50); border-top:1px solid var(--border) !important}
+.inq-qi .nw{display:inline-block; white-space:nowrap}
