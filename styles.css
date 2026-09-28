@@ -4836,3 +4836,20 @@ textarea.inq-drop{border-color:var(--blue) !important; background:var(--blue-lig
 @media (max-width:1100px){
     .inq-stage-bar{grid-template-columns:repeat(3, minmax(0,1fr)); row-gap:10px}
 }
+
+/* ---- 상담 타임라인 말풍선 구분 — 배경과 같은 색이라 안 보이던 문제 ---- */
+.inq-msg.d-in{background:#F2F4F7; border-color:#E3E7EC}
+.inq-msg.d-out{background:#E8F1FE; border-color:#C9DDFB}
+.inq-msg.d-memo{background:#FFF8E1; border-color:#F2D98A}
+.inq-msg.d-in .inq-msg-meta b{color:var(--gray-700)}
+.inq-msg.d-out .inq-msg-meta b{color:#1B64DA}
+.inq-msg.d-memo .inq-msg-meta b{color:#A16207}
+[data-theme="dark"] .inq-msg.d-in{background:#2A3544; border-color:#3A4757}
+[data-theme="dark"] .inq-msg.d-out{background:#1D3558; border-color:#2E5287}
+[data-theme="dark"] .inq-msg.d-memo{background:#3A301A; border-color:#6B5520}
+[data-theme="dark"] .inq-msg.d-in .inq-msg-meta b{color:#C9D1DB}
+[data-theme="dark"] .inq-msg.d-out .inq-msg-meta b{color:#7FB0FF}
+[data-theme="dark"] .inq-msg.d-memo .inq-msg-meta b{color:#F5C451}
+[data-theme="dark"] .inq-msg .inq-msg-meta{color:#8B95A1}
+[data-theme="dark"] .inq-msg-btn:hover{background:rgba(255,255,255,.08)}
+.inq-msg.editing{background:var(--white) !important}
