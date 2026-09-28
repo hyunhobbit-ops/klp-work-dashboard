@@ -4853,3 +4853,33 @@ textarea.inq-drop{border-color:var(--blue) !important; background:var(--blue-lig
 [data-theme="dark"] .inq-msg .inq-msg-meta{color:#8B95A1}
 [data-theme="dark"] .inq-msg-btn:hover{background:rgba(255,255,255,.08)}
 .inq-msg.editing{background:var(--white) !important}
+
+
+/* ---- 상담: 가견적 (039) ---- */
+.s-pre{background:#FCE7F3; color:#BE185D}
+[data-theme="dark"] .s-pre{background:#4A1D35; color:#F9A8D4}
+.inq-pre:empty{display:none}
+.inq-pre{padding:12px 18px 4px}
+.inq-pre .inq-q-head > span:not(.inq-q-sum){font-size:12px; font-weight:600; color:var(--gray-400)}
+.inq-pre-box{margin-top:10px}
+.inq-qt b.pre, .inq-q-sum b.pre{color:#BE185D}
+[data-theme="dark"] .inq-qt b.pre, [data-theme="dark"] .inq-q-sum b.pre{color:#F9A8D4}
+.inq-q-sum em.inq-pre-sent{color:#12B76A; font-weight:700}
+.inq-q-sum em.inq-pre-unsent{color:var(--orange); font-weight:700}
+.inq-pre-edit{margin-top:10px; padding:12px; background:var(--white); border:1.5px solid #F2A7CB; border-radius:10px}
+.inq-pre-head, .inq-pre-row{display:grid; grid-template-columns:minmax(0,1fr) 90px 120px 14px 120px 24px; gap:8px; align-items:center}
+.inq-pre-head{font-size:11px; font-weight:700; color:var(--label); margin-bottom:4px}
+.inq-pre-head span:last-child{grid-column:3 / span 3}
+.inq-pre-row + .inq-pre-row{margin-top:6px}
+.inq-pre-row input, .inq-pre-opts input, .inq-pre-opts select, .inq-pre-note textarea{height:34px; padding:0 10px; border:1px solid var(--border);
+    border-radius:8px; font-family:inherit; font-size:13px; color:var(--gray-900); background:var(--white); outline:none; min-width:0}
+.inq-pre-row input[data-f="qty"], .inq-pre-row input[data-f="min"], .inq-pre-row input[data-f="max"]{text-align:right; font-variant-numeric:tabular-nums}
+.inq-pre-row span{text-align:center; color:var(--gray-400); font-weight:700}
+.inq-pre-row input:focus, .inq-pre-opts input:focus, .inq-pre-opts select:focus, .inq-pre-note textarea:focus{border-color:#DB2777}
+.inq-pre-edit .inq-todo-link{margin-top:8px}
+.inq-pre-opts{display:flex; gap:10px; margin-top:12px}
+.inq-pre-opts label, .inq-pre-note{display:flex; flex-direction:column; gap:4px}
+.inq-pre-opts label span, .inq-pre-note span{font-size:11px; font-weight:700; color:var(--label)}
+.inq-pre-opts label.grow{flex:1}
+.inq-pre-note{margin-top:10px}
+.inq-pre-note textarea{height:auto; padding:8px 10px; line-height:1.5; resize:vertical}

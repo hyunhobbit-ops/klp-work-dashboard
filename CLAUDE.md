@@ -143,6 +143,7 @@
   - 화면: `inqRenderStage`(6단계 막대 + '지금 할 일' 버튼 — 견적 작성/국내로 넘기기/디자인확인서·작업요청서 만들기/체크), `inqRenderProjs`(국내 진행 칸, 7개 체크 칩 = `inqToggleProjCheck`, 국내 메뉴와 같은 규칙), 고객 정보는 한 줄 요약으로 접힘(`inqContactSummary`)
   - 문서 만들기·국내 상세는 전역 `projects` 배열을 쓰므로 `inqEnsureProject`로 없으면 넣고 호출
   - 상태 목록: 신규/상담중/견적발송/수주/제작중/납품완료/정산완료/보류/실패. '진행 중' 필터 = 정산완료·보류·실패 제외
+- **가견적 (migration 039)**: 디자인 확정 전 예상가 범위. `inquiries.pre_estimate` jsonb `{items:[{item,qty,min,max}], vat, lead, note, sent_at, sent_count}` — 견적(projects_temp)과 분리해 매출·마진·국내 등록에 안 섞임. `inqRenderPre`(보기/편집), `inqPreText`(고객용 안내문), `inqPreAction`: copy(클립보드) / send(우리 답변으로 기록 + sent_at + 상태 신규·상담중→**가견적**) / quote(견적 입력칸에 품목·수량 채우고 단가는 비워 확정가 입력). 상태 순서: 신규/상담중/가견적/견적발송/…
 - **기록 수정**: 타임라인 연필 버튼 → `inqEditLog`(글·사진·고객/우리/메모·경로 수정, `inquiry_logs.edited_at` → '수정됨' 표시). 자동 기록(system)은 수정 불가
 - ⚠️ `inquiry_logs`를 배열로 한 번에 insert할 때는 모든 행의 키를 같게 — `images`가 NOT NULL이라 한 행에서 빠지면 전체가 거부됨
 - 주요 함수: `tpInitView`, `inqEnter`, `inqRenderList`, `inqRenderDetail`, `inqSubmit`, `inqPatch`, `inqAddLog`, `inqCreate`, `inqParseContact`, `inqAutofillNew`

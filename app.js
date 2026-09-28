@@ -20657,10 +20657,10 @@ function closeClientExportMenu() {
 // 상담 관리 (견적 의뢰 화면 안) — 문의 접수부터 수주/실패까지
 // 상담 건(inquiries) + 타임라인(inquiry_logs), 견적 품목은 projects_temp.inquiry_id로 연결
 // =====================================
-const INQ_STATUSES = ['신규', '상담중', '견적발송', '수주', '제작중', '납품완료', '정산완료', '보류', '실패'];
-const INQ_ACTIVE = ['신규', '상담중', '견적발송', '수주', '제작중', '납품완료'];   // 정산완료·보류·실패만 '끝난 건'
+const INQ_STATUSES = ['신규', '상담중', '가견적', '견적발송', '수주', '제작중', '납품완료', '정산완료', '보류', '실패'];
+const INQ_ACTIVE = ['신규', '상담중', '가견적', '견적발송', '수주', '제작중', '납품완료'];   // 정산완료·보류·실패만 '끝난 건'
 const INQ_CHANNELS = ['전화', '카톡', '문자', '이메일', '방문', '홈페이지', '기타'];
-const INQ_STATUS_CLS = { '신규': 's-new', '상담중': 's-talk', '견적발송': 's-quote', '수주': 's-won', '제작중': 's-make', '납품완료': 's-deliv', '정산완료': 's-done', '보류': 's-hold', '실패': 's-lost' };
+const INQ_STATUS_CLS = { '신규': 's-new', '상담중': 's-talk', '가견적': 's-pre', '견적발송': 's-quote', '수주': 's-won', '제작중': 's-make', '납품완료': 's-deliv', '정산완료': 's-done', '보류': 's-hold', '실패': 's-lost' };
 const INQ_DIR_LABEL = { in: '고객', out: '우리', memo: '내부 메모' };
 
 let _inqList = [];
@@ -20893,6 +20893,7 @@ async function inqRenderDetail() {
         ${x.status === '실패' && x.fail_reason ? `<div class="inq-fail">실패 사유 · ${escHtml(x.fail_reason)}</div>` : ''}
       </div>
       <div class="inq-flow">
+        <div class="inq-pre" id="inqPre"></div>
         <div class="inq-quotes" id="inqQuotes"></div>
         <div class="inq-projs" id="inqProjs"></div>
       </div>
@@ -20920,7 +20921,9 @@ async function inqRenderDetail() {
     _inqComposerImages.length = 0;
     _inqTodos = [];
     if (_inqProjsFor !== x.id) { _inqProjs = []; _inqProjsFor = null; }
+    if (_inqPreEditing !== x.id) _inqPreEditing = null;
     inqBindDetail(x);
+    inqRenderPre(x);
     inqRenderQuotes(x);
     inqLoadDeal(x);
     inqSetDir(_inqDir);
@@ -22211,7 +22214,9 @@ function inqStages(x) {
     const st = [];
     st.push({ key: 'talk', label: '상담', done: true, sub: x.started_at ? inqMD(x.started_at) : '' });
     const qDone = quotes.length > 0 || ['견적발송', '수주', '제작중', '납품완료', '정산완료'].includes(x.status);
-    st.push({ key: 'quote', label: '견적', done: qDone, sub: quotes.length ? inqMD(inqMinDate(quotes.map(q => q.date))) + ' 발송' : '' });
+    const pre = x.pre_estimate && (x.pre_estimate.items || []).length ? x.pre_estimate : null;
+    st.push({ key: 'quote', label: '견적', done: qDone,
+        sub: quotes.length ? inqMD(inqMinDate(quotes.map(q => q.date))) + ' 발송' : (pre && pre.sent_at ? '가견적 ' + inqMD(inqDateOf(pre.sent_at)) : (pre ? '가견적 작성' : '')) });
     st.push({ key: 'won', label: '수주', done: n > 0, sub: n ? inqMD(inqMinDate(projs.map(p => inqDateOf(p.created_at)))) + (n > 1 ? ` · ${n}건` : '') : '' });
     const stepK = (key, label, k) => {
         const c = cnt(k);
@@ -22245,7 +22250,17 @@ function inqRenderStage(x) {
     const firstLack = k => projs.find(p => !(p.checks && p.checks[k]));
     if (stopped) msg = `${x.status} 상태입니다${x.status === '실패' && x.fail_reason ? ' · ' + x.fail_reason : ''}`;
     else if (!cur) msg = '모든 단계가 끝났습니다';
-    else if (cur.key === 'quote') { msg = '견적을 만들어 보내세요'; btns.push(['quote-new', '+ 이 상담으로 견적 작성', 1]); }
+    else if (cur.key === 'quote') {
+        const pe = x.pre_estimate;
+        if (pe && (pe.items || []).length) {
+            if (pe.sent_at) { msg = '디자인이 확정되면 확정 견적을 작성하세요'; btns.push(['pre-copy', '가견적 안내문 복사']); btns.push(['pre-quote', '가견적으로 견적 작성', 1]); }
+            else { msg = '가견적을 고객에게 안내하세요'; btns.push(['pre-copy', '안내문 복사']); btns.push(['pre-send', '안내 기록', 1]); }
+        } else {
+            msg = '가격이 확정 전이면 가견적을, 확정됐으면 견적을 보내세요';
+            btns.push(['pre-new', '가견적 안내']);
+            btns.push(['quote-new', '+ 이 상담으로 견적 작성', 1]);
+        }
+    }
     else if (cur.key === 'won') {
         msg = '견적이 확정되면 국내 프로젝트로 넘기세요 (수주)';
         if (quotes.length) { btns.push(['quote-doc', '견적서 보기']); btns.push(['transfer', '국내로 넘기기 · 수주', 1]); }
@@ -22288,6 +22303,7 @@ async function inqDealAction(x, act, btn) {
     const [kind, idStr, key] = act.split(':');
     const row = idStr ? _inqProjs.find(p => p.id === Number(idStr)) : null;
     if (kind === 'quote-new') { inqStartQuote(x.id); return; }
+    if (kind.startsWith('pre-')) { await inqPreAction(x, kind.slice(4)); return; }
     if (kind === 'quote-doc' || kind === 'transfer') {
         const q = tempProjects.filter(p => p.inquiryId === x.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
         if (!q) return;
@@ -22364,4 +22380,210 @@ function inqContactSummary(x) {
     const parts = [who, x.contact_phone, x.contact_email].filter(Boolean);
     const meta = [x.channel ? inqJosaRo(x.channel) + ' 문의' : '', x.assignee ? '담당 ' + x.assignee : '', x.started_at ? inqMD(x.started_at) + ' 시작' : ''].filter(Boolean);
     return `<span class="inq-ci-main">${parts.length ? parts.map(escHtml).join('<i>·</i>') : '<em>고객 연락처 없음</em>'}</span><span class="inq-ci-meta">${meta.map(escHtml).join(' · ')}</span>`;
+}
+
+// ---------- 가견적 — 디자인 확정 전 예상가 범위 안내 (migration 039) ----------
+// inquiries.pre_estimate jsonb: { items:[{item, qty, min, max}], vat, lead, note, updated_at, sent_at, sent_count }
+// 견적(projects_temp)과 분리 — 매출·마진·국내 등록에 섞이지 않는다
+const INQ_PRE_NOTE = '디자인 확정 전 예상 금액이며, 디자인 확정 후 정확한 견적을 드리겠습니다.';
+let _inqPreEditing = null;   // 편집 중인 상담 id
+
+function inqPreNum(v) { return Number(String(v == null ? '' : v).replace(/[^0-9]/g, '')) || 0; }
+function inqPreWon(n) { return Number(n || 0).toLocaleString() + '원'; }
+function inqPreRange(a, b) {
+    a = a || 0; b = b || 0;
+    if (a && b && a !== b) return `${Number(Math.min(a, b)).toLocaleString()} ~ ${inqPreWon(Math.max(a, b))}`;
+    return inqPreWon(a || b);
+}
+function inqPreTotals(pe) {
+    let lo = 0, hi = 0;
+    (pe.items || []).forEach(it => {
+        const q = it.qty || 0, a = it.min || it.max || 0, b = it.max || it.min || 0;
+        lo += q * Math.min(a, b); hi += q * Math.max(a, b);
+    });
+    return { lo, hi };
+}
+
+// 고객에게 보낼 안내문 (메일·카톡에 붙여넣기)
+function inqPreText(x) {
+    const pe = x.pre_estimate || {};
+    const s = (currentCompany && currentCompany.settings) || {};
+    const brand = s.brandName || (currentCompany && currentCompany.name) || '';
+    const vat = pe.vat || 'VAT 별도';
+    const lines = [`[${x.client || '고객'}] 가견적 안내`, ''];
+    (pe.items || []).forEach(it => {
+        lines.push(`■ ${it.item || '품목'}${it.qty ? ` · ${Number(it.qty).toLocaleString()}개` : ''}`);
+        lines.push(`  개당 ${inqPreRange(it.min, it.max)} (${vat})`);
+        if (it.qty) lines.push(`  예상 합계 ${inqPreRange(it.qty * (it.min || it.max), it.qty * (it.max || it.min))}`);
+        lines.push('');
+    });
+    if ((pe.items || []).length > 1) {
+        const t = inqPreTotals(pe);
+        lines.push(`총 예상 금액 ${inqPreRange(t.lo, t.hi)} (${vat})`, '');
+    }
+    if (pe.lead) lines.push(`· 제작기간: ${pe.lead}`);
+    lines.push(`· ${pe.note || INQ_PRE_NOTE}`);
+    if (brand) lines.push('', `${brand} 드림`);
+    return lines.join('\n');
+}
+
+function inqRenderPre(x) {
+    const el = document.getElementById('inqPre');
+    if (!el || _inqSel !== x.id) return;
+    const pe = x.pre_estimate;
+    if (_inqPreEditing === x.id) { inqRenderPreEditor(x); return; }
+    if (!pe || !(pe.items || []).length) { el.innerHTML = ''; return; }
+    const vat = pe.vat || 'VAT 별도';
+    const t = inqPreTotals(pe);
+    el.innerHTML = `
+      <div class="inq-q-head">
+        <b>가견적</b>
+        <span class="inq-q-sum">
+          <em>예상 합계 <b class="pre">${inqPreRange(t.lo, t.hi)}</b> (${escHtml(vat)})</em>
+          ${pe.sent_at ? `<em class="inq-pre-sent">${inqMD(inqDateOf(pe.sent_at))} 안내함${pe.sent_count > 1 ? ` · ${pe.sent_count}회` : ''}</em>` : '<em class="inq-pre-unsent">아직 안내 안 함</em>'}
+        </span>
+        <div class="inq-spacer"></div>
+        <button class="inq-mini" data-pre="copy">안내문 복사</button>
+        <button class="inq-mini" data-pre="send">${pe.sent_at ? '다시 안내 기록' : '안내 기록'}</button>
+        <button class="inq-mini" data-pre="edit">수정</button>
+      </div>
+      <div class="inq-qg inq-pre-box">
+        <div class="inq-qt-wrap"><table class="inq-qt">
+          <thead><tr><th class="l">품목</th><th>수량</th><th>예상 단가<small>${escHtml(vat)}</small></th><th>예상 합계</th></tr></thead>
+          <tbody>${pe.items.map(it => `<tr>
+            <td class="l"><b>${escHtml(it.item || '-')}</b></td>
+            <td>${it.qty ? Number(it.qty).toLocaleString() + '개' : '<span class="inq-qt-dash">-</span>'}</td>
+            <td><b class="pre">${inqPreRange(it.min, it.max)}</b></td>
+            <td>${it.qty ? inqPreRange(it.qty * (it.min || it.max), it.qty * (it.max || it.min)) : '<span class="inq-qt-dash">-</span>'}</td>
+          </tr>`).join('')}</tbody>
+        </table></div>
+        ${pe.lead || pe.note ? `<div class="inq-qg-note">${pe.lead ? `<span>제작기간</span>${escHtml(pe.lead)}<br>` : ''}<span>안내</span>${escHtml(pe.note || INQ_PRE_NOTE)}</div>` : ''}
+      </div>`;
+    el.querySelectorAll('[data-pre]').forEach(b => b.addEventListener('click', () => inqPreAction(x, b.dataset.pre)));
+}
+
+function inqRenderPreEditor(x) {
+    const el = document.getElementById('inqPre');
+    if (!el) return;
+    const pe = x.pre_estimate || {};
+    // 품목 기본값 = 문의 제목에서 '제작 문의 (…)' 같은 꼬리를 뗀 것 ('미니 시계 키링 제작 문의 (단가…)' → '미니 시계 키링')
+    const guess = String(x.title || '').replace(/\s*\(.*$/, '').replace(/(\s*(제작|주문|구매|대량|문의|견적|요청|건))+\s*$/, '').trim();
+    const items = (pe.items && pe.items.length) ? pe.items : [{ item: guess, qty: '', min: '', max: '' }];
+    const fmt = n => n ? Number(n).toLocaleString() : '';
+    const row = it => `<div class="inq-pre-row">
+        <input data-f="item" placeholder="품목 — 예) 미니 시계 키링" value="${escHtml(it.item || '')}">
+        <input data-f="qty" inputmode="numeric" placeholder="수량" value="${fmt(it.qty)}">
+        <input data-f="min" inputmode="numeric" placeholder="최저 단가" value="${fmt(it.min)}">
+        <span>~</span>
+        <input data-f="max" inputmode="numeric" placeholder="최고 단가" value="${fmt(it.max)}">
+        <button type="button" class="inq-todo-del" data-rm title="빼기">×</button>
+      </div>`;
+    el.innerHTML = `
+      <div class="inq-q-head"><b>가견적 ${pe.items ? '수정' : '작성'}</b><span>디자인 확정 전 예상가 범위 — 매출·마진에는 들어가지 않아요</span></div>
+      <div class="inq-pre-edit">
+        <div class="inq-pre-head"><span>품목</span><span>수량</span><span>개당 예상 단가 (범위)</span></div>
+        <div id="inqPreRows">${items.map(row).join('')}</div>
+        <button type="button" class="inq-todo-link" id="inqPreAdd">+ 품목 추가</button>
+        <div class="inq-pre-opts">
+          <label><span>부가세</span><select id="inqPreVat">${inqOpt(['VAT 별도', 'VAT 포함'], pe.vat || 'VAT 별도')}</select></label>
+          <label class="grow"><span>제작기간</span><input id="inqPreLead" placeholder="예) 디자인 확정 후 약 3~4주" value="${escHtml(pe.lead || '')}"></label>
+        </div>
+        <label class="inq-pre-note"><span>안내 문구</span><textarea id="inqPreNote" rows="2">${escHtml(pe.note || INQ_PRE_NOTE)}</textarea></label>
+        <div class="inq-edit-act">
+          ${pe.items ? '<button type="button" class="btn-ghost" id="inqPreDel" style="margin-right:auto;color:var(--red)">가견적 삭제</button>' : '<span></span>'}
+          <button type="button" class="btn-ghost" id="inqPreCancel">취소</button>
+          <button type="button" class="btn-ghost" id="inqPreSave">저장</button>
+          <button type="button" class="btn-primary" id="inqPreSaveSend">저장하고 안내 기록</button>
+        </div>
+      </div>`;
+    const $ = id => document.getElementById(id);
+    const bindRows = () => {
+        $('inqPreRows').querySelectorAll('.inq-pre-row').forEach(r => {
+            r.querySelectorAll('[data-f="qty"],[data-f="min"],[data-f="max"]').forEach(i => i.oninput = () => { const n = inqPreNum(i.value); i.value = n ? n.toLocaleString() : ''; });
+            r.querySelector('[data-rm]').onclick = () => { if ($('inqPreRows').children.length > 1) r.remove(); };
+        });
+    };
+    bindRows();
+    $('inqPreAdd').addEventListener('click', () => {
+        $('inqPreRows').insertAdjacentHTML('beforeend', row({}));
+        bindRows();
+        $('inqPreRows').lastElementChild.querySelector('input').focus();
+    });
+    $('inqPreCancel').addEventListener('click', () => { _inqPreEditing = null; inqRenderPre(x); });
+    if ($('inqPreDel')) $('inqPreDel').addEventListener('click', async () => {
+        if (!confirm('가견적을 삭제할까요? (이미 남긴 안내 기록은 그대로 남습니다)')) return;
+        const d = await inqPatch(x.id, { pre_estimate: null }, '가견적 삭제');
+        if (d) { Object.assign(x, d); _inqPreEditing = null; inqRenderPre(x); inqRenderStage(x); }
+    });
+    const collect = () => {
+        const items = [];
+        $('inqPreRows').querySelectorAll('.inq-pre-row').forEach(r => {
+            const g = f => r.querySelector(`[data-f="${f}"]`).value;
+            const it = { item: g('item').trim(), qty: inqPreNum(g('qty')), min: inqPreNum(g('min')), max: inqPreNum(g('max')) };
+            if (it.item || it.min || it.max) items.push(it);
+        });
+        return items;
+    };
+    const save = async (send) => {
+        const items = collect();
+        if (!items.length) { showToast('품목과 예상 단가를 입력해주세요'); return; }
+        if (items.some(it => !it.min && !it.max)) { showToast('예상 단가를 입력해주세요 (한 가격이면 최저 칸만 적어도 됩니다)'); return; }
+        const next = Object.assign({}, x.pre_estimate || {}, {
+            items, vat: $('inqPreVat').value, lead: $('inqPreLead').value.trim(),
+            note: $('inqPreNote').value.trim() || INQ_PRE_NOTE, updated_at: new Date().toISOString()
+        });
+        const d = await inqPatch(x.id, { pre_estimate: next });
+        if (!d) return;
+        Object.assign(x, d);
+        _inqPreEditing = null;
+        inqRenderPre(x);
+        inqRenderStage(x);
+        if (send) await inqPreAction(x, 'send');
+        else showToast('가견적을 저장했습니다');
+    };
+    $('inqPreSave').addEventListener('click', () => save(false));
+    $('inqPreSaveSend').addEventListener('click', () => save(true));
+    const first = $('inqPreRows').querySelector('[data-f="min"]');
+    if (first && !first.value) first.focus();
+}
+
+async function inqPreAction(x, act) {
+    if (act === 'edit' || act === 'new') { _inqPreEditing = x.id; inqRenderPre(x); const el = document.getElementById('inqPre'); if (el) el.scrollIntoView({ block: 'nearest' }); return; }
+    const pe = x.pre_estimate;
+    if (!pe || !(pe.items || []).length) { inqPreAction(x, 'new'); return; }
+    if (act === 'copy') {
+        const text = inqPreText(x);
+        try { await navigator.clipboard.writeText(text); showToast('안내문을 복사했습니다 — 메일·카톡에 붙여넣으세요'); }
+        catch (_) { prompt('아래 안내문을 복사하세요 (Ctrl+C)', text); }
+        return;
+    }
+    if (act === 'send') {
+        // 우리 답변으로 기록 + 안내 날짜 + 상태 '가견적'
+        const saved = await inqAddLog(x.id, { direction: 'out', channel: x.channel || '', body: inqPreText(x), images: [] });
+        if (!saved) return;
+        const next = Object.assign({}, pe, { sent_at: new Date().toISOString(), sent_count: (pe.sent_count || 0) + 1 });
+        const patch = { pre_estimate: next, last_contact_at: new Date().toISOString() };
+        const bump = ['신규', '상담중'].includes(x.status);
+        if (bump) patch.status = '가견적';
+        const d = await inqPatch(x.id, patch, bump ? `상태 변경 · ${x.status} → 가견적` : null);
+        if (d) {
+            Object.assign(x, d);
+            const sel = document.getElementById('inqFStatus');
+            if (sel) { sel.value = d.status; sel.className = 'inq-h-status ' + (INQ_STATUS_CLS[d.status] || ''); }
+        }
+        inqRenderPre(x); inqRenderStage(x);
+        showToast('가견적 안내를 기록했습니다 · 안내문 복사로 고객에게 보내세요');
+        return;
+    }
+    if (act === 'quote') {
+        // 가견적 품목으로 확정 견적 시작 — 단가는 확정가로 직접 입력
+        inqStartQuote(x.id);
+        const it = pe.items[0];
+        const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+        set('tempInItem', it.item || '');
+        set('tempInQty', it.qty ? Number(it.qty).toLocaleString() : '');
+        const up = document.getElementById('tempInUnitPrice');
+        if (up) { up.value = ''; up.placeholder = `확정 단가 (가견적 ${inqPreRange(it.min, it.max)})`; up.focus(); }
+        showToast(pe.items.length > 1 ? `첫 품목을 채웠어요. 나머지 ${pe.items.length - 1}개 품목도 추가해주세요` : '가견적 품목을 채웠어요 — 확정 단가를 입력하세요');
+    }
 }
