@@ -69,6 +69,7 @@
 - 세션 관리: Supabase가 JWT를 자동 관리, `localStorage.klp_user`는 display name 캐시 + `doc-generator.html` 호환용 보조. 정식 인증은 `sb.auth.getSession()`
 - `doc-generator.html`은 SDK가 아닌 hand-rolled `sbFetch` 사용 — bootstrapAuthSession에서 access_token 추출 후 Bearer 자동 첨부 (RLS 잠금 대응). `sbFetch`는 `res.ok` 체크 + 에러 throw 패턴 (Phase 3 #11).
 - **페이지네이션**: 큰 테이블 로드는 `paginatedLoad(table, options)` 헬퍼 사용 — 첫 N개만 로드 + `renderLoadMoreButton`으로 "남은 X건 더 보기" UI. 새 list view 추가 시 동일 패턴 따를 것 (Phase 3 #10). 단, kanban/relational 묶음 화면(daily_tasks, planning_*)은 cap 내에서 auto-loop 패턴 사용.
+  - ⚠️ 첫 N개만 불러온 목록에서 **검색·필터는 전체를 대상으로** 해야 함. 거래처 DB는 검색어/분류 필터를 쓰는 순간 `ensureAllClientsLoaded()`가 남은 페이지를 다 불러와 `clients`를 채움 (예전엔 이름순 500개 안에서만 찾아 삼인물산주식회사 같은 뒤쪽 거래처가 안 나왔음)
 
 ## 멀티테넌트 (SaaS) — 2026-07-20 기반 공사 (migrations 021~026)
 - **목적**: KLP 전용 앱 → 여러 회사가 회사별 칸막이 안에서 쓰는 판매 제품. KLP = `company_id = 1`.

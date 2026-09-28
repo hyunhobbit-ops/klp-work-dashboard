@@ -6470,8 +6470,38 @@ async function dbDeleteClient(id) {
     else invalidateClientNamesCache();
 }
 
+// 검색·분류 필터는 처음 불러온 500개가 아니라 거래처 DB 전체에서 찾아야 한다
+// (이름순 500번째 뒤 거래처 — 예: 삼인물산주식회사 — 가 검색에 안 나오던 문제).
+// 필터를 쓰는 순간 남은 페이지를 모두 불러와 clients 를 전체로 채운다 (편집·실시간 반영도 그대로 동작)
+let _clientsLoadingAll = null;
+function ensureAllClientsLoaded() {
+    if (!_clientsPagination || !_clientsPagination.hasMore) return Promise.resolve(false);
+    if (_clientsLoadingAll) return _clientsLoadingAll;
+    _clientsLoadingAll = (async () => {
+        try {
+            while (_clientsPagination.hasMore) {
+                const before = _clientsPagination.data.length;
+                await _clientsPagination.loadMore();
+                if (_clientsPagination.data.length === before) break;
+            }
+            clients.length = 0;
+            _clientsPagination.data.forEach(r => clients.push(clientFromDb(r)));
+            cacheWrite('clients', clients);
+            return true;
+        } catch (e) {
+            console.error('거래처 전체 로드 실패', e);
+            showToast('거래처 전체 불러오기 실패: ' + (e.message || e));
+            return false;
+        } finally { _clientsLoadingAll = null; }
+    })();
+    return _clientsLoadingAll;
+}
+
 function filterClients() {
     let list = clients;
+    if ((clientSearch || clientCategoryFilter !== 'all') && _clientsPagination && _clientsPagination.hasMore && !_clientsLoadingAll) {
+        ensureAllClientsLoaded().then(ok => { if (ok) renderClients(); });
+    }
 
     // 1) 카테고리 필터 (매출처/매입처/서비스(비용)/공란/전체)
     const CAT_SET = ['매출처', '매입처', '서비스(비용)'];
@@ -6663,7 +6693,7 @@ function renderClients() {
     const pageItems = filtered.slice(start, start + CLIENTS_PER_PAGE);
 
     const stats = document.getElementById('clientStats');
-    if (stats) stats.textContent = `총 ${total.toLocaleString()}개 고객사 · ${clientPage} / ${totalPages} 페이지`;
+    if (stats) stats.textContent = `총 ${total.toLocaleString()}개 고객사 · ${clientPage} / ${totalPages} 페이지${_clientsLoadingAll ? ' · 전체 거래처에서 찾는 중…' : ''}`;
 
     const esc = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
 
