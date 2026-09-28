@@ -11516,6 +11516,8 @@ function renderTempProjects() {
         _rebuildTempProjectsFromPagination();
         renderTempProjects();
     });
+    // 편집 저장 등으로 견적 목록이 다시 그려지면 상담 화면의 견적 표도 갱신
+    if (typeof inqRefreshQuotes === 'function') inqRefreshQuotes();
 }
 
 // 견적 의뢰 품목 드래그 순서변경 — 위임 리스너 1회 바인딩 (tbody는 유지, innerHTML만 교체됨)
@@ -21098,11 +21100,43 @@ function inqRefreshQuotes() {
     if (x && document.getElementById('inqQuotes')) inqRenderQuotes(x);
 }
 
+// 견적 부대비용 한 줄 — '인쇄 레이저각인 · 개당 500원 = 150,000원 (VAT별도)'
+function inqFeeLines(p, sup) {
+    const q = p.qty || 0;
+    const won = n => Number(n || 0).toLocaleString() + '원';
+    const vat = v => v === 'VAT 포함' ? 'VAT포함' : 'VAT별도';
+    const f = sup
+        ? [['인쇄', p.supPrintMethod, p.supPrintFee, p.supPrintFeeApply, p.supPrintFeeVat],
+           ['포장', p.supPackMethod, p.supPackagingFee, p.supPackagingFeeApply, p.supPackagingFeeVat],
+           ['라벨', '', p.supLabelFee, p.supLabelFeeApply || '1개당', p.supLabelFeeVat]]
+        : [['인쇄', p.printMethod, p.printFee, p.printFeeApply, p.printFeeVat],
+           ['포장', p.packMethod, p.packagingFee, p.packagingFeeApply, p.packagingFeeVat],
+           ['라벨', '', p.labelFee, p.labelFeeApply || '1개당', p.labelFeeVat]];
+    const out = [];
+    f.forEach(([name, method, fee, apply, v]) => {
+        const m = method && method !== '없음' && method !== '기본박스' ? method : '';
+        const total = calcTempFeeTotal(fee, apply, q);
+        if (!total && !(name === '인쇄' && m)) return;
+        let t = name + (m ? ' ' + m : '');
+        if (total) t += (apply === '1개당' ? ` · 개당 ${won(fee)} = ${won(total)}` : ` · 일괄 ${won(total)}`) + ` (${vat(v)})`;
+        out.push(t);
+    });
+    const boxes = sup ? p.supShippingBoxes : p.shippingBoxes, sf = sup ? p.supShippingFee : p.shippingFee;
+    if (boxes && sf) out.push(`택배 ${boxes}박스 × ${won(sf)} = ${won(boxes * sf)} (${vat(sup ? p.supShippingFeeVat : p.shippingFeeVat)})`);
+    return out;
+}
+
+function inqQuoteGroupIndex(date, client) {
+    if (!tempGroups.length) renderTempProjects();
+    return tempGroups.findIndex(g => g.key === (date || '') + '||' + (client || ''));
+}
+
 function inqRenderQuotes(x) {
     const el = document.getElementById('inqQuotes');
     if (!el) return;
     const linked = tempProjects.filter(p => p.inquiryId === x.id);
-    const total = linked.reduce((s, p) => s + calcTempRevenueWithVat(p), 0);
+    const rev = linked.reduce((s, p) => s + calcTempRevenueWithVat(p), 0);
+    const sup = linked.reduce((s, p) => s + calcTempSupRevenueWithVat(p), 0);
     // 같은 거래처의 아직 연결 안 된 견적 (날짜별 묶음)
     const cands = [];
     tempProjects.filter(p => !p.inquiryId && x.client && p.client === x.client).forEach(p => {
@@ -21112,25 +21146,97 @@ function inqRenderQuotes(x) {
     });
     cands.sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
+    // 견적 묶음(날짜+매출처)별 — 견적 목록과 같은 기준
+    const groups = [];
+    linked.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || ((a.sortOrder ?? a.id) - (b.sortOrder ?? b.id))).forEach(p => {
+        const key = (p.date || '') + '||' + (p.client || '');
+        let g = groups.find(q => q.key === key);
+        if (!g) { g = { key, date: p.date, client: p.client, contact: p.clientContact, note: '', items: [] }; groups.push(g); }
+        if (!g.note && p.quoteNote) g.note = p.quoteNote;
+        g.items.push(p);
+    });
+
+    let open = true;
+    try { open = localStorage.getItem('inq_q_open') !== '0'; } catch (_) {}
+    const won = n => Number(n || 0).toLocaleString() + '원';
+    const dash = '<span class="inq-qt-dash">-</span>';
+    const vatTag = v => `<small class="${v === 'VAT 포함' ? 'inc' : ''}">${v === 'VAT 포함' ? 'VAT포함' : 'VAT별도'}</small>`;
+    const marginCell = (r, s) => {
+        if (!s) return dash;
+        const m = r - s, pct = r > 0 ? Math.round(m / r * 100) : 0;
+        return `<b class="${m >= 0 ? 'pos' : 'neg'}">${won(m)}</b><small>${pct}%</small>`;
+    };
+    const sub = lines => lines.length ? `<div class="inq-qt-sub">${lines.map(l => `<div>+ ${escHtml(l)}</div>`).join('')}</div>` : '';
+
+    const body = groups.map(g => {
+        const gRev = g.items.reduce((s, p) => s + calcTempRevenueWithVat(p), 0);
+        const gSup = g.items.reduce((s, p) => s + calcTempSupRevenueWithVat(p), 0);
+        const done = g.items.some(p => p.transferredAt);
+        return `
+        <div class="inq-qg">
+          <div class="inq-qg-head">
+            <b>${escHtml(String(g.date || '').replace(/-/g, '.'))} 견적</b>
+            <span>${escHtml(g.client || '')}${g.contact ? ' · ' + escHtml(g.contact) : ''} · ${g.items.length}품목</span>
+            ${done ? '<span class="inq-q-done">매입매출 등록됨</span>' : ''}
+            <div class="inq-spacer"></div>
+            <button class="inq-mini" data-qedit="${escHtml(g.key)}">편집</button>
+            <button class="inq-mini" data-qdoc="${escHtml(g.key)}">견적서</button>
+          </div>
+          <div class="inq-qt-wrap"><table class="inq-qt">
+            <thead><tr>
+              <th class="l">품목</th><th>수량</th><th>매출 단가</th><th>매출액<small>VAT포함</small></th>
+              <th class="l">매입처</th><th>매입 단가</th><th>매입액<small>VAT포함</small></th><th>마진</th>
+            </tr></thead>
+            <tbody>${g.items.map(p => {
+                const r = calcTempRevenueWithVat(p), s = calcTempSupRevenueWithVat(p);
+                return `<tr>
+                  <td class="l"><b>${escHtml(p.item || '-')}</b>${sub(inqFeeLines(p, false))}</td>
+                  <td>${p.qty ? p.qty.toLocaleString() + '개' : dash}</td>
+                  <td>${p.unitPrice ? won(p.unitPrice) + vatTag(p.unitPriceVat) : dash}</td>
+                  <td><b class="rev">${won(r)}</b></td>
+                  <td class="l">${p.supplier ? `<b>${escHtml(p.supplier)}</b>` : dash}${p.supplierContact ? `<small>${escHtml(p.supplierContact)}</small>` : ''}${sub(inqFeeLines(p, true))}</td>
+                  <td>${p.supplierUnitPrice ? won(p.supplierUnitPrice) + vatTag(p.supplierUnitPriceVat) : dash}</td>
+                  <td>${s ? `<b class="sup">${won(s)}</b>` : dash}</td>
+                  <td>${marginCell(r, s)}</td>
+                </tr>`;
+            }).join('')}</tbody>
+            ${g.items.length > 1 ? `<tfoot><tr>
+              <td class="l">합계</td><td></td><td></td><td><b class="rev">${won(gRev)}</b></td>
+              <td></td><td></td><td>${gSup ? `<b class="sup">${won(gSup)}</b>` : dash}</td><td>${marginCell(gRev, gSup)}</td>
+            </tr></tfoot>` : ''}
+          </table></div>
+          ${g.note ? `<div class="inq-qg-note"><span>견적 메모</span>${escHtml(g.note)}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    const m = rev - sup, pct = rev > 0 ? Math.round(m / rev * 100) : 0;
     el.innerHTML = `
       <div class="inq-q-head">
+        ${linked.length ? `<button class="inq-q-toggle ${open ? 'on' : ''}" id="inqQToggle" title="${open ? '접기' : '펼치기'}">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>` : ''}
         <b>연결된 견적</b>
-        ${linked.length ? `<span>${linked.length}품목 · ${total.toLocaleString()}원</span>` : '<span>아직 없음</span>'}
+        ${linked.length ? `<span class="inq-q-sum">
+            <em>${groups.length}건 · ${linked.length}품목</em>
+            <em>매출 <b class="rev">${won(rev)}</b></em>
+            ${sup ? `<em>매입 <b class="sup">${won(sup)}</b></em><em>마진 <b class="${m >= 0 ? 'pos' : 'neg'}">${won(m)} (${pct}%)</b></em>` : ''}
+          </span>` : '<span>아직 없음</span>'}
         <div class="inq-spacer"></div>
         ${cands.length ? `<select id="inqQLink"><option value="">같은 거래처 견적 연결…</option>${cands.map(c =>
             `<option value="${escHtml(c.date)}">${escHtml(String(c.date).replace(/-/g, '.'))} · ${c.n}품목</option>`).join('')}</select>` : ''}
         <button class="inq-mini primary" id="inqQStart">+ 이 상담으로 견적 작성</button>
       </div>
-      ${linked.length ? `<div class="inq-q-list">${linked.map(p => `
-        <div class="inq-q-row">
-          <span class="inq-q-item">${escHtml(p.item || '-')}</span>
-          <span>${(p.qty || 0).toLocaleString()}개</span>
-          <span class="inq-q-amt">${calcTempRevenueWithVat(p).toLocaleString()}원</span>
-          ${p.transferredAt ? '<span class="inq-q-done">매입매출 등록됨</span>' : ''}
-        </div>`).join('')}</div>` : ''}`;
+      ${linked.length && open ? `<div class="inq-q-body">${body}</div>` : ''}`;
     document.getElementById('inqQStart').addEventListener('click', () => inqStartQuote(x.id));
     const sel = document.getElementById('inqQLink');
     if (sel) sel.addEventListener('change', () => { if (sel.value) inqLinkGroup(x.id, sel.value); });
+    const tg = document.getElementById('inqQToggle');
+    if (tg) tg.addEventListener('click', () => {
+        try { localStorage.setItem('inq_q_open', open ? '0' : '1'); } catch (_) {}
+        inqRenderQuotes(x);
+    });
+    const byKey = k => { const i = k.indexOf('||'); return inqQuoteGroupIndex(k.slice(0, i), k.slice(i + 2)); };
+    el.querySelectorAll('[data-qedit]').forEach(b => b.addEventListener('click', () => { const gi = byKey(b.dataset.qedit); if (gi >= 0) openTempGroupEdit(gi); }));
+    el.querySelectorAll('[data-qdoc]').forEach(b => b.addEventListener('click', () => { const gi = byKey(b.dataset.qdoc); if (gi >= 0) openTempQuote(gi); }));
 }
 
 async function inqLinkGroup(id, date) {
