@@ -12,3 +12,6 @@ update inquiries
 
 -- 붙여넣은 이미지 여러 장 (압축된 base64 배열). 예전 image 한 칸은 읽기 호환용으로 유지
 alter table inquiry_logs add column if not exists images jsonb not null default '[]'::jsonb;
+
+-- 037 (2026-09-28): 부서를 직함과 분리
+alter table inquiries add column if not exists contact_dept text default '';

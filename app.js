@@ -20783,7 +20783,7 @@ function inqFiltered() {
     if (_inqFilter === 'active') list = list.filter(x => INQ_ACTIVE.includes(x.status));
     else if (_inqFilter !== 'all') list = list.filter(x => x.status === _inqFilter);
     if (q) list = list.filter(x =>
-        [x.client, x.title, x.client_contact, x.contact_name, x.contact_phone, x.contact_email]
+        [x.client, x.title, x.client_contact, x.contact_name, x.contact_dept, x.contact_phone, x.contact_email]
             .some(v => String(v || '').toLowerCase().includes(q)));
     // 할 일 기한 지난 것 → 최근 연락 순
     return list.slice().sort((a, b) => {
@@ -20867,7 +20867,8 @@ async function inqRenderDetail() {
         <input class="inq-h-title" id="inqFTitle" value="${escHtml(x.title || '')}" placeholder="무엇을 문의했나요? 예) 손목시계 300개 각인 견적">
         <div class="inq-fields">
           <label><span>고객 담당자</span><input id="inqFCName" value="${escHtml(x.contact_name || x.client_contact || '')}" placeholder="이름"></label>
-          <label><span>직함 · 부서</span><input id="inqFCTitle" value="${escHtml(x.contact_title || '')}" placeholder="예) 총무팀 과장"></label>
+          <label><span>부서</span><input id="inqFCDept" value="${escHtml(x.contact_dept || '')}" placeholder="예) 총무팀"></label>
+          <label><span>직함</span><input id="inqFCTitle" value="${escHtml(x.contact_title || '')}" placeholder="예) 과장"></label>
           <label><span>연락처</span><input id="inqFCPhone" inputmode="tel" value="${escHtml(x.contact_phone || '')}" placeholder="010-0000-0000"></label>
           <label><span>이메일</span><input id="inqFCEmail" type="email" value="${escHtml(x.contact_email || '')}" placeholder="name@company.com"></label>
           <label><span>문의 경로</span><select id="inqFChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select></label>
@@ -20901,6 +20902,7 @@ async function inqRenderDetail() {
           <textarea id="inqCBody" rows="2" placeholder="오간 내용을 그대로 적거나 카톡 대화를 붙여넣으세요"></textarea>
           <button class="btn-primary" id="inqCSave">기록</button>
         </div>
+        <div class="inq-img-notice" id="inqCImgNotice" hidden></div>
         <div class="inq-thumbs" id="inqCThumbs"></div>
       </div>`;
     _inqComposerImages.length = 0;
@@ -20925,6 +20927,7 @@ function inqBindDetail(x) {
     saveField('inqFClient', 'client');
     saveField('inqFTitle', 'title');
     saveField('inqFCName', 'contact_name');
+    saveField('inqFCDept', 'contact_dept');
     saveField('inqFCTitle', 'contact_title');
     saveField('inqFCPhone', 'contact_phone', inqNormPhone);
     saveField('inqFCEmail', 'contact_email');
@@ -20980,7 +20983,7 @@ function inqBindDetail(x) {
         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); inqSubmit(); }
     });
     const redraw = () => inqThumbs(_inqComposerImages, 'inqCThumbs');
-    inqBindImageInput($('inqCBody'), _inqComposerImages, redraw);
+    inqBindImageInput($('inqCBody'), _inqComposerImages, redraw, 'inqCImgNotice');
     $('inqCFile').addEventListener('change', async (ev) => {
         await inqAddImageFiles(ev.target.files, _inqComposerImages, redraw);
         ev.target.value = '';
@@ -21238,17 +21241,19 @@ function inqRenderNewForm() {
           <label class="span4"><span>무엇을 문의했나요?</span><input id="inqNTitle" placeholder="예) 손목시계 300개 각인 견적"></label>
         </div>
         <div class="inq-new-sec">고객 연락처 <em>선택 · 나중에 채워도 됩니다</em></div>
-        <div class="inq-new-grid">
+        <div class="inq-new-grid c5">
           <label><span>담당자 이름</span><input id="inqNCName" placeholder="홍길동"></label>
-          <label><span>직함 · 부서</span><input id="inqNCTitle" placeholder="예) 총무팀 과장"></label>
+          <label><span>부서</span><input id="inqNCDept" placeholder="예) 총무팀"></label>
+          <label><span>직함</span><input id="inqNCTitle" placeholder="예) 과장"></label>
           <label><span>연락처</span><input id="inqNCPhone" inputmode="tel" placeholder="010-0000-0000"></label>
           <label><span>이메일</span><input id="inqNCEmail" type="email" placeholder="name@company.com"></label>
         </div>
         <div class="inq-new-full">
-          <div class="inq-new-lab">첫 문의 내용 <em>선택 — 메일·카톡·홈페이지 문의를 붙여넣으면 위 칸이 자동으로 채워집니다</em></div>
-          <textarea id="inqNBody" rows="7" placeholder="고객이 보낸 내용을 그대로 붙여넣으세요.&#10;사진도 Ctrl+V로 붙여넣거나 여기로 끌어다 놓을 수 있습니다."></textarea>
-          <div class="inq-thumbs" id="inqNThumbs"></div>
+          <div class="inq-new-lab">첫 문의 내용 <em>선택 — 메일·카톡·홈페이지 문의를 붙여넣으면 AI가 읽고 위 칸을 채워줍니다</em></div>
+          <textarea id="inqNBody" rows="9" placeholder="고객이 보낸 내용을 그대로 붙여넣으세요.&#10;사진도 Ctrl+V로 붙여넣거나 여기로 끌어다 놓을 수 있습니다."></textarea>
           <div class="inq-auto-hint" id="inqNAutoHint"></div>
+          <div class="inq-img-notice" id="inqNImgNotice" hidden></div>
+          <div class="inq-thumbs" id="inqNThumbs"></div>
         </div>
         <div class="inq-new-actions">
           <button type="button" class="btn-ghost" id="inqNCancel">취소</button>
@@ -21265,15 +21270,20 @@ function inqRenderNewForm() {
     $('inqNSave').addEventListener('click', inqCreate);
 
     // 자동 입력된 칸을 사람이 고치면 그 칸은 더 이상 자동으로 덮어쓰지 않는다
-    ['inqNClient', 'inqNTitle', 'inqNCName', 'inqNCTitle', 'inqNCPhone', 'inqNCEmail'].forEach(id => {
+    ['inqNClient', 'inqNTitle', 'inqNCName', 'inqNCDept', 'inqNCTitle', 'inqNCPhone', 'inqNCEmail'].forEach(id => {
         $(id).addEventListener('input', () => { delete $(id).dataset.auto; $(id).classList.remove('inq-autofilled'); });
     });
     $('inqNCPhone').addEventListener('change', () => { $('inqNCPhone').value = inqNormPhone($('inqNCPhone').value); });
 
-    let t = null;
+    // 규칙으로 바로 채우고(0.25초), 잠시 멈추면 AI가 한 번 더 읽어 보강(0.9초)
+    let t = null, ta = null;
+    _inqAiLast = '';
     const body = $('inqNBody');
-    body.addEventListener('input', () => { clearTimeout(t); t = setTimeout(inqAutofillNew, 250); });
-    inqBindImageInput(body, _inqNewImages, () => inqThumbs(_inqNewImages, 'inqNThumbs'));
+    body.addEventListener('input', () => {
+        clearTimeout(t); t = setTimeout(inqAutofillNew, 250);
+        clearTimeout(ta); ta = setTimeout(inqAiExtract, 900);
+    });
+    inqBindImageInput(body, _inqNewImages, () => inqThumbs(_inqNewImages, 'inqNThumbs'), 'inqNImgNotice');
     $('inqNClient').focus();
 }
 
@@ -21287,7 +21297,7 @@ async function inqCreate() {
     btn.disabled = true;
     const { data, error } = await sb.from('inquiries').insert({
         client, channel, assignee: v('inqNAssignee'), title: v('inqNTitle'),
-        contact_name: v('inqNCName'), contact_title: v('inqNCTitle'),
+        contact_name: v('inqNCName'), contact_dept: v('inqNCDept'), contact_title: v('inqNCTitle'),
         contact_phone: inqNormPhone(v('inqNCPhone')), contact_email: v('inqNCEmail'),
         status: '신규', started_at: getTodayStr(),
         last_contact_at: new Date().toISOString(),
@@ -21319,12 +21329,7 @@ async function inqAddImageFiles(files, arr, onDone) {
     for (const f of list) {
         if (arr.length >= INQ_MAX_IMAGES) { showToast(`사진은 한 번에 ${INQ_MAX_IMAGES}장까지 넣을 수 있습니다`); break; }
         try {
-            const raw = await new Promise((res, rej) => {
-                const r = new FileReader();
-                r.onload = e => res(e.target.result);
-                r.onerror = () => rej(new Error('파일을 읽지 못했습니다'));
-                r.readAsDataURL(f);
-            });
+            const raw = await inqBlobToDataUrl(f);
             arr.push(await _shrinkDataUrl(raw, 1200, 0.8));   // 업로드 전 자동 압축
         } catch (e) { showToast('사진 처리 실패: ' + e.message); }
     }
@@ -21332,28 +21337,177 @@ async function inqAddImageFiles(files, arr, onDone) {
     return true;
 }
 
-// 글 입력칸에 Ctrl+V 이미지 붙여넣기 + 파일 끌어놓기
-function inqBindImageInput(el, arr, onDone) {
+function inqBlobToDataUrl(blob) {
+    return new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = e => res(e.target.result);
+        r.onerror = () => rej(new Error('파일을 읽지 못했습니다'));
+        r.readAsDataURL(blob);
+    });
+}
+
+// 복사한 메일 본문(HTML) 속 사진 주소 — 이모지·추적용 1px 그림은 뺀다
+function inqHtmlImageSrcs(html) {
+    if (!html || !/<img/i.test(html)) return [];
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const seen = new Set();
+    return Array.from(doc.images).filter(img => {
+        const src = img.getAttribute('src') || '';
+        if (!/^(data:image\/|https?:)/i.test(src) || seen.has(src)) return false;
+        const w = parseInt(img.getAttribute('width'), 10), h = parseInt(img.getAttribute('height'), 10);
+        if ((w && w <= 32) || (h && h <= 32)) return false;
+        if (/emoji|emoticon|sticker|spacer|pixel|tracking/i.test(src + ' ' + (img.className || '') + ' ' + (img.alt || ''))) return false;
+        seen.add(src);
+        return true;
+    }).map(img => img.getAttribute('src'));
+}
+
+// 주소로 사진 가져오기 — 메일 서비스 사진은 로그인 보안 때문에 대부분 막힌다(실패 개수 반환)
+async function inqAddImageUrls(urls, arr, onDone) {
+    let ok = 0, fail = 0;
+    for (const src of urls) {
+        if (arr.length >= INQ_MAX_IMAGES) break;
+        try {
+            let dataUrl = src;
+            if (!/^data:image\//i.test(src)) {
+                const ctl = new AbortController();
+                const tm = setTimeout(() => ctl.abort(), 8000);
+                const r = await fetch(src, { mode: 'cors', credentials: 'omit', signal: ctl.signal });
+                clearTimeout(tm);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const b = await r.blob();
+                if (!b.type.startsWith('image/')) throw new Error('사진이 아님');
+                dataUrl = await inqBlobToDataUrl(b);
+            }
+            arr.push(await _shrinkDataUrl(dataUrl, 1200, 0.8));
+            ok++;
+        } catch (_) { fail++; }
+    }
+    if (ok && onDone) onDone();
+    return { ok, fail };
+}
+
+function inqImgNotice(id, n) {
+    const el = document.getElementById(id);
     if (!el) return;
+    if (!n) { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    el.innerHTML = `<b>메일 속 사진 ${n}장은 메일 보안 때문에 자동으로 못 가져왔어요.</b>
+        <span>메일에서 사진에 마우스 오른쪽 → <b>이미지 복사</b> → 여기서 <b>Ctrl+V</b> 하거나, 사진을 이 칸으로 끌어다 놓으세요.</span>
+        <button type="button" title="닫기">×</button>`;
+    el.querySelector('button').addEventListener('click', () => inqImgNotice(id, 0));
+}
+
+// ---------- 붙여넣은 글 정리 ----------
+// 메일·웹페이지에서 복사한 HTML → 화면에 보이던 줄바꿈 그대로의 글
+function inqHtmlToText(html) {
+    const doc = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    doc.querySelectorAll('script,style,head,title,meta,link,noscript').forEach(n => n.remove());
+    const BLOCK = /^(P|DIV|H[1-6]|UL|OL|LI|TABLE|THEAD|TBODY|TFOOT|TR|BLOCKQUOTE|PRE|SECTION|ARTICLE|HEADER|FOOTER|ADDRESS|DL|DT|DD|HR|FIGURE|FIGCAPTION|CENTER|FORM|FIELDSET|MAIN|NAV|ASIDE)$/;
+    let out = '';
+    const nl = () => { out = out.replace(/[ \t]+$/, ''); if (out && !out.endsWith('\n')) out += '\n'; };
+    const walk = (n) => {
+        if (n.nodeType === 3) {
+            let s = n.nodeValue.replace(/[\r\n\t]+/g, ' ').replace(/[ ]{2,}/g, ' ');
+            const blank = !s.replace(/ /g, '').trim();
+            s = s.replace(/ /g, ' ');
+            if (blank) { if (out && !/\s$/.test(out)) out += ' '; return; }
+            if (!out || out.endsWith('\n')) s = s.replace(/^ +/, '');
+            out += s;
+            return;
+        }
+        if (n.nodeType !== 1) return;
+        const tag = n.tagName;
+        if (tag === 'BR') { out = out.replace(/[ \t]+$/, '') + '\n'; return; }
+        if (tag === 'IMG') return;
+        if (tag === 'TD' || tag === 'TH') {
+            if (out && !out.endsWith('\n') && !out.endsWith('\t')) out = out.replace(/ +$/, '') + '\t';
+            n.childNodes.forEach(walk);
+            return;
+        }
+        const block = BLOCK.test(tag);
+        if (block) nl();
+        const start = out.length;
+        if (tag === 'LI') out += '• ';
+        n.childNodes.forEach(walk);
+        if (block) {
+            // 내용 없이 &nbsp; 만 든 문단(<p>&nbsp;</p>)은 빈 줄 한 줄
+            if (!out.slice(start).trim() && / /.test(n.textContent || '')) out += '\n';
+            nl();
+        }
+    };
+    walk(doc.body || doc.documentElement);
+    return inqTidyText(out);
+}
+
+function inqTidyText(s) {
+    return String(s || '').replace(/\r\n?/g, '\n')
+        .split('\n').map(l => l.replace(/[ \t ]+$/, '')).join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .replace(/^\n+|\n+$/g, '');
+}
+
+// 글만 복사된 경우 — 모든 줄 사이에 빈 줄이 끼어 있으면(문단마다 두 줄) 한 줄로 줄인다
+function inqTidyPlain(s) {
+    let t = String(s || '').replace(/\r\n?/g, '\n');
+    const doubles = (t.match(/\n\n/g) || []).length;
+    const singles = (t.replace(/\n{2,}/g, '').match(/\n/g) || []).length;
+    if (doubles >= 3 && singles === 0) t = t.replace(/\n\n/g, '\n');
+    return inqTidyText(t);
+}
+
+// 커서 위치에 글 넣기 (되돌리기 Ctrl+Z 가 되도록 execCommand 먼저)
+function inqInsertText(el, text) {
+    el.focus();
+    let done = false;
+    try { done = document.execCommand('insertText', false, text); } catch (_) { done = false; }
+    if (!done) {
+        const s = el.selectionStart, e = el.selectionEnd;
+        el.setRangeText(text, s, e, 'end');
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+}
+
+// 글 입력칸: 붙여넣기(글 정리 + 사진) · 끌어놓기
+function inqBindImageInput(el, arr, onDone, noticeId) {
+    if (!el) return;
+    const afterUrls = (r) => { inqImgNotice(noticeId, r.fail); };
     el.addEventListener('paste', (e) => {
-        const items = (e.clipboardData && e.clipboardData.items) || [];
+        const cd = e.clipboardData;
+        if (!cd) return;
         const files = [];
-        for (const it of items) {
+        for (const it of (cd.items || [])) {
             if (it.kind === 'file' && it.type && it.type.startsWith('image/')) {
                 const f = it.getAsFile();
                 if (f) files.push(f);
             }
         }
-        if (files.length) inqAddImageFiles(files, arr, onDone);   // 글자는 평소처럼 붙여넣어진다
+        const html = cd.getData('text/html') || '';
+        const plain = cd.getData('text/plain') || '';
+        let text = '';
+        if (html && /<(p|div|br|tr|td|li|table|span|font|b|strong|a|img)\b/i.test(html)) text = inqHtmlToText(html);
+        if (!text && plain) text = inqTidyPlain(plain);
+        if (text) { e.preventDefault(); inqInsertText(el, text); }
+
+        if (files.length) { inqImgNotice(noticeId, 0); inqAddImageFiles(files, arr, onDone); }
+        else {
+            const srcs = inqHtmlImageSrcs(html);
+            if (srcs.length) inqAddImageUrls(srcs, arr, onDone).then(afterUrls);
+        }
     });
     el.addEventListener('dragover', (e) => {
-        if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) { e.preventDefault(); el.classList.add('inq-drop'); }
+        const types = Array.from((e.dataTransfer && e.dataTransfer.types) || []);
+        if (types.includes('Files')) { e.preventDefault(); el.classList.add('inq-drop'); }
     });
     el.addEventListener('dragleave', () => el.classList.remove('inq-drop'));
     el.addEventListener('drop', (e) => {
         el.classList.remove('inq-drop');
-        const files = e.dataTransfer && e.dataTransfer.files;
-        if (files && files.length) { e.preventDefault(); inqAddImageFiles(files, arr, onDone); }
+        const dt = e.dataTransfer;
+        if (!dt) return;
+        if (dt.files && dt.files.length) { e.preventDefault(); inqImgNotice(noticeId, 0); inqAddImageFiles(dt.files, arr, onDone); return; }
+        // 다른 창의 사진을 끌어온 경우 — 주소로 시도
+        const srcs = inqHtmlImageSrcs(dt.getData('text/html') || '');
+        if (srcs.length) { e.preventDefault(); inqAddImageUrls(srcs, arr, onDone).then(afterUrls); }
     });
 }
 
@@ -21382,21 +21536,37 @@ function inqNormPhone(v) {
 const INQ_LABELS = {
     company: ['회사명', '회사', '업체명', '업체', '상호명', '상호', '기업명', '기업', '기관명', '기관', '단체명', '소속', 'company name', 'company'],
     name: ['담당자 성함', '담당자명', '담당자', '성함', '성명', '이름', '고객명', '신청자', '문의자', '작성자', 'name'],
-    title: ['직함', '직책', '직급', '부서명', '부서', 'position', 'job title'],
+    dept: ['부서명', '부서', '팀명', '소속 부서', '소속부서', 'department', 'dept'],
+    title: ['직함', '직책', '직급', 'position', 'job title'],
     phone: ['휴대폰 번호', '휴대폰번호', '휴대폰', '휴대전화', '핸드폰', '연락처', '전화번호', '전화', 'phone', 'mobile', 'tel'],
     email: ['이메일 주소', '이메일', 'e-mail', 'email', '메일 주소', '메일주소', '메일'],
     subject: ['문의 제목', '문의제목', '제목', '문의 유형', '문의유형', '문의 종류', 'subject']
 };
-const INQ_JOB_TITLES = '대표이사|대표님|대표|전무|상무|이사|본부장|부장|차장|과장|대리|주임|사원|팀장|실장|매니저|국장|원장|센터장|교수|선생님|사무장|총무';
-const INQ_NOT_NAMES = ['저희', '우리', '담당', '해당', '저는', '제가', '귀사', '회사', '안녕', '문의', '관련', '이번', '다음'];
+// 긴 것부터 맞춰야 '선임매니저'가 '선임'+'매니저'로 쪼개지지 않는다
+const INQ_TITLE_LIST = ['대표이사', '대표님', '대표', '부사장', '사장', '전무', '상무', '이사', '본부장', '부장', '차장', '과장', '대리', '주임', '사원',
+    '팀장', '실장', '파트장', '그룹장', '센터장', '국장', '원장', '소장', '매니저', '매니져', '선임매니저', '책임매니저', '수석매니저',
+    '선임연구원', '책임연구원', '수석연구원', '주임연구원', '연구원', '선임', '책임', '수석', '프로', '디자이너', '컨설턴트',
+    '교수', '선생님', '사무장', '총무', '계장', '주무관', '팀원'].sort((a, b) => b.length - a.length);
+const INQ_JOB_TITLES = INQ_TITLE_LIST.join('|');
+const INQ_NOT_NAMES = ['저희', '우리', '담당', '담당자', '해당', '저는', '제가', '귀사', '회사', '안녕', '문의', '관련', '이번', '다음',
+    '감사', '감사해요', '말씀', '연락', '안내', '예정', '수고', '드림', '올림', '참조', '회신', '전체', '원활', '업무', '가능', '여부', '최소', '단가', '제작', '기간', '고객', '대표님'];
+const INQ_FREE_MAIL = /^(gmail|googlemail|naver|daum|hanmail|kakao|nate|hotmail|outlook|live|msn|yahoo|icloud|me|korea|empal|dreamwiz|lycos|paran|hanmir|chol|freechal|hanafos|unitel|netian)$/i;
+const INQ_DEPT_RE = /^[가-힣A-Za-z0-9&·\s]{1,20}(?:팀|부|실|본부|센터|그룹|파트|사업부|사업본부|과|국|처|연구소|연구실|사무국)$/;
+
+function inqIsTitle(w) { return INQ_TITLE_LIST.includes(w); }
+function inqNameOk(w) {
+    return !!w && /^[가-힣]{2,4}$/.test(w) && !inqIsTitle(w) && !INQ_NOT_NAMES.includes(w)
+        && !INQ_TITLE_LIST.some(tt => tt.length >= 2 && w.endsWith(tt) && w.length - tt.length < 2);
+}
 
 function inqParseContact(text) {
     const t = String(text || '');
     const out = {};
     const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // '이름 : 홍길동' 형태 (콜론·탭 구분자가 있어야 인정 — '연락처 알려주세요' 같은 문장은 무시)
+    const lines = t.split(/\r?\n/).map(l => l.trim());
+    // 1) '이름 : 홍길동' 형태 (콜론·탭 구분자가 있어야 인정 — '연락처 알려주세요' 같은 문장은 무시)
     const segs = [];
-    t.split(/\r?\n/).forEach(line => line.split(/\s[|/]\s/).forEach(s => segs.push(s)));
+    lines.forEach(line => line.split(/\s[|/]\s/).forEach(s => segs.push(s)));
     Object.keys(INQ_LABELS).forEach(k => {
         const labs = INQ_LABELS[k].slice().sort((a, b) => b.length - a.length).map(esc).join('|');
         const re = new RegExp('^[\\s\\[\\(<*•·#\\-]*(?:' + labs + ')\\s*[\\]\\)>]*\\s*(?:[:：]|\\t)\\s*(.+?)\\s*$', 'i');
@@ -21412,56 +21582,178 @@ function inqParseContact(text) {
     if (out.name) {
         const nm = out.name.replace(/님$/, '').trim();
         const m = nm.match(new RegExp('^([가-힣A-Za-z]{2,10})\\s*(' + INQ_JOB_TITLES + ')$'));
-        if (m) { out.name = m[1]; if (!out.title) out.title = m[2]; }
+        if (m && !inqIsTitle(m[1])) { out.name = m[1]; if (!out.title) out.title = m[2]; }
         else out.name = nm.slice(0, 30);
     }
-    if (out.company) out.company = out.company.slice(0, 60);
-    if (out.subject) out.subject = out.subject.slice(0, 80);
-    if (out.title) out.title = out.title.slice(0, 30);
+    ['company', 'subject', 'dept', 'title'].forEach(k => { if (out[k]) out[k] = out[k].slice(0, k === 'subject' ? 80 : 60); });
+    Object.keys(out).forEach(k => { if (!out[k]) delete out[k]; });
 
-    // 라벨이 없을 때 — 본문 어디서든 찾는다
+    // 2) 서명 줄 — 'HR마케팅2팀 | 선임매니저', '김규리/HR마케팅2팀/NHR', '총무팀 과장'
+    for (const line of lines) {
+        if (!line || line.length > 60) continue;
+        let parts = line.split(/\s*[|/·ㅣ]\s*/).filter(Boolean);
+        if (parts.length === 1) {
+            const m = line.match(new RegExp('^(.+?(?:팀|부|실|본부|센터|그룹|파트|과))\\s+(' + INQ_JOB_TITLES + ')$'));
+            if (m) parts = [m[1], m[2]];
+        }
+        if (parts.length < 2 || parts.length > 4) continue;
+        let dept = '', title = '', name = '', rest = [];
+        parts.forEach(p => {
+            if (!title && inqIsTitle(p)) title = p;
+            else if (!dept && INQ_DEPT_RE.test(p)) dept = p;
+            else if (!name && inqNameOk(p)) name = p;
+            else rest.push(p);
+        });
+        if (!dept && !title) continue;
+        if (dept && !out.dept) out.dept = dept;
+        if (title && !out.title) out.title = title;
+        if (name && !out.name) out.name = name;
+        if (!out.company && rest.length === 1 && /^[A-Za-z0-9&.\-]{2,20}$|주식회사|㈜|\(주\)/.test(rest[0])) out.company = rest[0];
+        if (out.dept && out.title) break;
+    }
+
+    // 3) 본문 어디서든 — 이메일 · 연락처(휴대폰 우선, 팩스 제외)
     if (!out.email) { const m = t.match(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/); if (m) out.email = m[0]; }
     if (!out.phone) {
         const mob = t.match(/01[016789][\s.\-]?\d{3,4}[\s.\-]?\d{4}/);
-        const land = t.match(/0\d{1,2}[\s.\-)]\s?\d{3,4}[\s.\-]\d{4}/);
         if (mob) out.phone = inqNormPhone(mob[0]);
-        else if (land) out.phone = inqNormPhone(land[0]);
+        else {
+            const re = /0\d{1,2}[\s.\-)]\s?\d{3,4}[\s.\-]\d{4}/g;
+            let m;
+            while ((m = re.exec(t))) {
+                const before = t.slice(Math.max(0, m.index - 8), m.index);
+                if (/(?:^|[\s(])(?:F|FAX|Fax|fax|팩스)[\s.:)]*$/.test(before)) continue;
+                out.phone = inqNormPhone(m[0]);
+                break;
+            }
+        }
     }
-    if (!out.company) {
-        // '주식회사 한빛' 형태를 먼저, 없으면 '한빛 주식회사' — 줄바꿈은 넘지 않는다
-        const m = t.match(/(?:주식회사|\(주\)|㈜)[ 	]?[가-힣A-Za-z0-9&]+/) || t.match(/[가-힣A-Za-z0-9&]+[ 	]?(?:주식회사|\(주\)|㈜)/);
-        if (m) out.company = m[0].trim();
+
+    // 4) 이름 — 맺음말 'OOO 드림' → 자기소개 'NHR 김규리 선임입니다' → 연락처 바로 위 이름 한 줄 → '김규리 선임'
+    if (!out.name) {
+        const m = t.match(new RegExp('([가-힣]{2,4})\\s?(?:(' + INQ_JOB_TITLES + ')\\s?)?(?:드림|올림)\\s*$', 'm'));
+        if (m && inqNameOk(m[1])) { out.name = m[1]; if (!out.title && m[2]) out.title = m[2]; }
+    }
+    {
+        const intro = new RegExp('(?:^|[\\s,.])((?:주식회사|㈜|\\(주\\))\\s?[가-힣A-Za-z0-9&]+|[가-힣A-Za-z0-9&]+(?:주식회사|㈜|\\(주\\))|[A-Za-z][A-Za-z0-9&.\\-]{1,19}|[가-힣A-Za-z0-9&]+(?:상사|산업|전자|테크|기업|그룹|재단|협회|학교|대학교|병원|은행|공사|공단|시청|구청|군청|도청|컴퍼니|코리아))?\\s*([가-힣]{2,4})\\s?(' + INQ_JOB_TITLES + ')?\\s?(?:입니다|이에요|예요|이라고 합니다|라고 합니다)', 'm');
+        const m = t.match(intro);
+        if (m && (m[1] || m[3]) && inqNameOk(m[2])) {   // 회사나 직함이 같이 있어야 인정('예정입니다' 같은 오탐 방지)
+            if (!out.name) out.name = m[2];
+            if (!out.title && m[3]) out.title = m[3];
+            if (!out.company && m[1]) out.company = m[1].trim();
+        }
+    }
+    if (!out.name) {
+        const m = t.match(/(?:저는|제 이름은)\s*([가-힣]{2,4})(?:입니다|이에요|예요|이라고)/);
+        if (m && inqNameOk(m[1])) out.name = m[1];
+    }
+    if (!out.name) {
+        const idx = lines.findIndex(l => /@|01[016789][\s.\-]?\d{3,4}/.test(l));
+        for (let i = idx - 1; i >= 0 && i >= idx - 4; i--) {
+            if (inqNameOk(lines[i])) { out.name = lines[i]; break; }
+        }
     }
     if (!out.name) {
         const re = new RegExp('([가-힣]{2,4})\\s?(' + INQ_JOB_TITLES + ')(?=님|입니다|이에요|예요|$|[\\s,.)!])', 'm');
         const m = t.match(re);
-        if (m && !INQ_NOT_NAMES.includes(m[1])) { out.name = m[1]; if (!out.title) out.title = m[2]; }
+        if (m && inqNameOk(m[1])) { out.name = m[1]; if (!out.title) out.title = m[2]; }
+    }
+
+    // 5) 회사 — '주식회사 한빛' / '한빛 주식회사' → 없으면 회사 메일 주소(nhr.kr → NHR)
+    if (!out.company) {
+        const m = t.match(/(?:주식회사|\(주\)|㈜)[ \t]?[가-힣A-Za-z0-9&]+/) || t.match(/[가-힣A-Za-z0-9&]+[ \t]?(?:주식회사|\(주\)|㈜)/);
+        if (m) out.company = m[0].trim();
+    }
+    if (!out.company && out.email) {
+        const dom = out.email.split('@')[1].split('.')[0];
+        if (dom && !INQ_FREE_MAIL.test(dom) && dom.length <= 5) out.company = dom.toUpperCase();
     }
     return out;
 }
 
+// 거래처 DB에 같은 이름이 있으면 DB 표기로 ('nhr' → 'NHR', '한빛테크' → '(주)한빛테크')
+function inqMatchClient(name) {
+    const norm = s => String(s || '').replace(/주식회사|\(주\)|㈜|\(유\)|유한회사|\s/g, '').toLowerCase();
+    const n = norm(name);
+    if (!n) return name;
+    const opts = Array.from(document.querySelectorAll('#tempClientList option')).map(o => o.value);
+    const hit = opts.find(v => norm(v) === n);
+    return hit || name;
+}
+
 // 새 상담 — 붙여넣은 문의 내용에서 위 칸 채우기 (비었거나 이전에 자동으로 채운 칸만)
-function inqAutofillNew() {
-    const body = document.getElementById('inqNBody');
-    if (!body) return;
-    const p = inqParseContact(body.value);
-    const map = [
-        ['company', 'inqNClient', '거래처'], ['subject', 'inqNTitle', '문의 내용'],
-        ['name', 'inqNCName', '담당자'], ['title', 'inqNCTitle', '직함'],
-        ['phone', 'inqNCPhone', '연락처'], ['email', 'inqNCEmail', '이메일']
-    ];
+const INQ_AUTO_MAP = [
+    ['company', 'inqNClient', '거래처'], ['subject', 'inqNTitle', '문의 내용'],
+    ['name', 'inqNCName', '담당자'], ['dept', 'inqNCDept', '부서'], ['title', 'inqNCTitle', '직함'],
+    ['phone', 'inqNCPhone', '연락처'], ['email', 'inqNCEmail', '이메일']
+];
+const INQ_CHECK_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>';
+
+function inqApplyAuto(p) {
     const filled = [];
-    map.forEach(([k, id, label]) => {
+    INQ_AUTO_MAP.forEach(([k, id, label]) => {
         const el = document.getElementById(id);
-        if (!el || !p[k]) return;
+        let v = p[k];
+        if (!el || !v) return;
+        if (k === 'phone') v = inqNormPhone(v);
+        if (k === 'company') v = inqMatchClient(v);
         if (el.value.trim() && el.dataset.auto !== '1') return;   // 사람이 쓴 칸은 건드리지 않음
-        el.value = p[k];
+        el.value = v;
         el.dataset.auto = '1';
         el.classList.add('inq-autofilled');
         filled.push(label);
     });
+    return filled;
+}
+
+function inqAutoHint(html) {
     const hint = document.getElementById('inqNAutoHint');
-    if (hint) hint.innerHTML = filled.length
-        ? `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg> 붙여넣은 내용에서 자동 입력 — <b>${filled.join(' · ')}</b> <span>틀리면 바로 고쳐주세요</span>`
-        : '';
+    if (hint) hint.innerHTML = html || '';
+}
+
+function inqAutofillNew() {
+    const body = document.getElementById('inqNBody');
+    if (!body) return;
+    const filled = inqApplyAuto(inqParseContact(body.value));
+    if (filled.length) inqAutoHint(`${INQ_CHECK_SVG} 붙여넣은 내용에서 자동 입력 — <b>${filled.join(' · ')}</b> <span>틀리면 바로 고쳐주세요</span>`);
+    else if (!body.value.trim()) inqAutoHint('');
+}
+
+// AI로 한 번 더 — 보낸 사람 정보 + '무엇을 문의했는지' 한 줄 (실패하면 위 규칙 결과만 남긴다)
+let _inqAiSeq = 0;
+let _inqAiLast = '';
+async function inqAiExtract() {
+    const body = document.getElementById('inqNBody');
+    if (!body) return;
+    const content = body.value.trim();
+    if (content.length < 20 || content === _inqAiLast) return;
+    _inqAiLast = content;
+    const seq = ++_inqAiSeq;
+    inqAutoHint('<span class="inq-ai-spin"></span> AI가 문의 내용을 읽는 중…');
+    try {
+        const { data: sess } = await sb.auth.getSession();
+        const token = sess && sess.session && sess.session.access_token;
+        if (!token) throw new Error('no session');
+        const s = (currentCompany && currentCompany.settings) || {};
+        const res = await fetch('/api/inquiry-extract', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ content, ourCompany: s.brandName || (currentCompany && currentCompany.name) || '' })
+        });
+        const d = await res.json().catch(() => ({}));
+        if (seq !== _inqAiSeq || !document.getElementById('inqNBody')) return;   // 그사이 내용이 바뀜
+        if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
+        const filled = inqApplyAuto({
+            company: d.company, subject: d.inquiry_title, name: d.contact_name, dept: d.contact_dept,
+            title: d.contact_title, phone: d.contact_phone, email: d.contact_email
+        });
+        const got = INQ_AUTO_MAP.filter(([, id]) => { const el = document.getElementById(id); return el && el.dataset.auto === '1'; }).map(a => a[2]);
+        inqAutoHint(got.length || filled.length
+            ? `${INQ_CHECK_SVG} AI 자동 입력 — <b>${(got.length ? got : filled).join(' · ')}</b> <span>틀리면 바로 고쳐주세요</span>`
+            : '');
+    } catch (e) {
+        if (seq !== _inqAiSeq) return;
+        _inqAiLast = '';   // 다음에 다시 시도할 수 있게
+        inqAutofillNew();  // 규칙으로 뽑은 결과 안내로 되돌림
+    }
 }

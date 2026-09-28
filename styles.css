@@ -4645,3 +4645,22 @@ textarea.inq-drop{border-color:var(--blue) !important; background:var(--blue-lig
     .inq-new-grid{grid-template-columns:repeat(2, minmax(0,1fr))}
     .inq-new-grid .span2{grid-column:1 / -1}
 }
+
+/* ---- 상담 v3: 부서 칸 · 메일 사진 안내 · AI 읽는 중 ---- */
+.inq-new-grid.c5{grid-template-columns:repeat(5, minmax(0,1fr))}
+.inq-img-notice{display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; position:relative;
+    padding:9px 34px 9px 12px; border-radius:9px; font-size:12.5px; line-height:1.5;
+    background:color-mix(in srgb, #F59E0B 12%, var(--white)); color:var(--gray-700);
+    border:1px solid color-mix(in srgb, #F59E0B 35%, transparent)}
+.inq-img-notice[hidden]{display:none}
+.inq-img-notice > b{color:var(--gray-900)}
+.inq-img-notice span b{color:var(--gray-900)}
+.inq-img-notice button{position:absolute; top:6px; right:8px; border:0; background:none; cursor:pointer;
+    font-size:16px; line-height:1; color:var(--gray-500)}
+.inq-composer .inq-img-notice{margin-top:8px}
+.inq-ai-spin{width:12px; height:12px; border-radius:50%; border:2px solid color-mix(in srgb, var(--blue) 25%, transparent);
+    border-top-color:var(--blue); animation:inqSpin .8s linear infinite; display:inline-block}
+@keyframes inqSpin{to{transform:rotate(360deg)}}
+@media (max-width:1100px){
+    .inq-new-grid.c5{grid-template-columns:repeat(2, minmax(0,1fr))}
+}

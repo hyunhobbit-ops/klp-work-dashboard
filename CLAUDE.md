@@ -132,7 +132,10 @@
 - **견적 연결**: 상담 상세의 '이 상담으로 견적 작성'(`inqStartQuote` → `_inqPendingLink`, 견적 목록 상단 배너) 또는 '같은 거래처 견적 연결'(`inqLinkGroup`). 묶음 안 품목 추가는 묶음의 inquiry_id를 따라감. 견적 목록 매출처 칸에 '상담 보기' 칩
 - **고객 연락처 칸 (migration 036)**: `contact_name / contact_title / contact_phone / contact_email`. 예전 `client_contact`는 읽기 호환용(값은 contact_name으로 옮김). 연락처는 `inqNormPhone`으로 하이픈 정리
 - **사진**: `inquiry_logs.images` jsonb 배열(업로드 시 `_shrinkDataUrl` 1200px 압축, 한 번에 최대 10장). Ctrl+V 붙여넣기·끌어놓기·파일 선택 모두 `inqBindImageInput`/`inqAddImageFiles`. 옛 `image` 한 칸도 표시는 함
-- **자동 입력**: 새 상담 '첫 문의 내용'에 붙여넣으면 `inqParseContact`가 라벨('이름:', '연락처:' 등, 콜론/탭 필수) → 없으면 본문에서 이메일·전화·`주식회사 OO`·`홍길동 과장` 패턴으로 찾아 빈 칸만 채움(`data-auto`, 사람이 고친 칸은 안 덮음)
+- **부서 칸**: `contact_dept` (036 파일 끝에 추가, 직함과 분리)
+- **자동 입력(규칙)**: 새 상담 '첫 문의 내용'에 붙여넣으면 0.25초 뒤 `inqParseContact` — 라벨('이름:' 등, 콜론/탭 필수) → 서명 줄('HR마케팅2팀 | 선임매니저') → 휴대폰 우선·팩스 제외 → 이름은 'OOO 드림' / 'NHR 김규리 선임입니다'(회사나 직함 있어야 인정) / 연락처 위 이름 한 줄 / '홍길동 과장' 순 → 회사는 `주식회사 OO` 또는 회사 메일 도메인(5자 이하, nhr.kr→NHR). 직함은 `INQ_TITLE_LIST` 긴 것부터(선임매니저가 선임+매니저로 쪼개지지 않게). 빈 칸·`data-auto` 칸만 채움
+- **자동 입력(AI)**: 0.9초 멈추면 `inqAiExtract` → `api/inquiry-extract.js`(로그인 토큰 검증, 도구 강제 JSON, 모델 `ANTHROPIC_INQUIRY_MODEL`→실패 시 `ANTHROPIC_MODEL`)가 거래처·담당자·부서·직함·연락처·이메일·**문의 한 줄 요약**을 채움. 실패하면 규칙 결과만 남음. 거래처는 `inqMatchClient`로 DB 표기에 맞춤
+- **붙여넣기 정리**: `inqBindImageInput` paste에서 text/html을 `inqHtmlToText`로 변환(문단=한 줄, `<p>&nbsp;</p>`·`<div><br></div>`=빈 줄, 3줄 이상 빈 줄은 1줄) → `execCommand('insertText')`(Ctrl+Z 가능). 글만 있으면 `inqTidyPlain`. 메일 속 `<img>`는 `inqAddImageUrls`로 시도 — 웹메일 사진은 로그인 쿠키가 필요해 대부분 실패 → `inqImgNotice`로 '오른쪽 클릭→이미지 복사→Ctrl+V' 안내. 서버 이미지 프록시는 SSRF 위험·쿠키 문제로 만들지 않음
 - ⚠️ `inquiry_logs`를 배열로 한 번에 insert할 때는 모든 행의 키를 같게 — `images`가 NOT NULL이라 한 행에서 빠지면 전체가 거부됨
 - 주요 함수: `tpInitView`, `inqEnter`, `inqRenderList`, `inqRenderDetail`, `inqSubmit`, `inqPatch`, `inqAddLog`, `inqCreate`, `inqParseContact`, `inqAutofillNew`
 - `.btn-ghost`는 전역 스타일(styles.css 끝). 예전엔 `#tab-meetings` 안에서만 정의돼 다른 화면에서 기본 버튼으로 깨졌음
