@@ -125,6 +125,13 @@
 - 주요 함수: `renderMeetings`, `_renderMeetingList`, `openMeetingEditor`, `closeMeetingEditor`, `renderMeetingEditor`, `saveMeeting`, `deleteMeeting`, `loadMeetingActions`, `renderMeetingActions`, `saveMeetingActions`, `sendMeetingActionsToDaily`
 - 2단계(`api/meeting-summarize.js`, AI 정리), 3단계(`api/meeting-transcribe.js`, 녹음 전사)는 미구현
 
+## 상담 관리 (견적 의뢰 화면 안) — migration 035
+- **목적**: 문의 접수부터 수주/실패까지 상담 과정(고객 말·우리 답변·내부 메모)을 남김. 메뉴를 늘리지 않으려고 `tab-projects-temp` 상단 전환 `상담 관리 | 견적 목록`(`tpSetView`, 마지막 선택 localStorage `tp_view`)
+- **테이블**: `inquiries`(상담 건: client, status 신규/상담중/견적발송/수주/보류/실패, next_action+date, fail_reason 등), `inquiry_logs`(direction in/out/memo/system, channel, body, image base64), `projects_temp.inquiry_id`(견적 품목 → 상담 연결). 둘 다 회사 스코프 RLS + set_company_id 트리거
+- **자동 흐름**: 우리 첫 답변 → 신규→상담중 / 견적 품목 추가(`inqOnQuoteAdded`) → 견적발송 / `transferGroupToDomestic` 이관(`inqOnTransferred`) → 수주. 상태 변경은 모두 system 로그로 남음
+- **견적 연결**: 상담 상세의 '이 상담으로 견적 작성'(`inqStartQuote` → `_inqPendingLink`, 견적 목록 상단 배너) 또는 '같은 거래처 견적 연결'(`inqLinkGroup`). 묶음 안 품목 추가는 묶음의 inquiry_id를 따라감. 견적 목록 매출처 칸에 '상담 보기' 칩
+- 주요 함수: `tpInitView`, `inqEnter`, `inqRenderList`, `inqRenderDetail`, `inqSubmit`, `inqPatch`, `inqAddLog`, `inqCreate`
+
 ## 마진계산기 (편의성 그룹)
 - **목적**: 원가 항목들과 판매가를 입력해 마진/마진율을 계산. 기존 엑셀 양식(이니셜D 시계 굿즈 기준)을 발전시킨 자유형 구조
 - **데이터 모델**: `margin_simulations` 테이블 (margin_simulations.sql 참조). 자유형 카테고리/항목을 `categories` jsonb 컬럼에 저장

@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260922a">
+    <link rel="stylesheet" href="styles.css?v=20260928a">
     <link rel="stylesheet" href="mobile.css?v=20260507e" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -729,6 +729,40 @@
             <!-- ===== Projects (매입매출) ===== -->
             <!-- ===== 임시 프로젝트 ===== -->
             <main class="content" id="tab-projects-temp">
+                <!-- 상담 관리 | 견적 목록 전환 (메뉴를 늘리지 않고 같은 화면에서) -->
+                <div class="tp-switch">
+                    <button type="button" id="tpSwInq" onclick="tpSetView('inq')">
+                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
+                        상담 관리 <span class="tp-sw-cnt" id="tpSwInqCnt"></span>
+                    </button>
+                    <button type="button" id="tpSwQuote" onclick="tpSetView('quote')">
+                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M9 5h10M9 12h10M9 19h10M4 5h.01M4 12h.01M4 19h.01"/></svg>
+                        견적 목록
+                    </button>
+                </div>
+
+                <!-- ===== 상담 관리 ===== -->
+                <div id="tpInqView" class="inq-wrap" style="display:none">
+                    <aside class="inq-list-col">
+                        <div class="inq-list-top">
+                            <div class="inq-search">
+                                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                                <input id="inqSearch" placeholder="거래처·문의 내용 검색" oninput="inqRenderList()">
+                            </div>
+                            <button class="btn-primary inq-new-btn" onclick="inqOpenNew()">
+                                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                                새 상담
+                            </button>
+                        </div>
+                        <div class="inq-chips" id="inqChips"></div>
+                        <div class="inq-list" id="inqList"></div>
+                    </aside>
+                    <section class="inq-detail" id="inqDetail"></section>
+                </div>
+
+                <!-- ===== 견적 목록 (기존 화면) ===== -->
+                <div id="tpQuoteView">
+                <div class="inq-link-banner" id="inqLinkBanner" style="display:none"></div>
                 <div class="content-toolbar">
                     <div class="toolbar-left">
                         <div style="font-size:14px;color:var(--text-tertiary)">아래 입력행에 빠르게 추가하거나, 자세한 항목까지 입력하려면 새로 작성을 누르세요</div>
@@ -780,6 +814,7 @@
                     </table>
                 </div>
                 <div class="card-grid" id="tempProjectCardGrid"></div>
+                </div><!-- /tpQuoteView -->
             </main>
 
             <!-- 임시 프로젝트 견적서 오버레이 -->
@@ -1897,6 +1932,6 @@
         <div class="label-scroll" id="labelScroll"></div>
     </div>
 
-    <script src="app.js?v=20260922b"></script>
+    <script src="app.js?v=20260928a"></script>
 </body>
 </html>

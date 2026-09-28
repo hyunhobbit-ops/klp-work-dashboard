@@ -1644,6 +1644,7 @@ function switchTab(tabId, fromHistory = false) {
         const dateEl = document.getElementById('tempInDate');
         if (dateEl && !dateEl.value) dateEl.value = getTodayStr();
         buildTempClientDatalist();
+        tpInitView();
     }
 
     // 중고마켓DB 탭 열릴 때 렌더
@@ -11334,7 +11335,8 @@ function _projectsTempRowToObj(r) {
         supShippingFeeVat: r.sup_shipping_fee_vat || 'VAT 별도',
         quoteNote: r.quote_note || '',
         transferredAt: r.transferred_at || '',
-        transferredProjectIds: r.transferred_project_ids || []
+        transferredProjectIds: r.transferred_project_ids || [],
+        inquiryId: r.inquiry_id || null
     };
 }
 
@@ -11357,6 +11359,7 @@ async function loadTempProjects() {
         console.error('임시 프로젝트 로드 실패:', err.message);
     }
     renderTempProjects();
+    try { inqRefreshQuotes(); } catch (_) {}
 }
 
 function renderTempProjects() {
@@ -11384,6 +11387,7 @@ function renderTempProjects() {
 
     groups.forEach((g, gi) => {
         const bgColor = groupColors[gi % 2];
+        const _gInq = (g.items.find(x => x.inquiryId) || {}).inquiryId || 0;
         const dateStr = g.date ? g.date.replace(/-/g, '.') : '-';
         const rowspan = g.items.length;
 
@@ -11409,7 +11413,7 @@ function renderTempProjects() {
             const ce = (field, type) => `class="cell-editable" data-id="${p.id}" data-field="${field}" data-type="${type || 'text'}" data-entity="temp"`;
             if (pi === 0) {
                 rowHtml += `<td rowspan="${rs}" ${ce('date','date')} style="vertical-align:middle;font-weight:600;background:${bgColor};${borderTop};cursor:pointer">${dateStr}</td>`;
-                rowHtml += `<td rowspan="${rs}" ${ce('client')} style="vertical-align:middle;background:${bgColor};${borderTop};cursor:pointer"><strong>${g.client || '-'}</strong></td>`;
+                rowHtml += `<td rowspan="${rs}" ${ce('client')} style="vertical-align:middle;background:${bgColor};${borderTop};cursor:pointer"><strong>${g.client || '-'}</strong>${_gInq ? `<button class="inq-chip-link" onclick="event.stopPropagation();inqOpenFromQuote(${_gInq})">상담 보기</button>` : ''}</td>`;
                 rowHtml += `<td rowspan="${rs}" ${ce('clientContact')} style="vertical-align:middle;background:${bgColor};${borderTop};cursor:pointer">${g.clientContact || '-'}</td>`;
             }
             const vatBadge = v => v === 'VAT 포함' ? '<div style="font-size:10px;color:#E67E22;font-weight:600">VAT포함</div>' : '<div style="font-size:10px;color:#1B64DA;font-weight:600">VAT별도</div>';
@@ -11682,10 +11686,14 @@ async function saveTempProject(id) {
             if (p) { p.date = date; p.client = client; p.clientContact = clientContact; p.supplier = supplier; p.supplierContact = supplierContact; p.item = item; p.unitPrice = unitPrice; p.supplierUnitPrice = supplierUnitPrice; p.qty = qty; p.revenue = revenue; p.supplierRevenue = supplierRevenue; }
             showToast('수정 완료');
         } else {
+            const _inqId = _inqPendingLink || null;
+            if (_inqId) row.inquiry_id = _inqId;
             const { data, error } = await sb.from('projects_temp').insert(row).select().single();
             if (error) throw error;
             tempProjects.unshift({ id: data.id, date, client, clientContact, supplier, supplierContact, item, unitPrice, supplierUnitPrice, qty, revenue, supplierRevenue });
+            if (tempProjects[0] && tempProjects[0].id === data.id) tempProjects[0].inquiryId = _inqId;
             showToast('저장 완료');
+            if (_inqId) inqOnQuoteAdded(_inqId, row);
         }
     } catch (err) {
         console.error('임시 프로젝트 저장 실패:', err);
@@ -11855,10 +11863,14 @@ async function saveTempGroupItem(gi, date, client, clientContact) {
     const row = { date, client, client_contact: clientContact, supplier, supplier_contact: supplierContact, item, unit_price: unitPrice, supplier_unit_price: supplierUnitPrice, qty, revenue, supplier_revenue: supplierRevenue, unit_price_vat: 'VAT 별도', supplier_unit_price_vat: 'VAT 별도', print_fee: 0, packaging_fee: 0, label_fee: 0, shipping_fee: 0 };
 
     try {
+        const _inqId = (tempGroups[gi] && (tempGroups[gi].items.find(x => x.inquiryId) || {}).inquiryId) || _inqPendingLink || null;
+        if (_inqId) row.inquiry_id = _inqId;
         const { data, error } = await sb.from('projects_temp').insert(row).select().single();
         if (error) throw error;
         tempProjects.unshift({ id: data.id, date, client, clientContact, supplier, supplierContact, item, unitPrice, supplierUnitPrice, qty, revenue, supplierRevenue, unitPriceVat: 'VAT 별도', supplierUnitPriceVat: 'VAT 별도', printFee: 0, packagingFee: 0, labelFee: 0, shippingFee: 0 });
+        if (tempProjects[0] && tempProjects[0].id === data.id) tempProjects[0].inquiryId = _inqId;
         showToast('추가 완료');
+        if (_inqId) inqOnQuoteAdded(_inqId, row);
     } catch (err) {
         console.error('임시 프로젝트 저장 실패:', err);
         showToast('저장 실패: ' + err.message);
@@ -11917,10 +11929,14 @@ async function saveTempInline() {
     const row = { date, client, client_contact: clientContact, supplier, supplier_contact: supplierContact, item, unit_price: unitPrice, supplier_unit_price: supplierUnitPrice, qty, revenue, supplier_revenue: supplierRevenue, unit_price_vat: 'VAT 별도', supplier_unit_price_vat: 'VAT 별도', print_fee: 0, packaging_fee: 0, label_fee: 0, shipping_fee: 0 };
 
     try {
+        const _inqId = _inqPendingLink || null;
+        if (_inqId) row.inquiry_id = _inqId;
         const { data, error } = await sb.from('projects_temp').insert(row).select().single();
         if (error) throw error;
         tempProjects.unshift({ id: data.id, date, client, clientContact, supplier, supplierContact, item, unitPrice, supplierUnitPrice, qty, revenue, supplierRevenue, unitPriceVat: 'VAT 별도', supplierUnitPriceVat: 'VAT 별도', printFee: 0, packagingFee: 0, labelFee: 0, shippingFee: 0 });
+        if (tempProjects[0] && tempProjects[0].id === data.id) tempProjects[0].inquiryId = _inqId;
         showToast('저장 완료');
+        if (_inqId) inqOnQuoteAdded(_inqId, row);
     } catch (err) {
         console.error('임시 프로젝트 저장 실패:', err);
         showToast('저장 실패: ' + err.message);
@@ -12464,6 +12480,9 @@ async function transferGroupToDomestic(gi) {
             .update({ transferred_at: now, transferred_project_ids: newIds })
             .in('id', tempIds);
         if (updErr) throw updErr;
+        // 상담에 연결된 견적이면 상담을 '수주'로
+        try { for (const iid of [...new Set(g.items.map(x => x.inquiryId).filter(Boolean))]) await inqOnTransferred(iid, newIds.length); }
+        catch (e) { console.error('상담 상태 갱신 실패', e); }
 
         // 3) 로컬 상태 갱신 + 두 화면 동시 리로드
         showToast(`국내 프로젝트로 ${newIds.length}건 등록되었습니다`);
@@ -20626,4 +20645,641 @@ async function toggleClientExportMenu(ev) {
 function closeClientExportMenu() {
     const m = document.getElementById('clientExportMenu');
     if (m) m.classList.remove('show');
+}
+
+// =====================================
+// 상담 관리 (견적 의뢰 화면 안) — 문의 접수부터 수주/실패까지
+// 상담 건(inquiries) + 타임라인(inquiry_logs), 견적 품목은 projects_temp.inquiry_id로 연결
+// =====================================
+const INQ_STATUSES = ['신규', '상담중', '견적발송', '수주', '보류', '실패'];
+const INQ_ACTIVE = ['신규', '상담중', '견적발송'];
+const INQ_CHANNELS = ['전화', '카톡', '문자', '이메일', '방문', '홈페이지', '기타'];
+const INQ_STATUS_CLS = { '신규': 's-new', '상담중': 's-talk', '견적발송': 's-quote', '수주': 's-won', '보류': 's-hold', '실패': 's-lost' };
+const INQ_DIR_LABEL = { in: '고객', out: '우리', memo: '내부 메모' };
+
+let _inqList = [];
+let _inqSel = null;            // 선택된 상담 id, 새 등록 중이면 'new'
+let _inqLogs = [];
+let _inqFilter = 'active';
+let _inqDir = 'in';
+let _inqPendingLink = null;    // '이 상담으로 견적 작성' 중인 상담 id
+let _inqComposerImage = '';
+
+// ---------- 화면 전환 ----------
+function tpSetView(v) {
+    if (v !== 'inq' && v !== 'quote') v = 'inq';
+    try { localStorage.setItem('tp_view', v); } catch (_) {}
+    const iv = document.getElementById('tpInqView');
+    const qv = document.getElementById('tpQuoteView');
+    if (!iv || !qv) return;
+    iv.style.display = v === 'inq' ? '' : 'none';
+    qv.style.display = v === 'quote' ? '' : 'none';
+    document.getElementById('tpSwInq').classList.toggle('on', v === 'inq');
+    document.getElementById('tpSwQuote').classList.toggle('on', v === 'quote');
+    if (v === 'inq') {
+        _inqPendingLink = null;       // 상담 화면으로 돌아오면 견적 연결 모드 해제
+        inqRenderLinkBanner();
+        inqEnter();
+    } else {
+        inqRenderLinkBanner();
+    }
+}
+
+function tpInitView() {
+    let v = 'inq';
+    try { v = localStorage.getItem('tp_view') || 'inq'; } catch (_) {}
+    if (v === 'quote') inqLoad();     // 목록 화면이어도 상단 건수는 보여준다
+    tpSetView(v);
+}
+
+// ---------- 데이터 ----------
+async function inqLoad() {
+    const { data, error } = await sb.from('inquiries').select('*')
+        .order('last_contact_at', { ascending: false }).limit(2000);
+    if (error) { console.error('상담 로드 실패', error); showToast('상담 불러오기 실패: ' + error.message); return false; }
+    _inqList = data || [];
+    inqUpdateSwitchCount();
+    return true;
+}
+
+async function inqEnter() {
+    await inqLoad();
+    inqRenderChips();
+    if (_inqSel && _inqSel !== 'new' && !_inqList.find(x => x.id === _inqSel)) _inqSel = null;
+    if (!_inqSel) { const first = inqFiltered()[0]; if (first) _inqSel = first.id; }
+    inqRenderList();
+    inqRenderDetail();
+}
+
+function inqUpdateSwitchCount() {
+    const el = document.getElementById('tpSwInqCnt');
+    if (!el) return;
+    const n = _inqList.filter(x => INQ_ACTIVE.includes(x.status)).length;
+    el.textContent = n ? String(n) : '';
+}
+
+function inqFind(id) { return _inqList.find(x => x.id === id) || null; }
+
+// 상담 건 수정 (+ 선택적으로 자동 기록 한 줄)
+async function inqPatch(id, patch, systemLog) {
+    patch.updated_at = new Date().toISOString();
+    const { data, error } = await sb.from('inquiries').update(patch).eq('id', id).select().single();
+    if (error) { showToast('저장 실패: ' + error.message); return null; }
+    const i = _inqList.findIndex(x => x.id === id);
+    if (i >= 0) _inqList[i] = data; else _inqList.unshift(data);
+    if (systemLog) await inqAddLog(id, { direction: 'system', body: systemLog });
+    inqRenderChips(); inqRenderList(); inqUpdateSwitchCount();
+    return data;
+}
+
+async function inqAddLog(id, log) {
+    const row = {
+        inquiry_id: id,
+        direction: log.direction || 'memo',
+        channel: log.channel || '',
+        body: log.body || '',
+        image: log.image || '',
+        author: log.direction === 'system' ? '' : ((currentUser && currentUser.name) || '')
+    };
+    const { data, error } = await sb.from('inquiry_logs').insert(row).select().single();
+    if (error) { showToast('기록 실패: ' + error.message); return null; }
+    if (_inqSel === id && document.getElementById('inqTimeline')) {
+        _inqLogs.push(data);
+        inqRenderTimeline();
+    }
+    return data;
+}
+
+// ---------- 날짜 표시 ----------
+// '카톡으로' / '전화로' — 받침 있으면(ㄹ 제외) '으로'
+function inqJosaRo(w) {
+    const c = String(w || '').slice(-1).charCodeAt(0);
+    if (c >= 0xAC00 && c <= 0xD7A3) { const jong = (c - 0xAC00) % 28; return w + (jong && jong !== 8 ? '으로' : '로'); }
+    return w + '로';
+}
+function inqMD(d) { if (!d) return ''; const p = String(d).split('-'); return `${+p[1]}/${+p[2]}`; }
+function inqTime(ts) { const t = new Date(ts); return `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`; }
+function inqDayLabel(ts) { const t = new Date(ts); return `${t.getFullYear()}.${t.getMonth() + 1}.${t.getDate()} (${'일월화수목금토'[t.getDay()]})`; }
+function inqRel(ts) {
+    if (!ts) return '';
+    const m = (Date.now() - new Date(ts).getTime()) / 60000;
+    if (m < 1) return '방금';
+    if (m < 60) return Math.floor(m) + '분 전';
+    if (m < 1440) return Math.floor(m / 60) + '시간 전';
+    const d = Math.floor(m / 1440);
+    if (d < 7) return d + '일 전';
+    const t = new Date(ts);
+    return `${t.getMonth() + 1}/${t.getDate()}`;
+}
+function inqIsOverdue(x) {
+    return !!(x && x.next_action && x.next_action_date && INQ_ACTIVE.includes(x.status) && x.next_action_date <= getTodayStr());
+}
+
+// ---------- 목록 ----------
+function inqFiltered() {
+    const q = ((document.getElementById('inqSearch') || {}).value || '').trim().toLowerCase();
+    let list = _inqList;
+    if (_inqFilter === 'active') list = list.filter(x => INQ_ACTIVE.includes(x.status));
+    else if (_inqFilter !== 'all') list = list.filter(x => x.status === _inqFilter);
+    if (q) list = list.filter(x =>
+        (x.client || '').toLowerCase().includes(q) ||
+        (x.title || '').toLowerCase().includes(q) ||
+        (x.client_contact || '').toLowerCase().includes(q));
+    // 할 일 기한 지난 것 → 최근 연락 순
+    return list.slice().sort((a, b) => {
+        const ao = inqIsOverdue(a) ? 0 : 1, bo = inqIsOverdue(b) ? 0 : 1;
+        if (ao !== bo) return ao - bo;
+        return String(b.last_contact_at || '').localeCompare(String(a.last_contact_at || ''));
+    });
+}
+
+function inqRenderChips() {
+    const el = document.getElementById('inqChips');
+    if (!el) return;
+    const cnt = s => _inqList.filter(x => x.status === s).length;
+    const act = _inqList.filter(x => INQ_ACTIVE.includes(x.status)).length;
+    const chips = [['active', '진행 중', act]].concat(INQ_STATUSES.map(s => [s, s, cnt(s)])).concat([['all', '전체', _inqList.length]]);
+    el.innerHTML = chips.map(([k, l, n]) =>
+        `<button class="inq-chip ${_inqFilter === k ? 'on' : ''}" data-f="${escHtml(k)}">${escHtml(l)}<b>${n}</b></button>`).join('');
+    el.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => {
+        _inqFilter = b.dataset.f; inqRenderChips(); inqRenderList();
+    }));
+}
+
+function inqRenderList() {
+    const el = document.getElementById('inqList');
+    if (!el) return;
+    const list = inqFiltered();
+    if (!list.length) {
+        el.innerHTML = `<div class="inq-empty">${_inqList.length
+            ? '조건에 맞는 상담이 없습니다'
+            : '아직 상담 기록이 없습니다.<br><b>새 상담</b>으로 첫 문의를 등록해보세요.'}</div>`;
+        return;
+    }
+    el.innerHTML = list.map(x => {
+        const late = inqIsOverdue(x);
+        return `<div class="inq-item ${x.id === _inqSel ? 'on' : ''}" data-id="${x.id}">
+            <div class="inq-item-top">
+                <span class="inq-client">${escHtml(x.client || '(거래처 미정)')}</span>
+                <span class="inq-st ${INQ_STATUS_CLS[x.status] || ''}">${escHtml(x.status)}</span>
+            </div>
+            ${x.title ? `<div class="inq-title">${escHtml(x.title)}</div>` : ''}
+            <div class="inq-meta">
+                ${x.assignee ? `<span>${escHtml(x.assignee)}</span>` : ''}
+                <span>${inqRel(x.last_contact_at)}</span>
+            </div>
+            ${x.next_action ? `<div class="inq-next ${late ? 'late' : ''}">${x.next_action_date ? inqMD(x.next_action_date) + ' · ' : ''}${escHtml(x.next_action)}</div>` : ''}
+        </div>`;
+    }).join('');
+    el.querySelectorAll('[data-id]').forEach(d => d.addEventListener('click', () => {
+        _inqSel = Number(d.dataset.id);
+        inqRenderList(); inqRenderDetail();
+    }));
+}
+
+// ---------- 상세 ----------
+function inqOpt(arr, v) { return arr.map(a => `<option value="${escHtml(a)}" ${a === v ? 'selected' : ''}>${escHtml(a)}</option>`).join(''); }
+
+async function inqRenderDetail() {
+    const el = document.getElementById('inqDetail');
+    if (!el) return;
+    if (_inqSel === 'new') { inqRenderNewForm(); return; }
+    const x = inqFind(_inqSel);
+    if (!x) {
+        el.innerHTML = `<div class="inq-placeholder">
+            <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
+            <div>왼쪽에서 상담을 고르거나 <b>새 상담</b>을 등록하세요</div></div>`;
+        return;
+    }
+    const people = companyPeople();
+    const assigneeOpts = `<option value="">-</option>` + inqOpt(people.includes(x.assignee) || !x.assignee ? people : people.concat([x.assignee]), x.assignee);
+    el.innerHTML = `
+      <div class="inq-head">
+        <div class="inq-head-row">
+          <input class="inq-h-client" id="inqFClient" list="tempClientList" value="${escHtml(x.client || '')}" placeholder="거래처">
+          <select class="inq-h-status ${INQ_STATUS_CLS[x.status] || ''}" id="inqFStatus">${inqOpt(INQ_STATUSES, x.status)}</select>
+          <div class="inq-spacer"></div>
+          <button class="inq-icon-btn" id="inqFDelete" title="상담 삭제">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
+          </button>
+        </div>
+        <input class="inq-h-title" id="inqFTitle" value="${escHtml(x.title || '')}" placeholder="무엇을 문의했나요? 예) 손목시계 300개 각인 견적">
+        <div class="inq-fields">
+          <label><span>고객 담당자</span><input id="inqFContact" value="${escHtml(x.client_contact || '')}" placeholder="이름 · 연락처"></label>
+          <label><span>문의 경로</span><select id="inqFChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select></label>
+          <label><span>우리 담당</span><select id="inqFAssignee">${assigneeOpts}</select></label>
+          <label><span>상담 시작일</span><input type="date" id="inqFStarted" value="${escHtml(x.started_at || '')}"></label>
+        </div>
+        <div class="inq-next-row ${inqIsOverdue(x) ? 'late' : ''}">
+          <span class="inq-next-label">다음 할 일</span>
+          <input type="date" id="inqFNextDate" value="${escHtml(x.next_action_date || '')}">
+          <input id="inqFNext" value="${escHtml(x.next_action || '')}" placeholder="예) 9/30까지 샘플 사진 보내기">
+          ${x.next_action ? '<button class="inq-mini" id="inqFNextDone">완료</button>' : ''}
+        </div>
+        ${x.status === '실패' && x.fail_reason ? `<div class="inq-fail">실패 사유 · ${escHtml(x.fail_reason)}</div>` : ''}
+      </div>
+      <div class="inq-quotes" id="inqQuotes"></div>
+      <div class="inq-timeline" id="inqTimeline"><div class="inq-empty">불러오는 중…</div></div>
+      <div class="inq-composer">
+        <div class="inq-comp-top">
+          <div class="inq-dir" id="inqDir">
+            <button data-dir="in">고객</button><button data-dir="out">우리 답변</button><button data-dir="memo">내부 메모</button>
+          </div>
+          <select id="inqCChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select>
+          <label class="inq-attach" title="사진 첨부">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 16l-5-5-8 8"/></svg>
+            <input type="file" accept="image/*" id="inqCFile" hidden>
+          </label>
+          <div class="inq-spacer"></div>
+          <span class="inq-comp-hint">Ctrl+Enter 저장</span>
+        </div>
+        <div class="inq-comp-body">
+          <textarea id="inqCBody" rows="2" placeholder="오간 내용을 그대로 적거나 카톡 대화를 붙여넣으세요"></textarea>
+          <button class="btn-primary" id="inqCSave">기록</button>
+        </div>
+        <div id="inqCPreview"></div>
+      </div>`;
+    inqBindDetail(x);
+    inqRenderQuotes(x);
+    inqSetDir(_inqDir);
+    _inqComposerImage = '';
+    await inqLoadLogs(x.id);
+}
+
+function inqBindDetail(x) {
+    const $ = id => document.getElementById(id);
+    const saveField = (id, key) => {
+        const el = $(id); if (!el) return;
+        el.addEventListener('change', () => {
+            const v = el.value.trim();
+            if ((x[key] || '') === v) return;
+            inqPatch(x.id, { [key]: v || (key === 'started_at' ? null : '') }).then(d => { if (d) Object.assign(x, d); });
+        });
+    };
+    saveField('inqFClient', 'client');
+    saveField('inqFTitle', 'title');
+    saveField('inqFContact', 'client_contact');
+    saveField('inqFChannel', 'channel');
+    saveField('inqFAssignee', 'assignee');
+    saveField('inqFStarted', 'started_at');
+
+    const nextSave = () => {
+        const d = $('inqFNextDate').value || null;
+        const t = $('inqFNext').value.trim();
+        if ((x.next_action || '') === t && (x.next_action_date || null) === d) return;
+        inqPatch(x.id, { next_action: t, next_action_date: d }).then(r => { if (r) Object.assign(x, r); });
+    };
+    $('inqFNextDate').addEventListener('change', nextSave);
+    $('inqFNext').addEventListener('change', nextSave);
+    const nd = $('inqFNextDone');
+    if (nd) nd.addEventListener('click', async () => {
+        const done = x.next_action;
+        const r = await inqPatch(x.id, { next_action: '', next_action_date: null }, `할 일 완료 · ${done}`);
+        if (r) inqRenderDetail();
+    });
+
+    $('inqFStatus').addEventListener('change', async (e) => {
+        const nv = e.target.value, ov = x.status;
+        if (nv === ov) return;
+        const patch = { status: nv };
+        let log = `상태 변경 · ${ov} → ${nv}`;
+        if (nv === '실패') {
+            const r = prompt('실패 사유를 적어주세요\n예) 단가 안 맞음 / 납기 / 연락 두절 / 타사 선택', x.fail_reason || '');
+            if (r === null) { e.target.value = ov; return; }
+            patch.fail_reason = r.trim();
+            if (r.trim()) log += ` (사유: ${r.trim()})`;
+        }
+        const d = await inqPatch(x.id, patch, log);
+        if (d) inqRenderDetail();
+    });
+
+    $('inqFDelete').addEventListener('click', async () => {
+        if (!confirm(`'${x.client || '이 상담'}' 상담과 모든 기록을 삭제할까요?\n연결된 견적 품목은 그대로 남습니다.`)) return;
+        const { error } = await sb.from('inquiries').delete().eq('id', x.id);
+        if (error) { showToast('삭제 실패: ' + error.message); return; }
+        _inqList = _inqList.filter(i => i.id !== x.id);
+        tempProjects.forEach(p => { if (p.inquiryId === x.id) p.inquiryId = null; });
+        _inqSel = null;
+        inqRenderChips(); inqRenderList(); inqRenderDetail(); inqUpdateSwitchCount();
+        showToast('상담을 삭제했습니다');
+    });
+
+    // 작성기
+    $('inqDir').querySelectorAll('[data-dir]').forEach(b => b.addEventListener('click', () => inqSetDir(b.dataset.dir)));
+    $('inqCSave').addEventListener('click', inqSubmit);
+    $('inqCBody').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); inqSubmit(); }
+    });
+    $('inqCFile').addEventListener('change', async (ev) => {
+        const f = ev.target.files && ev.target.files[0];
+        if (!f) return;
+        if (!f.type.startsWith('image/')) { showToast('이미지 파일만 첨부할 수 있습니다'); return; }
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                _inqComposerImage = await _shrinkDataUrl(e.target.result, 1200, 0.8);
+                inqRenderComposerPreview();
+            } catch (err) { showToast('사진 처리 실패: ' + err.message); }
+        };
+        reader.readAsDataURL(f);
+        ev.target.value = '';
+    });
+}
+
+function inqSetDir(d) {
+    _inqDir = INQ_DIR_LABEL[d] ? d : 'in';
+    const box = document.getElementById('inqDir');
+    if (box) box.querySelectorAll('[data-dir]').forEach(b => b.classList.toggle('on', b.dataset.dir === _inqDir));
+    const ta = document.getElementById('inqCBody');
+    if (ta) ta.placeholder = _inqDir === 'in' ? '고객이 한 말 · 카톡 대화를 그대로 붙여넣어도 됩니다'
+        : _inqDir === 'out' ? '우리가 어떻게 답변했는지'
+        : '팀끼리만 보는 메모 (고객에게 안 나감)';
+}
+
+function inqRenderComposerPreview() {
+    const box = document.getElementById('inqCPreview');
+    if (!box) return;
+    if (!_inqComposerImage) { box.innerHTML = ''; return; }
+    box.innerHTML = `<div class="inq-c-img"><img src="${escHtml(_inqComposerImage)}" alt="첨부"><button type="button" title="첨부 취소">×</button></div>`;
+    box.querySelector('button').addEventListener('click', () => { _inqComposerImage = ''; inqRenderComposerPreview(); });
+}
+
+async function inqSubmit() {
+    const x = inqFind(_inqSel);
+    if (!x) return;
+    const body = document.getElementById('inqCBody').value.trim();
+    if (!body && !_inqComposerImage) { showToast('내용을 입력하거나 사진을 첨부하세요'); return; }
+    const btn = document.getElementById('inqCSave');
+    btn.disabled = true;
+    const saved = await inqAddLog(x.id, {
+        direction: _inqDir,
+        channel: _inqDir === 'memo' ? '' : document.getElementById('inqCChannel').value,   // 내부 메모엔 경로 없음
+        body, image: _inqComposerImage
+    });
+    btn.disabled = false;
+    if (!saved) return;
+    document.getElementById('inqCBody').value = '';
+    _inqComposerImage = '';
+    inqRenderComposerPreview();
+
+    // 고객·우리 대화면 마지막 연락 갱신, 우리가 처음 답하면 신규 → 상담중
+    if (_inqDir !== 'memo') {
+        const patch = { last_contact_at: new Date().toISOString() };
+        const bump = x.status === '신규' && _inqDir === 'out';
+        if (bump) patch.status = '상담중';
+        const d = await inqPatch(x.id, patch, bump ? '상태 변경 · 신규 → 상담중' : null);
+        if (d && bump) {
+            Object.assign(x, d);
+            const sel = document.getElementById('inqFStatus');
+            if (sel) { sel.value = d.status; sel.className = 'inq-h-status ' + (INQ_STATUS_CLS[d.status] || ''); }
+        }
+    }
+    document.getElementById('inqCBody').focus();
+}
+
+// ---------- 타임라인 ----------
+async function inqLoadLogs(id) {
+    const { data, error } = await sb.from('inquiry_logs').select('*').eq('inquiry_id', id).order('at', { ascending: true });
+    if (_inqSel !== id) return;
+    if (error) {
+        const el = document.getElementById('inqTimeline');
+        if (el) el.innerHTML = `<div class="inq-empty">기록을 불러오지 못했습니다: ${escHtml(error.message)}</div>`;
+        return;
+    }
+    _inqLogs = data || [];
+    inqRenderTimeline();
+}
+
+function inqRenderTimeline() {
+    const el = document.getElementById('inqTimeline');
+    if (!el) return;
+    if (!_inqLogs.length) {
+        el.innerHTML = '<div class="inq-empty">아직 기록이 없습니다.<br>아래에 첫 대화를 남겨보세요.</div>';
+        return;
+    }
+    let html = '', lastDay = '';
+    _inqLogs.forEach(l => {
+        const day = inqDayLabel(l.at);
+        if (day !== lastDay) { html += `<div class="inq-day"><span>${day}</span></div>`; lastDay = day; }
+        if (l.direction === 'system') {
+            html += `<div class="inq-sys"><span>${escHtml(l.body)}</span><em>${inqTime(l.at)}</em></div>`;
+            return;
+        }
+        html += `<div class="inq-msg d-${escHtml(l.direction)}">
+            <div class="inq-msg-meta">
+                <b>${escHtml(INQ_DIR_LABEL[l.direction] || '')}</b>
+                ${l.channel ? `<span>${escHtml(l.channel)}</span>` : ''}
+                ${l.author ? `<span>${escHtml(l.author)}</span>` : ''}
+                <span>${inqTime(l.at)}</span>
+                <button class="inq-msg-del" data-del="${l.id}" title="이 기록 삭제">×</button>
+            </div>
+            ${l.body ? `<div class="inq-msg-body">${escHtml(l.body).replace(/\n/g, '<br>')}</div>` : ''}
+            ${l.image ? `<img class="inq-msg-img" src="${escHtml(l.image)}" alt="첨부 사진">` : ''}
+        </div>`;
+    });
+    el.innerHTML = html;
+    el.scrollTop = el.scrollHeight;
+    el.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+        if (!confirm('이 기록을 삭제할까요?')) return;
+        const id = Number(b.dataset.del);
+        const { error } = await sb.from('inquiry_logs').delete().eq('id', id);
+        if (error) { showToast('삭제 실패: ' + error.message); return; }
+        _inqLogs = _inqLogs.filter(l => l.id !== id);
+        inqRenderTimeline();
+    }));
+    el.querySelectorAll('.inq-msg-img').forEach(img => img.addEventListener('click', () => img.classList.toggle('zoom')));
+}
+
+// ---------- 견적 연결 ----------
+function inqRefreshQuotes() {
+    const x = inqFind(_inqSel);
+    if (x && document.getElementById('inqQuotes')) inqRenderQuotes(x);
+}
+
+function inqRenderQuotes(x) {
+    const el = document.getElementById('inqQuotes');
+    if (!el) return;
+    const linked = tempProjects.filter(p => p.inquiryId === x.id);
+    const total = linked.reduce((s, p) => s + calcTempRevenueWithVat(p), 0);
+    // 같은 거래처의 아직 연결 안 된 견적 (날짜별 묶음)
+    const cands = [];
+    tempProjects.filter(p => !p.inquiryId && x.client && p.client === x.client).forEach(p => {
+        let g = cands.find(c => c.date === p.date);
+        if (!g) { g = { date: p.date, n: 0 }; cands.push(g); }
+        g.n++;
+    });
+    cands.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+    el.innerHTML = `
+      <div class="inq-q-head">
+        <b>연결된 견적</b>
+        ${linked.length ? `<span>${linked.length}품목 · ${total.toLocaleString()}원</span>` : '<span>아직 없음</span>'}
+        <div class="inq-spacer"></div>
+        ${cands.length ? `<select id="inqQLink"><option value="">같은 거래처 견적 연결…</option>${cands.map(c =>
+            `<option value="${escHtml(c.date)}">${escHtml(String(c.date).replace(/-/g, '.'))} · ${c.n}품목</option>`).join('')}</select>` : ''}
+        <button class="inq-mini primary" id="inqQStart">+ 이 상담으로 견적 작성</button>
+      </div>
+      ${linked.length ? `<div class="inq-q-list">${linked.map(p => `
+        <div class="inq-q-row">
+          <span class="inq-q-item">${escHtml(p.item || '-')}</span>
+          <span>${(p.qty || 0).toLocaleString()}개</span>
+          <span class="inq-q-amt">${calcTempRevenueWithVat(p).toLocaleString()}원</span>
+          ${p.transferredAt ? '<span class="inq-q-done">매입매출 등록됨</span>' : ''}
+        </div>`).join('')}</div>` : ''}`;
+    document.getElementById('inqQStart').addEventListener('click', () => inqStartQuote(x.id));
+    const sel = document.getElementById('inqQLink');
+    if (sel) sel.addEventListener('change', () => { if (sel.value) inqLinkGroup(x.id, sel.value); });
+}
+
+async function inqLinkGroup(id, date) {
+    const x = inqFind(id);
+    if (!x) return;
+    const rows = tempProjects.filter(p => !p.inquiryId && p.client === x.client && p.date === date);
+    if (!rows.length) return;
+    const { error } = await sb.from('projects_temp').update({ inquiry_id: id }).in('id', rows.map(p => p.id));
+    if (error) { showToast('연결 실패: ' + error.message); return; }
+    rows.forEach(p => { p.inquiryId = id; });
+    const sum = rows.reduce((s, p) => s + calcTempRevenueWithVat(p), 0);
+    await inqAddLog(id, { direction: 'system', body: `견적 연결 · ${String(date).replace(/-/g, '.')} 견적 ${rows.length}품목 (${sum.toLocaleString()}원)` });
+    if (rows.every(p => p.transferredAt) && x.status !== '수주') {
+        await inqPatch(id, { status: '수주' }, `상태 변경 · ${x.status} → 수주`);
+    } else if (['신규', '상담중'].includes(x.status)) {
+        await inqPatch(id, { status: '견적발송' }, `상태 변경 · ${x.status} → 견적발송`);
+    }
+    renderTempProjects();
+    inqRenderDetail();
+    showToast('견적을 연결했습니다');
+}
+
+function inqStartQuote(id) {
+    const x = inqFind(id);
+    if (!x) return;
+    tpSetView('quote');
+    _inqPendingLink = id;                 // tpSetView('quote') 이후에 지정 (inq 전환 시 해제되므로)
+    const set = (elId, v) => { const e = document.getElementById(elId); if (e) e.value = v; };
+    set('tempInDate', getTodayStr());
+    set('tempInClient', x.client || '');
+    set('tempInClientContact', x.client_contact || '');
+    inqRenderLinkBanner();
+    const it = document.getElementById('tempInItem');
+    if (it) it.focus();
+}
+
+function inqRenderLinkBanner() {
+    const el = document.getElementById('inqLinkBanner');
+    if (!el) return;
+    const x = _inqPendingLink ? inqFind(_inqPendingLink) : null;
+    if (!x) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = '';
+    el.innerHTML = `
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg>
+      <span><b>${escHtml(x.client || '상담')}</b> 상담에 연결해서 작성 중 — 아래 첫 줄에서 추가하는 품목은 상담 기록에 자동으로 남습니다</span>
+      <div class="inq-spacer"></div>
+      <button class="inq-mini" id="inqBannerBack">상담으로 돌아가기</button>
+      <button class="inq-mini" id="inqBannerOff">연결 해제</button>`;
+    document.getElementById('inqBannerBack').addEventListener('click', () => { _inqSel = x.id; tpSetView('inq'); });
+    document.getElementById('inqBannerOff').addEventListener('click', () => { _inqPendingLink = null; inqRenderLinkBanner(); });
+}
+
+// 견적 목록에서 '상담 보기'
+function inqOpenFromQuote(id) {
+    _inqSel = id;
+    _inqFilter = 'all';
+    tpSetView('inq');
+}
+
+// 견적 품목이 추가될 때 (projects_temp insert 직후)
+async function inqOnQuoteAdded(id, row) {
+    if (!id) return;
+    const amt = (row.revenue || 0).toLocaleString();
+    await inqAddLog(id, { direction: 'system', body: `견적 품목 추가 · ${row.item || '품목'} ${Number(row.qty || 0).toLocaleString()}개 (${amt}원)` });
+    let x = inqFind(id);
+    if (!x) {
+        const { data } = await sb.from('inquiries').select('*').eq('id', id).maybeSingle();
+        x = data;
+    }
+    const patch = { last_contact_at: new Date().toISOString() };
+    const bump = x && ['신규', '상담중'].includes(x.status);
+    if (bump) patch.status = '견적발송';
+    await inqPatch(id, patch, bump ? `상태 변경 · ${x.status} → 견적발송` : null);
+}
+
+// 견적 묶음이 매입매출로 넘어갈 때
+async function inqOnTransferred(id, count) {
+    if (!id) return;
+    await inqAddLog(id, { direction: 'system', body: `매입매출로 등록 · ${count}건 — 수주` });
+    let x = inqFind(id);
+    if (!x) {
+        const { data } = await sb.from('inquiries').select('*').eq('id', id).maybeSingle();
+        x = data;
+    }
+    if (x && x.status !== '수주') await inqPatch(id, { status: '수주' }, `상태 변경 · ${x.status} → 수주`);
+}
+
+// ---------- 새 상담 ----------
+function inqOpenNew() {
+    _inqSel = 'new';
+    inqRenderList();
+    inqRenderNewForm();
+}
+
+function inqRenderNewForm() {
+    const el = document.getElementById('inqDetail');
+    if (!el) return;
+    const people = companyPeople();
+    const me = currentUser && currentUser.name;
+    el.innerHTML = `
+      <div class="inq-new">
+        <h3>새 상담 등록</h3>
+        <div class="inq-new-grid">
+          <label><span>거래처 *</span><input id="inqNClient" list="tempClientList" placeholder="거래처 DB에서 고르거나 직접 입력" autocomplete="off"></label>
+          <label><span>고객 담당자</span><input id="inqNContact" placeholder="이름 · 연락처"></label>
+          <label><span>문의 경로</span><select id="inqNChannel">${inqOpt(INQ_CHANNELS, '전화')}</select></label>
+          <label><span>우리 담당</span><select id="inqNAssignee"><option value="">-</option>${inqOpt(people, people.includes(me) ? me : '')}</select></label>
+        </div>
+        <label class="inq-new-full"><span>무엇을 문의했나요?</span><input id="inqNTitle" placeholder="예) 손목시계 300개 각인 견적"></label>
+        <label class="inq-new-full"><span>첫 문의 내용 <em>(선택)</em></span>
+          <textarea id="inqNBody" rows="5" placeholder="고객이 한 말이나 카톡 대화를 그대로 붙여넣어도 됩니다"></textarea></label>
+        <div class="inq-new-actions">
+          <button class="btn-ghost" id="inqNCancel">취소</button>
+          <button class="btn-primary" id="inqNSave">등록</button>
+        </div>
+      </div>`;
+    document.getElementById('inqNCancel').addEventListener('click', () => {
+        _inqSel = null;
+        const first = inqFiltered()[0];
+        if (first) _inqSel = first.id;
+        inqRenderList(); inqRenderDetail();
+    });
+    document.getElementById('inqNSave').addEventListener('click', inqCreate);
+    document.getElementById('inqNClient').focus();
+}
+
+async function inqCreate() {
+    const v = id => (document.getElementById(id).value || '').trim();
+    const client = v('inqNClient');
+    if (!client) { showToast('거래처를 입력해주세요'); document.getElementById('inqNClient').focus(); return; }
+    const channel = v('inqNChannel');
+    const body = v('inqNBody');
+    const btn = document.getElementById('inqNSave');
+    btn.disabled = true;
+    const { data, error } = await sb.from('inquiries').insert({
+        client, client_contact: v('inqNContact'), channel, assignee: v('inqNAssignee'),
+        title: v('inqNTitle'), status: '신규', started_at: getTodayStr(),
+        last_contact_at: new Date().toISOString(),
+        created_by: (currentUser && currentUser.name) || ''
+    }).select().single();
+    if (error) { btn.disabled = false; showToast('등록 실패: ' + error.message); return; }
+
+    const author = (currentUser && currentUser.name) || '';
+    const logs = [{ inquiry_id: data.id, direction: 'system', body: `상담 시작 · ${inqJosaRo(channel)} 문의` }];
+    if (body) logs.push({ inquiry_id: data.id, direction: 'in', channel, body, author });
+    await sb.from('inquiry_logs').insert(logs);
+
+    _inqList.unshift(data);
+    _inqSel = data.id;
+    if (_inqFilter !== 'all' && _inqFilter !== 'active' && _inqFilter !== '신규') _inqFilter = 'active';
+    inqRenderChips(); inqRenderList(); inqUpdateSwitchCount();
+    await inqRenderDetail();
+    showToast('상담을 등록했습니다');
 }
