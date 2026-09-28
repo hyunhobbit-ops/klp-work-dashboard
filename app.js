@@ -5843,7 +5843,9 @@ function _projectsDomesticRowToObj(r) {
         address: r.address || '',
         checks: r.checks || { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
         memo: r.memo || '',
-        sourceDocNumber: r.source_doc_number || ''
+        sourceDocNumber: r.source_doc_number || '',
+        inquiryId: r.inquiry_id || null,
+        checkDates: r.check_dates || {}
     };
 }
 
@@ -12441,6 +12443,7 @@ async function transferGroupToDomestic(gi) {
         start_date: null,
         checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
         memo: '',
+        inquiry_id: p.inquiryId || null,   // 상담에 연결 → 상담 화면에서 이어서 진행 (migration 038)
         supplier: p.supplier || '',
         supplier_contact: p.supplierContact || '',
         supplier_unit_price: p.supplierUnitPrice || 0,
@@ -20654,10 +20657,10 @@ function closeClientExportMenu() {
 // 상담 관리 (견적 의뢰 화면 안) — 문의 접수부터 수주/실패까지
 // 상담 건(inquiries) + 타임라인(inquiry_logs), 견적 품목은 projects_temp.inquiry_id로 연결
 // =====================================
-const INQ_STATUSES = ['신규', '상담중', '견적발송', '수주', '보류', '실패'];
-const INQ_ACTIVE = ['신규', '상담중', '견적발송'];
+const INQ_STATUSES = ['신규', '상담중', '견적발송', '수주', '제작중', '납품완료', '정산완료', '보류', '실패'];
+const INQ_ACTIVE = ['신규', '상담중', '견적발송', '수주', '제작중', '납품완료'];   // 정산완료·보류·실패만 '끝난 건'
 const INQ_CHANNELS = ['전화', '카톡', '문자', '이메일', '방문', '홈페이지', '기타'];
-const INQ_STATUS_CLS = { '신규': 's-new', '상담중': 's-talk', '견적발송': 's-quote', '수주': 's-won', '보류': 's-hold', '실패': 's-lost' };
+const INQ_STATUS_CLS = { '신규': 's-new', '상담중': 's-talk', '견적발송': 's-quote', '수주': 's-won', '제작중': 's-make', '납품완료': 's-deliv', '정산완료': 's-done', '보류': 's-hold', '실패': 's-lost' };
 const INQ_DIR_LABEL = { in: '고객', out: '우리', memo: '내부 메모' };
 
 let _inqList = [];
@@ -20857,6 +20860,8 @@ async function inqRenderDetail() {
     }
     const people = inqPeople();
     const assigneeOpts = `<option value="">-</option>` + inqOpt(people.includes(x.assignee) || !x.assignee ? people : people.concat([x.assignee]), x.assignee);
+    // 고객 정보가 채워져 있으면 한 줄 요약으로 접어둔다 (화면을 단계·기록에 양보)
+    const ciOpen = !(x.contact_name || x.client_contact || x.contact_phone || x.contact_email);
     el.innerHTML = `
       <div class="inq-head">
         <div class="inq-head-row">
@@ -20868,7 +20873,13 @@ async function inqRenderDetail() {
           </button>
         </div>
         <input class="inq-h-title" id="inqFTitle" value="${escHtml(x.title || '')}" placeholder="무엇을 문의했나요? 예) 손목시계 300개 각인 견적">
-        <div class="inq-fields">
+        <div class="inq-stage" id="inqStage"></div>
+        <div class="inq-cinfo">
+          <span class="inq-ci-lab">고객</span>
+          <div class="inq-ci-sum" id="inqCISum">${inqContactSummary(x)}</div>
+          <button type="button" class="inq-mini" id="inqCIToggle">${ciOpen ? '접기' : '편집'}</button>
+        </div>
+        <div class="inq-fields" id="inqFields" ${ciOpen ? '' : 'hidden'}>
           <label><span>고객 담당자</span><input id="inqFCName" value="${escHtml(x.contact_name || x.client_contact || '')}" placeholder="이름"></label>
           <label><span>부서</span><input id="inqFCDept" value="${escHtml(x.contact_dept || '')}" placeholder="예) 총무팀"></label>
           <label><span>직함</span><input id="inqFCTitle" value="${escHtml(x.contact_title || '')}" placeholder="예) 과장"></label>
@@ -20881,7 +20892,10 @@ async function inqRenderDetail() {
         <div class="inq-todos" id="inqTodos"><div class="inq-todo-head"><b>다음 할 일</b><em>불러오는 중…</em></div></div>
         ${x.status === '실패' && x.fail_reason ? `<div class="inq-fail">실패 사유 · ${escHtml(x.fail_reason)}</div>` : ''}
       </div>
-      <div class="inq-quotes" id="inqQuotes"></div>
+      <div class="inq-flow">
+        <div class="inq-quotes" id="inqQuotes"></div>
+        <div class="inq-projs" id="inqProjs"></div>
+      </div>
       <div class="inq-timeline" id="inqTimeline"><div class="inq-empty">불러오는 중…</div></div>
       <div class="inq-composer">
         <div class="inq-comp-top">
@@ -20905,8 +20919,10 @@ async function inqRenderDetail() {
       </div>`;
     _inqComposerImages.length = 0;
     _inqTodos = [];
+    if (_inqProjsFor !== x.id) { _inqProjs = []; _inqProjsFor = null; }
     inqBindDetail(x);
     inqRenderQuotes(x);
+    inqLoadDeal(x);
     inqSetDir(_inqDir);
     inqLoadTodos(x);
     await inqLoadLogs(x.id);
@@ -20921,9 +20937,20 @@ function inqBindDetail(x) {
             if (norm) { v = norm(v); el.value = v; }
             const cur = key === 'contact_name' ? (x.contact_name || x.client_contact || '') : (x[key] || '');
             if (cur === v) return;
-            inqPatch(x.id, { [key]: v || (key === 'started_at' ? null : '') }).then(d => { if (d) Object.assign(x, d); });
+            inqPatch(x.id, { [key]: v || (key === 'started_at' ? null : '') }).then(d => {
+                if (!d) return;
+                Object.assign(x, d);
+                const sum = $('inqCISum'); if (sum) sum.innerHTML = inqContactSummary(x);
+                if (key === 'started_at') inqRenderStage(x);
+            });
         });
     };
+    $('inqCIToggle').addEventListener('click', () => {
+        const f = $('inqFields');
+        f.hidden = !f.hidden;
+        $('inqCIToggle').textContent = f.hidden ? '편집' : '접기';
+        if (!f.hidden) { const n = $('inqFCName'); if (n) n.focus(); }
+    });
     saveField('inqFClient', 'client');
     saveField('inqFTitle', 'title');
     saveField('inqFCName', 'contact_name');
@@ -21293,6 +21320,7 @@ function inqRenderQuotes(x) {
     const byKey = k => { const i = k.indexOf('||'); return inqQuoteGroupIndex(k.slice(0, i), k.slice(i + 2)); };
     el.querySelectorAll('[data-qedit]').forEach(b => b.addEventListener('click', () => { const gi = byKey(b.dataset.qedit); if (gi >= 0) openTempGroupEdit(gi); }));
     el.querySelectorAll('[data-qdoc]').forEach(b => b.addEventListener('click', () => { const gi = byKey(b.dataset.qdoc); if (gi >= 0) openTempQuote(gi); }));
+    inqRenderStage(x);
 }
 
 async function inqLinkGroup(id, date) {
@@ -21371,13 +21399,15 @@ async function inqOnQuoteAdded(id, row) {
 // 견적 묶음이 매입매출로 넘어갈 때
 async function inqOnTransferred(id, count) {
     if (!id) return;
-    await inqAddLog(id, { direction: 'system', body: `매입매출로 등록 · ${count}건 — 수주` });
-    let x = inqFind(id);
-    if (!x) {
-        const { data } = await sb.from('inquiries').select('*').eq('id', id).maybeSingle();
-        x = data;
+    await inqAddLog(id, { direction: 'system', body: `국내 프로젝트로 등록 · ${count}건` });
+    // 상태 '수주'로 바꾸기·기록은 DB 트리거(inq_sync_stage)가 이미 함 → 새로 읽기만
+    const fresh = await inqReloadInquiry(id);
+    const x = inqFind(id);
+    if (x && _inqSel === id && document.getElementById('inqStage')) {
+        if (fresh) Object.assign(x, fresh);
+        await inqLoadDeal(x);
+        await inqLoadLogs(id);
     }
-    if (x && x.status !== '수주') await inqPatch(id, { status: '수주' }, `상태 변경 · ${x.status} → 수주`);
 }
 
 // ---------- 새 상담 ----------
@@ -22136,4 +22166,202 @@ async function inqSyncNextSummary(x) {
     if ((cur.next_action || '') === na && (cur.next_action_date || null) === nd) return;
     const d = await inqPatch(x.id, { next_action: na, next_action_date: nd });
     if (d) Object.assign(x, d);
+}
+
+// ---------- 거래 흐름: 상담 → 견적 → 수주 → 디자인확인 → 작업요청 → 납품·정산 (migration 038) ----------
+// 국내 프로젝트(projects_domestic.inquiry_id)를 상담에 연결해 한 화면에서 끝까지 진행.
+// 체크 날짜(check_dates)·타임라인 자동 기록·상담 상태(수주→제작중→납품완료→정산완료)는 DB 트리거가 처리.
+let _inqProjs = [];
+let _inqProjsFor = null;
+const INQ_SETTLE_KEYS = ['delivered', 'finalPayment', 'invoice', 'supplierPayment'];
+
+async function inqLoadDeal(x) {
+    const { data, error } = await sb.from('projects_domestic').select('*').eq('inquiry_id', x.id).order('id');
+    if (_inqSel !== x.id) return;
+    if (error) { console.error('연결된 국내 프로젝트 로드 실패', error); return; }
+    _inqProjs = (data || []).filter(r => r.status !== '취소');
+    _inqProjsFor = x.id;
+    inqRenderProjs(x);
+    inqRenderStage(x);
+}
+
+// 트리거가 바꾼 상담 상태·기록을 다시 읽어온다
+async function inqReloadInquiry(id) {
+    const { data } = await sb.from('inquiries').select('*').eq('id', id).maybeSingle();
+    if (!data) return null;
+    const i = _inqList.findIndex(v => v.id === id);
+    if (i >= 0) _inqList[i] = data; else _inqList.unshift(data);
+    inqRenderChips(); inqRenderList(); inqUpdateSwitchCount();
+    const sel = document.getElementById('inqFStatus');
+    if (sel && _inqSel === id) { sel.value = data.status; sel.className = 'inq-h-status ' + (INQ_STATUS_CLS[data.status] || ''); }
+    return data;
+}
+
+function inqDateOf(ts) { return ts ? String(ts).slice(0, 10) : ''; }
+function inqMaxDate(arr) { return arr.filter(Boolean).sort().slice(-1)[0] || ''; }
+function inqMinDate(arr) { return arr.filter(Boolean).sort()[0] || ''; }
+
+// 단계 계산 — done / cur / todo + 날짜·보조 문구
+function inqStages(x) {
+    const quotes = tempProjects.filter(p => p.inquiryId === x.id);
+    const projs = _inqProjsFor === x.id ? _inqProjs : [];
+    const n = projs.length;
+    const cnt = k => projs.filter(p => p.checks && p.checks[k]).length;
+    const kDate = k => inqMaxDate(projs.map(p => inqDateOf((p.check_dates || {})[k])));
+    const st = [];
+    st.push({ key: 'talk', label: '상담', done: true, sub: x.started_at ? inqMD(x.started_at) : '' });
+    const qDone = quotes.length > 0 || ['견적발송', '수주', '제작중', '납품완료', '정산완료'].includes(x.status);
+    st.push({ key: 'quote', label: '견적', done: qDone, sub: quotes.length ? inqMD(inqMinDate(quotes.map(q => q.date))) + ' 발송' : '' });
+    st.push({ key: 'won', label: '수주', done: n > 0, sub: n ? inqMD(inqMinDate(projs.map(p => inqDateOf(p.created_at)))) + (n > 1 ? ` · ${n}건` : '') : '' });
+    const stepK = (key, label, k) => {
+        const c = cnt(k);
+        st.push({ key, label, done: n > 0 && c === n, sub: n && c === n ? (inqMD(kDate(k)) || '완료') : (c ? `${c}/${n}` : '') });
+    };
+    stepK('design', '디자인확인', 'design');
+    stepK('wo', '작업요청', 'workOrder');
+    const settled = projs.filter(p => INQ_SETTLE_KEYS.every(k => p.checks && p.checks[k])).length;
+    const settleParts = n ? INQ_SETTLE_KEYS.reduce((s, k) => s + cnt(k), 0) : 0;
+    st.push({ key: 'settle', label: '납품·정산', done: n > 0 && settled === n,
+        sub: n && settled === n ? (inqMD(inqMaxDate(INQ_SETTLE_KEYS.map(kDate))) || '완료') : (settleParts ? `${settleParts}/${n * 4}` : '') });
+    const ci = st.findIndex(s => !s.done);
+    st.forEach((s, i) => { s.state = s.done ? 'done' : (i === ci ? 'cur' : 'todo'); });
+    return { st, cur: ci < 0 ? null : st[ci], quotes, projs };
+}
+
+function inqRenderStage(x) {
+    const el = document.getElementById('inqStage');
+    if (!el || _inqSel !== x.id) return;
+    const { st, cur, quotes, projs } = inqStages(x);
+    const stopped = x.status === '보류' || x.status === '실패';
+    const bar = `<div class="inq-stage-bar ${stopped ? 'stopped' : ''}">${st.map(s => `
+        <div class="inq-stg ${s.state}">
+          <i></i>
+          <b>${escHtml(s.label)}</b>
+          <span>${escHtml(s.sub || (s.state === 'cur' ? '진행 중' : ''))}</span>
+        </div>`).join('')}</div>`;
+
+    // 지금 할 일 — 현재 단계에 맞는 버튼
+    let msg = '', btns = [];
+    const firstLack = k => projs.find(p => !(p.checks && p.checks[k]));
+    if (stopped) msg = `${x.status} 상태입니다${x.status === '실패' && x.fail_reason ? ' · ' + x.fail_reason : ''}`;
+    else if (!cur) msg = '모든 단계가 끝났습니다';
+    else if (cur.key === 'quote') { msg = '견적을 만들어 보내세요'; btns.push(['quote-new', '+ 이 상담으로 견적 작성', 1]); }
+    else if (cur.key === 'won') {
+        msg = '견적이 확정되면 국내 프로젝트로 넘기세요 (수주)';
+        if (quotes.length) { btns.push(['quote-doc', '견적서 보기']); btns.push(['transfer', '국내로 넘기기 · 수주', 1]); }
+        else btns.push(['quote-new', '+ 이 상담으로 견적 작성', 1]);
+    } else if (cur.key === 'design') {
+        const p = firstLack('design');
+        msg = `디자인확인서를 만들고 고객 컨펌을 받으세요${projs.length > 1 ? ` · ${p.product_name || ''}` : ''}`;
+        btns.push([`dc:${p.id}`, p.source_doc_number ? '디자인확인서 열기' : '디자인확인서 만들기', 1]);
+        btns.push([`chk:${p.id}:design`, '컨펌 완료 체크']);
+    } else if (cur.key === 'wo') {
+        const p = firstLack('workOrder');
+        msg = `공장에 작업요청서를 보내세요${projs.length > 1 ? ` · ${p.product_name || ''}` : ''}`;
+        btns.push([`wr:${p.id}`, '작업요청서 만들기', 1]);
+        btns.push([`chk:${p.id}:workOrder`, '발송 완료 체크']);
+    } else if (cur.key === 'settle') {
+        const p = projs.find(v => INQ_SETTLE_KEYS.some(k => !(v.checks && v.checks[k])));
+        const lack = INQ_SETTLE_KEYS.concat(['advancePayment']).filter(k => !(p.checks && p.checks[k]));
+        msg = `납품·잔금·계산서·공급처 송금을 확인하세요${projs.length > 1 ? ` · ${p.product_name || ''}` : ''}`;
+        lack.forEach(k => { const it = CHECK_ITEMS.find(c => c.key === k); if (it) btns.push([`chk:${p.id}:${k}`, it.label + ' ✓']); });
+    }
+    el.innerHTML = bar + `
+      <div class="inq-now ${stopped ? 'stopped' : !cur ? 'done' : ''}">
+        <span class="inq-now-lab">지금 할 일</span>
+        <span class="inq-now-msg">${escHtml(msg)}</span>
+        <div class="inq-spacer"></div>
+        ${btns.map(([a, l, pri]) => `<button class="inq-mini ${pri ? 'primary' : ''}" data-act="${escHtml(a)}">${escHtml(l)}</button>`).join('')}
+      </div>`;
+    el.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => inqDealAction(x, b.dataset.act, b)));
+}
+
+// 국내 프로젝트가 전역 projects 배열에 없으면(페이지 밖) 넣어준다 — 문서 만들기·상세 모달이 projects를 쓰기 때문
+function inqEnsureProject(row) {
+    if (!row) return null;
+    let p = projects.find(v => v.id === row.id);
+    if (!p) { p = _projectsDomesticRowToObj(row); projects.push(p); }
+    return p;
+}
+
+async function inqDealAction(x, act, btn) {
+    const [kind, idStr, key] = act.split(':');
+    const row = idStr ? _inqProjs.find(p => p.id === Number(idStr)) : null;
+    if (kind === 'quote-new') { inqStartQuote(x.id); return; }
+    if (kind === 'quote-doc' || kind === 'transfer') {
+        const q = tempProjects.filter(p => p.inquiryId === x.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+        if (!q) return;
+        const gi = inqQuoteGroupIndex(q.date, q.client);
+        if (gi < 0) return;
+        if (kind === 'quote-doc') openTempQuote(gi);
+        else { await transferGroupToDomestic(gi); }
+        return;
+    }
+    if (kind === 'dc' || kind === 'wr') { if (inqEnsureProject(row)) createDocFromProject(row.id, kind); return; }
+    if (kind === 'open') { if (inqEnsureProject(row)) showProjectDetail(row.id); return; }
+    if (kind === 'chk') { if (btn) btn.disabled = true; await inqToggleProjCheck(x, row, key); }
+}
+
+// 상담 화면에서 국내 체크 — 국내 메뉴와 같은 규칙(전부 체크되면 '완료')
+async function inqToggleProjCheck(x, row, key) {
+    if (!row) return;
+    const checks = Object.assign({}, row.checks || {});
+    checks[key] = !checks[key];
+    const update = { checks };
+    if (CHECK_ITEMS.every(it => !!checks[it.key]) && row.status !== '완료') update.status = '완료';
+    const { data, error } = await sb.from('projects_domestic').update(update).eq('id', row.id).select().single();
+    if (error) { showToast('저장 실패: ' + error.message); inqRenderStage(x); return; }
+    Object.assign(row, data);
+    const gp = projects.find(v => v.id === row.id);
+    if (gp) { gp.checks = data.checks; if (update.status) gp.status = update.status; try { renderProjects(); } catch (_) {} }
+    const it = CHECK_ITEMS.find(c => c.key === key);
+    showToast(`${it ? it.label : key} ${checks[key] ? '체크' : '해제'}`);
+    inqRenderProjs(x);
+    inqRenderStage(x);
+    const fresh = await inqReloadInquiry(x.id);   // 트리거가 상태를 바꿨을 수 있음
+    if (fresh) Object.assign(x, fresh);
+    inqRenderStage(x);
+    await inqLoadLogs(x.id);                      // 트리거가 남긴 기록
+}
+
+function inqRenderProjs(x) {
+    const el = document.getElementById('inqProjs');
+    if (!el || _inqSel !== x.id) return;
+    const projs = _inqProjsFor === x.id ? _inqProjs : [];
+    if (!projs.length) { el.innerHTML = ''; return; }
+    const won = n => Number(n || 0).toLocaleString() + '원';
+    el.innerHTML = `
+      <div class="inq-q-head"><b>국내 진행</b><span class="inq-q-sum"><em>${projs.length}건 · 매출 <b class="rev">${won(projs.reduce((s, p) => s + (p.revenue || 0), 0))}</b></em></span></div>
+      <div class="inq-pj-list">${projs.map(p => {
+          const cd = p.check_dates || {};
+          const done = CHECK_ITEMS.filter(it => p.checks && p.checks[it.key]).length;
+          return `
+        <div class="inq-pj">
+          <div class="inq-pj-top">
+            <b>${escHtml(p.product_name || '(품목 없음)')}</b>
+            <span>${p.quantity ? Number(p.quantity).toLocaleString() + (p.unit || '개') : ''}${p.supplier ? ' · ' + escHtml(p.supplier) : ''}</span>
+            <span class="inq-pj-amt">${won(p.revenue)}</span>
+            <span class="inq-pj-prog">${done}/${CHECK_ITEMS.length}</span>
+            <div class="inq-spacer"></div>
+            <button class="inq-mini" data-act="dc:${p.id}">${p.source_doc_number ? '디자인확인서' : '디자인확인서 만들기'}</button>
+            <button class="inq-mini" data-act="wr:${p.id}">작업요청서</button>
+            <button class="inq-mini" data-act="open:${p.id}">국내에서 보기</button>
+          </div>
+          <div class="inq-pj-checks">${CHECK_ITEMS.map(it => {
+              const on = !!(p.checks && p.checks[it.key]);
+              const d = cd[it.key] ? inqMD(inqDateOf(cd[it.key])) : '';
+              return `<button class="inq-ck ${on ? 'on' : ''}" data-act="chk:${p.id}:${it.key}" title="${escHtml(it.label)}${on ? (d ? ' · ' + d + ' 체크' : ' · 완료') : ' — 누르면 체크'}">
+                  <i>${on ? '✓' : ''}</i>${escHtml(it.label)}${d ? `<em>${d}</em>` : ''}</button>`;
+          }).join('')}</div>
+        </div>`;
+      }).join('')}</div>`;
+    el.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => inqDealAction(x, b.dataset.act, b)));
+}
+
+// 고객 정보 한 줄 요약 (접힌 상태)
+function inqContactSummary(x) {
+    const who = [x.contact_name || x.client_contact, [x.contact_dept, x.contact_title].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+    const parts = [who, x.contact_phone, x.contact_email].filter(Boolean);
+    const meta = [x.channel ? inqJosaRo(x.channel) + ' 문의' : '', x.assignee ? '담당 ' + x.assignee : '', x.started_at ? inqMD(x.started_at) + ' 시작' : ''].filter(Boolean);
+    return `<span class="inq-ci-main">${parts.length ? parts.map(escHtml).join('<i>·</i>') : '<em>고객 연락처 없음</em>'}</span><span class="inq-ci-meta">${meta.map(escHtml).join(' · ')}</span>`;
 }

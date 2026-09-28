@@ -137,6 +137,12 @@
 - **자동 입력(AI)**: 0.9초 멈추면 `inqAiExtract` → `/api/meeting-summarize?kind=inquiry` → `api/_inquiry-extract.js`(Hobby 플랜 함수 12개 제한 때문에 `_` 파일로 두고 회의록 함수가 넘겨줌. 로그인 토큰 검증, 도구 강제 JSON, 모델 `ANTHROPIC_INQUIRY_MODEL`→실패 시 `ANTHROPIC_MODEL`)가 거래처·담당자·부서·직함·연락처·이메일·**문의 한 줄 요약**을 채움. 실패하면 규칙 결과만 남음. 거래처는 `inqMatchClient`로 DB 표기에 맞춤
 - **붙여넣기 정리**: `inqBindImageInput` paste에서 text/html을 `inqHtmlToText`로 변환(문단=한 줄, `<p>&nbsp;</p>`·`<div><br></div>`=빈 줄, 3줄 이상 빈 줄은 1줄) → `execCommand('insertText')`(Ctrl+Z 가능). 글만 있으면 `inqTidyPlain`. 메일 속 `<img>`는 `inqAddImageUrls`로 시도 — 웹메일 사진은 로그인 쿠키가 필요해 대부분 실패 → `inqImgNotice`로 '오른쪽 클릭→이미지 복사→Ctrl+V' 안내. 서버 이미지 프록시는 SSRF 위험·쿠키 문제로 만들지 않음
 - **다음 할 일 여러 개 (migration 037)**: `inquiry_todos`(task, due_date, assignee, done, daily_task_id). 추가하면 `inqTodoCreateDaily`가 담당자 `daily_tasks`에 `[거래처] 할 일`(label '회사 업무', date=할 날짜 또는 오늘)로 등록. 글·날짜·담당자·완료 변경은 연결된 daily_task에도 반영, 삭제하면 같이 삭제. 완료 여부는 연결돼 있으면 `daily_tasks.done`이 원본(상세 열 때 읽음). 담당자 기본값 = 작성자(`inqMe`). `inquiries.next_action/next_action_date`는 목록용 요약('가장 급한 미완료 외 N건', `inqSyncNextSummary`)
+- **거래 흐름 (migration 038)**: 상담 한 건에서 상담 → 견적 → 수주 → 디자인확인 → 작업요청 → 납품·정산까지. 견적 의뢰·국내 메뉴는 그대로(목록·장부용)
+  - `projects_domestic.inquiry_id`: `transferGroupToDomestic`이 견적의 inquiryId를 넣음. `check_dates` jsonb: 체크한 시각 — BEFORE UPDATE 트리거 `projects_domestic_stamp_checks`가 어디서 체크하든 기록
+  - AFTER 트리거 `projects_domestic_inquiry_sync` → 체크 시 상담 타임라인에 system 기록 + `inq_sync_stage()`로 상담 상태 자동: 국내 연결 있으면 수주 → 작지 발송 체크 시 제작중 → 전부 납품 시 납품완료 → 납품+잔금+계산서+송금 전부 시 정산완료 (보류·실패는 안 건드림). 그래서 앱은 상태를 직접 바꾸지 않고 `inqReloadInquiry`로 다시 읽음
+  - 화면: `inqRenderStage`(6단계 막대 + '지금 할 일' 버튼 — 견적 작성/국내로 넘기기/디자인확인서·작업요청서 만들기/체크), `inqRenderProjs`(국내 진행 칸, 7개 체크 칩 = `inqToggleProjCheck`, 국내 메뉴와 같은 규칙), 고객 정보는 한 줄 요약으로 접힘(`inqContactSummary`)
+  - 문서 만들기·국내 상세는 전역 `projects` 배열을 쓰므로 `inqEnsureProject`로 없으면 넣고 호출
+  - 상태 목록: 신규/상담중/견적발송/수주/제작중/납품완료/정산완료/보류/실패. '진행 중' 필터 = 정산완료·보류·실패 제외
 - **기록 수정**: 타임라인 연필 버튼 → `inqEditLog`(글·사진·고객/우리/메모·경로 수정, `inquiry_logs.edited_at` → '수정됨' 표시). 자동 기록(system)은 수정 불가
 - ⚠️ `inquiry_logs`를 배열로 한 번에 insert할 때는 모든 행의 키를 같게 — `images`가 NOT NULL이라 한 행에서 빠지면 전체가 거부됨
 - 주요 함수: `tpInitView`, `inqEnter`, `inqRenderList`, `inqRenderDetail`, `inqSubmit`, `inqPatch`, `inqAddLog`, `inqCreate`, `inqParseContact`, `inqAutofillNew`
