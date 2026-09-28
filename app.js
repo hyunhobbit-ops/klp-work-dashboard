@@ -20881,8 +20881,8 @@ async function inqRenderDetail() {
         </div>
         <div class="inq-fields" id="inqFields" ${ciOpen ? '' : 'hidden'}>
           <label><span>고객 담당자</span><input id="inqFCName" value="${escHtml(x.contact_name || x.client_contact || '')}" placeholder="이름"></label>
-          <label><span>부서</span><input id="inqFCDept" value="${escHtml(x.contact_dept || '')}" placeholder="예) 총무팀"></label>
           <label><span>직함</span><input id="inqFCTitle" value="${escHtml(x.contact_title || '')}" placeholder="예) 과장"></label>
+          <label><span>부서</span><input id="inqFCDept" value="${escHtml(x.contact_dept || '')}" placeholder="예) 총무팀"></label>
           <label><span>연락처</span><input id="inqFCPhone" inputmode="tel" value="${escHtml(x.contact_phone || '')}" placeholder="010-0000-0000"></label>
           <label><span>이메일</span><input id="inqFCEmail" type="email" value="${escHtml(x.contact_email || '')}" placeholder="name@company.com"></label>
           <label><span>문의 경로</span><select id="inqFChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select></label>
@@ -21447,8 +21447,8 @@ function inqRenderNewForm() {
         <div class="inq-new-sec">고객 연락처 <em>선택 · 나중에 채워도 됩니다</em></div>
         <div class="inq-new-grid c5">
           <label><span>담당자 이름</span><input id="inqNCName" placeholder="홍길동"></label>
-          <label><span>부서</span><input id="inqNCDept" placeholder="예) 총무팀"></label>
           <label><span>직함</span><input id="inqNCTitle" placeholder="예) 과장"></label>
+          <label><span>부서</span><input id="inqNCDept" placeholder="예) 총무팀"></label>
           <label><span>연락처</span><input id="inqNCPhone" inputmode="tel" placeholder="010-0000-0000"></label>
           <label><span>이메일</span><input id="inqNCEmail" type="email" placeholder="name@company.com"></label>
         </div>
@@ -21888,7 +21888,7 @@ function inqMatchClient(name) {
 // 새 상담 — 붙여넣은 문의 내용에서 위 칸 채우기 (비었거나 이전에 자동으로 채운 칸만)
 const INQ_AUTO_MAP = [
     ['company', 'inqNClient', '거래처'], ['subject', 'inqNTitle', '문의 내용'],
-    ['name', 'inqNCName', '담당자'], ['dept', 'inqNCDept', '부서'], ['title', 'inqNCTitle', '직함'],
+    ['name', 'inqNCName', '담당자'], ['title', 'inqNCTitle', '직함'], ['dept', 'inqNCDept', '부서'],
     ['phone', 'inqNCPhone', '연락처'], ['email', 'inqNCEmail', '이메일']
 ];
 const INQ_CHECK_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>';
