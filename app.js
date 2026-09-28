@@ -1480,6 +1480,7 @@ const F2_NEW_ACTIONS = [
     ['tab-product-db',         () => openProductDBModal(null)],
     ['tab-proposals',          () => openProposalEditor(null)],
     ['tab-marketing',          () => openMarketingModal(null)],
+    ['tab-projects-temp',      () => inqShortcutNew()],   // 견적 의뢰 화면 = 새 상담 (견적 목록 보던 중이면 상담 관리로 넘어감)
     // 협업 프로젝트 — 펀딩 모드에서만 F2 활성 (회사/개인은 기간 섹션별 버튼이 있어 F2 제외)
     ['tab-planning',           () => {
         if (currentPlanningMode !== 'funding') return;
@@ -21380,6 +21381,18 @@ async function inqOnTransferred(id, count) {
 }
 
 // ---------- 새 상담 ----------
+// F2 — 새 상담. 이미 새 상담 작성 중이면 내용 지우지 않고 거래처 칸으로만 이동
+function inqShortcutNew() {
+    const iv = document.getElementById('tpInqView');
+    if (iv && iv.style.display !== 'none') {
+        if (_inqSel === 'new' && document.getElementById('inqNClient')) { document.getElementById('inqNClient').focus(); return; }
+        inqOpenNew();
+        return;
+    }
+    _inqSel = 'new';      // inqEnter가 'new'를 유지해서 새 상담 칸을 그린다
+    tpSetView('inq');
+}
+
 function inqOpenNew() {
     _inqSel = 'new';
     inqRenderList();
