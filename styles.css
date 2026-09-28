@@ -4708,3 +4708,56 @@ textarea.inq-drop{border-color:var(--blue) !important; background:var(--blue-lig
 .inq-qg-note{padding:9px 12px; border-top:1px solid var(--border-soft); font-size:12.5px; color:var(--gray-700);
     white-space:pre-wrap; line-height:1.55; background:var(--gray-50)}
 .inq-qg-note span{font-weight:800; color:var(--label); margin-right:8px}
+
+/* ---- 상담: 다음 할 일 여러 개 (037) ---- */
+.inq-todos{margin-top:10px; padding:8px 10px 10px; background:var(--gray-50); border:1px solid var(--border-soft); border-radius:10px}
+.inq-todo-head{display:flex; align-items:center; gap:7px; padding:0 2px 6px; font-size:12.5px}
+.inq-todo-head b{font-weight:800; color:var(--gray-800)}
+.inq-todo-head > span{min-width:18px; height:18px; padding:0 5px; border-radius:9px; background:var(--gray-800); color:#fff;
+    font-size:11px; font-weight:800; display:inline-flex; align-items:center; justify-content:center}
+.inq-todo-head em{margin-left:auto; font-style:normal; font-size:11.5px; font-weight:600; color:var(--gray-400)}
+.inq-todo{display:grid; grid-template-columns:18px minmax(0,1fr) 136px 108px auto 24px; align-items:center; gap:8px;
+    padding:4px 4px; border-radius:7px}
+.inq-todo + .inq-todo{border-top:1px solid var(--border-soft)}
+.inq-todo input[type="checkbox"]{width:16px; height:16px; margin:0; cursor:pointer; accent-color:var(--blue)}
+.inq-todo input:not([type="checkbox"]), .inq-todo select{height:30px; padding:0 8px; border:1px solid transparent; border-radius:7px;
+    background:transparent; font-family:inherit; font-size:13px; color:var(--gray-900); outline:none; min-width:0}
+.inq-todo input:not([type="checkbox"]):hover, .inq-todo select:hover{border-color:var(--border); background:var(--white)}
+.inq-todo input:not([type="checkbox"]):focus, .inq-todo select:focus{border-color:var(--blue); background:var(--white)}
+.inq-todo-task{font-weight:600}
+.inq-todo.done .inq-todo-task{text-decoration:line-through; color:var(--gray-400)}
+.inq-todo.done input[type="date"], .inq-todo.done select{color:var(--gray-400)}
+.inq-todo.late input[type="date"]{color:var(--red); font-weight:800}
+.inq-todo-linked{font-size:11px; font-weight:800; color:#12B76A; white-space:nowrap}
+.inq-todo-link{border:1px dashed var(--border); background:var(--white); border-radius:6px; height:24px; padding:0 7px;
+    font-family:inherit; font-size:11px; font-weight:700; color:var(--gray-600); cursor:pointer; white-space:nowrap}
+.inq-todo-link:hover{border-color:var(--blue); color:var(--blue)}
+.inq-todo-del{border:none; background:none; color:var(--gray-300); font-size:16px; line-height:1; cursor:pointer; padding:0}
+.inq-todo-del:hover{color:var(--red)}
+.inq-todo.add{margin-top:4px; border-top:1px dashed var(--border) !important; padding-top:8px;
+    grid-template-columns:18px minmax(0,1fr) 136px 108px auto}
+.inq-todo.add input:not([type="checkbox"]), .inq-todo.add select{border-color:var(--border); background:var(--white)}
+.inq-todo-plus{font-size:16px; font-weight:800; color:var(--gray-400); text-align:center}
+.inq-todo-err{font-size:12px; color:var(--red); padding:4px}
+@media (max-width:1100px){
+    .inq-todo, .inq-todo.add{grid-template-columns:18px minmax(0,1fr) 124px; row-gap:4px}
+}
+
+/* ---- 상담: 기록 수정 ---- */
+.inq-msg-acts{margin-left:auto; display:inline-flex; gap:2px; opacity:0; transition:opacity .12s}
+.inq-msg:hover .inq-msg-acts{opacity:1}
+.inq-msg-btn{width:24px; height:22px; border:none; background:none; border-radius:5px; color:var(--gray-400);
+    cursor:pointer; display:inline-flex; align-items:center; justify-content:center; padding:0}
+.inq-msg-btn:hover{background:var(--gray-100); color:var(--gray-800)}
+.inq-msg-btn.del:hover{color:var(--red)}
+.inq-edited{font-size:10.5px; font-weight:700; color:var(--gray-400); background:var(--gray-100); padding:1px 5px; border-radius:4px}
+.inq-msg.editing{max-width:92%; width:92%; background:var(--white); border:1.5px solid var(--blue); box-shadow:0 4px 16px rgba(0,0,0,.06)}
+.inq-edit-top{display:flex; align-items:center; gap:8px; margin-bottom:8px}
+.inq-edit-top select{height:30px; padding:0 8px; border:1px solid var(--border); border-radius:7px; font-family:inherit; font-size:12.5px; background:var(--white); color:var(--gray-900)}
+.inq-msg.editing textarea{width:100%; box-sizing:border-box; padding:9px 11px; border:1px solid var(--border); border-radius:8px;
+    font-family:inherit; font-size:13.5px; line-height:1.6; color:var(--gray-900); background:var(--white); outline:none; resize:vertical}
+.inq-msg.editing textarea:focus{border-color:var(--blue)}
+.inq-msg.editing .inq-thumbs, .inq-msg.editing .inq-img-notice{margin-top:8px}
+.inq-edit-act{display:flex; align-items:center; gap:8px; margin-top:8px}
+.inq-edit-act span{margin-right:auto; font-size:11.5px; font-weight:600; color:var(--gray-400)}
+.inq-edit-act .btn-primary{height:32px; padding:0 16px}

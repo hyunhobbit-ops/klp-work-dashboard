@@ -20877,12 +20877,7 @@ async function inqRenderDetail() {
           <label><span>우리 담당</span><select id="inqFAssignee">${assigneeOpts}</select></label>
           <label><span>상담 시작일</span><input type="date" id="inqFStarted" value="${escHtml(x.started_at || '')}"></label>
         </div>
-        <div class="inq-next-row ${inqIsOverdue(x) ? 'late' : ''}">
-          <span class="inq-next-label">다음 할 일</span>
-          <input type="date" id="inqFNextDate" value="${escHtml(x.next_action_date || '')}">
-          <input id="inqFNext" value="${escHtml(x.next_action || '')}" placeholder="예) 9/30까지 샘플 사진 보내기">
-          ${x.next_action ? '<button class="inq-mini" id="inqFNextDone">완료</button>' : ''}
-        </div>
+        <div class="inq-todos" id="inqTodos"><div class="inq-todo-head"><b>다음 할 일</b><em>불러오는 중…</em></div></div>
         ${x.status === '실패' && x.fail_reason ? `<div class="inq-fail">실패 사유 · ${escHtml(x.fail_reason)}</div>` : ''}
       </div>
       <div class="inq-quotes" id="inqQuotes"></div>
@@ -20908,9 +20903,11 @@ async function inqRenderDetail() {
         <div class="inq-thumbs" id="inqCThumbs"></div>
       </div>`;
     _inqComposerImages.length = 0;
+    _inqTodos = [];
     inqBindDetail(x);
     inqRenderQuotes(x);
     inqSetDir(_inqDir);
+    inqLoadTodos(x);
     await inqLoadLogs(x.id);
 }
 
@@ -20937,20 +20934,6 @@ function inqBindDetail(x) {
     saveField('inqFAssignee', 'assignee');
     saveField('inqFStarted', 'started_at');
 
-    const nextSave = () => {
-        const d = $('inqFNextDate').value || null;
-        const t = $('inqFNext').value.trim();
-        if ((x.next_action || '') === t && (x.next_action_date || null) === d) return;
-        inqPatch(x.id, { next_action: t, next_action_date: d }).then(r => { if (r) Object.assign(x, r); });
-    };
-    $('inqFNextDate').addEventListener('change', nextSave);
-    $('inqFNext').addEventListener('change', nextSave);
-    const nd = $('inqFNextDone');
-    if (nd) nd.addEventListener('click', async () => {
-        const done = x.next_action;
-        const r = await inqPatch(x.id, { next_action: '', next_action_date: null }, `할 일 완료 · ${done}`);
-        if (r) inqRenderDetail();
-    });
 
     $('inqFStatus').addEventListener('change', async (e) => {
         const nv = e.target.value, ov = x.status;
@@ -21053,13 +21036,14 @@ async function inqLoadLogs(id) {
     inqRenderTimeline();
 }
 
-function inqRenderTimeline() {
+function inqRenderTimeline(keepScroll) {
     const el = document.getElementById('inqTimeline');
     if (!el) return;
     if (!_inqLogs.length) {
         el.innerHTML = '<div class="inq-empty">아직 기록이 없습니다.<br>아래에 첫 대화를 남겨보세요.</div>';
         return;
     }
+    const prevScroll = el.scrollTop;
     let html = '', lastDay = '';
     _inqLogs.forEach(l => {
         const day = inqDayLabel(l.at);
@@ -21068,30 +21052,101 @@ function inqRenderTimeline() {
             html += `<div class="inq-sys"><span>${escHtml(l.body)}</span><em>${inqTime(l.at)}</em></div>`;
             return;
         }
-        const imgs = (Array.isArray(l.images) && l.images.length) ? l.images : (l.image ? [l.image] : []);
-        html += `<div class="inq-msg d-${escHtml(l.direction)}">
+        const imgs = inqLogImages(l);
+        html += `<div class="inq-msg d-${escHtml(l.direction)}" data-lid="${l.id}">
             <div class="inq-msg-meta">
                 <b>${escHtml(INQ_DIR_LABEL[l.direction] || '')}</b>
                 ${l.channel ? `<span>${escHtml(l.channel)}</span>` : ''}
                 ${l.author ? `<span>${escHtml(l.author)}</span>` : ''}
                 <span>${inqTime(l.at)}</span>
-                <button class="inq-msg-del" data-del="${l.id}" title="이 기록 삭제">×</button>
+                ${l.edited_at ? `<span class="inq-edited" title="${escHtml(inqDayLabel(l.edited_at) + ' ' + inqTime(l.edited_at))} 수정">수정됨</span>` : ''}
+                <span class="inq-msg-acts">
+                    <button class="inq-msg-btn" data-edit="${l.id}" title="이 기록 수정">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg></button>
+                    <button class="inq-msg-btn del" data-del="${l.id}" title="이 기록 삭제">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button>
+                </span>
             </div>
             ${l.body ? `<div class="inq-msg-body">${escHtml(l.body).replace(/\n/g, '<br>')}</div>` : ''}
             ${imgs.length ? `<div class="inq-msg-imgs">${imgs.map(s => `<img class="inq-msg-img" src="${escHtml(s)}" alt="첨부 사진">`).join('')}</div>` : ''}
         </div>`;
     });
     el.innerHTML = html;
-    el.scrollTop = el.scrollHeight;
+    el.scrollTop = keepScroll ? prevScroll : el.scrollHeight;
     el.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
         if (!confirm('이 기록을 삭제할까요?')) return;
         const id = Number(b.dataset.del);
         const { error } = await sb.from('inquiry_logs').delete().eq('id', id);
         if (error) { showToast('삭제 실패: ' + error.message); return; }
         _inqLogs = _inqLogs.filter(l => l.id !== id);
-        inqRenderTimeline();
+        inqRenderTimeline(true);
     }));
+    el.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => inqEditLog(Number(b.dataset.edit))));
     el.querySelectorAll('.inq-msg-img').forEach(img => img.addEventListener('click', () => img.classList.toggle('zoom')));
+}
+
+function inqLogImages(l) {
+    return (Array.isArray(l.images) && l.images.length) ? l.images : (l.image ? [l.image] : []);
+}
+
+// 기록 수정 — 글 · 사진(빼기/붙여넣기) · 누가 한 말인지 · 경로
+function inqEditLog(id) {
+    const el = document.getElementById('inqTimeline');
+    const l = _inqLogs.find(v => v.id === id);
+    const box = el && el.querySelector(`[data-lid="${id}"]`);
+    if (!l || !box) return;
+    const imgs = inqLogImages(l).slice();
+    box.classList.add('editing');
+    box.innerHTML = `
+        <div class="inq-edit-top">
+          <div class="inq-dir" id="inqEDir">
+            <button data-dir="in">고객</button><button data-dir="out">우리 답변</button><button data-dir="memo">내부 메모</button>
+          </div>
+          <select id="inqEChannel">${inqOpt(INQ_CHANNELS, l.channel || '')}</select>
+        </div>
+        <textarea id="inqEBody" rows="${Math.min(14, Math.max(3, String(l.body || '').split('\n').length + 1))}" placeholder="내용 (사진은 Ctrl+V로 추가)">${escHtml(l.body || '')}</textarea>
+        <div class="inq-img-notice" id="inqEImgNotice" hidden></div>
+        <div class="inq-thumbs" id="inqEThumbs"></div>
+        <div class="inq-edit-act">
+          <span>Ctrl+Enter 저장 · Esc 취소</span>
+          <button type="button" class="btn-ghost" id="inqECancel">취소</button>
+          <button type="button" class="btn-primary" id="inqESave">저장</button>
+        </div>`;
+    let dir = l.direction;
+    const $ = i => document.getElementById(i);
+    const setDir = d => {
+        dir = d;
+        $('inqEDir').querySelectorAll('[data-dir]').forEach(b => b.classList.toggle('on', b.dataset.dir === d));
+        $('inqEChannel').style.display = d === 'memo' ? 'none' : '';
+    };
+    setDir(dir);
+    if (!l.channel) $('inqEChannel').value = inqFind(_inqSel) ? (inqFind(_inqSel).channel || INQ_CHANNELS[0]) : INQ_CHANNELS[0];
+    $('inqEDir').querySelectorAll('[data-dir]').forEach(b => b.addEventListener('click', () => setDir(b.dataset.dir)));
+    const redraw = () => inqThumbs(imgs, 'inqEThumbs');
+    redraw();
+    inqBindImageInput($('inqEBody'), imgs, redraw, 'inqEImgNotice');
+    const ta = $('inqEBody');
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+
+    const cancel = () => inqRenderTimeline(true);
+    const save = async () => {
+        const body = ta.value.trim();
+        if (!body && !imgs.length) { showToast('내용이 비었습니다. 지우려면 삭제를 눌러주세요'); return; }
+        const patch = { body, images: imgs.slice(), direction: dir, channel: dir === 'memo' ? '' : $('inqEChannel').value, edited_at: new Date().toISOString() };
+        $('inqESave').disabled = true;
+        const { data, error } = await sb.from('inquiry_logs').update(patch).eq('id', id).select().single();
+        if (error) { $('inqESave').disabled = false; showToast('수정 실패: ' + error.message); return; }
+        Object.assign(l, data);
+        inqRenderTimeline(true);
+        showToast('기록을 수정했습니다');
+    };
+    $('inqECancel').addEventListener('click', cancel);
+    $('inqESave').addEventListener('click', save);
+    ta.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save(); }
+        else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    });
 }
 
 // ---------- 견적 연결 ----------
@@ -21862,4 +21917,208 @@ async function inqAiExtract() {
         _inqAiLast = '';   // 다음에 다시 시도할 수 있게
         inqAutofillNew();  // 규칙으로 뽑은 결과 안내로 되돌림
     }
+}
+
+// ---------- 다음 할 일 — 여러 개 · 담당자 · 일일계획표 자동 등록 (migration 037) ----------
+// 일일계획표(daily_tasks)와 연결된 할 일은 완료 여부를 daily_tasks.done에서 읽는다(단일 원본).
+// inquiries.next_action / next_action_date 는 목록·정렬용 요약('가장 급한 미완료 할 일 외 N건')
+let _inqTodos = [];
+
+function inqMe() { const n = (currentUser && currentUser.name) || ''; return DISPLAY_NAME_MAP[n] || n; }
+function inqPeopleOpts(v) {
+    const p = companyPeople().slice();
+    if (v && !p.includes(v)) p.push(v);
+    return inqOpt(p, v);
+}
+function inqTodoDailyText(x, task) { return x && x.client ? `[${x.client}] ${task}` : task; }
+function inqTodoSort(a, b) {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    const ad = a.due_date || '9999', bd = b.due_date || '9999';
+    return ad.localeCompare(bd) || (a.id - b.id);
+}
+function inqDailyLocal(id) {
+    try { return (typeof dailyTasks !== 'undefined' && dailyTasks) ? dailyTasks.find(d => d.id === id) : null; } catch (_) { return null; }
+}
+
+function inqDailyRemoveLocal(id) {
+    try { const i = dailyTasks.findIndex(d => d.id === id); if (i >= 0) dailyTasks.splice(i, 1); } catch (_) {}
+}
+
+async function inqLoadTodos(x) {
+    const el = document.getElementById('inqTodos');
+    const { data, error } = await sb.from('inquiry_todos').select('*').eq('inquiry_id', x.id).order('id');
+    if (_inqSel !== x.id) return;
+    if (error) { if (el) el.innerHTML = `<div class="inq-todo-err">할 일을 불러오지 못했습니다: ${escHtml(error.message)}</div>`; return; }
+    _inqTodos = data || [];
+    // 일일계획표에서 완료 체크한 것 반영
+    const ids = _inqTodos.map(t => t.daily_task_id).filter(Boolean);
+    if (ids.length) {
+        const { data: d } = await sb.from('daily_tasks').select('id, done').in('id', ids);
+        const m = new Map((d || []).map(r => [r.id, r]));
+        _inqTodos.forEach(t => { const r = m.get(t.daily_task_id); if (r) t.done = !!r.done; });
+    }
+    if (_inqSel !== x.id) return;
+    inqRenderTodos(x);
+    inqSyncNextSummary(x);
+}
+
+function inqRenderTodos(x) {
+    const el = document.getElementById('inqTodos');
+    if (!el) return;
+    const today = getTodayStr();
+    const list = _inqTodos.slice().sort(inqTodoSort);
+    const open = list.filter(t => !t.done).length;
+    el.innerHTML = `
+      <div class="inq-todo-head">
+        <b>다음 할 일</b>${open ? `<span>${open}</span>` : ''}
+        <em>추가하면 담당자 일일계획표에 자동으로 들어가요</em>
+      </div>
+      ${list.map(t => `
+      <div class="inq-todo ${t.done ? 'done' : ''} ${!t.done && t.due_date && t.due_date <= today ? 'late' : ''}" data-tid="${t.id}">
+        <input type="checkbox" data-k="done" ${t.done ? 'checked' : ''} title="완료">
+        <input class="inq-todo-task" data-k="task" value="${escHtml(t.task)}">
+        <input type="date" data-k="due_date" value="${escHtml(t.due_date || '')}" title="할 날짜">
+        <select data-k="assignee" title="담당자">${inqPeopleOpts(t.assignee || '')}</select>
+        ${t.daily_task_id
+            ? '<span class="inq-todo-linked" title="담당자 일일계획표에 등록됨">일일계획표 ✓</span>'
+            : '<button type="button" class="inq-todo-link" data-link title="담당자 일일계획표에 등록">+ 일일계획표</button>'}
+        <button type="button" class="inq-todo-del" data-del title="삭제">×</button>
+      </div>`).join('')}
+      <div class="inq-todo add">
+        <span class="inq-todo-plus">+</span>
+        <input class="inq-todo-task" id="inqTNew" placeholder="할 일 추가 — 예) 샘플 사진 보내기 (Enter)">
+        <input type="date" id="inqTNewDate" value="${today}" title="할 날짜">
+        <select id="inqTNewWho" title="담당자">${inqPeopleOpts(inqMe())}</select>
+        <button type="button" class="inq-mini primary" id="inqTNewAdd">추가</button>
+      </div>`;
+
+    el.querySelectorAll('[data-tid]').forEach(row => {
+        const t = _inqTodos.find(v => v.id === Number(row.dataset.tid));
+        if (!t) return;
+        row.querySelectorAll('[data-k]').forEach(inp => inp.addEventListener('change', () => {
+            const k = inp.dataset.k;
+            if (k === 'done') { inqTodoToggle(x, t, inp.checked); return; }
+            let v = inp.value.trim();
+            if (k === 'task' && !v) { inp.value = t.task; return; }
+            if (k === 'due_date') v = v || null;
+            if ((t[k] || null) === (v || null)) return;
+            inqTodoUpdate(x, t, { [k]: v });
+        }));
+        const task = row.querySelector('[data-k="task"]');
+        task.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); task.blur(); } });
+        const link = row.querySelector('[data-link]');
+        if (link) link.addEventListener('click', () => inqTodoLinkDaily(x, t));
+        row.querySelector('[data-del]').addEventListener('click', () => inqTodoDelete(x, t));
+    });
+    const add = () => inqTodoAdd(x);
+    document.getElementById('inqTNewAdd').addEventListener('click', add);
+    document.getElementById('inqTNew').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); add(); }
+    });
+}
+
+// 담당자 일일계획표에 할 일 한 줄 만들기 → 저장된 daily_task id
+async function inqTodoCreateDaily(x, task, due, who) {
+    const saved = await dbInsertTask({
+        task: inqTodoDailyText(x, task),
+        date: due || getTodayStr(),
+        assignee: who, target: '',
+        label: '회사 업무',
+        client: x.client || '',
+        note: '상담: ' + (x.title || x.client || ''),
+        priority: '🟡 보통',
+        done: false
+    });
+    if (!saved || !saved.id) return null;
+    try { dailyTasks.push(saved); } catch (_) {}
+    tbxSyncViews();
+    return saved.id;
+}
+
+async function inqTodoAdd(x) {
+    const inp = document.getElementById('inqTNew');
+    const task = (inp.value || '').trim();
+    if (!task) { inp.focus(); return; }
+    const due = document.getElementById('inqTNewDate').value || null;
+    const who = document.getElementById('inqTNewWho').value || inqMe();
+    const btn = document.getElementById('inqTNewAdd');
+    btn.disabled = true;
+    const dailyId = who ? await inqTodoCreateDaily(x, task, due, who) : null;
+    const { data, error } = await sb.from('inquiry_todos').insert({
+        inquiry_id: x.id, task, due_date: due, assignee: who, daily_task_id: dailyId, created_by: inqMe()
+    }).select().single();
+    btn.disabled = false;
+    if (error) {
+        showToast('할 일 저장 실패: ' + error.message);
+        if (dailyId) { await dbDeleteTask(dailyId); inqDailyRemoveLocal(dailyId); tbxSyncViews(); }
+        return;
+    }
+    _inqTodos.push(data);
+    inqRenderTodos(x);
+    document.getElementById('inqTNew').focus();
+    showToast(dailyId ? `${who} 일일계획표(${inqMD(due || getTodayStr())})에 등록했습니다` : '할 일을 추가했습니다 (일일계획표 등록은 실패)');
+    await inqAddLog(x.id, { direction: 'system', body: `할 일 추가 · ${task} (${who}${due ? ' · ' + inqMD(due) : ''})` });
+    inqSyncNextSummary(x);
+}
+
+async function inqTodoUpdate(x, t, patch) {
+    const { error } = await sb.from('inquiry_todos').update(patch).eq('id', t.id);
+    if (error) { showToast('저장 실패: ' + error.message); inqRenderTodos(x); return false; }
+    Object.assign(t, patch);
+    if (t.daily_task_id) {
+        const dp = {};
+        if ('task' in patch) dp.task = inqTodoDailyText(x, patch.task);
+        if ('due_date' in patch) dp.date = patch.due_date || getTodayStr();
+        if ('assignee' in patch) dp.assignee = patch.assignee;
+        if ('done' in patch) { dp.done = patch.done; dp.completedAt = patch.done ? new Date().toISOString() : null; }
+        await dbUpdateTask(t.daily_task_id, dp);
+        const g = inqDailyLocal(t.daily_task_id);
+        if (g) Object.assign(g, dp);
+        tbxSyncViews();
+    }
+    inqRenderTodos(x);
+    inqSyncNextSummary(x);
+    return true;
+}
+
+async function inqTodoToggle(x, t, done) {
+    const ok = await inqTodoUpdate(x, t, { done, done_at: done ? new Date().toISOString() : null });
+    if (ok && done) await inqAddLog(x.id, { direction: 'system', body: `할 일 완료 · ${t.task}${t.assignee ? ' (' + t.assignee + ')' : ''}` });
+}
+
+// 예전 '다음 할 일'에서 옮겨온 것처럼 일일계획표 연결이 없는 할 일 → 지금 등록
+async function inqTodoLinkDaily(x, t) {
+    const who = t.assignee || inqMe();
+    const id = await inqTodoCreateDaily(x, t.task, t.due_date, who);
+    if (!id) return;
+    const { error } = await sb.from('inquiry_todos').update({ daily_task_id: id, assignee: who }).eq('id', t.id);
+    if (error) { showToast('연결 실패: ' + error.message); return; }
+    t.daily_task_id = id; t.assignee = who;
+    inqRenderTodos(x);
+    showToast(`${who} 일일계획표에 등록했습니다`);
+}
+
+async function inqTodoDelete(x, t) {
+    if (!confirm(t.daily_task_id ? `'${t.task}' 할 일을 지울까요?\n${t.assignee || '담당자'} 일일계획표에서도 함께 지워집니다.` : `'${t.task}' 할 일을 지울까요?`)) return;
+    if (t.daily_task_id) {
+        await dbDeleteTask(t.daily_task_id);
+        inqDailyRemoveLocal(t.daily_task_id);
+        tbxSyncViews();
+    }
+    const { error } = await sb.from('inquiry_todos').delete().eq('id', t.id);
+    if (error) { showToast('삭제 실패: ' + error.message); return; }
+    _inqTodos = _inqTodos.filter(v => v.id !== t.id);
+    inqRenderTodos(x);
+    inqSyncNextSummary(x);
+}
+
+// 목록에 보이는 '다음 할 일' 요약 갱신
+async function inqSyncNextSummary(x) {
+    const open = _inqTodos.filter(t => !t.done).sort(inqTodoSort);
+    const na = open.length ? open[0].task + (open.length > 1 ? ` 외 ${open.length - 1}건` : '') : '';
+    const nd = open.length ? (open[0].due_date || null) : null;
+    const cur = inqFind(x.id) || x;
+    if ((cur.next_action || '') === na && (cur.next_action_date || null) === nd) return;
+    const d = await inqPatch(x.id, { next_action: na, next_action_date: nd });
+    if (d) Object.assign(x, d);
 }
