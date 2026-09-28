@@ -5780,6 +5780,7 @@ async function addProject(type) {
     try { notifyNewProject(newProject); } catch (e) {}
     closeModal(); renderProjects(); renderHome();
     showToast('프로젝트가 추가되었습니다');
+    if (type === 'domestic') clientAutoAddNotice([client, newProject.supplier]);
 }
 
 // projects_domestic row → 도메인 객체 매퍼 (Phase 3 #10 더보기 콜백에서도 재사용)
@@ -6783,6 +6784,7 @@ function openClientModal(existing) {
     title.textContent = existing ? '고객사 수정' : '새 고객사';
     const v = k => (c[k] || '').toString().replace(/"/g, '&quot;');
     body.innerHTML = `
+        ${bizregBoxHtml()}
         <div class="form-row">
             <div class="form-group"><label class="form-label">회사명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="cliCompanyName" value="${v('companyName')}" placeholder="회사명" ></div>
             <div class="form-group"><label class="form-label">대표자</label><input type="text" class="form-input" id="cliCeo" value="${v('ceo')}"></div>
@@ -6828,6 +6830,9 @@ function openClientModal(existing) {
             <button class="form-submit" style="flex:2" onclick="${existing ? `saveEditClient(${c.id})` : 'addClient()'}">💾 ${existing ? '수정 저장' : '추가'}</button>
         </div>`;
     document.getElementById('modalOverlay').classList.add('show'); openModalHistory();
+    const drop = document.getElementById('cliBizDrop');
+    if (drop && existing) drop.dataset.editing = String(c.id);
+    bizregBind();
 }
 
 function readClientForm() {
@@ -11697,6 +11702,7 @@ async function saveTempProject(id) {
             showToast('저장 완료');
             if (_inqId) inqOnQuoteAdded(_inqId, row);
         }
+        clientAutoAddNotice([client, supplier]);
     } catch (err) {
         console.error('임시 프로젝트 저장 실패:', err);
         showToast('저장 실패: ' + err.message);
@@ -11872,6 +11878,7 @@ async function saveTempGroupItem(gi, date, client, clientContact) {
         tempProjects.unshift({ id: data.id, date, client, clientContact, supplier, supplierContact, item, unitPrice, supplierUnitPrice, qty, revenue, supplierRevenue, unitPriceVat: 'VAT 별도', supplierUnitPriceVat: 'VAT 별도', printFee: 0, packagingFee: 0, labelFee: 0, shippingFee: 0 });
         if (tempProjects[0] && tempProjects[0].id === data.id) tempProjects[0].inquiryId = _inqId;
         showToast('추가 완료');
+        clientAutoAddNotice([client, supplier]);
         if (_inqId) inqOnQuoteAdded(_inqId, row);
     } catch (err) {
         console.error('임시 프로젝트 저장 실패:', err);
@@ -11939,6 +11946,7 @@ async function saveTempInline() {
         if (tempProjects[0] && tempProjects[0].id === data.id) tempProjects[0].inquiryId = _inqId;
         showToast('저장 완료');
         if (_inqId) inqOnQuoteAdded(_inqId, row);
+        clientAutoAddNotice([client, supplier]);
     } catch (err) {
         console.error('임시 프로젝트 저장 실패:', err);
         showToast('저장 실패: ' + err.message);
@@ -20958,6 +20966,7 @@ function inqBindDetail(x) {
         if (!f.hidden) { const n = $('inqFCName'); if (n) n.focus(); }
     });
     saveField('inqFClient', 'client');
+    $('inqFClient').addEventListener('change', () => setTimeout(() => clientAutoAddNotice([$('inqFClient').value]), 600));
     saveField('inqFTitle', 'title');
     saveField('inqFCName', 'contact_name');
     saveField('inqFCDept', 'contact_dept');
@@ -21511,6 +21520,7 @@ async function inqCreate() {
         created_by: (currentUser && currentUser.name) || ''
     }).select().single();
     if (error) { btn.disabled = false; showToast('등록 실패: ' + error.message); return; }
+    clientAutoAddNotice([client]);
 
     const author = (currentUser && currentUser.name) || '';
     // 한 번에 넣는 행들은 칸 구성이 같아야 한다 (images는 NOT NULL이라 빠지면 전체 거부됨)
@@ -22714,4 +22724,201 @@ async function renderClientHistory(c) {
         closeModal(); switchTab('projects-domestic');
         setTimeout(() => { if (inqEnsureProject(hit && hit.r)) showProjectDetail(hit.r.id); }, 100);
     }));
+}
+
+// ---------- 거래처 자동 추가 알림 (migration 040 트리거가 실제 추가) ----------
+// 저장 직후, 방금(1분 안) 거래처 DB에 새로 생긴 이름이 있으면 알려주고 거래처 목록 캐시를 새로 고친다
+async function clientAutoAddNotice(names) {
+    const keys = [...new Set((names || []).map(n => clientNameKey(n)).filter(k => k.length >= 2))];
+    if (!keys.length) return;
+    await new Promise(r => setTimeout(r, 400));
+    const since = new Date(Date.now() - 60000).toISOString();
+    const { data } = await sb.from('clients').select('company_name, category, created_at').gte('created_at', since).limit(50);
+    const added = (data || []).filter(r => keys.includes(clientNameKey(r.company_name)));
+    if (!added.length) return;
+    try { invalidateClientNamesCache(); buildTempClientDatalist(); } catch (_) {}
+    showToast(`국내 거래처 DB에 새로 추가했어요 · ${added.map(r => r.company_name + (r.category ? `(${r.category})` : '')).join(', ')}`);
+}
+
+// ---------- 새 고객사: 사업자등록증(사진·PDF·복사한 글)으로 자동 입력 ----------
+// AI 읽기: /api/meeting-summarize?kind=bizreg → api/_bizreg-extract.js
+const BIZREG_MAP = [
+    ['company_name', 'cliCompanyName', '회사명'], ['ceo', 'cliCeo', '대표자'], ['business_no', 'cliBusinessNo', '사업자번호'],
+    ['address', 'cliAddress', '주소'], ['biz_type', 'cliBizType', '업태'], ['biz_item', 'cliBizItem', '업종'],
+    ['phone', 'cliPhone', '전화'], ['email', 'cliEmail', '이메일']
+];
+let _bizregSeq = 0;
+
+function bizregBoxHtml() {
+    return `
+      <div class="biz-drop" id="cliBizDrop">
+        <div class="biz-drop-top">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
+          <div><b>사업자등록증으로 자동 입력</b><span>사진·PDF를 여기로 끌어다 놓거나, 아래 칸에 Ctrl+V (사진도 됨) · 글을 복사해 붙여넣어도 됩니다</span></div>
+          <label class="biz-file-btn">파일 선택<input type="file" id="cliBizFile" accept="image/*,application/pdf" hidden></label>
+        </div>
+        <textarea id="cliBizText" rows="2" placeholder="여기를 누르고 Ctrl+V — 사업자등록증 사진 또는 글"></textarea>
+        <div class="biz-status" id="cliBizStatus"></div>
+      </div>`;
+}
+
+function bizregStatus(html, kind) {
+    const el = document.getElementById('cliBizStatus');
+    if (!el) return;
+    el.className = 'biz-status' + (kind ? ' ' + kind : '');
+    el.innerHTML = html || '';
+}
+
+function bizregBind() {
+    const box = document.getElementById('cliBizDrop');
+    if (!box) return;
+    const ta = document.getElementById('cliBizText');
+    let t = null;
+    ta.addEventListener('paste', (e) => {
+        const items = (e.clipboardData && e.clipboardData.items) || [];
+        for (const it of items) {
+            if (it.kind === 'file' && it.type && (it.type.startsWith('image/') || it.type === 'application/pdf')) {
+                const f = it.getAsFile();
+                if (f) { e.preventDefault(); bizregFromFile(f); return; }
+            }
+        }
+        const html = e.clipboardData && e.clipboardData.getData('text/html');
+        if (html && /<(p|div|br|tr|td|table)\b/i.test(html)) {
+            e.preventDefault();
+            inqInsertText(ta, inqHtmlToText(html));
+        }
+    });
+    ta.addEventListener('input', () => {
+        clearTimeout(t);
+        const v = ta.value.trim();
+        if (v.length >= 20) t = setTimeout(() => bizregRun({ text: v }), 700);
+    });
+    document.getElementById('cliBizFile').addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (f) bizregFromFile(f);
+        e.target.value = '';
+    });
+    box.addEventListener('dragover', (e) => { if (Array.from((e.dataTransfer && e.dataTransfer.types) || []).includes('Files')) { e.preventDefault(); box.classList.add('over'); } });
+    box.addEventListener('dragleave', () => box.classList.remove('over'));
+    box.addEventListener('drop', (e) => {
+        box.classList.remove('over');
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) { e.preventDefault(); bizregFromFile(f); }
+    });
+    // 사람이 고친 칸은 자동 입력이 다시 덮지 않게
+    BIZREG_MAP.forEach(([, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => { delete el.dataset.auto; el.classList.remove('biz-auto'); });
+    });
+}
+
+async function bizregFromFile(f) {
+    const isPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name || '');
+    if (!isPdf && !(f.type || '').startsWith('image/')) { bizregStatus('사진(JPG·PNG) 또는 PDF 파일만 읽을 수 있어요', 'err'); return; }
+    if (isPdf && f.size > 5 * 1024 * 1024) { bizregStatus('PDF가 너무 커요 (5MB 이하). 사진으로 찍어 넣어주세요', 'err'); return; }
+    bizregStatus('<span class="inq-ai-spin"></span> 파일 준비 중…', 'busy');
+    try {
+        let dataUrl = await inqBlobToDataUrl(f);
+        if (!isPdf) dataUrl = await _shrinkDataUrl(dataUrl, 2000, 0.88);   // 글자가 읽힐 만큼만 줄여서 전송
+        const m = /^data:([^;,]+)/.exec(dataUrl);
+        const mediaType = isPdf ? 'application/pdf' : (m ? m[1] : 'image/jpeg');
+        if (!isPdf && !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(mediaType)) {
+            bizregStatus('이 사진 형식은 읽을 수 없어요. 캡처(Win+Shift+S)해서 붙여넣어 주세요', 'err'); return;
+        }
+        await bizregRun({ file: { data: dataUrl.split(',')[1], mediaType }, name: f.name || '' });
+    } catch (e) { bizregStatus('파일을 읽지 못했어요: ' + escHtml(e.message || String(e)), 'err'); }
+}
+
+// 글만 있을 때 AI가 안 되면 쓰는 최소 규칙 (라벨 사이 띄어쓰기 허용)
+function bizregParseText(t) {
+    const s = String(t || '');
+    const lab = (w) => w.split('').map(ch => ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s*');
+    const unspace = v => /^([가-힣]\s){1,5}[가-힣]$/.test(v) ? v.replace(/\s/g, '') : v;   // '홍 길 동' → '홍길동'
+    const get = (labels) => {
+        for (const l of labels) {
+            const m = s.match(new RegExp(lab(l) + '\\s*[:：]?\\s*([^\\n]+)'));
+            if (m && m[1].trim()) return m[1].trim();
+        }
+        return '';
+    };
+    const bn = s.match(/\d{3}\s*-\s*\d{2}\s*-\s*\d{5}/);
+    return {
+        business_no: bn ? bn[0].replace(/\s/g, '') : '',
+        company_name: get(['법인명(단체명)', '법인명', '상호']).replace(/\s*(성\s*명|대\s*표\s*자).*$/, ''),
+        ceo: unspace(get(['대표자', '성명'])).replace(/\s*(생\s*년|주\s*민|법\s*인).*$/, ''),
+        address: get(['사업장소재지', '사업장 소재지']),
+        biz_type: get(['업태']).replace(/\s*종\s*목.*$/, ''),
+        biz_item: get(['종목'])
+    };
+}
+
+async function bizregRun(payload) {
+    const seq = ++_bizregSeq;
+    bizregStatus('<span class="inq-ai-spin"></span> AI가 사업자등록증을 읽는 중…', 'busy');
+    let d = null, fail = '';
+    try {
+        const { data: sess } = await sb.auth.getSession();
+        const token = sess && sess.session && sess.session.access_token;
+        if (!token) throw new Error('로그인이 필요합니다');
+        const res = await fetch('/api/meeting-summarize?kind=bizreg', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify({ text: payload.text || '', file: payload.file || null })
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+        d = j;
+    } catch (e) {
+        fail = e.message || String(e);
+        if (payload.text) d = bizregParseText(payload.text);   // 글이면 규칙으로라도
+    }
+    if (seq !== _bizregSeq || !document.getElementById('cliCompanyName')) return;
+    if (!d) { bizregStatus('읽지 못했어요 — ' + escHtml(fail), 'err'); return; }
+
+    const filled = [], kept = [];
+    BIZREG_MAP.forEach(([k, id, label]) => {
+        const el = document.getElementById(id);
+        const v = String(d[k] || '').trim();
+        if (!el || !v) return;
+        if (el.value.trim() && el.dataset.auto !== '1') { if (el.value.trim() !== v) kept.push(label); return; }
+        el.value = v;
+        el.dataset.auto = '1';
+        el.classList.add('biz-auto');
+        filled.push(label);
+    });
+    if (!filled.length) {
+        bizregStatus(d.is_certificate === false ? '사업자등록증이 아닌 것 같아요. 다른 파일로 다시 시도해주세요' : '새로 채울 정보가 없어요' + (kept.length ? ` (이미 입력된 칸: ${kept.join(' · ')})` : ''), 'err');
+        return;
+    }
+    let msg = `${INQ_CHECK_SVG} 자동 입력 — <b>${filled.join(' · ')}</b> <span>틀리면 바로 고쳐주세요</span>`;
+    if (kept.length) msg += `<div class="biz-kept">이미 입력돼 있어 그대로 둔 칸: ${kept.join(' · ')}</div>`;
+    if (fail) msg += `<div class="biz-kept">AI 연결이 안 돼 글에서 찾은 것만 넣었어요</div>`;
+    bizregStatus(msg, 'ok');
+    bizregDupCheck(d);
+}
+
+// 이미 등록된 거래처인지 (사업자번호 또는 이름)
+async function bizregDupCheck(d) {
+    const bn = String(d.business_no || '').replace(/[^0-9]/g, '');
+    const key = clientNameKey(d.company_name);
+    const editingId = Number((document.getElementById('cliBizDrop') || {}).dataset?.editing || 0);
+    const hits = new Map();
+    try {
+        if (bn.length === 10) {
+            const fmt = `${bn.slice(0, 3)}-${bn.slice(3, 5)}-${bn.slice(5)}`;
+            const { data } = await sb.from('clients').select('id, company_name, business_no').in('business_no', [fmt, bn]).limit(5);
+            (data || []).forEach(r => hits.set(r.id, r));
+        }
+        if (key.length >= 2) {
+            const core = String(d.company_name).replace(/주식회사|유한회사|\(주\)|\(유\)|㈜/g, '').trim();
+            const { data } = await sb.from('clients').select('id, company_name, business_no').ilike('company_name', '%' + core.replace(/[%_\\]/g, m => '\\' + m) + '%').limit(20);
+            (data || []).filter(r => clientNameKey(r.company_name) === key).forEach(r => hits.set(r.id, r));
+        }
+    } catch (_) { return; }
+    const list = [...hits.values()].filter(r => r.id !== editingId);
+    if (!list.length || !document.getElementById('cliBizStatus')) return;
+    const el = document.getElementById('cliBizStatus');
+    el.insertAdjacentHTML('beforeend', `<div class="biz-dup">⚠️ 이미 등록된 거래처일 수 있어요: ${list.map(r =>
+        `<a href="#" data-cid="${r.id}">${escHtml(r.company_name)}${r.business_no ? ' (' + escHtml(r.business_no) + ')' : ''}</a>`).join(', ')} — 눌러서 기존 거래처 열기</div>`);
+    el.querySelectorAll('[data-cid]').forEach(a => a.addEventListener('click', (e) => { e.preventDefault(); openClientDetail(Number(a.dataset.cid)); }));
 }

@@ -10,9 +10,11 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ||
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 
 const inquiryExtract = require('./_inquiry-extract');   // Hobby 플랜 함수 12개 제한 → 상담 문의 추출은 여기로 같이 받음
+const bizregExtract = require('./_bizreg-extract');     // 사업자등록증 읽기도 같은 이유로 여기로
 
 module.exports = async (req, res) => {
     if (req.query && req.query.kind === 'inquiry') return inquiryExtract(req, res);
+    if (req.query && req.query.kind === 'bizreg') return bizregExtract(req, res);
     if (req.method !== 'POST') { res.status(405).json({ error: 'POST 요청만 허용됩니다.' }); return; }
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) { res.status(503).json({ error: 'AI 키가 아직 설정되지 않았습니다. 관리자가 Vercel 환경변수(ANTHROPIC_API_KEY)를 등록해야 합니다.' }); return; }

@@ -166,6 +166,10 @@
 - **엑셀 양식 시드**: `seedMarginTemplate()` — 본품/패키지/품질보증서/국내배송비/판매수수료/라이선스/특전/기타비용 8개 카테고리를 엑셀 기준으로 채움
 - **주요 함수**: `initMarginCalcIfNeeded`, `defaultMarginState`, `seedMarginTemplate`, `addMarginCategory`, `removeMarginCategory`, `addMarginItem`, `removeMarginItem`, `updateMarginItem`, `recalcMargin`, `renderMarginCategories`, `renderMarginSummary`, `loadMarginSimulationsFromDb`, `saveMarginSimulation`, `onMarginSimSelectChange`, `deleteCurrentMarginSimulation`
 
+## 거래처 자동화 (migration 040)
+- **자동 추가**: 상담(inquiries.client)·견적 의뢰(projects_temp.client/supplier)·국내 프로젝트(projects_domestic.client/supplier)에 저장된 거래처가 국내/해외 거래처 DB에 없으면 트리거가 `clients`에 추가 (매출처 칸→'매출처', 매입처 칸→'매입처', 상담은 고객 담당자·연락처·이메일을 담당직원 칸에). 같은 회사 판단은 `client_name_key()` ((주)·주식회사·㈜·공백 제거). '개인'·'자체'·'(회사명 모름)' 등은 건너뜀. 앱은 저장 뒤 `clientAutoAddNotice`로 새로 생긴 거래처를 토스트로 알림
+- **사업자등록증 자동 입력**: 새 고객사/수정 모달 위 `bizregBoxHtml` — 사진·PDF(끌어놓기·Ctrl+V·파일 선택) 또는 복사한 글 → `/api/meeting-summarize?kind=bizreg` → `api/_bizreg-extract.js`(Claude 비전, PDF는 document 블록). 빈 칸/자동 입력 칸만 채움. AI 실패 시 글이면 `bizregParseText` 규칙으로. `bizregDupCheck`가 사업자번호·이름으로 기존 거래처 경고
+
 ## 문서 생성기 (DC/WR) 연동
 - **생성 흐름**: 프로젝트 진행사항 → 상세/편집 모달의 `📄 디자인확인서 만들기` / `📋 작업요청서 만들기` 버튼 → `doc-generator.html`로 이동하여 pre-fill
   - 프로젝트 데이터는 `localStorage.klp_doc_prefill`로 전달 (doc-generator가 로드 시 읽고 즉시 삭제)

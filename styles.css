@@ -5002,3 +5002,30 @@ textarea.inq-drop{border-color:var(--blue) !important; background:var(--blue-lig
 .inq-cust .inq-cinfo .inq-mini{height:24px; padding:0 9px}
 .inq-cust .inq-fields{margin-top:8px; padding:10px; background:var(--gray-50); border:1px solid var(--border-soft); border-radius:9px}
 @media (max-width:1400px){ .inq-cust .inq-fields{grid-template-columns:repeat(2, minmax(0,1fr))} }
+
+
+/* ---- 새 고객사: 사업자등록증 자동 입력 ---- */
+.biz-drop{margin-bottom:16px; padding:12px; border:1.5px dashed color-mix(in srgb, var(--blue) 45%, var(--border)); border-radius:12px;
+    background:color-mix(in srgb, var(--blue) 5%, var(--white)); transition:background .15s, border-color .15s}
+.biz-drop.over{background:var(--blue-light); border-color:var(--blue)}
+.biz-drop-top{display:flex; align-items:center; gap:10px; color:var(--blue)}
+.biz-drop-top > div{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px}
+.biz-drop-top b{font-size:13.5px; font-weight:800; color:var(--gray-900)}
+.biz-drop-top span{font-size:12px; font-weight:500; color:var(--gray-500)}
+.biz-file-btn{flex:none; height:32px; padding:0 12px; display:inline-flex; align-items:center; border-radius:8px; cursor:pointer;
+    border:1px solid var(--border); background:var(--white); font-size:12.5px; font-weight:700; color:var(--gray-700)}
+.biz-file-btn:hover{border-color:var(--blue); color:var(--blue)}
+.biz-drop textarea{width:100%; box-sizing:border-box; margin-top:10px; padding:8px 10px; border:1px solid var(--border); border-radius:8px;
+    font-family:inherit; font-size:13px; line-height:1.5; color:var(--gray-900); background:var(--white); outline:none; resize:vertical; min-height:40px}
+.biz-drop textarea:focus{border-color:var(--blue)}
+.biz-status:empty{display:none}
+.biz-status{margin-top:8px; font-size:12.5px; font-weight:600; color:var(--gray-600); display:flex; flex-direction:column; gap:4px}
+.biz-status.busy{flex-direction:row; align-items:center; gap:8px; color:var(--blue)}
+.biz-status.ok{color:var(--blue)}
+.biz-status.ok b{font-weight:800}
+.biz-status.ok span{color:var(--gray-500)}
+.biz-status.err{color:var(--red)}
+.biz-kept{font-size:12px; font-weight:600; color:var(--gray-500)}
+.biz-dup{font-size:12.5px; font-weight:700; color:var(--orange)}
+.biz-dup a{color:var(--orange); text-decoration:underline}
+.form-input.biz-auto{background:var(--blue-light); border-color:color-mix(in srgb, var(--blue) 45%, transparent)}
