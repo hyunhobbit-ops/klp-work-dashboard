@@ -441,8 +441,8 @@ async function renderCompanySettings() {
                             <td style="padding:6px 4px"><select class="form-select" id="csEditRole_${m.id}" style="width:100px;padding:4px 8px">${ROLE_OPTS.map(r => `<option ${m.role === r ? 'selected' : ''}>${r}</option>`).join('')}</select></td>
                             <td style="padding:6px 4px">${m.is_active === false ? '비활성' : '활성'}</td>
                             <td style="padding:6px 4px;text-align:right;white-space:nowrap">
-                                <button class="btn-ghost" style="font-size:12px;color:var(--blue);background:none;border:none;cursor:pointer" onclick="saveMember(${m.id})">저장</button>
-                                <button class="btn-ghost" style="font-size:12px;color:var(--gray-500);background:none;border:none;cursor:pointer" onclick="cancelEditMember()">취소</button>
+                                <button class="btn-ghost" style="font-size:12px;color:var(--blue);background:none;border:none;cursor:pointer;padding:2px 4px;display:inline" onclick="saveMember(${m.id})">저장</button>
+                                <button class="btn-ghost" style="font-size:12px;color:var(--gray-500);background:none;border:none;cursor:pointer;padding:2px 4px;display:inline" onclick="cancelEditMember()">취소</button>
                             </td></tr>`;
                     }
                     return `<tr style="border-bottom:1px solid var(--gray-100);${m.is_active === false ? 'opacity:.5' : ''}">
@@ -451,8 +451,8 @@ async function renderCompanySettings() {
                         <td style="padding:8px 4px">${escHtml(m.role || '')}</td>
                         <td style="padding:8px 4px">${m.is_active === false ? '비활성' : '활성'}</td>
                         <td style="padding:8px 4px;text-align:right;white-space:nowrap">
-                            <button class="btn-ghost" style="font-size:12px;color:var(--gray-600);background:none;border:none;cursor:pointer" onclick="editMember(${m.id})">수정</button>
-                            ${m.id === currentUser.id ? '' : `<button class="btn-ghost" style="font-size:12px;color:${m.is_active === false ? 'var(--blue)' : 'var(--red)'};background:none;border:none;cursor:pointer;margin-left:6px" onclick="toggleEmployeeActive(${m.id}, ${m.is_active === false})">${m.is_active === false ? '복구' : '내보내기'}</button>`}
+                            <button class="btn-ghost" style="font-size:12px;color:var(--gray-600);background:none;border:none;cursor:pointer;padding:2px 4px;display:inline" onclick="editMember(${m.id})">수정</button>
+                            ${m.id === currentUser.id ? '' : `<button class="btn-ghost" style="font-size:12px;color:${m.is_active === false ? 'var(--blue)' : 'var(--red)'};background:none;border:none;cursor:pointer;padding:2px 4px;display:inline;margin-left:6px" onclick="toggleEmployeeActive(${m.id}, ${m.is_active === false})">${m.is_active === false ? '복구' : '내보내기'}</button>`}
                         </td></tr>`;
                 }).join('')}</tbody></table>`;
         }
@@ -20663,7 +20663,8 @@ let _inqLogs = [];
 let _inqFilter = 'active';
 let _inqDir = 'in';
 let _inqPendingLink = null;    // '이 상담으로 견적 작성' 중인 상담 id
-let _inqComposerImage = '';
+const _inqComposerImages = [];   // 기록 작성칸에 붙인 사진들
+const _inqNewImages = [];        // 새 상담 첫 문의 내용에 붙인 사진들
 
 // ---------- 화면 전환 ----------
 function tpSetView(v) {
@@ -20738,7 +20739,7 @@ async function inqAddLog(id, log) {
         direction: log.direction || 'memo',
         channel: log.channel || '',
         body: log.body || '',
-        image: log.image || '',
+        images: Array.isArray(log.images) ? log.images : [],
         author: log.direction === 'system' ? '' : ((currentUser && currentUser.name) || '')
     };
     const { data, error } = await sb.from('inquiry_logs').insert(row).select().single();
@@ -20782,9 +20783,8 @@ function inqFiltered() {
     if (_inqFilter === 'active') list = list.filter(x => INQ_ACTIVE.includes(x.status));
     else if (_inqFilter !== 'all') list = list.filter(x => x.status === _inqFilter);
     if (q) list = list.filter(x =>
-        (x.client || '').toLowerCase().includes(q) ||
-        (x.title || '').toLowerCase().includes(q) ||
-        (x.client_contact || '').toLowerCase().includes(q));
+        [x.client, x.title, x.client_contact, x.contact_name, x.contact_phone, x.contact_email]
+            .some(v => String(v || '').toLowerCase().includes(q)));
     // 할 일 기한 지난 것 → 최근 연락 순
     return list.slice().sort((a, b) => {
         const ao = inqIsOverdue(a) ? 0 : 1, bo = inqIsOverdue(b) ? 0 : 1;
@@ -20818,14 +20818,15 @@ function inqRenderList() {
     }
     el.innerHTML = list.map(x => {
         const late = inqIsOverdue(x);
+        const who = x.contact_name || x.client_contact || '';
         return `<div class="inq-item ${x.id === _inqSel ? 'on' : ''}" data-id="${x.id}">
             <div class="inq-item-top">
-                <span class="inq-client">${escHtml(x.client || '(거래처 미정)')}</span>
+                <span class="inq-client">${escHtml(x.client || '(거래처 미정)')}${who ? `<em>${escHtml(who)}</em>` : ''}</span>
                 <span class="inq-st ${INQ_STATUS_CLS[x.status] || ''}">${escHtml(x.status)}</span>
             </div>
             ${x.title ? `<div class="inq-title">${escHtml(x.title)}</div>` : ''}
             <div class="inq-meta">
-                ${x.assignee ? `<span>${escHtml(x.assignee)}</span>` : ''}
+                ${x.assignee ? `<span>담당 ${escHtml(x.assignee)}</span>` : ''}
                 <span>${inqRel(x.last_contact_at)}</span>
             </div>
             ${x.next_action ? `<div class="inq-next ${late ? 'late' : ''}">${x.next_action_date ? inqMD(x.next_action_date) + ' · ' : ''}${escHtml(x.next_action)}</div>` : ''}
@@ -20865,7 +20866,10 @@ async function inqRenderDetail() {
         </div>
         <input class="inq-h-title" id="inqFTitle" value="${escHtml(x.title || '')}" placeholder="무엇을 문의했나요? 예) 손목시계 300개 각인 견적">
         <div class="inq-fields">
-          <label><span>고객 담당자</span><input id="inqFContact" value="${escHtml(x.client_contact || '')}" placeholder="이름 · 연락처"></label>
+          <label><span>고객 담당자</span><input id="inqFCName" value="${escHtml(x.contact_name || x.client_contact || '')}" placeholder="이름"></label>
+          <label><span>직함 · 부서</span><input id="inqFCTitle" value="${escHtml(x.contact_title || '')}" placeholder="예) 총무팀 과장"></label>
+          <label><span>연락처</span><input id="inqFCPhone" inputmode="tel" value="${escHtml(x.contact_phone || '')}" placeholder="010-0000-0000"></label>
+          <label><span>이메일</span><input id="inqFCEmail" type="email" value="${escHtml(x.contact_email || '')}" placeholder="name@company.com"></label>
           <label><span>문의 경로</span><select id="inqFChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select></label>
           <label><span>우리 담당</span><select id="inqFAssignee">${assigneeOpts}</select></label>
           <label><span>상담 시작일</span><input type="date" id="inqFStarted" value="${escHtml(x.started_at || '')}"></label>
@@ -20886,39 +20890,44 @@ async function inqRenderDetail() {
             <button data-dir="in">고객</button><button data-dir="out">우리 답변</button><button data-dir="memo">내부 메모</button>
           </div>
           <select id="inqCChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select>
-          <label class="inq-attach" title="사진 첨부">
+          <label class="inq-attach" title="사진 첨부 (Ctrl+V로 붙여넣기도 됩니다)">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M21 16l-5-5-8 8"/></svg>
-            <input type="file" accept="image/*" id="inqCFile" hidden>
+            <input type="file" accept="image/*" multiple id="inqCFile" hidden>
           </label>
           <div class="inq-spacer"></div>
-          <span class="inq-comp-hint">Ctrl+Enter 저장</span>
+          <span class="inq-comp-hint">사진은 Ctrl+V · Ctrl+Enter 저장</span>
         </div>
         <div class="inq-comp-body">
           <textarea id="inqCBody" rows="2" placeholder="오간 내용을 그대로 적거나 카톡 대화를 붙여넣으세요"></textarea>
           <button class="btn-primary" id="inqCSave">기록</button>
         </div>
-        <div id="inqCPreview"></div>
+        <div class="inq-thumbs" id="inqCThumbs"></div>
       </div>`;
+    _inqComposerImages.length = 0;
     inqBindDetail(x);
     inqRenderQuotes(x);
     inqSetDir(_inqDir);
-    _inqComposerImage = '';
     await inqLoadLogs(x.id);
 }
 
 function inqBindDetail(x) {
     const $ = id => document.getElementById(id);
-    const saveField = (id, key) => {
+    const saveField = (id, key, norm) => {
         const el = $(id); if (!el) return;
         el.addEventListener('change', () => {
-            const v = el.value.trim();
-            if ((x[key] || '') === v) return;
+            let v = el.value.trim();
+            if (norm) { v = norm(v); el.value = v; }
+            const cur = key === 'contact_name' ? (x.contact_name || x.client_contact || '') : (x[key] || '');
+            if (cur === v) return;
             inqPatch(x.id, { [key]: v || (key === 'started_at' ? null : '') }).then(d => { if (d) Object.assign(x, d); });
         });
     };
     saveField('inqFClient', 'client');
     saveField('inqFTitle', 'title');
-    saveField('inqFContact', 'client_contact');
+    saveField('inqFCName', 'contact_name');
+    saveField('inqFCTitle', 'contact_title');
+    saveField('inqFCPhone', 'contact_phone', inqNormPhone);
+    saveField('inqFCEmail', 'contact_email');
     saveField('inqFChannel', 'channel');
     saveField('inqFAssignee', 'assignee');
     saveField('inqFStarted', 'started_at');
@@ -20964,24 +20973,16 @@ function inqBindDetail(x) {
         showToast('상담을 삭제했습니다');
     });
 
-    // 작성기
+    // 작성기 — 방향 전환, 저장, 사진(파일 선택·붙여넣기·끌어놓기)
     $('inqDir').querySelectorAll('[data-dir]').forEach(b => b.addEventListener('click', () => inqSetDir(b.dataset.dir)));
     $('inqCSave').addEventListener('click', inqSubmit);
     $('inqCBody').addEventListener('keydown', e => {
         if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); inqSubmit(); }
     });
+    const redraw = () => inqThumbs(_inqComposerImages, 'inqCThumbs');
+    inqBindImageInput($('inqCBody'), _inqComposerImages, redraw);
     $('inqCFile').addEventListener('change', async (ev) => {
-        const f = ev.target.files && ev.target.files[0];
-        if (!f) return;
-        if (!f.type.startsWith('image/')) { showToast('이미지 파일만 첨부할 수 있습니다'); return; }
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                _inqComposerImage = await _shrinkDataUrl(e.target.result, 1200, 0.8);
-                inqRenderComposerPreview();
-            } catch (err) { showToast('사진 처리 실패: ' + err.message); }
-        };
-        reader.readAsDataURL(f);
+        await inqAddImageFiles(ev.target.files, _inqComposerImages, redraw);
         ev.target.value = '';
     });
 }
@@ -20996,31 +20997,28 @@ function inqSetDir(d) {
         : '팀끼리만 보는 메모 (고객에게 안 나감)';
 }
 
+// (사진 여러 장 지원으로 inqThumbs로 대체됨 — 호출 호환용)
 function inqRenderComposerPreview() {
-    const box = document.getElementById('inqCPreview');
-    if (!box) return;
-    if (!_inqComposerImage) { box.innerHTML = ''; return; }
-    box.innerHTML = `<div class="inq-c-img"><img src="${escHtml(_inqComposerImage)}" alt="첨부"><button type="button" title="첨부 취소">×</button></div>`;
-    box.querySelector('button').addEventListener('click', () => { _inqComposerImage = ''; inqRenderComposerPreview(); });
+    inqThumbs(_inqComposerImages, 'inqCThumbs');
 }
 
 async function inqSubmit() {
     const x = inqFind(_inqSel);
     if (!x) return;
     const body = document.getElementById('inqCBody').value.trim();
-    if (!body && !_inqComposerImage) { showToast('내용을 입력하거나 사진을 첨부하세요'); return; }
+    if (!body && !_inqComposerImages.length) { showToast('내용을 입력하거나 사진을 붙여넣으세요'); return; }
     const btn = document.getElementById('inqCSave');
     btn.disabled = true;
     const saved = await inqAddLog(x.id, {
         direction: _inqDir,
         channel: _inqDir === 'memo' ? '' : document.getElementById('inqCChannel').value,   // 내부 메모엔 경로 없음
-        body, image: _inqComposerImage
+        body, images: _inqComposerImages.slice()
     });
     btn.disabled = false;
     if (!saved) return;
     document.getElementById('inqCBody').value = '';
-    _inqComposerImage = '';
-    inqRenderComposerPreview();
+    _inqComposerImages.length = 0;
+    inqThumbs(_inqComposerImages, 'inqCThumbs');
 
     // 고객·우리 대화면 마지막 연락 갱신, 우리가 처음 답하면 신규 → 상담중
     if (_inqDir !== 'memo') {
@@ -21065,6 +21063,7 @@ function inqRenderTimeline() {
             html += `<div class="inq-sys"><span>${escHtml(l.body)}</span><em>${inqTime(l.at)}</em></div>`;
             return;
         }
+        const imgs = (Array.isArray(l.images) && l.images.length) ? l.images : (l.image ? [l.image] : []);
         html += `<div class="inq-msg d-${escHtml(l.direction)}">
             <div class="inq-msg-meta">
                 <b>${escHtml(INQ_DIR_LABEL[l.direction] || '')}</b>
@@ -21074,7 +21073,7 @@ function inqRenderTimeline() {
                 <button class="inq-msg-del" data-del="${l.id}" title="이 기록 삭제">×</button>
             </div>
             ${l.body ? `<div class="inq-msg-body">${escHtml(l.body).replace(/\n/g, '<br>')}</div>` : ''}
-            ${l.image ? `<img class="inq-msg-img" src="${escHtml(l.image)}" alt="첨부 사진">` : ''}
+            ${imgs.length ? `<div class="inq-msg-imgs">${imgs.map(s => `<img class="inq-msg-img" src="${escHtml(s)}" alt="첨부 사진">`).join('')}</div>` : ''}
         </div>`;
     });
     el.innerHTML = html;
@@ -21159,7 +21158,7 @@ function inqStartQuote(id) {
     const set = (elId, v) => { const e = document.getElementById(elId); if (e) e.value = v; };
     set('tempInDate', getTodayStr());
     set('tempInClient', x.client || '');
-    set('tempInClientContact', x.client_contact || '');
+    set('tempInClientContact', x.contact_name || x.client_contact || '');
     inqRenderLinkBanner();
     const it = document.getElementById('tempInItem');
     if (it) it.focus();
@@ -21228,31 +21227,54 @@ function inqRenderNewForm() {
     if (!el) return;
     const people = companyPeople();
     const me = currentUser && currentUser.name;
+    _inqNewImages.length = 0;
     el.innerHTML = `
       <div class="inq-new">
         <h3>새 상담 등록</h3>
         <div class="inq-new-grid">
-          <label><span>거래처 *</span><input id="inqNClient" list="tempClientList" placeholder="거래처 DB에서 고르거나 직접 입력" autocomplete="off"></label>
-          <label><span>고객 담당자</span><input id="inqNContact" placeholder="이름 · 연락처"></label>
+          <label class="span2"><span>거래처 *</span><input id="inqNClient" list="tempClientList" placeholder="거래처 DB에서 고르거나 직접 입력" autocomplete="off"></label>
           <label><span>문의 경로</span><select id="inqNChannel">${inqOpt(INQ_CHANNELS, '전화')}</select></label>
           <label><span>우리 담당</span><select id="inqNAssignee"><option value="">-</option>${inqOpt(people, people.includes(me) ? me : '')}</select></label>
+          <label class="span4"><span>무엇을 문의했나요?</span><input id="inqNTitle" placeholder="예) 손목시계 300개 각인 견적"></label>
         </div>
-        <label class="inq-new-full"><span>무엇을 문의했나요?</span><input id="inqNTitle" placeholder="예) 손목시계 300개 각인 견적"></label>
-        <label class="inq-new-full"><span>첫 문의 내용 <em>(선택)</em></span>
-          <textarea id="inqNBody" rows="5" placeholder="고객이 한 말이나 카톡 대화를 그대로 붙여넣어도 됩니다"></textarea></label>
+        <div class="inq-new-sec">고객 연락처 <em>선택 · 나중에 채워도 됩니다</em></div>
+        <div class="inq-new-grid">
+          <label><span>담당자 이름</span><input id="inqNCName" placeholder="홍길동"></label>
+          <label><span>직함 · 부서</span><input id="inqNCTitle" placeholder="예) 총무팀 과장"></label>
+          <label><span>연락처</span><input id="inqNCPhone" inputmode="tel" placeholder="010-0000-0000"></label>
+          <label><span>이메일</span><input id="inqNCEmail" type="email" placeholder="name@company.com"></label>
+        </div>
+        <div class="inq-new-full">
+          <div class="inq-new-lab">첫 문의 내용 <em>선택 — 메일·카톡·홈페이지 문의를 붙여넣으면 위 칸이 자동으로 채워집니다</em></div>
+          <textarea id="inqNBody" rows="7" placeholder="고객이 보낸 내용을 그대로 붙여넣으세요.&#10;사진도 Ctrl+V로 붙여넣거나 여기로 끌어다 놓을 수 있습니다."></textarea>
+          <div class="inq-thumbs" id="inqNThumbs"></div>
+          <div class="inq-auto-hint" id="inqNAutoHint"></div>
+        </div>
         <div class="inq-new-actions">
-          <button class="btn-ghost" id="inqNCancel">취소</button>
-          <button class="btn-primary" id="inqNSave">등록</button>
+          <button type="button" class="btn-ghost" id="inqNCancel">취소</button>
+          <button type="button" class="btn-primary" id="inqNSave">등록</button>
         </div>
       </div>`;
-    document.getElementById('inqNCancel').addEventListener('click', () => {
+    const $ = id => document.getElementById(id);
+    $('inqNCancel').addEventListener('click', () => {
         _inqSel = null;
         const first = inqFiltered()[0];
         if (first) _inqSel = first.id;
         inqRenderList(); inqRenderDetail();
     });
-    document.getElementById('inqNSave').addEventListener('click', inqCreate);
-    document.getElementById('inqNClient').focus();
+    $('inqNSave').addEventListener('click', inqCreate);
+
+    // 자동 입력된 칸을 사람이 고치면 그 칸은 더 이상 자동으로 덮어쓰지 않는다
+    ['inqNClient', 'inqNTitle', 'inqNCName', 'inqNCTitle', 'inqNCPhone', 'inqNCEmail'].forEach(id => {
+        $(id).addEventListener('input', () => { delete $(id).dataset.auto; $(id).classList.remove('inq-autofilled'); });
+    });
+    $('inqNCPhone').addEventListener('change', () => { $('inqNCPhone').value = inqNormPhone($('inqNCPhone').value); });
+
+    let t = null;
+    const body = $('inqNBody');
+    body.addEventListener('input', () => { clearTimeout(t); t = setTimeout(inqAutofillNew, 250); });
+    inqBindImageInput(body, _inqNewImages, () => inqThumbs(_inqNewImages, 'inqNThumbs'));
+    $('inqNClient').focus();
 }
 
 async function inqCreate() {
@@ -21264,17 +21286,22 @@ async function inqCreate() {
     const btn = document.getElementById('inqNSave');
     btn.disabled = true;
     const { data, error } = await sb.from('inquiries').insert({
-        client, client_contact: v('inqNContact'), channel, assignee: v('inqNAssignee'),
-        title: v('inqNTitle'), status: '신규', started_at: getTodayStr(),
+        client, channel, assignee: v('inqNAssignee'), title: v('inqNTitle'),
+        contact_name: v('inqNCName'), contact_title: v('inqNCTitle'),
+        contact_phone: inqNormPhone(v('inqNCPhone')), contact_email: v('inqNCEmail'),
+        status: '신규', started_at: getTodayStr(),
         last_contact_at: new Date().toISOString(),
         created_by: (currentUser && currentUser.name) || ''
     }).select().single();
     if (error) { btn.disabled = false; showToast('등록 실패: ' + error.message); return; }
 
     const author = (currentUser && currentUser.name) || '';
-    const logs = [{ inquiry_id: data.id, direction: 'system', body: `상담 시작 · ${inqJosaRo(channel)} 문의` }];
-    if (body) logs.push({ inquiry_id: data.id, direction: 'in', channel, body, author });
-    await sb.from('inquiry_logs').insert(logs);
+    // 한 번에 넣는 행들은 칸 구성이 같아야 한다 (images는 NOT NULL이라 빠지면 전체 거부됨)
+    const logs = [{ inquiry_id: data.id, direction: 'system', channel: '', body: `상담 시작 · ${inqJosaRo(channel)} 문의`, images: [], author: '' }];
+    if (body || _inqNewImages.length) logs.push({ inquiry_id: data.id, direction: 'in', channel, body, images: _inqNewImages.slice(), author });
+    const { error: lErr } = await sb.from('inquiry_logs').insert(logs);
+    if (lErr) showToast('첫 문의 내용 저장 실패: ' + lErr.message);
+    _inqNewImages.length = 0;
 
     _inqList.unshift(data);
     _inqSel = data.id;
@@ -21282,4 +21309,159 @@ async function inqCreate() {
     inqRenderChips(); inqRenderList(); inqUpdateSwitchCount();
     await inqRenderDetail();
     showToast('상담을 등록했습니다');
+}
+// ---------- 사진: 붙여넣기 · 끌어놓기 · 파일 선택 ----------
+const INQ_MAX_IMAGES = 10;
+
+async function inqAddImageFiles(files, arr, onDone) {
+    const list = Array.from(files || []).filter(f => f && f.type && f.type.startsWith('image/'));
+    if (!list.length) return false;
+    for (const f of list) {
+        if (arr.length >= INQ_MAX_IMAGES) { showToast(`사진은 한 번에 ${INQ_MAX_IMAGES}장까지 넣을 수 있습니다`); break; }
+        try {
+            const raw = await new Promise((res, rej) => {
+                const r = new FileReader();
+                r.onload = e => res(e.target.result);
+                r.onerror = () => rej(new Error('파일을 읽지 못했습니다'));
+                r.readAsDataURL(f);
+            });
+            arr.push(await _shrinkDataUrl(raw, 1200, 0.8));   // 업로드 전 자동 압축
+        } catch (e) { showToast('사진 처리 실패: ' + e.message); }
+    }
+    if (onDone) onDone();
+    return true;
+}
+
+// 글 입력칸에 Ctrl+V 이미지 붙여넣기 + 파일 끌어놓기
+function inqBindImageInput(el, arr, onDone) {
+    if (!el) return;
+    el.addEventListener('paste', (e) => {
+        const items = (e.clipboardData && e.clipboardData.items) || [];
+        const files = [];
+        for (const it of items) {
+            if (it.kind === 'file' && it.type && it.type.startsWith('image/')) {
+                const f = it.getAsFile();
+                if (f) files.push(f);
+            }
+        }
+        if (files.length) inqAddImageFiles(files, arr, onDone);   // 글자는 평소처럼 붙여넣어진다
+    });
+    el.addEventListener('dragover', (e) => {
+        if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) { e.preventDefault(); el.classList.add('inq-drop'); }
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('inq-drop'));
+    el.addEventListener('drop', (e) => {
+        el.classList.remove('inq-drop');
+        const files = e.dataTransfer && e.dataTransfer.files;
+        if (files && files.length) { e.preventDefault(); inqAddImageFiles(files, arr, onDone); }
+    });
+}
+
+function inqThumbs(arr, boxId) {
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    box.innerHTML = arr.map((src, i) =>
+        `<div class="inq-c-img"><img src="${escHtml(src)}" alt="첨부 ${i + 1}"><button type="button" data-rm="${i}" title="빼기">×</button></div>`).join('');
+    box.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
+        arr.splice(Number(b.dataset.rm), 1);
+        inqThumbs(arr, boxId);
+    }));
+}
+
+// ---------- 붙여넣은 문의에서 연락처 뽑기 ----------
+function inqNormPhone(v) {
+    const s = String(v || '').trim();
+    const d = s.replace(/[^0-9]/g, '');
+    if (/^01[016789]\d{7,8}$/.test(d)) return d.length === 11 ? `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}` : `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+    if (/^02\d{7,8}$/.test(d)) return d.length === 10 ? `02-${d.slice(2, 6)}-${d.slice(6)}` : `02-${d.slice(2, 5)}-${d.slice(5)}`;
+    if (/^0[3-9]\d\d{7,8}$/.test(d)) return d.length === 11 ? `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}` : `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+    if (/^1[5-9]\d{6}$/.test(d)) return `${d.slice(0, 4)}-${d.slice(4)}`;   // 1588-0000
+    return s;
+}
+
+const INQ_LABELS = {
+    company: ['회사명', '회사', '업체명', '업체', '상호명', '상호', '기업명', '기업', '기관명', '기관', '단체명', '소속', 'company name', 'company'],
+    name: ['담당자 성함', '담당자명', '담당자', '성함', '성명', '이름', '고객명', '신청자', '문의자', '작성자', 'name'],
+    title: ['직함', '직책', '직급', '부서명', '부서', 'position', 'job title'],
+    phone: ['휴대폰 번호', '휴대폰번호', '휴대폰', '휴대전화', '핸드폰', '연락처', '전화번호', '전화', 'phone', 'mobile', 'tel'],
+    email: ['이메일 주소', '이메일', 'e-mail', 'email', '메일 주소', '메일주소', '메일'],
+    subject: ['문의 제목', '문의제목', '제목', '문의 유형', '문의유형', '문의 종류', 'subject']
+};
+const INQ_JOB_TITLES = '대표이사|대표님|대표|전무|상무|이사|본부장|부장|차장|과장|대리|주임|사원|팀장|실장|매니저|국장|원장|센터장|교수|선생님|사무장|총무';
+const INQ_NOT_NAMES = ['저희', '우리', '담당', '해당', '저는', '제가', '귀사', '회사', '안녕', '문의', '관련', '이번', '다음'];
+
+function inqParseContact(text) {
+    const t = String(text || '');
+    const out = {};
+    const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // '이름 : 홍길동' 형태 (콜론·탭 구분자가 있어야 인정 — '연락처 알려주세요' 같은 문장은 무시)
+    const segs = [];
+    t.split(/\r?\n/).forEach(line => line.split(/\s[|/]\s/).forEach(s => segs.push(s)));
+    Object.keys(INQ_LABELS).forEach(k => {
+        const labs = INQ_LABELS[k].slice().sort((a, b) => b.length - a.length).map(esc).join('|');
+        const re = new RegExp('^[\\s\\[\\(<*•·#\\-]*(?:' + labs + ')\\s*[\\]\\)>]*\\s*(?:[:：]|\\t)\\s*(.+?)\\s*$', 'i');
+        for (const s of segs) {
+            const m = s.match(re);
+            if (m && m[1]) { out[k] = m[1].trim(); break; }
+        }
+    });
+
+    // 값 다듬기
+    if (out.email) { const m = out.email.match(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/); out.email = m ? m[0] : ''; }
+    if (out.phone) { const m = out.phone.match(/0\d{1,2}[\s.\-)]*\d{3,4}[\s.\-]*\d{4}|1[5-9]\d{2}[\s.\-]*\d{4}/); out.phone = m ? inqNormPhone(m[0]) : ''; }
+    if (out.name) {
+        const nm = out.name.replace(/님$/, '').trim();
+        const m = nm.match(new RegExp('^([가-힣A-Za-z]{2,10})\\s*(' + INQ_JOB_TITLES + ')$'));
+        if (m) { out.name = m[1]; if (!out.title) out.title = m[2]; }
+        else out.name = nm.slice(0, 30);
+    }
+    if (out.company) out.company = out.company.slice(0, 60);
+    if (out.subject) out.subject = out.subject.slice(0, 80);
+    if (out.title) out.title = out.title.slice(0, 30);
+
+    // 라벨이 없을 때 — 본문 어디서든 찾는다
+    if (!out.email) { const m = t.match(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/); if (m) out.email = m[0]; }
+    if (!out.phone) {
+        const mob = t.match(/01[016789][\s.\-]?\d{3,4}[\s.\-]?\d{4}/);
+        const land = t.match(/0\d{1,2}[\s.\-)]\s?\d{3,4}[\s.\-]\d{4}/);
+        if (mob) out.phone = inqNormPhone(mob[0]);
+        else if (land) out.phone = inqNormPhone(land[0]);
+    }
+    if (!out.company) {
+        // '주식회사 한빛' 형태를 먼저, 없으면 '한빛 주식회사' — 줄바꿈은 넘지 않는다
+        const m = t.match(/(?:주식회사|\(주\)|㈜)[ 	]?[가-힣A-Za-z0-9&]+/) || t.match(/[가-힣A-Za-z0-9&]+[ 	]?(?:주식회사|\(주\)|㈜)/);
+        if (m) out.company = m[0].trim();
+    }
+    if (!out.name) {
+        const re = new RegExp('([가-힣]{2,4})\\s?(' + INQ_JOB_TITLES + ')(?=님|입니다|이에요|예요|$|[\\s,.)!])', 'm');
+        const m = t.match(re);
+        if (m && !INQ_NOT_NAMES.includes(m[1])) { out.name = m[1]; if (!out.title) out.title = m[2]; }
+    }
+    return out;
+}
+
+// 새 상담 — 붙여넣은 문의 내용에서 위 칸 채우기 (비었거나 이전에 자동으로 채운 칸만)
+function inqAutofillNew() {
+    const body = document.getElementById('inqNBody');
+    if (!body) return;
+    const p = inqParseContact(body.value);
+    const map = [
+        ['company', 'inqNClient', '거래처'], ['subject', 'inqNTitle', '문의 내용'],
+        ['name', 'inqNCName', '담당자'], ['title', 'inqNCTitle', '직함'],
+        ['phone', 'inqNCPhone', '연락처'], ['email', 'inqNCEmail', '이메일']
+    ];
+    const filled = [];
+    map.forEach(([k, id, label]) => {
+        const el = document.getElementById(id);
+        if (!el || !p[k]) return;
+        if (el.value.trim() && el.dataset.auto !== '1') return;   // 사람이 쓴 칸은 건드리지 않음
+        el.value = p[k];
+        el.dataset.auto = '1';
+        el.classList.add('inq-autofilled');
+        filled.push(label);
+    });
+    const hint = document.getElementById('inqNAutoHint');
+    if (hint) hint.innerHTML = filled.length
+        ? `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg> 붙여넣은 내용에서 자동 입력 — <b>${filled.join(' · ')}</b> <span>틀리면 바로 고쳐주세요</span>`
+        : '';
 }

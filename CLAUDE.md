@@ -130,7 +130,12 @@
 - **테이블**: `inquiries`(상담 건: client, status 신규/상담중/견적발송/수주/보류/실패, next_action+date, fail_reason 등), `inquiry_logs`(direction in/out/memo/system, channel, body, image base64), `projects_temp.inquiry_id`(견적 품목 → 상담 연결). 둘 다 회사 스코프 RLS + set_company_id 트리거
 - **자동 흐름**: 우리 첫 답변 → 신규→상담중 / 견적 품목 추가(`inqOnQuoteAdded`) → 견적발송 / `transferGroupToDomestic` 이관(`inqOnTransferred`) → 수주. 상태 변경은 모두 system 로그로 남음
 - **견적 연결**: 상담 상세의 '이 상담으로 견적 작성'(`inqStartQuote` → `_inqPendingLink`, 견적 목록 상단 배너) 또는 '같은 거래처 견적 연결'(`inqLinkGroup`). 묶음 안 품목 추가는 묶음의 inquiry_id를 따라감. 견적 목록 매출처 칸에 '상담 보기' 칩
-- 주요 함수: `tpInitView`, `inqEnter`, `inqRenderList`, `inqRenderDetail`, `inqSubmit`, `inqPatch`, `inqAddLog`, `inqCreate`
+- **고객 연락처 칸 (migration 036)**: `contact_name / contact_title / contact_phone / contact_email`. 예전 `client_contact`는 읽기 호환용(값은 contact_name으로 옮김). 연락처는 `inqNormPhone`으로 하이픈 정리
+- **사진**: `inquiry_logs.images` jsonb 배열(업로드 시 `_shrinkDataUrl` 1200px 압축, 한 번에 최대 10장). Ctrl+V 붙여넣기·끌어놓기·파일 선택 모두 `inqBindImageInput`/`inqAddImageFiles`. 옛 `image` 한 칸도 표시는 함
+- **자동 입력**: 새 상담 '첫 문의 내용'에 붙여넣으면 `inqParseContact`가 라벨('이름:', '연락처:' 등, 콜론/탭 필수) → 없으면 본문에서 이메일·전화·`주식회사 OO`·`홍길동 과장` 패턴으로 찾아 빈 칸만 채움(`data-auto`, 사람이 고친 칸은 안 덮음)
+- ⚠️ `inquiry_logs`를 배열로 한 번에 insert할 때는 모든 행의 키를 같게 — `images`가 NOT NULL이라 한 행에서 빠지면 전체가 거부됨
+- 주요 함수: `tpInitView`, `inqEnter`, `inqRenderList`, `inqRenderDetail`, `inqSubmit`, `inqPatch`, `inqAddLog`, `inqCreate`, `inqParseContact`, `inqAutofillNew`
+- `.btn-ghost`는 전역 스타일(styles.css 끝). 예전엔 `#tab-meetings` 안에서만 정의돼 다른 화면에서 기본 버튼으로 깨졌음
 
 ## 마진계산기 (편의성 그룹)
 - **목적**: 원가 항목들과 판매가를 입력해 마진/마진율을 계산. 기존 엑셀 양식(이니셜D 시계 굿즈 기준)을 발전시킨 자유형 구조

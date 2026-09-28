@@ -4589,3 +4589,59 @@ body.hide-delivery-price .delivery-price-col { display: none !important; }
     .inq-fields{grid-template-columns:repeat(2, minmax(0,1fr))}
     .inq-msg{max-width:90%}
 }
+
+/* ============================================================
+   공통 보조 버튼 — 예전엔 회의록 안에서만 정의돼 다른 화면에서 기본 버튼으로 깨졌음
+   (회의록의 #tab-meetings .btn-ghost 가 더 구체적이라 그대로 우선)
+   ============================================================ */
+.btn-ghost{display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    padding:9px 16px; border:1px solid var(--border); border-radius:var(--radius-xs);
+    background:var(--white); color:var(--gray-700); font-size:14px; font-weight:700;
+    font-family:inherit; line-height:1.2; cursor:pointer; white-space:nowrap;
+    text-decoration:none; transition:all var(--transition)}
+.btn-ghost:hover{border-color:var(--gray-400); color:var(--gray-900); background:var(--gray-50)}
+.btn-ghost:disabled{opacity:.5; cursor:default}
+
+/* ---- 상담 v2: 연락처 칸 · 사진 여러 장 · 자동 입력 ---- */
+.inq-client em{font-style:normal; font-size:12px; font-weight:600; color:var(--gray-500); margin-left:6px}
+
+.inq-thumbs{display:flex; flex-wrap:wrap; gap:8px}
+.inq-thumbs:empty{display:none}
+.inq-composer .inq-thumbs{margin-top:8px}
+.inq-thumbs .inq-c-img{margin-top:0}
+.inq-thumbs .inq-c-img img{height:76px; width:auto; max-width:140px; object-fit:cover}
+
+.inq-msg-imgs{display:flex; flex-wrap:wrap; gap:6px; margin-top:7px}
+.inq-msg-imgs .inq-msg-img{margin-top:0; max-width:180px; max-height:180px}
+.inq-msg-imgs .inq-msg-img.zoom{max-width:100%; max-height:none; flex-basis:100%}
+
+.inq-new{max-width:980px}
+.inq-new-grid{grid-template-columns:repeat(4, minmax(0,1fr))}
+.inq-new-grid .span2{grid-column:span 2}
+.inq-new-grid .span4{grid-column:1 / -1}
+.inq-new-sec{display:flex; align-items:center; gap:10px; margin:20px 0 10px;
+    font-size:12.5px; font-weight:800; color:var(--gray-700)}
+.inq-new-sec em{font-style:normal; font-weight:600; color:var(--gray-400)}
+.inq-new-sec::after{content:''; flex:1; height:1px; background:var(--border-soft)}
+.inq-new-full{display:flex; flex-direction:column; gap:6px; margin-top:16px}
+.inq-new-lab{font-size:12px; font-weight:700; color:var(--label)}
+.inq-new-lab em{font-style:normal; font-weight:600; color:var(--gray-400)}
+.inq-new-full textarea{padding:10px 12px; border:1px solid var(--border); border-radius:9px;
+    font-family:inherit; font-size:13.5px; line-height:1.6; color:var(--gray-900);
+    background:var(--white); outline:none; resize:vertical; min-height:140px}
+.inq-new-full textarea:focus{border-color:var(--blue)}
+
+/* 자동 입력된 칸 — 확인하라고 살짝 표시 */
+.inq-new input.inq-autofilled{background:var(--blue-light); border-color:color-mix(in srgb, var(--blue) 45%, transparent)}
+.inq-auto-hint{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:var(--blue)}
+.inq-auto-hint:empty{display:none}
+.inq-auto-hint b{font-weight:800}
+.inq-auto-hint span{color:var(--gray-500); font-weight:600}
+
+/* 사진을 끌어다 놓는 중 */
+textarea.inq-drop{border-color:var(--blue) !important; background:var(--blue-light) !important}
+
+@media (max-width:1100px){
+    .inq-new-grid{grid-template-columns:repeat(2, minmax(0,1fr))}
+    .inq-new-grid .span2{grid-column:1 / -1}
+}
