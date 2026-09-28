@@ -108,8 +108,8 @@
                             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                             <span>매입매출</span>
                         </div>
-                        <button class="nav-item nav-sub-item" data-tab="projects-temp" data-tip="견적 의뢰 — 단가·수량·부대비용 자동 계산 + 견적서 출력">
-                            <span>견적 의뢰</span>
+                        <button class="nav-item nav-sub-item" data-tab="projects-temp" data-tip="상담·견적 — 고객 상담 기록부터 견적서 출력까지">
+                            <span>상담·견적</span>
                         </button>
                         <button class="nav-item nav-sub-item" data-tab="projects-domestic" data-tip="국내 주문 프로젝트 진행 현황 (매출+매입 통합)">
                             <span>국내</span>
@@ -733,11 +733,11 @@
                 <div class="tp-switch">
                     <button type="button" id="tpSwInq" onclick="tpSetView('inq')">
                         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
-                        상담 관리 <span class="tp-sw-cnt" id="tpSwInqCnt"></span>
+                        상담 <span class="tp-sw-cnt" id="tpSwInqCnt"></span>
                     </button>
                     <button type="button" id="tpSwQuote" onclick="tpSetView('quote')">
                         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M9 5h10M9 12h10M9 19h10M4 5h.01M4 12h.01M4 19h.01"/></svg>
-                        견적 목록
+                        견적
                     </button>
                 </div>
 
@@ -768,7 +768,7 @@
                         <div style="font-size:14px;color:var(--text-tertiary)">아래 입력행에 빠르게 추가하거나, 자세한 항목까지 입력하려면 새로 작성을 누르세요</div>
                     </div>
                     <div class="toolbar-buttons">
-                        <button class="btn-primary" onclick="openTempProjectModal()" title="새 견적 의뢰 (상세 입력)">
+                        <button class="btn-primary" onclick="openTempProjectModal()" title="새 견적 (상세 입력)">
                             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
                             새로 작성
                         </button>
@@ -1932,6 +1932,6 @@
         <div class="label-scroll" id="labelScroll"></div>
     </div>
 
-    <script src="app.js?v=20260928x"></script>
+    <script src="app.js?v=20260929a"></script>
 </body>
 </html>

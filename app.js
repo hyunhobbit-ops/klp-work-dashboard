@@ -999,7 +999,7 @@ const pageTitles = {
     'admin-manage': '고객사 관리',
     'company-settings': '회사 설정',
     planning: '프로젝트',
-    'projects-temp': '매입매출 — 견적 의뢰',
+    'projects-temp': '매입매출 — 상담·견적',
     'projects-domestic': '매입매출 — 국내',
     'projects-overseas': '매입매출 — 해외',
     daily: '일일계획표',
@@ -11509,7 +11509,7 @@ function renderTempProjects() {
     });
 
     if (!rowHtml) {
-        rowHtml = '<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-tertiary)">등록된 견적 의뢰가 없습니다</td></tr>';
+        rowHtml = '<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-tertiary)">등록된 견적이 없습니다</td></tr>';
     }
     tbody.innerHTML = rowHtml;
     _bindTempDnd(tbody);
@@ -11609,7 +11609,7 @@ function openTempProjectModal(id) {
 
     const html = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <h2 style="margin:0;font-size:18px">${isEdit ? '견적 의뢰 편집' : '새 견적 의뢰'}</h2>
+        <h2 style="margin:0;font-size:18px">${isEdit ? '견적 편집' : '새 견적'}</h2>
         <button onclick="closeTempModal()" style="background:var(--gray-100);border:none;font-size:20px;cursor:pointer;color:var(--gray-500);padding:6px 10px;border-radius:10px">✕</button>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
@@ -12406,7 +12406,7 @@ async function transferGroupToDomestic(gi) {
     const baseMsg = `거래처: ${g.client || '-'}\n품목: ${itemCount}건`;
     const msg = alreadyTransferred
         ? `⚠️ 이미 국내 프로젝트로 등록된 견적입니다.\n\n${baseMsg}\n\n다시 등록하면 국내 메뉴에 ${itemCount}건이 추가로 더 생성됩니다.\n그래도 진행할까요?`
-        : `이 견적을 국내 프로젝트로 등록할까요?\n\n${baseMsg}\n\n견적 의뢰 데이터는 그대로 유지되고 '등록 완료' 로 표시됩니다.`;
+        : `이 견적을 국내 프로젝트로 등록할까요?\n\n${baseMsg}\n\n견적 데이터는 그대로 유지되고 '등록 완료' 로 표시됩니다.`;
     if (!confirm(msg)) return;
 
     const managerName = currentUser ? currentUser.name : '';
