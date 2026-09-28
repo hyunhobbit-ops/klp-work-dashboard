@@ -6900,18 +6900,6 @@ async function openClientDetail(id) {
         .filter(t => t.client && t.client === c.companyName)
         .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
-    // 연동된 프로젝트 — 매출처(project.client) + 매입처(project.supplier) 양쪽 매칭
-    const linkedProjectsMap = new Map();
-    projects.forEach(p => {
-        const asClient = p.client && p.client === c.companyName;
-        const asSupplier = p.supplier && p.supplier === c.companyName;
-        if (!asClient && !asSupplier) return;
-        const role = asClient && asSupplier ? '매출+매입' : (asClient ? '매출' : '매입');
-        linkedProjectsMap.set(p.id, { p, role });
-    });
-    const linkedProjects = Array.from(linkedProjectsMap.values())
-        .sort((a, b) => (b.p.startDate || '').localeCompare(a.p.startDate || ''));
-
     const tasksHtml = linkedTasks.length === 0
         ? `<div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">연동된 일일계획표가 없습니다</div>`
         : `<table class="data-table" style="margin-top:8px">
@@ -6922,27 +6910,6 @@ async function openClientDetail(id) {
                 <td>${esc(t.assignee)}</td>
                 <td>${t.done ? '✅' : '⬜'}</td>
             </tr>`).join('')}</tbody>
-        </table>`;
-
-    const roleBadge = role => {
-        if (role === '매출+매입') return `<span class="badge badge-purple">매출+매입</span>`;
-        if (role === '매입') return `<span class="badge badge-purple">매입</span>`;
-        return `<span class="badge badge-blue">매출</span>`;
-    };
-    const projectsHtml = linkedProjects.length === 0
-        ? `<div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">연동된 프로젝트가 없습니다</div>`
-        : `<table class="data-table" style="margin-top:8px">
-            <thead><tr><th style="width:90px">역할</th><th>품명</th><th style="width:100px">상태</th><th style="width:120px">납기</th><th style="width:120px">금액</th></tr></thead>
-            <tbody>${linkedProjects.map(({ p, role }) => {
-                const amount = role === '매입' ? (p.supplierRevenue || 0) : (p.revenue || 0);
-                return `<tr onclick="closeModal();switchTab('${p.category === '해외 주문' ? 'projects-overseas' : 'projects-domestic'}');setTimeout(()=>showProjectDetail(${p.id}),100)" style="cursor:pointer">
-                    <td>${roleBadge(role)}</td>
-                    <td><strong>${esc(p.name)}</strong></td>
-                    <td>${esc(p.status)}</td>
-                    <td>${esc(p.deadline) || '-'}</td>
-                    <td>${amount.toLocaleString()}원</td>
-                </tr>`;
-            }).join('')}</tbody>
         </table>`;
 
     const row = (label, val) => `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--gray-100)"><div style="width:100px;color:var(--text-tertiary);font-size:13px">${label}</div><div style="flex:1;font-size:14px">${esc(val) || '-'}</div></div>`;
@@ -6980,8 +6947,7 @@ async function openClientDetail(id) {
                 </div>
                 <div class="form-section-title">📅 연동된 일일계획표 (${linkedTasks.length}건)</div>
                 ${tasksHtml}
-                <div class="form-section-title" style="margin-top:16px">📦 연동된 프로젝트 (${linkedProjects.length}건)</div>
-                ${projectsHtml}
+                <div id="clientHistBox" style="margin-top:16px"><div class="form-section-title">💬 상담 · 🧾 견적 · 📦 국내 프로젝트</div><div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">불러오는 중…</div></div>
             </div>
         </div>
         <div class="form-section-title" style="margin-top:20px">📍 근처 거래처 <span style="font-weight:400;color:var(--text-tertiary);font-size:13px">— 방문 동선 참고</span></div>
@@ -6994,6 +6960,7 @@ async function openClientDetail(id) {
     overlay.classList.add('show'); openModalHistory();
     overlay.classList.add('modal-wide');
     renderNearbyClients(id, c.address);
+    renderClientHistory(c);   // 상담·견적·국내 프로젝트 이력 (DB 전체에서)
 }
 
 async function saveEditClient(id) {
@@ -22646,4 +22613,105 @@ function inqBindCardToggle(el, key, rerender) {
         try { localStorage.setItem('inq_card_' + key, inqCardOpen(key) ? '0' : '1'); } catch (_) {}
         rerender();
     });
+}
+
+// ---------- 거래처 상세: 상담 · 견적 · 프로젝트 이력 (DB에서 직접 조회) ----------
+// 예전엔 화면에 불러온 프로젝트(최근 200건)에서만 찾고, 상담·견적은 아예 안 보여줬음.
+// 이름 표기가 조금 달라도('(주)삼인물산' / '삼인물산주식회사') 같은 거래처로 본다.
+function clientNameKey(n) {
+    return String(n || '').replace(/주식회사|유한회사|\(주\)|\(유\)|㈜|\s/g, '').toLowerCase();
+}
+
+async function clientHistoryFetch(name) {
+    const key = clientNameKey(name);
+    const core = String(name || '').replace(/주식회사|유한회사|\(주\)|\(유\)|㈜/g, '').trim();
+    const like = '%' + core.replace(/[%_\\]/g, m => '\\' + m) + '%';
+    const same = v => clientNameKey(v) === key;
+    const [inq, tmp, domC, domS] = await Promise.all([
+        sb.from('inquiries').select('id, client, title, status, assignee, started_at, last_contact_at').ilike('client', like).limit(500),
+        sb.from('projects_temp').select('*').ilike('client', like).limit(1000),
+        sb.from('projects_domestic').select('*').ilike('client', like).limit(500),
+        sb.from('projects_domestic').select('*').ilike('supplier', like).limit(500)
+    ]);
+    const doms = new Map();
+    (domC.data || []).filter(r => same(r.client)).forEach(r => doms.set(r.id, { r, role: '매출' }));
+    (domS.data || []).filter(r => same(r.supplier)).forEach(r => {
+        const had = doms.get(r.id);
+        doms.set(r.id, { r, role: had ? '매출+매입' : '매입' });
+    });
+    return {
+        inquiries: (inq.data || []).filter(r => same(r.client)).sort((a, b) => String(b.last_contact_at || '').localeCompare(String(a.last_contact_at || ''))),
+        quotes: (tmp.data || []).filter(r => same(r.client)).map(_projectsTempRowToObj),
+        projects: [...doms.values()].sort((a, b) => String(b.r.created_at || '').localeCompare(String(a.r.created_at || ''))),
+        error: inq.error || tmp.error || domC.error || domS.error
+    };
+}
+
+async function renderClientHistory(c) {
+    const box = document.getElementById('clientHistBox');
+    if (!box) return;
+    const esc = s => (s || '').toString().replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    let h;
+    try { h = await clientHistoryFetch(c.companyName); }
+    catch (e) { box.innerHTML = `<div style="color:var(--red);font-size:13px">이력을 불러오지 못했습니다: ${esc(e.message || e)}</div>`; return; }
+    if (!document.getElementById('clientHistBox')) return;
+    const empty = t => `<div style="color:var(--text-tertiary);font-size:13px;padding:8px 0">${t}</div>`;
+    const won = n => Number(n || 0).toLocaleString() + '원';
+    const md = d => d ? String(d).slice(0, 10).replace(/-/g, '.') : '-';
+
+    // 상담
+    const inqHtml = !h.inquiries.length ? empty('상담 기록이 없습니다') : `<table class="data-table" style="margin-top:8px">
+        <thead><tr><th style="width:96px">시작일</th><th>문의 내용</th><th style="width:84px">상태</th><th style="width:80px">담당</th></tr></thead>
+        <tbody>${h.inquiries.map(q => `<tr data-hinq="${q.id}" style="cursor:pointer">
+            <td>${md(q.started_at)}</td><td><strong>${esc(q.title || '(제목 없음)')}</strong></td>
+            <td><span class="inq-st ${INQ_STATUS_CLS[q.status] || ''}">${esc(q.status)}</span></td><td>${esc(q.assignee) || '-'}</td>
+        </tr>`).join('')}</tbody></table>`;
+
+    // 견적 — 날짜별 묶음
+    const groups = [];
+    h.quotes.forEach(p => {
+        let g = groups.find(x => x.date === p.date);
+        if (!g) { g = { date: p.date, items: [] }; groups.push(g); }
+        g.items.push(p);
+    });
+    groups.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const quoteHtml = !groups.length ? empty('견적 기록이 없습니다') : `<table class="data-table" style="margin-top:8px">
+        <thead><tr><th style="width:96px">견적일</th><th>품목</th><th style="width:120px">매출 (VAT포함)</th><th style="width:84px">국내 등록</th></tr></thead>
+        <tbody>${groups.map((g, gi) => `<tr data-hquote="${gi}" style="cursor:pointer">
+            <td>${md(g.date)}</td>
+            <td><strong>${esc(g.items[0].item || '-')}</strong>${g.items.length > 1 ? ` <span style="color:var(--text-tertiary)">외 ${g.items.length - 1}품목</span>` : ''}</td>
+            <td>${won(g.items.reduce((s, p) => s + calcTempRevenueWithVat(p), 0))}</td>
+            <td>${g.items.some(p => p.transferredAt) ? '✅' : '-'}</td>
+        </tr>`).join('')}</tbody></table>`;
+
+    // 국내 프로젝트
+    const roleBadge = role => role === '매출' ? '<span class="badge badge-blue">매출</span>' : `<span class="badge badge-purple">${role}</span>`;
+    const projHtml = !h.projects.length ? empty('연동된 프로젝트가 없습니다') : `<table class="data-table" style="margin-top:8px">
+        <thead><tr><th style="width:90px">역할</th><th>품명</th><th style="width:84px">상태</th><th style="width:100px">납기</th><th style="width:120px">금액</th></tr></thead>
+        <tbody>${h.projects.map(({ r, role }) => `<tr data-hproj="${r.id}" style="cursor:pointer">
+            <td>${roleBadge(role)}</td><td><strong>${esc(r.product_name || '-')}</strong></td><td>${esc(r.status)}</td>
+            <td>${esc(r.delivery_date) || '-'}</td><td>${won(role === '매입' ? r.supplier_revenue : r.revenue)}</td>
+        </tr>`).join('')}</tbody></table>`;
+
+    box.innerHTML = `
+        <div class="form-section-title">💬 상담 (${h.inquiries.length}건)</div>${inqHtml}
+        <div class="form-section-title" style="margin-top:16px">🧾 견적 (${groups.length}건)</div>${quoteHtml}
+        <div class="form-section-title" style="margin-top:16px">📦 국내 프로젝트 (${h.projects.length}건)</div>${projHtml}`;
+
+    box.querySelectorAll('[data-hinq]').forEach(tr => tr.addEventListener('click', () => {
+        _inqSel = Number(tr.dataset.hinq); _inqFilter = 'all';
+        try { localStorage.setItem('tp_view', 'inq'); } catch (_) {}
+        closeModal(); switchTab('projects-temp');
+    }));
+    box.querySelectorAll('[data-hquote]').forEach(tr => tr.addEventListener('click', () => {
+        try { localStorage.setItem('tp_view', 'quote'); } catch (_) {}
+        closeModal(); switchTab('projects-temp');
+        const g = groups[Number(tr.dataset.hquote)];
+        setTimeout(() => { const gi = g ? inqQuoteGroupIndex(g.date, g.items[0].client) : -1; if (gi >= 0) openTempQuote(gi); }, 400);
+    }));
+    box.querySelectorAll('[data-hproj]').forEach(tr => tr.addEventListener('click', () => {
+        const hit = h.projects.find(v => v.r.id === Number(tr.dataset.hproj));
+        closeModal(); switchTab('projects-domestic');
+        setTimeout(() => { if (inqEnsureProject(hit && hit.r)) showProjectDetail(hit.r.id); }, 100);
+    }));
 }
