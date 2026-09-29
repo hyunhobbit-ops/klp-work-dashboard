@@ -20402,7 +20402,19 @@ async function loadProductCosts(productId, publicCode) {
 }
 
 // 공급처 datalist — 거래처 DB(매입처·서비스 우선)에서 채운다. 직접 입력도 허용
+// 공급처 목록·연동 확인은 거래처 DB 전체 기준 — 처음 불러온 500개만 보면 '두리정밀'처럼
+// 이름순 뒤쪽 거래처가 '거래처 DB에 없는 이름'으로 잘못 나온다
 function fillSupplierDatalist() {
+    fillSupplierDatalistNow();
+    if (_clientsPagination && !_clientsPagination.hasMore) return;
+    (async () => {
+        try { if (!_clientsPagination) await loadClientsFromDb(); await ensureAllClientsLoaded(); } catch (_) {}
+        fillSupplierDatalistNow();
+        onSupplierInput();
+    })();
+}
+
+function fillSupplierDatalistNow() {
     const dl = document.getElementById('pcSupplierList');
     if (!dl) return;
     const rank = c => (c.category === '매입처' ? 0 : c.category === '서비스(비용)' ? 1 : 2);
@@ -20421,7 +20433,14 @@ function onSupplierInput() {
     const hint = document.getElementById('pcSupplierHint');
     if (!inp || !hid || !hint) return;
     const name = inp.value.trim();
-    const hit = (clients || []).find(c => c.companyName === name);
+    const key = clientNameKey(name);
+    const hit = (clients || []).find(c => c.companyName === name)
+        || (key.length >= 2 ? (clients || []).find(c => clientNameKey(c.companyName) === key) : null);   // (주)·공백 차이는 같은 거래처로
+    if (!hit && name && (_clientsLoadingAll || (_clientsPagination && _clientsPagination.hasMore))) {
+        hid.value = '';
+        hint.innerHTML = '거래처 DB 전체에서 확인하는 중…';
+        return;   // 전체 불러오기가 끝나면 fillSupplierDatalist 가 다시 확인한다
+    }
     if (hit) {
         hid.value = hit.id;
         const bits = [hit.category, hit.staffName, hit.staffMobile || hit.phone].filter(Boolean);
