@@ -100,6 +100,18 @@ async function paginatedLoad(table, options) {
 
 // "남은 N건 더 보기" 버튼을 컨테이너 하단에 부착. (Phase 3 #10)
 // 이미 동일 컨테이너에 버튼이 있으면 먼저 제거 후 새로 그림 (재렌더 안전).
+// 페이지로 나눠 불러온 목록을 끝까지 불러온다.
+// 검색·필터·조회는 반드시 전체를 대상으로 해야 한다 (일부만 보면 있는 데이터도 '없음'으로 나옴)
+async function loadAllPages(pageState) {
+    if (!pageState) return pageState;
+    while (pageState.hasMore) {
+        const n = pageState.data.length;
+        await pageState.loadMore();
+        if (pageState.data.length === n) break;
+    }
+    return pageState;
+}
+
 function renderLoadMoreButton(container, pageState, onAfterLoad) {
     if (!container) return;
     const existing = container.querySelector(':scope > .load-more-btn');
@@ -1283,6 +1295,7 @@ async function loadUrlShortcuts() {
             orderBy: 'sort_order', orderDir: 'asc',
             secondaryOrderBy: 'id', secondaryOrderDir: 'asc'
         });
+        await loadAllPages(_urlShortcutsPagination);   // 검색·필터·연결이 전체 기준이 되도록 전부 불러옴
         urlShortcuts = _urlShortcutsPagination.data || [];
         renderUrlShortcuts();
     } catch (err) {
@@ -3503,7 +3516,22 @@ async function toggleTask(id) {
 // =====================================
 // DELIVERIES
 // =====================================
+let _deliveriesLoadingAll = false;
 function renderDeliveries() {
+    const _filterOn = !!currentDeliverySearch || currentDeliveryTypeFilter !== 'all' || currentDeliveryYear !== 'all' || currentDeliveryMonth !== 'all';
+    if (_filterOn && !_deliveriesLoadingAll && (!deliveriesFullLoaded || (_deliveriesPagination && _deliveriesPagination.hasMore))) {
+        _deliveriesLoadingAll = true;
+        (async () => {
+            try {
+                if (!deliveriesFullLoaded) await loadDeliveriesFromDb({ full: true });
+                await loadAllPages(_deliveriesPagination);
+                deliveries.length = 0;
+                _deliveriesPagination.data.forEach(r => deliveries.push(deliveryFromDb(r)));
+            } catch (e) { console.error('택배 전체 로드 실패', e); }
+            finally { _deliveriesLoadingAll = false; }
+            renderDeliveries();
+        })();
+    }
     let filtered = currentDeliveryTypeFilter === 'all'
         ? deliveries
         : deliveries.filter(d => d.type === currentDeliveryTypeFilter);
@@ -5871,6 +5899,7 @@ async function loadDomesticProjectsFromDb() {
             pageSize: 200,
             orderBy: 'created_at', orderDir: 'desc'
         });
+        await loadAllPages(_projectsDomesticPagination);   // 검색·필터·연결이 전체 기준이 되도록 전부 불러옴
         _rebuildDomesticProjectsFromPagination();
     } catch (err) {
         console.error('국내 프로젝트 로드 실패 (테이블 미생성?):', err.message);
@@ -5953,14 +5982,18 @@ async function loadDailyTasksFromDb() {
     try {
         // 일일계획은 kanban/캘린더 렌더라 "더 보기" 버튼이 부적절.
         // pageSize 100 으로 단계 로드 후, 남은 페이지를 자동 fetch (1500 행 safety cap)
+        // 최신부터 불러와야 상한을 넘어도 오래된 것만 빠진다 (예전엔 오래된 것부터라 1500건 넘으면 새 할 일이 안 보일 뻔함)
         _dailyTasksPagination = await paginatedLoad('daily_tasks', {
-            pageSize: 100,
-            orderBy: 'id', orderDir: 'asc'
+            pageSize: 500,
+            orderBy: 'id', orderDir: 'desc'
         });
-        const SAFETY_CAP = 1500;
+        const SAFETY_CAP = 20000;
         while (_dailyTasksPagination.hasMore && _dailyTasksPagination.data.length < SAFETY_CAP) {
+            const n = _dailyTasksPagination.data.length;
             await _dailyTasksPagination.loadMore();
+            if (_dailyTasksPagination.data.length === n) break;
         }
+        _dailyTasksPagination.data.sort((a, b) => a.id - b.id);   // 화면은 예전처럼 id 오름차순
         dailyTasks.length = 0;
         _dailyTasksPagination.data.forEach(r => dailyTasks.push(taskFromDb(r)));
         cacheWrite('dailyTasks', dailyTasks);
@@ -6868,8 +6901,12 @@ async function addClient() {
     showToast('고객사가 추가되었습니다');
 }
 
-function openEditClient(id) {
-    const c = clients.find(x => x.id === id);
+async function openEditClient(id) {
+    let c = clients.find(x => x.id === id);
+    if (!c) {
+        const { data } = await sb.from('clients').select('*').eq('id', id).maybeSingle();
+        if (data) { c = clientFromDb(data); clients.push(c); }
+    }
     if (!c) return;
     openClientModal(c);
 }
@@ -7025,6 +7062,7 @@ async function loadClientsOverseasFromDb() {
             pageSize: 500,
             orderBy: 'company_name', orderDir: 'asc'
         });
+        await loadAllPages(_clientsOverseasPagination);   // 검색·필터·연결이 전체 기준이 되도록 전부 불러옴
         clientsOverseas.length = 0;
         _clientsOverseasPagination.data.forEach(r => clientsOverseas.push(clientOverseasFromDb(r)));
         cacheWrite('clientsOverseas', clientsOverseas);
@@ -7326,6 +7364,7 @@ async function loadMarketingCampaignsFromDb() {
             pageSize: 200,
             orderBy: 'created_at', orderDir: 'desc'
         });
+        await loadAllPages(_marketingCampaignsPagination);   // 검색·필터·연결이 전체 기준이 되도록 전부 불러옴
         marketingCampaigns.length = 0;
         _marketingCampaignsPagination.data.forEach(r => marketingCampaigns.push(marketingFromDb(r)));
         cacheWrite('marketingCampaigns', marketingCampaigns);
@@ -7762,7 +7801,10 @@ async function importClientsFromExcel(event) {
 
         const dataRows = rows.slice(headerRow + 1);
         const toInsert = [];
-        const existingKeys = new Set(clients.map(c => `${c.companyName}|${c.businessNo}`));
+        // 중복 확인은 전체 거래처 기준 (처음 불러온 500개만 보면 이미 있는 거래처가 또 들어감)
+        let _allForDup = clients;
+        try { _allForDup = await fetchAllClients(); } catch (_) {}
+        const existingKeys = new Set(_allForDup.map(c => `${c.companyName}|${c.businessNo}`));
 
         dataRows.forEach(r => {
             const get = (k) => colIdx[k] >= 0 ? (r[colIdx[k]] || '').toString().trim() : '';
@@ -8474,6 +8516,7 @@ async function loadProductsFromDb() {
             orderBy: 'created_at', orderDir: 'desc',
             select: PRODUCT_LIST_COLUMNS
         });
+        await loadAllPages(_productsPagination);   // 검색·필터가 전체 기준이 되도록
         productsDB.length = 0;
         _productsPagination.data.forEach(r => productsDB.push(productFromDb(r)));
         _productImagesLoaded = false;   // 새로 로드했으니 이미지는 다시 "미로드" 상태
@@ -8584,6 +8627,7 @@ async function loadProposalsFromDb() {
             pageSize: 200,
             orderBy: 'created_at', orderDir: 'desc'
         });
+        await loadAllPages(_proposalsPagination);   // 검색·필터·연결이 전체 기준이 되도록 전부 불러옴
         proposals.length = 0;
         _proposalsPagination.data.forEach(r => proposals.push(proposalFromDb(r)));
         cacheWrite('proposals', proposals);
@@ -10394,6 +10438,7 @@ async function loadMarketdbFromDb() {
                 secondaryOrderBy: 'id', secondaryOrderDir: 'desc'
                 // 카테고리별 id desc(최신 등록이 먼저) — NO는 카테고리 내 등록순(오래된=1, 최신=length)
             });
+            await loadAllPages(_marketDbPagination);   // 검색·필터·연결이 전체 기준이 되도록 전부 불러옴
             _rebuildMarketdbFromPagination();
             subscribeMarketRealtime();
             hookMarketdbVisibilityRefresh();
@@ -11359,6 +11404,7 @@ async function loadTempProjects() {
             pageSize: 200,
             orderBy: 'created_at', orderDir: 'desc'
         });
+        await loadAllPages(_projectsTempPagination);   // 검색·필터·연결이 전체 기준이 되도록 전부 불러옴
         _rebuildTempProjectsFromPagination();
     } catch (err) {
         console.error('임시 프로젝트 로드 실패:', err.message);
@@ -15060,6 +15106,7 @@ async function loadQuotesFromDb() {
             orderBy: 'doc_date', orderDir: 'desc',
             secondaryOrderBy: 'id', secondaryOrderDir: 'desc'
         });
+        await loadAllPages(_quotesPagination);   // 검색·필터·연결이 전체 기준이 되도록 전부 불러옴
         quotes.length = 0;
         _quotesPagination.data.forEach(r => quotes.push(quoteFromDb(r)));
     } catch (err) {
@@ -15659,10 +15706,7 @@ function loginManagerDisplay() {
 }
 
 function buildQuoteClientsDatalist() {
-    const list = document.getElementById('quoteClientsList');
-    if (!list || typeof clients === 'undefined' || !Array.isArray(clients)) return;
-    const names = [...new Set(clients.map(c => c.companyName).filter(Boolean))];
-    list.innerHTML = names.map(n => `<option value="${escHtml(n)}">`).join('');
+    if (document.getElementById('quoteClientsList')) fillClientDatalist('quoteClientsList');   // 전체 거래처명
 }
 
 function nextQuoteDocNumber(dateStr) {
@@ -16140,6 +16184,11 @@ function showMarginEditView() {
 function populateMarginClientsList() {
     const dl = document.getElementById('marginClientsList');
     if (!dl) return;
+    // 전체 거래처명(국내+해외)으로 다시 채움 — 아래 즉시 채우기는 불러온 것만이라 임시
+    fetchAllClientNames().then(names => {
+        const el = document.getElementById('marginClientsList');
+        if (el && names && names.length) el.innerHTML = names.map(n => `<option value="${escapeHtml(n)}"></option>`).join('');
+    }).catch(() => {});
     const domestic = Array.isArray(clients) ? clients.map(c => (c.companyName || '').trim()).filter(Boolean) : [];
     const overseas = Array.isArray(clientsOverseas) ? clientsOverseas.map(c => (c.companyName || '').trim()).filter(Boolean) : [];
     const unique = Array.from(new Set([...domestic, ...overseas])).sort((a, b) => a.localeCompare(b, 'ko'));
@@ -16762,6 +16811,7 @@ async function loadMarginSimulationsFromDb() {
             pageSize: 100,
             orderBy: 'updated_at', orderDir: 'desc'
         });
+        await loadAllPages(_marginSimulationsPagination);   // 검색·필터·연결이 전체 기준이 되도록 전부 불러옴
         marginSimulations = _marginSimulationsPagination.data.map(marginSimFromDb);
     } catch (err) {
         console.error('마진계산기 시뮬레이션 로드 실패:', err.message);
@@ -18302,6 +18352,7 @@ async function loadMeetings() {
         _meetingsPage = await paginatedLoad('meetings', {
             pageSize: 30, orderBy: 'meet_at', orderDir: 'desc', secondaryOrderBy: 'id', secondaryOrderDir: 'desc'
         });
+        await loadAllPages(_meetingsPage);   // 검색·필터·연결이 전체 기준이 되도록 전부 불러옴
         _meetings = _meetingsPage.data || [];
     } catch (e) {
         console.error('loadMeetings failed', e);

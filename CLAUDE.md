@@ -69,6 +69,7 @@
 - 세션 관리: Supabase가 JWT를 자동 관리, `localStorage.klp_user`는 display name 캐시 + `doc-generator.html` 호환용 보조. 정식 인증은 `sb.auth.getSession()`
 - `doc-generator.html`은 SDK가 아닌 hand-rolled `sbFetch` 사용 — bootstrapAuthSession에서 access_token 추출 후 Bearer 자동 첨부 (RLS 잠금 대응). `sbFetch`는 `res.ok` 체크 + 에러 throw 패턴 (Phase 3 #11).
 - **페이지네이션**: 큰 테이블 로드는 `paginatedLoad(table, options)` 헬퍼 사용 — 첫 N개만 로드 + `renderLoadMoreButton`으로 "남은 X건 더 보기" UI. 새 list view 추가 시 동일 패턴 따를 것 (Phase 3 #10). 단, kanban/relational 묶음 화면(daily_tasks, planning_*)은 cap 내에서 auto-loop 패턴 사용.
+  - ⚠️ **(2026-09-29 전체 정리)** 작은 목록(국내 프로젝트·견적·상품·제안서·중고마켓DB·마케팅·견적서·마진·회의록·해외 거래처·바로가기)은 로드 직후 `loadAllPages(pageState)`로 **전부** 불러옴 → 검색·필터·연결이 항상 전체 기준. 큰 목록: 거래처(3천+)는 검색·필터·조회 때 `ensureAllClientsLoaded`, 택배(2천+)는 검색·종류·연도·월 필터를 쓰면 `renderDeliveries`가 전체 기간을 끝까지 불러옴. 일일계획표는 **최신부터(id desc)** 불러와 상한(20000)을 넘어도 새 할 일이 안 빠지게 한 뒤 id 오름차순으로 정렬. 거래처 자동완성(마진계산기·견적서)은 `fetchAllClientNames`, 엑셀 가져오기 중복 확인은 `fetchAllClients`, `openEditClient`는 목록에 없으면 DB에서 조회
   - ⚠️ 첫 N개만 불러온 목록에서 **검색·필터는 전체를 대상으로** 해야 함. 거래처 DB는 검색어/분류 필터를 쓰는 순간 `ensureAllClientsLoaded()`가 남은 페이지를 다 불러와 `clients`를 채움 (예전엔 이름순 500개 안에서만 찾아 삼인물산주식회사 같은 뒤쪽 거래처가 안 나왔음)
   - 상품 DB 공급처 칸(`fillSupplierDatalist`/`onSupplierInput`)도 같은 이유로 전체를 불러온 뒤 확인하고, (주)·공백 차이는 `clientNameKey`로 같은 거래처로 봄
   - 거래처 상세 모달의 상담·견적·국내 프로젝트 이력은 `renderClientHistory`가 **DB에서 직접** 조회 (inquiries·projects_temp·projects_domestic 매출처/매입처). 이름은 `clientNameKey`로 (주)·주식회사·공백을 빼고 비교
