@@ -5228,3 +5228,23 @@ textarea.inq-drop{border-color:var(--blue) !important; background:var(--blue-lig
     .inq-hfields input, .inq-hfields select{padding:0 7px; font-size:13px}
     .inq-hfields input[type="date"]{padding:0 4px; font-size:12.5px}
 }
+
+
+/* ---- 거래처 등급 S·A·B·C (043) ---- */
+.grade-badge{display:inline-flex; align-items:baseline; gap:3px; margin-right:6px; padding:1px 6px; border-radius:5px; font-size:11px; font-weight:900; line-height:1.5; vertical-align:1px; white-space:nowrap}
+.grade-badge em{font-style:normal; font-size:10px; font-weight:700}
+.grade-badge.g-S{background:#FEE2E2; color:#B91C1C}
+.grade-badge.g-A{background:#DBEAFE; color:#1D4ED8}
+.grade-badge.g-B{background:var(--gray-100); color:var(--gray-600)}
+.grade-badge.g-C{background:#FEF3C7; color:#B45309}
+[data-theme="dark"] .grade-badge.g-S{background:#4C1D1D; color:#FCA5A5}
+[data-theme="dark"] .grade-badge.g-A{background:#1E3A5F; color:#93C5FD}
+[data-theme="dark"] .grade-badge.g-C{background:#453014; color:#FCD34D}
+.inq-h-grade{height:34px; padding:0 8px; border-radius:8px; border:1px solid var(--border); background:var(--white); cursor:pointer; font-family:inherit; font-size:13px; font-weight:800; color:var(--gray-600)}
+.inq-h-grade.g-S{background:#FEE2E2; color:#B91C1C; border-color:#FCA5A5}
+.inq-h-grade.g-A{background:#DBEAFE; color:#1D4ED8; border-color:#93C5FD}
+.inq-h-grade.g-C{background:#FEF3C7; color:#B45309; border-color:#FCD34D}
+[data-theme="dark"] .inq-h-grade.g-S{background:#4C1D1D; color:#FCA5A5; border-color:#7F1D1D}
+[data-theme="dark"] .inq-h-grade.g-A{background:#1E3A5F; color:#93C5FD; border-color:#1E40AF}
+[data-theme="dark"] .inq-h-grade.g-C{background:#453014; color:#FCD34D; border-color:#78350F}
+.inq-new-grid .span3{grid-column:span 3}

@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260930j">
+    <link rel="stylesheet" href="styles.css?v=20260930k">
     <link rel="stylesheet" href="mobile.css?v=20260507e" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -1461,7 +1461,7 @@
                         <label style="font-size:13px;color:var(--text-secondary);margin:0;display:flex;align-items:center;gap:6px">
                             <input type="checkbox" id="clientBulkGradeEnabled" style="width:16px;height:16px"> 등급
                         </label>
-                        <input type="text" id="clientBulkGrade" class="form-input" placeholder="등급 값 (체크 시 변경)" style="width:180px;margin:0">
+                        <select id="clientBulkGrade" class="form-select" style="width:150px;margin:0"><option value="">등급 없음</option><option value="S">S · 중요</option><option value="A">A · 우수</option><option value="B">B · 일반</option><option value="C">C · 관심</option></select>
                         <button class="btn-primary" onclick="applyClientBulkEdit()">일괄 적용</button>
                         <button class="btn-export" onclick="clearClientSelection()">선택 해제</button>
                         <button class="btn-danger" onclick="bulkDeleteClients()" style="padding:8px 14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">🗑️ 선택 삭제</button>
@@ -1938,6 +1938,6 @@
         <div class="label-scroll" id="labelScroll"></div>
     </div>
 
-    <script src="app.js?v=20260930h"></script>
+    <script src="app.js?v=20260930i"></script>
 </body>
 </html>

@@ -6472,6 +6472,17 @@ async function dbInsertClient(c) {
 }
 // 인라인 편집 + 모달 수정 양쪽에서 쓰이므로 patch 의 실제 키만 DB 컬럼으로 매핑.
 // (clientToDb 는 전체 필드를 강제 반환하므로 부분 업데이트에 쓰면 다른 필드가 빈 문자열로 덮여버림)
+// 거래처 등급 (migration 043) — 이름을 바꾸려면 여기 한 곳만
+const CLIENT_GRADES = [['S', '중요'], ['A', '우수'], ['B', '일반'], ['C', '관심']];
+function clientGradeLabel(g) { const hit = CLIENT_GRADES.find(x => x[0] === g); return hit ? `${hit[0]} ${hit[1]}` : ''; }
+function clientGradeBadge(g) {
+    const hit = CLIENT_GRADES.find(x => x[0] === g);
+    return hit ? `<span class="grade-badge g-${hit[0]}" title="등급 ${hit[0]} · ${hit[1]}">${hit[0]}<em>${hit[1]}</em></span>` : '';
+}
+function clientGradeOptions(v) {
+    return `<option value="">등급 없음</option>` + CLIENT_GRADES.map(([k, l]) => `<option value="${k}" ${v === k ? 'selected' : ''}>${k} · ${l}</option>`).join('');
+}
+
 const CLIENT_FIELD_MAP = {
     businessNo: 'business_no',
     companyName: 'company_name',
@@ -6758,7 +6769,7 @@ function renderClients() {
         ${ed('bizType', 'text', esc(c.bizType) || '-')}
         ${ed('bizItem', 'text', esc(c.bizItem) || '-')}
         ${ed('staffName', 'text', esc(c.staffName) || '-')}
-        ${ed('grade', 'text', esc(c.grade) || '-')}
+        ${ed('grade', 'select', clientGradeBadge(c.grade) || '-', 'S,A,B,C,')}
         <td><button class="edit-btn" onclick="event.stopPropagation();openEditClient(${c.id})">편집</button></td>
     </tr>`;
     }).join('') || `<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
@@ -6862,7 +6873,7 @@ function openClientModal(existing) {
         </div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">이메일</label><input type="text" class="form-input" id="cliStaffEmail" value="${v('staffEmail')}"></div>
-            <div class="form-group"><label class="form-label">등급</label><input type="text" class="form-input" id="cliGrade" value="${v('grade')}"></div>
+            <div class="form-group"><label class="form-label">등급</label><select class="form-select" id="cliGrade">${clientGradeOptions(c.grade || '')}</select></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px">
             ${existing ? `<button class="form-submit" style="flex:1;background:var(--red)" onclick="deleteClient(${c.id})">🗑️ 삭제</button>` : ''}
@@ -6987,7 +6998,7 @@ async function openClientDetail(id) {
         : row('홈페이지', c.website)}
                     ${row('업태', c.bizType)}
                     ${row('업종', c.bizItem)}
-                    ${row('등급', c.grade)}
+                    ${c.grade ? `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--gray-100)"><div style="width:100px;color:var(--text-tertiary);font-size:13px">등급</div><div style="flex:1;font-size:14px">${clientGradeBadge(c.grade)}</div></div>` : row('등급', '')}
                 </div>
             </div>
             <div>
@@ -20913,7 +20924,7 @@ function inqRenderList() {
         const who = x.contact_name || x.client_contact || '';
         return `<div class="inq-item ${x.id === _inqSel ? 'on' : ''}" data-id="${x.id}">
             <div class="inq-item-top">
-                <span class="inq-client">${escHtml(x.client || '(거래처 미정)')}${who ? `<em>${escHtml(who)}</em>` : ''}</span>
+                <span class="inq-client">${clientGradeBadge(x.grade)}${escHtml(x.client || '(거래처 미정)')}${who ? `<em>${escHtml(who)}</em>` : ''}</span>
                 <span class="inq-st ${INQ_STATUS_CLS[x.status] || ''}">${escHtml(x.status)}</span>
             </div>
             ${x.title ? `<div class="inq-title">${escHtml(x.title)}</div>` : ''}
@@ -20952,6 +20963,7 @@ async function inqRenderDetail() {
         <div class="inq-head-row">
           <input class="inq-h-client" id="inqFClient" list="tempClientList" value="${escHtml(x.client || '')}" placeholder="거래처">
           <select class="inq-h-status ${INQ_STATUS_CLS[x.status] || ''}" id="inqFStatus">${inqOpt(INQ_STATUSES, x.status)}</select>
+          <select class="inq-h-grade g-${escHtml(x.grade || 'none')}" id="inqFGrade" title="거래처 등급 — 바꾸면 거래처 DB 등급도 같이 바뀌어요">${clientGradeOptions(x.grade || '')}</select>
           <input class="inq-h-title" id="inqFTitle" value="${escHtml(x.title || '')}" placeholder="무엇을 문의했나요? 예) 손목시계 300개 각인 견적">
           <button class="inq-icon-btn" id="inqFDelete" title="상담 삭제">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
@@ -21060,6 +21072,8 @@ function inqBindDetail(x) {
     saveField('inqFChannel', 'channel');
     saveField('inqFAssignee', 'assignee');
     saveField('inqFStarted', 'started_at');
+    saveField('inqFGrade', 'grade');
+    $('inqFGrade').addEventListener('change', () => { $('inqFGrade').className = 'inq-h-grade g-' + ($('inqFGrade').value || 'none'); });
     saveField('inqFCAddr', 'company_address');
     saveField('inqFCFax', 'company_fax', inqNormPhone);
     saveField('inqFCWeb', 'company_website');
@@ -21539,7 +21553,8 @@ function inqRenderNewForm() {
             <label class="span2"><span>거래처 *</span><input id="inqNClient" list="tempClientList" placeholder="거래처 DB에서 고르거나 직접 입력" autocomplete="off"></label>
             <label><span>문의 경로</span><select id="inqNChannel">${inqOpt(INQ_CHANNELS, '전화')}</select></label>
             <label><span>우리 담당</span><select id="inqNAssignee"><option value="">-</option>${inqOpt(people, people.includes(me) ? me : '')}</select></label>
-            <label class="span4"><span>무엇을 문의했나요? <em>비워두면 품목·수량으로 자동</em></span><input id="inqNTitle" placeholder="예) 손목시계 300개 각인 견적"></label>
+            <label class="span3"><span>무엇을 문의했나요? <em>비워두면 품목·수량으로 자동</em></span><input id="inqNTitle" placeholder="예) 손목시계 300개 각인 견적"></label>
+            <label><span>거래처 등급</span><select id="inqNGrade">${clientGradeOptions('')}</select></label>
           </div>
           <div class="inq-new-sec">고객 담당자</div>
           <div class="inq-new-grid c5">
@@ -21631,7 +21646,7 @@ async function inqCreate() {
     const title = v('inqNTitle') || (items.length ? inqItemsSummary(items) + ' 문의' : '');
     btn.disabled = true;
     const { data, error } = await sb.from('inquiries').insert({
-        client, channel, assignee: v('inqNAssignee'), title,
+        client, channel, assignee: v('inqNAssignee'), title, grade: v('inqNGrade'),
         contact_name: v('inqNCName'), contact_dept: v('inqNCDept'), contact_title: v('inqNCTitle'),
         contact_phone: inqNormPhone(v('inqNCPhone')), contact_email: v('inqNCEmail'),
         company_address: v('inqNAddr'), company_fax: inqNormPhone(v('inqNFax')), company_website: v('inqNWeb'),
@@ -23304,6 +23319,7 @@ const TP_HELP = [
     ['#inqChips .inq-chip', '상태별로 모아보기 — 진행 중 = 정산완료·보류·실패를 뺀 전체'],
     ['#inqFStatus', '상담 상태 — 대부분 자동으로 바뀌어요 (답변→상담중, 가견적 안내→가견적, 견적 작성→견적발송, 국내로 넘기기→수주, 작지 발송→제작중, 납품→납품완료, 정산→정산완료)'],
     ['#inqFDelete', '상담과 모든 기록 삭제 (연결된 견적은 남아요)'],
+    ['#inqFGrade, #inqNGrade', '거래처 등급 S 중요 · A 우수 · B 일반 · C 관심 — 바꾸면 거래처 DB 등급도 같이 바뀌어요'],
     ['#inqFTitle', '무엇을 문의했는지 한 줄 — 목록에 보여요'],
     ['#inqFields input, #inqFields select', '눌러서 바로 고치면 저장돼요'],
     ['#inqStage', '진행 단계 — 초록=끝남, 파랑=지금 단계, 날짜=그 단계를 끝낸 날'],
@@ -23632,7 +23648,7 @@ async function inqFillFromClientDb(name) {
     const key = clientNameKey(name);
     if (key.length < 2) return;
     const core = String(name).replace(/주식회사|유한회사|\(주\)|\(유\)|㈜/g, '').trim();
-    const { data } = await sb.from('clients').select('company_name, address, fax, website, staff_name, staff_mobile, staff_email, phone')
+    const { data } = await sb.from('clients').select('company_name, address, fax, website, staff_name, staff_mobile, staff_email, phone, grade')
         .ilike('company_name', '%' + core.replace(/[%_\\]/g, m => '\\' + m) + '%').limit(20);
     const c = (data || []).find(r => clientNameKey(r.company_name) === key);
     if (!c || !document.getElementById('inqNClient')) return;
@@ -23646,6 +23662,8 @@ async function inqFillFromClientDb(name) {
         el.classList.add('inq-autofilled');
         filled.push(label);
     });
+    const gSel = document.getElementById('inqNGrade');
+    if (gSel && c.grade && !gSel.value) { gSel.value = c.grade; filled.push('등급'); }
     if (filled.length) {
         inqAutoHint(`${INQ_CHECK_SVG} 거래처 DB에서 불러옴 — <b>${filled.join(' · ')}</b> <span>틀리면 바로 고쳐주세요</span>`);
         inqRenderNewCheck();
