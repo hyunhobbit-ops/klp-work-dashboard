@@ -5099,3 +5099,23 @@ textarea.inq-drop{border-color:var(--blue) !important; background:var(--blue-lig
 .help-tip.show{opacity:1; transform:none}
 [data-theme="dark"] .help-tip{background:#F3F4F6; color:#111827}
 .tour-dim{position:absolute; background:rgba(10,14,22,.58); pointer-events:none}
+
+
+/* 사용법 안내 — 다크모드에서도 눈에 띄게: 말풍선은 테마와 상관없이 흰 바탕 + 파란 테두리, 주변은 더 어둡게 */
+.tour-dim{background:rgba(0,0,0,.72)}
+.tour-hole{box-shadow:0 0 0 3px #60A5FA, 0 0 0 7px rgba(96,165,250,.35), 0 0 28px 6px rgba(96,165,250,.45)}
+.tour-pop{background:#FFFFFF; color:#1F2937; border:2px solid #3B82F6;
+    box-shadow:0 0 0 5px rgba(59,130,246,.22), 0 24px 64px rgba(0,0,0,.55)}
+.tour-pop::before{content:''; position:absolute; left:0; right:0; top:0; height:5px; border-radius:10px 10px 0 0; background:#3B82F6}
+.tour-count{color:#2563EB}
+.tour-pop h4{color:#0F172A; font-size:16px}
+.tour-body{color:#334155}
+.tour-body b{color:#0F172A}
+.tour-flow em, .tour-tip{color:#64748B}
+.tour-miss{color:#EA580C}
+.tour-act button{background:#FFFFFF; border-color:#CBD5E1; color:#334155}
+.tour-act button:hover:not(:disabled){border-color:#3B82F6; color:#1D4ED8}
+.tour-act .tour-skip{background:none; color:#64748B}
+.tour-act .tour-skip:hover{color:#0F172A}
+.tour-act .tour-next{background:#2563EB; border-color:#2563EB; color:#FFFFFF}
+.tour-act .tour-next:hover:not(:disabled){background:#1D4ED8; border-color:#1D4ED8; color:#FFFFFF}
