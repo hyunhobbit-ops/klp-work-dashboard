@@ -20772,6 +20772,7 @@ function tpInitView() {
     try { v = localStorage.getItem('tp_view') || 'inq'; } catch (_) {}
     if (v === 'quote') inqLoad();     // 목록 화면이어도 상단 건수는 보여준다
     tpSetView(v);
+    tpMaybeAutoTour();   // 처음 들어온 사람에게 사용법 안내 한 번
 }
 
 // ---------- 데이터 ----------
@@ -23045,3 +23046,271 @@ function inqQuoteItemHtml(p) {
       ${hasBuy && bd.buy.total ? `<div class="inq-bd-margin ${m >= 0 ? 'pos' : 'neg'}">마진 <b>${n(m)}원</b> <span>${pct}%</span> <em>= 판매 합계 − 매입 합계</em></div>` : ''}
     </div>`;
 }
+
+// ---------- 사용법 안내: ① 따라하기 안내(가이드 투어) ② 마우스 올리면 뜨는 설명 — 상담·견적 화면 ----------
+// 투어: 버튼을 일하는 순서대로 하나씩 강조하고 옆에 설명. 처음 들어온 사람에게 한 번 자동으로.
+// 설명: [data-help] 에 마우스를 올리면 짧은 설명 (TP_HELP 선택자 목록을 화면이 다시 그려질 때마다 붙임)
+const TOUR_TP_KEY = 'tour_tp_v1';
+
+function _tourEl(sel) {
+    const list = Array.isArray(sel) ? sel : [sel];
+    for (const s of list) {
+        if (!s) continue;
+        const el = document.querySelector(s);
+        if (el && el.offsetParent !== null && el.getBoundingClientRect().width > 0) return el;
+    }
+    return null;
+}
+
+let _tour = null;
+function startTour(steps) {
+    endTour();
+    const wrap = document.createElement('div');
+    wrap.className = 'tour-layer';
+    wrap.innerHTML = `<div class="tour-block"></div><div class="tour-dim"></div><div class="tour-dim"></div><div class="tour-dim"></div><div class="tour-dim"></div><div class="tour-hole"></div>
+      <div class="tour-pop" role="dialog" aria-live="polite">
+        <div class="tour-count"></div><h4></h4><div class="tour-body"></div>
+        <div class="tour-act">
+          <button type="button" class="tour-skip">그만 보기</button>
+          <div class="inq-spacer"></div>
+          <button type="button" class="tour-prev">이전</button>
+          <button type="button" class="tour-next">다음</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    _tour = { steps, i: 0, wrap };
+    wrap.querySelector('.tour-skip').onclick = endTour;
+    wrap.querySelector('.tour-prev').onclick = () => tourGo(_tour.i - 1);
+    wrap.querySelector('.tour-next').onclick = () => (_tour.i >= _tour.steps.length - 1 ? endTour() : tourGo(_tour.i + 1));
+    _tour.onKey = (e) => {
+        if (!_tour) return;
+        if (e.key === 'Escape') endTour();
+        else if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); wrap.querySelector('.tour-next').click(); }
+        else if (e.key === 'ArrowLeft') tourGo(_tour.i - 1);
+    };
+    _tour.onResize = () => { if (_tour) tourPlace(); };
+    document.addEventListener('keydown', _tour.onKey, true);
+    window.addEventListener('resize', _tour.onResize);
+    tourGo(0);
+}
+
+function endTour() {
+    if (!_tour) return;
+    document.removeEventListener('keydown', _tour.onKey, true);
+    window.removeEventListener('resize', _tour.onResize);
+    _tour.wrap.remove();
+    const done = _tour.onEnd;
+    _tour = null;
+    if (done) try { done(); } catch (_) {}
+}
+
+async function tourGo(i) {
+    if (!_tour) return;
+    i = Math.max(0, Math.min(_tour.steps.length - 1, i));
+    _tour.i = i;
+    const st = _tour.steps[i];
+    if (st.prep) { try { await st.prep(); } catch (_) {} }
+    if (!_tour || _tour.i !== i) return;
+    const w = _tour.wrap;
+    w.querySelector('.tour-count').textContent = `${i + 1} / ${_tour.steps.length}`;
+    w.querySelector('h4').textContent = st.title;
+    const el = st.sel ? _tourEl(st.sel) : null;
+    w.querySelector('.tour-body').innerHTML = st.body + (st.sel && !el && st.missing ? `<p class="tour-miss">${st.missing}</p>` : '');
+    w.querySelector('.tour-prev').disabled = i === 0;
+    w.querySelector('.tour-next').textContent = i === _tour.steps.length - 1 ? '끝내기' : '다음';
+    _tour.el = el;
+    if (el) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    requestAnimationFrame(tourPlace);
+}
+
+function tourPlace() {
+    if (!_tour) return;
+    const w = _tour.wrap, hole = w.querySelector('.tour-hole'), pop = w.querySelector('.tour-pop');
+    const el = _tour.el;
+    const vw = window.innerWidth, vh = window.innerHeight, pad = 6;
+    pop.style.visibility = 'hidden';
+    pop.style.left = '0px'; pop.style.top = '0px';
+    const pw = pop.offsetWidth, ph = pop.offsetHeight;
+    let left, top;
+    // 강조 영역 둘레를 어두운 사각형 4개로 덮는다 (큰 box-shadow는 환경에 따라 안 그려짐)
+    const dims = w.querySelectorAll('.tour-dim');
+    const setDims = (x, y, wd, ht) => {
+        const R = [[0, 0, vw, y], [0, y + ht, vw, Math.max(0, vh - y - ht)], [0, y, x, ht], [x + wd, y, Math.max(0, vw - x - wd), ht]];
+        dims.forEach((d, k) => { const [a, b, c, e] = R[k]; d.style.cssText = `left:${a}px;top:${b}px;width:${c}px;height:${e}px`; });
+    };
+    if (!el) {
+        hole.style.cssText = 'display:none';
+        setDims(0, vh, 0, 0);
+        left = (vw - pw) / 2; top = (vh - ph) / 2;
+    } else {
+        const r = el.getBoundingClientRect();
+        const x = Math.max(4, r.left - pad), y = Math.max(4, r.top - pad);
+        const wd = Math.min(vw - 8, r.right + pad) - x, ht = Math.min(vh - 8, r.bottom + pad) - y;
+        hole.style.cssText = `left:${x}px;top:${y}px;width:${wd}px;height:${ht}px`;
+        setDims(x, y, wd, ht);
+        // 아래 → 위 → 오른쪽 → 왼쪽 순으로 빈 곳에
+        if (y + ht + 12 + ph < vh) { top = y + ht + 12; left = x; }
+        else if (y - 12 - ph > 0) { top = y - 12 - ph; left = x; }
+        else if (x + wd + 12 + pw < vw) { left = x + wd + 12; top = y; }
+        else { left = x - 12 - pw; top = y; }
+        left = Math.max(12, Math.min(vw - pw - 12, left));
+        top = Math.max(12, Math.min(vh - ph - 12, top));
+    }
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+    pop.style.visibility = 'visible';
+}
+
+// 상담 하나를 열어둔다 (투어가 상세 화면을 가리킬 수 있게)
+async function _tourOpenInquiry() {
+    tpSetView('inq');
+    if (!_inqList.length) { try { await inqLoad(); } catch (_) {} }
+    if (_inqSel === 'new') _inqSel = null;
+    if (!_inqSel || !inqFind(_inqSel)) {
+        const first = inqFiltered()[0] || _inqList[0];
+        if (!first) return;
+        _inqSel = first.id;
+        inqRenderList();
+    }
+    if (!document.getElementById('inqStage')) await inqRenderDetail();
+    await new Promise(r => setTimeout(r, 350));
+}
+
+function tpTourSteps() {
+    const needInq = '※ 등록된 상담이 없어서 이 부분은 아직 화면에 없어요. 상담을 하나 등록하면 보여요.';
+    return [
+        { title: '상담·견적 사용법', body: `<p>고객 문의가 들어와서 <b>국내 프로젝트로 넘어가기까지</b>를 이 화면에서 처리해요.</p>
+            <ol class="tour-flow"><li>상담 등록</li><li>대화 기록</li><li>가견적 안내 <em>(선택)</em></li><li>견적 작성</li><li>국내로 넘기기 (수주)</li><li>디자인확인서 → 작업요청서 → 납품·정산</li></ol>
+            <p class="tour-tip">키보드 → 다음 · ← 이전 · Esc 그만 보기</p>`,
+          prep: () => tpSetView('inq') },
+        { sel: '.tp-switch', title: '상담 / 견적 전환', body: '<b>상담</b>은 고객별 대화·진행 기록, <b>견적</b>은 견적 품목 전체 목록이에요. 같은 데이터를 두 방향에서 봐요.', prep: () => tpSetView('inq') },
+        { sel: '.inq-new-btn', title: '① 새 상담 등록 (F2)', body: '고객 문의가 오면 여기서 시작해요. <b>메일·카톡 내용을 그대로 붙여넣으면</b> 거래처·담당자·연락처·문의 내용이 자동으로 채워져요.' },
+        { sel: '#inqChips', title: '상태별로 모아보기', body: '<b>진행 중</b>은 아직 끝나지 않은 모든 상담이에요. 빨간 날짜는 <b>할 일 날짜가 지난 상담</b>이라 맨 위로 올라와요.' },
+        { sel: ['#inqList .inq-item.on', '#inqList .inq-item'], title: '상담 열기', body: '목록에서 상담을 누르면 오른쪽에 자세한 내용이 열려요.', missing: needInq, prep: _tourOpenInquiry },
+        { sel: '#inqStage', title: '진행 단계', body: '상담 → 견적 → 수주 → 디자인확인 → 작업요청 → 납품·정산. <b>초록</b>=끝난 단계, <b>파랑</b>=지금 단계예요. 대부분 <b>자동으로</b> 넘어가요.', missing: needInq },
+        { sel: '#inqNow', title: '지금 할 일', body: '지금 단계에서 해야 할 일과 <b>바로 누를 버튼</b>이 떠요. 무엇을 할지 모를 땐 여기부터 보세요.', missing: needInq },
+        { sel: '.inq-cust', title: '고객 정보', body: '고객 담당자·연락처·이메일이에요. <b>편집</b>을 누르면 고칠 수 있어요.', missing: needInq },
+        { sel: '#inqTodos', title: '다음 할 일', body: '할 일을 적고 Enter — <b>담당자 일일계획표에 자동으로</b> 들어가요. 계획표에서 완료 체크해도 여기에 반영돼요.', missing: needInq },
+        { sel: '#inqTimeline', title: '대화 기록', body: '고객과 오간 내용이 날짜순으로 쌓여요. 말풍선에 마우스를 올리면 <b>수정·삭제</b> 버튼이 보여요.', missing: needInq },
+        { sel: '.inq-composer', title: '② 기록 남기기', body: '<b>고객</b>(고객이 한 말) · <b>우리 답변</b> · <b>내부 메모</b>(팀만 봄) 중 고르고 적어요. 사진은 Ctrl+V, 저장은 Ctrl+Enter.', missing: needInq },
+        { sel: ['#inqPre:not(:empty)', '#inqNow [data-act="pre-new"]', '#inqNow'], title: '③ 가견적 안내 (선택)', body: '디자인이 확정되기 전이라 가격을 <b>범위로</b>(예: 13,000~15,000원) 안내할 때 써요. 안내문을 복사해 보내고 <b>안내 기록</b>을 누르면 상태가 <b>가견적</b>이 돼요. 매출·마진에는 들어가지 않아요.', missing: needInq },
+        { sel: ['#inqQuotes'], title: '④ 견적 작성', body: '<b>+ 이 상담으로 견적 작성</b>을 누르면 견적 화면으로 가서 이 상담에 연결된 견적을 만들어요. 연결된 견적은 품목마다 <b>판매·매입·마진 명세</b>로 보여요.', missing: needInq },
+        { sel: ['#inqProjs:not(:empty)', '#inqStage'], title: '⑤ 국내로 넘긴 뒤', body: '견적이 확정되면 <b>국내로 넘기기</b>(수주). 그다음부터 <b>디자인확인서·작업요청서</b> 버튼과 <b>국내 체크리스트</b>(디확 컨펌, 작지 발송, 선금, 잔금, 계산서, 송금, 납품)가 여기 생겨요. 국내 메뉴에서 체크해도 똑같이 반영돼요.', missing: needInq },
+        { sel: ['#tempInlineRow'], title: '견적 화면 — 빠른 입력', body: '견적 화면 맨 위 줄에 바로 입력하면 품목이 추가돼요. 날짜·매출처는 남아 있어서 <b>같은 견적에 품목을 연달아</b> 넣기 좋아요.', prep: () => tpSetView('quote') },
+        { sel: ['#tempProjectTableBody button[onclick^="transferGroupToDomestic"]', '#tempProjectTableBody'], title: '견적서 · 국내 등록', body: '견적 줄의 <b>견적서</b>로 인쇄하고, 확정되면 <b>📥 국내 등록</b>으로 국내 프로젝트로 넘겨요. 상담과 연결된 견적이면 상담도 자동으로 <b>수주</b>가 돼요.' },
+        { title: '다 봤어요!', body: '<p>버튼에 <b>마우스를 올리면</b> 짧은 설명이 떠요.</p><p>다시 보고 싶으면 오른쪽 위 <b>사용법</b> 버튼을 누르세요.</p>', prep: () => tpSetView('inq') }
+    ];
+}
+
+function tpStartTour() {
+    try { localStorage.setItem(TOUR_TP_KEY, '1'); } catch (_) {}
+    startTour(tpTourSteps());
+}
+
+// 처음 들어온 사람에게 한 번 자동으로
+function tpMaybeAutoTour() {
+    let seen = '1';
+    try { seen = localStorage.getItem(TOUR_TP_KEY); } catch (_) {}
+    if (seen) return;
+    setTimeout(() => {
+        const tab = document.getElementById('tab-projects-temp');
+        if (tab && tab.classList.contains('active') && !_tour && !document.querySelector('#modalOverlay.show')) tpStartTour();
+    }, 900);
+}
+
+// ---------- ② 마우스 올리면 뜨는 설명 ----------
+const TP_HELP = [
+    ['#tpSwInq', '고객 문의부터 수주까지 상담 기록을 관리하는 화면'],
+    ['#tpSwQuote', '견적 품목 전체 목록 — 견적서 출력·국내 등록'],
+    ['.inq-new-btn', '새 고객 문의 등록 (F2). 메일을 붙여넣으면 담당자·연락처·문의 내용이 자동으로 채워져요'],
+    ['#inqSearch', '거래처·담당자·문의 내용으로 찾기'],
+    ['#inqChips .inq-chip', '상태별로 모아보기 — 진행 중 = 정산완료·보류·실패를 뺀 전체'],
+    ['#inqFStatus', '상담 상태 — 대부분 자동으로 바뀌어요 (답변→상담중, 가견적 안내→가견적, 견적 작성→견적발송, 국내로 넘기기→수주, 작지 발송→제작중, 납품→납품완료, 정산→정산완료)'],
+    ['#inqFDelete', '상담과 모든 기록 삭제 (연결된 견적은 남아요)'],
+    ['#inqFTitle', '무엇을 문의했는지 한 줄 — 목록에 보여요'],
+    ['#inqCIToggle', '고객 담당자·연락처·문의 경로·우리 담당·시작일 편집'],
+    ['#inqStage', '진행 단계 — 초록=끝남, 파랑=지금 단계, 날짜=그 단계를 끝낸 날'],
+    ['#inqNow .inq-now', '지금 단계에서 할 일과 바로 누를 수 있는 버튼'],
+    ['#inqTNew', '할 일 입력 후 Enter — 담당자 일일계획표에도 자동으로 들어가요'],
+    ['#inqTNewWho', '할 일 담당자 (기본은 나)'],
+    ['.inq-todo-linked', '담당자 일일계획표에 등록됨 — 여기서 고치면 계획표도 같이 바뀌어요'],
+    ['.inq-todo-link', '아직 일일계획표에 없는 할 일 — 누르면 등록'],
+    ['.inq-todo:not(.add) input[type="checkbox"]', '완료 체크 (일일계획표에서 체크해도 반영돼요)'],
+    ['#inqDir [data-dir="in"]', '고객이 한 말·보낸 메일을 기록'],
+    ['#inqDir [data-dir="out"]', '우리가 답변한 내용을 기록 (첫 답변이면 상태가 상담중으로)'],
+    ['#inqDir [data-dir="memo"]', '팀끼리만 보는 메모 (고객에게 안 나가요)'],
+    ['.inq-attach', '사진 첨부 — 입력칸에 Ctrl+V 로 붙여넣어도 돼요'],
+    ['#inqCSave', '기록 저장 (Ctrl+Enter)'],
+    ['[data-pre="copy"]', '고객에게 보낼 가견적 안내문 복사 — 메일·카톡에 붙여넣기'],
+    ['[data-pre="send"]', '안내문을 "우리 답변"으로 기록하고 상태를 가견적으로'],
+    ['[data-pre="edit"]', '가견적 품목·단가 범위 수정'],
+    ['#inqNow [data-act="pre-new"]', '디자인 확정 전 가격 범위로 안내 (매출·마진에는 안 들어가요)'],
+    ['#inqNow [data-act="pre-quote"]', '가견적 품목·수량으로 확정 견적 작성 — 단가는 확정가로 입력'],
+    ['#inqQStart, #inqNow [data-act="quote-new"]', '이 상담에 연결된 견적 작성 — 견적 화면으로 이동해요'],
+    ['#inqQLink', '같은 거래처로 먼저 만든 견적을 이 상담에 연결'],
+    ['[data-qedit]', '견적 품목·단가·부대비용 편집'],
+    ['[data-qdoc], #inqNow [data-act="quote-doc"]', '견적서 보기·인쇄'],
+    ['#inqNow [data-act="transfer"]', '견적을 국내 프로젝트로 넘겨요 (수주) — 이후 국내에서 진행'],
+    ['[data-act^="dc:"]', '디자인확인서 만들기/열기 (문서 만드는 화면으로 이동)'],
+    ['[data-act^="wr:"]', '작업요청서 만들기 (디자인확인서가 먼저 있어야 해요)'],
+    ['[data-act^="open:"]', '국내 프로젝트 상세 보기'],
+    ['.inq-ck, #inqNow [data-act^="chk:"]', '국내 체크리스트 — 여기서 체크해도 국내 메뉴와 같이 바뀌어요'],
+    ['.inq-bd-inc', '추가 금액 없이 제품 단가에 포함'],
+    ['#tempInlineRow', '여기에 바로 입력하면 견적 품목이 추가돼요 (날짜·매출처는 남아서 연달아 입력)'],
+    ['#tpQuoteView button[onclick="openTempProjectModal()"]', '부대비용까지 자세히 입력하는 새 견적 창'],
+    ['#tempProjectTableBody button[onclick^="openTempGroupEdit"]', '이 견적 묶음 편집 (단가·VAT·부대비용)'],
+    ['#tempProjectTableBody button[onclick^="openTempQuote"]', '견적서 보기·인쇄'],
+    ['#tempProjectTableBody button[onclick^="transferGroupToDomestic"]', '국내 프로젝트로 등록 (수주) — 상담과 연결돼 있으면 상담도 자동으로 수주'],
+    ['#tempProjectTableBody button[onclick^="deleteTempProject"]', '이 품목 삭제'],
+    ['.inq-chip-link', '이 견적과 연결된 상담 보기'],
+    ['.tour-btn', '이 화면 사용법을 순서대로 안내해요']
+];
+
+function tpApplyHelp() {
+    const root = document.getElementById('tab-projects-temp');
+    if (!root) return;
+    TP_HELP.forEach(([sel, text]) => root.querySelectorAll(sel).forEach(el => {
+        if (el.dataset.help === text) return;
+        el.dataset.help = text;
+        if (el.hasAttribute('title')) el.removeAttribute('title');   // 브라우저 기본 말풍선과 겹치지 않게
+    }));
+}
+
+let _helpTip = null, _helpTimer = null;
+function _helpShow(el) {
+    if (!_helpTip) { _helpTip = document.createElement('div'); _helpTip.className = 'help-tip'; document.body.appendChild(_helpTip); }
+    _helpTip.textContent = el.dataset.help;
+    _helpTip.style.visibility = 'hidden';
+    _helpTip.classList.add('show');
+    const r = el.getBoundingClientRect(), tw = _helpTip.offsetWidth, th = _helpTip.offsetHeight;
+    let top = r.bottom + 8, left = r.left + r.width / 2 - tw / 2;
+    if (top + th > window.innerHeight - 8) top = r.top - th - 8;
+    left = Math.max(8, Math.min(window.innerWidth - tw - 8, left));
+    _helpTip.style.left = left + 'px';
+    _helpTip.style.top = top + 'px';
+    _helpTip.style.visibility = 'visible';
+}
+function _helpHide() { clearTimeout(_helpTimer); if (_helpTip) _helpTip.classList.remove('show'); }
+
+(function setupTpHelp() {
+    const init = () => {
+        const root = document.getElementById('tab-projects-temp');
+        if (!root) return;
+        let t = null;
+        new MutationObserver(() => { clearTimeout(t); t = setTimeout(tpApplyHelp, 120); }).observe(root, { childList: true, subtree: true });
+        tpApplyHelp();
+        root.addEventListener('mouseover', (e) => {
+            const el = e.target.closest && e.target.closest('[data-help]');
+            if (!el || _tour) return;
+            clearTimeout(_helpTimer);
+            _helpTimer = setTimeout(() => _helpShow(el), 350);
+        });
+        root.addEventListener('mouseout', (e) => {
+            const el = e.target.closest && e.target.closest('[data-help]');
+            if (el && !el.contains(e.relatedTarget)) _helpHide();
+        });
+        root.addEventListener('mousedown', _helpHide);
+        window.addEventListener('scroll', _helpHide, true);
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();

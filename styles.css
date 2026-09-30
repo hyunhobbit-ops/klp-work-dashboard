@@ -5060,3 +5060,42 @@ textarea.inq-drop{border-color:var(--blue) !important; background:var(--blue-lig
 .inq-bd-margin.pos b, .inq-bd-margin.pos span{color:#12B76A}
 .inq-bd-margin.neg b, .inq-bd-margin.neg span{color:var(--red)}
 .inq-bd-margin em{font-style:normal; font-size:11px; font-weight:500; color:var(--gray-400); margin-left:auto}
+
+
+/* ---- 사용법 안내 (상담·견적): 가이드 투어 + 마우스 설명 ---- */
+.tp-top{display:flex; align-items:center; gap:10px; margin-bottom:14px}
+.tp-top .tp-switch{margin-bottom:0}
+.tour-btn{order:2; margin-left:auto; display:inline-flex; align-items:center; gap:6px; height:34px; padding:0 13px;
+    border:1px solid var(--border); border-radius:9px; background:var(--white); cursor:pointer;
+    font-family:inherit; font-size:13px; font-weight:700; color:var(--gray-600)}
+.tour-btn:hover{border-color:var(--blue); color:var(--blue)}
+
+.tour-layer{position:fixed; inset:0; z-index:10050}
+.tour-block{position:absolute; inset:0}
+.tour-hole{position:absolute; border-radius:10px; box-shadow:0 0 0 3px #3B82F6;
+    transition:left .22s ease, top .22s ease, width .22s ease, height .22s ease; pointer-events:none}
+.tour-pop{position:absolute; width:340px; max-width:calc(100vw - 24px); padding:16px 16px 12px; border-radius:12px;
+    background:var(--white); color:var(--gray-800); box-shadow:0 18px 50px rgba(0,0,0,.28); border:1px solid var(--border)}
+.tour-count{font-size:11px; font-weight:800; color:var(--blue); letter-spacing:.3px}
+.tour-pop h4{margin:4px 0 8px; font-size:15.5px; font-weight:800; color:var(--gray-900)}
+.tour-body{font-size:13.5px; line-height:1.65; color:var(--gray-700)}
+.tour-body p{margin:0 0 6px}
+.tour-body b{color:var(--gray-900)}
+.tour-flow{margin:6px 0 8px; padding-left:20px}
+.tour-flow li{margin:2px 0}
+.tour-flow em{font-style:normal; color:var(--gray-400)}
+.tour-tip{font-size:12px; color:var(--gray-400)}
+.tour-miss{margin-top:8px !important; font-size:12px; color:var(--orange)}
+.tour-act{display:flex; align-items:center; gap:6px; margin-top:12px}
+.tour-act button{height:32px; padding:0 13px; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;
+    border:1px solid var(--border); background:var(--white); color:var(--gray-700)}
+.tour-act .tour-skip{border:none; background:none; color:var(--gray-400); padding:0 4px}
+.tour-act .tour-next{background:#1B64DA; border-color:#1B64DA; color:#fff}
+.tour-act button:disabled{opacity:.4; cursor:default}
+
+.help-tip{position:fixed; z-index:10060; max-width:280px; padding:7px 10px; border-radius:8px; pointer-events:none;
+    background:#1F2937; color:#F9FAFB; font-size:12.5px; font-weight:600; line-height:1.5;
+    box-shadow:0 6px 18px rgba(0,0,0,.2); opacity:0; transform:translateY(-2px); transition:opacity .12s, transform .12s}
+.help-tip.show{opacity:1; transform:none}
+[data-theme="dark"] .help-tip{background:#F3F4F6; color:#111827}
+.tour-dim{position:absolute; background:rgba(10,14,22,.58); pointer-events:none}

@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260930a">
+    <link rel="stylesheet" href="styles.css?v=20260930c">
     <link rel="stylesheet" href="mobile.css?v=20260507e" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -729,7 +729,12 @@
             <!-- ===== Projects (매입매출) ===== -->
             <!-- ===== 임시 프로젝트 ===== -->
             <main class="content" id="tab-projects-temp">
-                <!-- 상담 관리 | 견적 목록 전환 (메뉴를 늘리지 않고 같은 화면에서) -->
+                <!-- 상담 관리 | 견적 목록 전환 (메뉴를 늘리지 않고 같은 화면에서) + 사용법 안내 -->
+                <div class="tp-top">
+                <button type="button" class="tour-btn" onclick="tpStartTour()" title="이 화면 사용법을 순서대로 안내해요">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.8c0 1.7-2.4 2.2-2.4 3.7M12 17h.01"/></svg>
+                    사용법
+                </button>
                 <div class="tp-switch">
                     <button type="button" id="tpSwInq" onclick="tpSetView('inq')">
                         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
@@ -739,6 +744,7 @@
                         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M9 5h10M9 12h10M9 19h10M4 5h.01M4 12h.01M4 19h.01"/></svg>
                         견적
                     </button>
+                </div>
                 </div>
 
                 <!-- ===== 상담 관리 ===== -->
@@ -1932,6 +1938,6 @@
         <div class="label-scroll" id="labelScroll"></div>
     </div>
 
-    <script src="app.js?v=20260930b"></script>
+    <script src="app.js?v=20260930d"></script>
 </body>
 </html>
