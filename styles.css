@@ -5191,3 +5191,11 @@ textarea.inq-drop{border-color:var(--blue) !important; background:var(--blue-lig
     .inq-check{position:static}
 }
 @media (max-width:1800px){ .inq-new2 .inq-new-grid.c5{grid-template-columns:repeat(3, minmax(0,1fr))} }
+
+/* 품목 수량 미정 체크 */
+.inq-it-row{grid-template-columns:minmax(0,1fr) 96px 16px auto 24px}
+.inq-side .inq-it-row{grid-template-columns:minmax(0,1fr) 72px 14px auto 22px}
+.inq-it-tbd{display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:700; color:var(--gray-600); cursor:pointer; white-space:nowrap; user-select:none}
+.inq-it-tbd input{width:15px; height:15px; margin:0; accent-color:var(--orange); cursor:pointer}
+.inq-it-row input[data-f="qty"]:disabled{background:var(--gray-100); color:var(--gray-400)}
+.inq-it-row input[data-f="qty"]:disabled::placeholder{color:var(--orange); font-weight:700}

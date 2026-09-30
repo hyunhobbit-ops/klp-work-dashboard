@@ -21431,7 +21431,7 @@ function inqStartQuote(id) {
     set('tempInClient', x.client || '');
     set('tempInClientContact', x.contact_name || x.client_contact || '');
     const it0 = (x.items || []).find(i => i && i.name);
-    if (it0) { set('tempInItem', it0.name); set('tempInQty', it0.qty ? Number(it0.qty).toLocaleString() : ''); }
+    if (it0) { set('tempInItem', it0.name); set('tempInQty', it0.qty && !it0.tbd ? Number(it0.qty).toLocaleString() : ''); }
     inqRenderLinkBanner();
     const it = document.getElementById('tempInItem');
     if (it) it.focus();
@@ -23395,7 +23395,7 @@ const INQ_REQ_CHECK = [
     { key: 'contact_phone', label: '연락처', q: '연락 받으실 번호를 알려주세요', req: true },
     { key: 'contact_email', label: '이메일', q: '견적서 받으실 메일 주소는요?' },
     { key: 'item', label: '품목', q: '어떤 제품을 찾으세요? (종류·디자인)', req: true },
-    { key: 'qty', label: '수량', q: '몇 개 필요하세요?', req: true },
+    { key: 'qty', label: '수량', q: '몇 개 필요하세요? (아직 모르면 미정 체크)', req: true },
     { key: 'due_date', label: '희망 납기', q: '언제까지 받으셔야 하나요?', req: true },
     { key: 'budget', label: '예산', q: '생각하신 예산(개당 단가)이 있으세요?' },
     { key: 'purpose', label: '용도·행사', q: '어떤 용도(행사)로 쓰시나요?' },
@@ -23437,17 +23437,20 @@ function inqItemRowHtml(it) {
     it = it || {};
     return `<div class="inq-it-row">
         <input data-f="name" placeholder="품목 — 예) 손목시계 남녀 세트" value="${escHtml(it.name || '')}">
-        <input data-f="qty" inputmode="numeric" placeholder="수량" value="${it.qty ? Number(it.qty).toLocaleString() : ''}">
+        <input data-f="qty" inputmode="numeric" placeholder="${it.tbd ? '미정' : '수량'}" value="${it.qty && !it.tbd ? Number(it.qty).toLocaleString() : ''}" ${it.tbd ? 'disabled' : ''}>
         <span>개</span>
+        <label class="inq-it-tbd" title="수량이 아직 정해지지 않았으면 체크"><input type="checkbox" data-f="tbd" ${it.tbd ? 'checked' : ''}>미정</label>
         <button type="button" class="inq-todo-del" data-rm title="이 품목 빼기">×</button>
       </div>`;
 }
 function inqReadItems(box) {
     if (!box) return [];
-    return [...box.querySelectorAll('.inq-it-row')].map(r => ({
-        name: r.querySelector('[data-f="name"]').value.trim(),
-        qty: inqPreNum(r.querySelector('[data-f="qty"]').value)
-    })).filter(i => i.name || i.qty);
+    return [...box.querySelectorAll('.inq-it-row')].map(r => {
+        const tbd = !!(r.querySelector('[data-f="tbd"]') || {}).checked;
+        const it = { name: r.querySelector('[data-f="name"]').value.trim(), qty: tbd ? 0 : inqPreNum(r.querySelector('[data-f="qty"]').value) };
+        if (tbd) it.tbd = true;
+        return it;
+    }).filter(i => i.name || i.qty || i.tbd);
 }
 function inqBindItemRows(box, onChange) {
     box.querySelectorAll('.inq-it-row').forEach(r => {
@@ -23455,6 +23458,13 @@ function inqBindItemRows(box, onChange) {
         r.dataset.bound = '1';
         const q = r.querySelector('[data-f="qty"]');
         q.addEventListener('input', () => { const n = inqPreNum(q.value); q.value = n ? n.toLocaleString() : ''; });
+        const tbd = r.querySelector('[data-f="tbd"]');
+        if (tbd) tbd.addEventListener('change', () => {
+            q.disabled = tbd.checked;
+            if (tbd.checked) q.value = '';
+            q.placeholder = tbd.checked ? '미정' : '수량';
+            if (!tbd.checked) q.focus();
+        });
         r.querySelectorAll('input').forEach(i => {
             i.addEventListener('input', () => { delete box.dataset.auto; box.classList.remove('inq-autofilled-box'); });
             i.addEventListener('change', () => onChange && onChange());
@@ -23467,7 +23477,7 @@ function inqBindItemRows(box, onChange) {
     });
 }
 function inqItemsSummary(items) {
-    return (items || []).filter(i => i && i.name).map(i => i.name + (i.qty ? ` ${Number(i.qty).toLocaleString()}개` : '')).join(', ');
+    return (items || []).filter(i => i && i.name).map(i => i.name + (i.tbd ? ' (수량 미정)' : i.qty ? ` ${Number(i.qty).toLocaleString()}개` : '')).join(', ');
 }
 
 // ---- 체크리스트 (새 상담 오른쪽) ----
@@ -23477,7 +23487,7 @@ function inqNewValues() {
     const first = items.find(i => i.name) || items[0] || {};
     return {
         client: g('inqNClient'), contact_name: g('inqNCName'), contact_phone: g('inqNCPhone'), contact_email: g('inqNCEmail'),
-        item: first.name, qty: first.qty, due_date: g('inqNDue'), budget: g('inqNBudget'), purpose: g('inqNPurpose'),
+        item: first.name, qty: first.tbd ? '미정' : first.qty, due_date: g('inqNDue'), budget: g('inqNBudget'), purpose: g('inqNPurpose'),
         print_request: g('inqNPrint'), packaging_request: g('inqNPack'), sample_needed: g('inqNSample'), delivery_address: g('inqNDelivery')
     };
 }
@@ -23532,7 +23542,7 @@ function inqReqValues(x) {
     const it = (x.items || []).find(i => i && i.name) || (x.items || [])[0] || {};
     return {
         client: x.client, contact_name: x.contact_name || x.client_contact, contact_phone: x.contact_phone, contact_email: x.contact_email,
-        item: it.name, qty: it.qty, due_date: x.due_date, budget: x.budget, purpose: x.purpose, print_request: x.print_request,
+        item: it.name, qty: it.tbd ? '미정' : it.qty, due_date: x.due_date, budget: x.budget, purpose: x.purpose, print_request: x.print_request,
         packaging_request: x.packaging_request, sample_needed: x.sample_needed, delivery_address: x.delivery_address
     };
 }
