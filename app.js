@@ -21350,23 +21350,10 @@ function inqRenderQuotes(x) {
             <button class="inq-mini" data-qedit="${escHtml(g.key)}">편집</button>
             <button class="inq-mini" data-qdoc="${escHtml(g.key)}">견적서</button>
           </div>
-          <div class="inq-qi-list">${g.items.map(p => {
-              const r = calcTempRevenueWithVat(p), sp = calcTempSupRevenueWithVat(p);
-              const vt = v => v === 'VAT 포함' ? 'VAT포함' : 'VAT별도';
-              const fees = inqFeeLines(p, false).map(l => '매출 ' + l).concat(inqFeeLines(p, true).map(l => '매입 ' + l));
-              return `<div class="inq-qi">
-                <div class="inq-qi-top"><b>${escHtml(p.item || '-')}</b>${p.qty ? `<span>${p.qty.toLocaleString()}개</span>` : ''}</div>
-                <div class="inq-qi-nums">
-                  <div><em>매출</em><b class="rev">${won(r)}</b>${p.unitPrice ? `<small>단가 ${won(p.unitPrice)} · ${vt(p.unitPriceVat)}</small>` : ''}</div>
-                  <div><em>매입</em>${sp ? `<b class="sup">${won(sp)}</b>` : dash}${p.supplier || p.supplierUnitPrice ? `<small>${escHtml(p.supplier || '')}${p.supplierUnitPrice ? `${p.supplier ? ' · ' : ''}단가 ${won(p.supplierUnitPrice)}` : ''}</small>` : ''}</div>
-                  <div><em>마진</em>${marginCell(r, sp)}</div>
-                </div>
-                ${fees.length ? `<div class="inq-qi-fees">${fees.map(l => `<span>+ ${escHtml(l)}</span>`).join('')}</div>` : ''}
-              </div>`;
-          }).join('')}
+          <div class="inq-qi-list">${g.items.map(p => inqQuoteItemHtml(p)).join('')}
           ${g.items.length > 1 ? `<div class="inq-qi inq-qi-total"><div class="inq-qi-nums">
-              <div><em>합계 매출</em><b class="rev">${won(gRev)}</b></div>
-              <div><em>합계 매입</em>${gSup ? `<b class="sup">${won(gSup)}</b>` : dash}</div>
+              <div><em>합계 판매 (VAT포함)</em><b class="rev">${won(gRev)}</b></div>
+              <div><em>합계 매입 (VAT포함)</em>${gSup ? `<b class="sup">${won(gSup)}</b>` : dash}</div>
               <div><em>합계 마진</em>${marginCell(gRev, gSup)}</div>
           </div></div>` : ''}
           </div>
@@ -22991,4 +22978,70 @@ async function bizregDupCheck(d) {
     el.insertAdjacentHTML('beforeend', `<div class="biz-dup">⚠️ 이미 등록된 거래처일 수 있어요: ${list.map(r =>
         `<a href="#" data-cid="${r.id}">${escHtml(r.company_name)}${r.business_no ? ' (' + escHtml(r.business_no) + ')' : ''}</a>`).join(', ')} — 눌러서 기존 거래처 열기</div>`);
     el.querySelectorAll('[data-cid]').forEach(a => a.addEventListener('click', (e) => { e.preventDefault(); openClientDetail(Number(a.dataset.cid)); }));
+}
+
+// ---------- 연결된 견적: 품목별 판매·매입 명세 ----------
+// 금액이 어디서 나왔는지 보이게 — 제품·인쇄·포장·라벨·택배를 판매/매입 나란히, 그 아래 공급가·부가세·합계·마진
+function inqQuoteBreakdown(p) {
+    const q = p.qty || 0;
+    const supplyOf = (amt, vat) => vat === 'VAT 포함' ? Math.round(amt / 1.1) : amt;
+    const fee = (unit, apply, vat) => {
+        const amt = calcTempFeeTotal(unit, apply, q);
+        return { amt, vat, calc: amt ? (apply === '1개당' ? `${Number(unit).toLocaleString()} × ${q.toLocaleString()}` : `일괄 (${q.toLocaleString()}개 전체)`) : '' };
+    };
+    const meth = (a, b, skip) => {
+        const clean = v => (v && !skip.includes(v)) ? v : '';
+        const x = clean(a), y = clean(b);
+        return x && y && x !== y ? `판매 ${x} / 매입 ${y}` : (x || y);
+    };
+    const rows = [];
+    rows.push({ label: '제품', sub: '',
+        sale: { amt: (p.unitPrice || 0) * q, vat: p.unitPriceVat, calc: p.unitPrice ? `${Number(p.unitPrice).toLocaleString()} × ${q.toLocaleString()}` : '' },
+        buy: { amt: (p.supplierUnitPrice || 0) * q, vat: p.supplierUnitPriceVat, calc: p.supplierUnitPrice ? `${Number(p.supplierUnitPrice).toLocaleString()} × ${q.toLocaleString()}` : '' } });
+    rows.push({ label: '인쇄', sub: meth(p.printMethod, p.supPrintMethod, ['없음']),
+        sale: fee(p.printFee, p.printFeeApply, p.printFeeVat), buy: fee(p.supPrintFee, p.supPrintFeeApply, p.supPrintFeeVat) });
+    rows.push({ label: '포장', sub: meth(p.packMethod, p.supPackMethod, ['기본박스', '없음']),
+        sale: fee(p.packagingFee, p.packagingFeeApply, p.packagingFeeVat), buy: fee(p.supPackagingFee, p.supPackagingFeeApply, p.supPackagingFeeVat) });
+    rows.push({ label: '라벨', sub: '',
+        sale: fee(p.labelFee, p.labelFeeApply || '1개당', p.labelFeeVat), buy: fee(p.supLabelFee, p.supLabelFeeApply || '1개당', p.supLabelFeeVat) });
+    const ship = (boxes, per, vat) => ({ amt: (boxes || 0) * (per || 0), vat, calc: boxes && per ? `${boxes}박스 × ${Number(per).toLocaleString()}` : '' });
+    rows.push({ label: '택배', sub: '',
+        sale: ship(p.shippingBoxes, p.shippingFee, p.shippingFeeVat), buy: ship(p.supShippingBoxes, p.supShippingFee, p.supShippingFeeVat) });
+    // 금액도 내용도 없는 줄은 뺀다 (제품 줄은 항상)
+    const shown = rows.filter((r, i) => i === 0 || r.sale.amt || r.buy.amt || r.sub);
+    const tot = side => {
+        const total = side === 'sale' ? calcTempRevenueWithVat(p) : calcTempSupRevenueWithVat(p);
+        const supply = rows.reduce((s, r) => s + supplyOf(r[side].amt, r[side].vat), 0);
+        return { supply, vat: total - supply, total };
+    };
+    return { rows: shown, sale: tot('sale'), buy: tot('buy') };
+}
+
+function inqQuoteItemHtml(p) {
+    const bd = inqQuoteBreakdown(p);
+    const n = v => Number(v || 0).toLocaleString();
+    const cell = (c, hasMethod) => {
+        if (c.amt) return `<b>${n(c.amt)}</b>${c.calc ? `<small>${escHtml(c.calc)}${c.vat === 'VAT 포함' ? ' · VAT포함가' : ''}</small>` : ''}`;
+        return hasMethod ? '<span class="inq-bd-inc" title="추가 금액 없이 제품 단가에 포함">단가에 포함</span>' : '<span class="inq-bd-none">–</span>';
+    };
+    const hasBuy = bd.buy.total > 0 || p.supplier;
+    const m = bd.sale.total - bd.buy.total;
+    const pct = bd.sale.total > 0 ? Math.round(m / bd.sale.total * 100) : 0;
+    return `<div class="inq-qi">
+      <div class="inq-qi-top"><b>${escHtml(p.item || '-')}</b>${p.qty ? `<span>${p.qty.toLocaleString()}개</span>` : ''}</div>
+      <table class="inq-bd">
+        <thead><tr><th></th><th class="sale">판매</th><th class="buy">매입${p.supplier ? `<small>${escHtml(p.supplier)}</small>` : ''}</th></tr></thead>
+        <tbody>${bd.rows.map(r => `<tr>
+            <td class="lab">${escHtml(r.label)}${r.sub ? `<small>${escHtml(r.sub)}</small>` : ''}</td>
+            <td>${cell(r.sale, !!r.sub)}</td>
+            <td>${hasBuy ? cell(r.buy, !!r.sub) : '<span class="inq-bd-none">–</span>'}</td>
+        </tr>`).join('')}</tbody>
+        <tfoot>
+          <tr class="sub"><td class="lab">공급가</td><td>${n(bd.sale.supply)}</td><td>${hasBuy ? n(bd.buy.supply) : '–'}</td></tr>
+          <tr class="sub"><td class="lab">부가세</td><td>${n(bd.sale.vat)}</td><td>${hasBuy ? n(bd.buy.vat) : '–'}</td></tr>
+          <tr class="total"><td class="lab">합계 <small>VAT포함</small></td><td class="sale"><b>${n(bd.sale.total)}원</b></td><td class="buy">${hasBuy ? `<b>${n(bd.buy.total)}원</b>` : '–'}</td></tr>
+        </tfoot>
+      </table>
+      ${hasBuy && bd.buy.total ? `<div class="inq-bd-margin ${m >= 0 ? 'pos' : 'neg'}">마진 <b>${n(m)}원</b> <span>${pct}%</span> <em>= 판매 합계 − 매입 합계</em></div>` : ''}
+    </div>`;
 }
