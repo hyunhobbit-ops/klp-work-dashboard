@@ -20937,7 +20937,6 @@ async function inqRenderDetail() {
     const people = inqPeople();
     const assigneeOpts = `<option value="">-</option>` + inqOpt(people.includes(x.assignee) || !x.assignee ? people : people.concat([x.assignee]), x.assignee);
     // 고객 정보가 채워져 있으면 한 줄 요약으로 접어둔다 (화면을 단계·기록에 양보)
-    const ciOpen = !(x.contact_name || x.client_contact || x.contact_phone || x.contact_email);
     el.innerHTML = `
       <div class="inq-head">
         <div class="inq-head-row">
@@ -20948,26 +20947,25 @@ async function inqRenderDetail() {
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
           </button>
         </div>
-      <div class="inq-cust">
-          <div class="inq-cinfo">
-            <span class="inq-ci-lab">고객</span>
-            <div class="inq-ci-sum" id="inqCISum">${inqContactSummary(x)}</div>
-            <button type="button" class="inq-mini" id="inqCIToggle">${ciOpen ? '접기' : '편집'}</button>
-          </div>
-          <div class="inq-fields" id="inqFields" ${ciOpen ? '' : 'hidden'}>
-            <label><span>고객 담당자</span><input id="inqFCName" value="${escHtml(x.contact_name || x.client_contact || '')}" placeholder="이름"></label>
+        <div class="inq-hfields" id="inqFields">
+          <div class="inq-hf-row">
+            <span class="inq-hf-cap">담당자</span>
+            <label><span>이름</span><input id="inqFCName" value="${escHtml(x.contact_name || x.client_contact || '')}" placeholder="이름"></label>
             <label><span>직함</span><input id="inqFCTitle" value="${escHtml(x.contact_title || '')}" placeholder="예) 과장"></label>
             <label><span>부서</span><input id="inqFCDept" value="${escHtml(x.contact_dept || '')}" placeholder="예) 총무팀"></label>
             <label><span>연락처</span><input id="inqFCPhone" inputmode="tel" value="${escHtml(x.contact_phone || '')}" placeholder="010-0000-0000"></label>
-            <label><span>이메일</span><input id="inqFCEmail" type="email" value="${escHtml(x.contact_email || '')}" placeholder="name@company.com"></label>
+            <label class="w3"><span>이메일</span><input id="inqFCEmail" type="email" value="${escHtml(x.contact_email || '')}" placeholder="name@company.com"></label>
+          </div>
+          <div class="inq-hf-row">
+            <span class="inq-hf-cap">회사</span>
+            <label class="w2"><span>회사 주소</span><input id="inqFCAddr" value="${escHtml(x.company_address || '')}" placeholder="회사 주소"></label>
+            <label><span>팩스</span><input id="inqFCFax" inputmode="tel" value="${escHtml(x.company_fax || '')}" placeholder="02-0000-0000"></label>
+            <label><span>홈페이지</span><input id="inqFCWeb" value="${escHtml(x.company_website || '')}" placeholder="www.company.co.kr"></label>
             <label><span>문의 경로</span><select id="inqFChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select></label>
             <label><span>우리 담당</span><select id="inqFAssignee">${assigneeOpts}</select></label>
-            <label><span>상담 시작일</span><input type="date" id="inqFStarted" value="${escHtml(x.started_at || '')}"></label>
-              <label class="span2"><span>회사 주소</span><input id="inqFCAddr" value="${escHtml(x.company_address || '')}" placeholder="회사 주소"></label>
-              <label><span>팩스</span><input id="inqFCFax" inputmode="tel" value="${escHtml(x.company_fax || '')}" placeholder="02-0000-0000"></label>
-              <label><span>홈페이지</span><input id="inqFCWeb" value="${escHtml(x.company_website || '')}" placeholder="www.company.co.kr"></label>
+            <label><span>시작일</span><input type="date" id="inqFStarted" value="${escHtml(x.started_at || '')}"></label>
           </div>
-      </div>
+        </div>
         <div class="inq-stage" id="inqStage"></div>
         ${x.status === '실패' && x.fail_reason ? `<div class="inq-fail">실패 사유 · ${escHtml(x.fail_reason)}</div>` : ''}
       </div>
@@ -21035,7 +21033,7 @@ function inqBindDetail(x) {
             });
         });
     };
-    $('inqCIToggle').addEventListener('click', () => {
+    if ($('inqCIToggle')) $('inqCIToggle').addEventListener('click', () => {
         const f = $('inqFields');
         f.hidden = !f.hidden;
         $('inqCIToggle').textContent = f.hidden ? '편집' : '접기';
@@ -23256,7 +23254,7 @@ function tpTourSteps() {
         { sel: ['#inqList .inq-item.on', '#inqList .inq-item'], title: '상담 열기', body: '목록에서 상담을 누르면 오른쪽에 자세한 내용이 열려요.', missing: needInq, prep: _tourOpenInquiry },
         { sel: '#inqStage', title: '진행 단계', body: '상담 → 견적 → 수주 → 디자인확인 → 작업요청 → 납품·정산. <b>초록</b>=끝난 단계, <b>파랑</b>=지금 단계예요. 대부분 <b>자동으로</b> 넘어가요.', missing: needInq },
         { sel: '#inqNow', title: '지금 할 일', body: '지금 단계에서 해야 할 일과 <b>바로 누를 버튼</b>이 떠요. 무엇을 할지 모를 땐 여기부터 보세요.', missing: needInq },
-        { sel: '.inq-cust', title: '고객 정보', body: '고객 담당자·연락처·이메일이에요. <b>편집</b>을 누르면 고칠 수 있어요.', missing: needInq },
+        { sel: '#inqFields', title: '고객 정보', body: '담당자(이름·직함·부서·연락처·이메일)와 회사(주소·팩스·홈페이지), 문의 경로·우리 담당이에요. 칸을 눌러 <b>바로 고치면 저장</b>돼요.', missing: needInq },
         { sel: '#inqTodos', title: '다음 할 일', body: '할 일을 적고 Enter — <b>담당자 일일계획표에 자동으로</b> 들어가요. 계획표에서 완료 체크해도 여기에 반영돼요.', missing: needInq },
         { sel: '#inqReq', title: '요청 사항', body: '품목·수량·납기·예산·용도·인쇄·포장·샘플·배송지를 칸으로 정리해요. <b>아직 모르는 것</b>은 질문과 함께 보여줘서 다음 통화 때 물어보면 돼요.', missing: needInq },
         { sel: '#inqTimeline', title: '대화 기록', body: '고객과 오간 내용이 날짜순으로 쌓여요. 말풍선에 마우스를 올리면 <b>수정·삭제</b> 버튼이 보여요.', missing: needInq },
@@ -23296,7 +23294,7 @@ const TP_HELP = [
     ['#inqFStatus', '상담 상태 — 대부분 자동으로 바뀌어요 (답변→상담중, 가견적 안내→가견적, 견적 작성→견적발송, 국내로 넘기기→수주, 작지 발송→제작중, 납품→납품완료, 정산→정산완료)'],
     ['#inqFDelete', '상담과 모든 기록 삭제 (연결된 견적은 남아요)'],
     ['#inqFTitle', '무엇을 문의했는지 한 줄 — 목록에 보여요'],
-    ['#inqCIToggle', '고객 담당자·연락처·문의 경로·우리 담당·시작일 편집'],
+    ['#inqFields input, #inqFields select', '눌러서 바로 고치면 저장돼요'],
     ['#inqStage', '진행 단계 — 초록=끝남, 파랑=지금 단계, 날짜=그 단계를 끝낸 날'],
     ['#inqNow .inq-now', '지금 단계에서 할 일과 바로 누를 수 있는 버튼'],
     ['#inqTNew', '할 일 입력 후 Enter — 담당자 일일계획표에도 자동으로 들어가요'],

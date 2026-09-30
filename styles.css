@@ -5199,3 +5199,32 @@ textarea.inq-drop{border-color:var(--blue) !important; background:var(--blue-lig
 .inq-it-tbd input{width:15px; height:15px; margin:0; accent-color:var(--orange); cursor:pointer}
 .inq-it-row input[data-f="qty"]:disabled{background:var(--gray-100); color:var(--gray-400)}
 .inq-it-row input[data-f="qty"]:disabled::placeholder{color:var(--orange); font-weight:700}
+
+
+/* ---- 상담 상세 머리: 회사명 크게 + 담당자·회사 정보는 항상 보이는 입력칸 ---- */
+.inq-head-row .inq-h-client{font-size:26px; font-weight:900; letter-spacing:-.6px; max-width:380px; padding:4px 8px; margin-left:-8px}
+.inq-head-row .inq-h-title{font-size:15px}
+.inq-head-row .inq-h-status{height:34px; font-size:13px}
+.inq-hfields{margin-top:12px; display:flex; flex-direction:column; gap:8px}
+.inq-hf-row{display:grid; grid-template-columns:56px repeat(7, minmax(0,1fr)); gap:8px; align-items:end}
+.inq-hf-cap{align-self:center; padding-top:16px; font-size:12.5px; font-weight:800; color:var(--gray-500)}
+.inq-hfields label{display:flex; flex-direction:column; gap:4px; min-width:0}
+.inq-hfields label.w2{grid-column:span 2}
+.inq-hfields label.w3{grid-column:span 3}
+.inq-hfields label span{font-size:11.5px; font-weight:700; color:var(--label)}
+.inq-hfields input, .inq-hfields select{height:38px; padding:0 11px; border:1px solid var(--border); border-radius:9px; min-width:0;
+    background:var(--white); font-family:inherit; font-size:14px; font-weight:600; color:var(--gray-900); outline:none}
+.inq-hfields input:hover, .inq-hfields select:hover{border-color:var(--gray-400)}
+.inq-hfields input:focus, .inq-hfields select:focus{border-color:var(--blue); box-shadow:0 0 0 3px color-mix(in srgb, var(--blue) 18%, transparent)}
+.inq-hfields input::placeholder{font-weight:500; color:var(--gray-400)}
+.inq-head .inq-stage{margin-top:14px}
+@media (max-width:1400px){
+    .inq-hf-row{grid-template-columns:repeat(4, minmax(0,1fr))}
+    .inq-hf-cap{grid-column:1 / -1; padding-top:4px}
+    .inq-hfields label.w3{grid-column:span 2}
+}
+@media (max-width:1750px) and (min-width:1401px){
+    .inq-hf-row{grid-template-columns:44px repeat(7, minmax(0,1fr)); gap:6px}
+    .inq-hfields input, .inq-hfields select{padding:0 7px; font-size:13px}
+    .inq-hfields input[type="date"]{padding:0 4px; font-size:12.5px}
+}
