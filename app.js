@@ -6424,7 +6424,8 @@ function clientToDb(c) {
         staff_mobile: c.staffMobile || '',
         staff_email: c.staffEmail || '',
         grade: c.grade || '',
-        category: c.category || ''
+        category: c.category || '',
+        website: c.website || ''
     };
 }
 function clientFromDb(r) {
@@ -6445,7 +6446,8 @@ function clientFromDb(r) {
         staffMobile: r.staff_mobile || '',
         staffEmail: r.staff_email || '',
         grade: r.grade || '',
-        category: r.category || ''
+        category: r.category || '',
+        website: r.website || ''
     };
 }
 async function loadClientsFromDb() {
@@ -6486,7 +6488,8 @@ const CLIENT_FIELD_MAP = {
     staffMobile: 'staff_mobile',
     staffEmail: 'staff_email',
     grade: 'grade',
-    category: 'category'
+    category: 'category',
+    website: 'website'
 };
 async function dbUpdateClient(id, patch) {
     const dbPatch = {};
@@ -6849,6 +6852,9 @@ function openClientModal(existing) {
             <div class="form-group"><label class="form-label">업태</label><input type="text" class="form-input" id="cliBizType" value="${v('bizType')}"></div>
             <div class="form-group"><label class="form-label">업종</label><input type="text" class="form-input" id="cliBizItem" value="${v('bizItem')}"></div>
         </div>
+        <div class="form-row">
+            <div class="form-group" style="grid-column:1 / -1"><label class="form-label">홈페이지</label><input type="text" class="form-input" id="cliWebsite" value="${v('website')}" placeholder="www.company.co.kr"></div>
+        </div>
         <div class="form-section-title">담당직원</div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">이름</label><input type="text" class="form-input" id="cliStaffName" value="${v('staffName')}"></div>
@@ -6885,7 +6891,8 @@ function readClientForm() {
         staffName: document.getElementById('cliStaffName').value.trim(),
         staffMobile: document.getElementById('cliStaffMobile').value.trim(),
         staffEmail: document.getElementById('cliStaffEmail').value.trim(),
-        grade: document.getElementById('cliGrade').value.trim()
+        grade: document.getElementById('cliGrade').value.trim(),
+        website: document.getElementById('cliWebsite').value.trim()
     };
 }
 
@@ -6975,6 +6982,9 @@ async function openClientDetail(id) {
                     ${c.address
         ? `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--gray-100)"><div style="width:100px;color:var(--text-tertiary);font-size:13px">주소</div><div style="flex:1;font-size:14px"><a href="${_mapsUrl(c.address)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none">${esc(c.address)} <span style="font-size:12px">🗺 지도</span></a></div></div>`
         : row('주소', c.address)}
+                    ${c.website
+        ? `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--gray-100)"><div style="width:100px;color:var(--text-tertiary);font-size:13px">홈페이지</div><div style="flex:1;font-size:14px"><a href="${esc(/^https?:\/\//i.test(c.website) ? c.website : 'https://' + c.website)}" target="_blank" rel="noopener" style="color:var(--blue);text-decoration:none">${esc(c.website)}</a></div></div>`
+        : row('홈페이지', c.website)}
                     ${row('업태', c.bizType)}
                     ${row('업종', c.bizItem)}
                     ${row('등급', c.grade)}
@@ -21580,6 +21590,7 @@ function inqRenderNewForm() {
         $(id).addEventListener('input', () => { delete $(id).dataset.auto; $(id).classList.remove('inq-autofilled'); });
     });
     ['inqNCPhone', 'inqNFax'].forEach(id => $(id).addEventListener('change', () => { $(id).value = inqNormPhone($(id).value); }));
+    $('inqNClient').addEventListener('change', () => inqFillFromClientDb($('inqNClient').value));
 
     // 품목 줄
     const items = $('inqNItems');
@@ -23614,4 +23625,29 @@ function inqRenderReq(x) {
             save({ [key]: v || (key === 'due_date' ? null : '') });
         });
     });
+}
+
+// 새 상담에서 거래처를 고르면 거래처 DB에 저장된 회사·담당자 정보를 빈 칸에 불러온다 (사람이 쓴 칸은 그대로)
+async function inqFillFromClientDb(name) {
+    const key = clientNameKey(name);
+    if (key.length < 2) return;
+    const core = String(name).replace(/주식회사|유한회사|\(주\)|\(유\)|㈜/g, '').trim();
+    const { data } = await sb.from('clients').select('company_name, address, fax, website, staff_name, staff_mobile, staff_email, phone')
+        .ilike('company_name', '%' + core.replace(/[%_\\]/g, m => '\\' + m) + '%').limit(20);
+    const c = (data || []).find(r => clientNameKey(r.company_name) === key);
+    if (!c || !document.getElementById('inqNClient')) return;
+    const filled = [];
+    [['inqNAddr', c.address, '회사 주소'], ['inqNFax', c.fax, '팩스'], ['inqNWeb', c.website, '홈페이지'],
+     ['inqNCName', c.staff_name, '담당자'], ['inqNCPhone', c.staff_mobile, '연락처'], ['inqNCEmail', c.staff_email, '이메일']].forEach(([id, v, label]) => {
+        const el = document.getElementById(id);
+        if (!el || !v || (el.value.trim() && el.dataset.auto !== '1')) return;
+        el.value = v;
+        el.dataset.auto = '1';
+        el.classList.add('inq-autofilled');
+        filled.push(label);
+    });
+    if (filled.length) {
+        inqAutoHint(`${INQ_CHECK_SVG} 거래처 DB에서 불러옴 — <b>${filled.join(' · ')}</b> <span>틀리면 바로 고쳐주세요</span>`);
+        inqRenderNewCheck();
+    }
 }
