@@ -20865,7 +20865,7 @@ function inqFiltered() {
     if (_inqFilter === 'active') list = list.filter(x => INQ_ACTIVE.includes(x.status));
     else if (_inqFilter !== 'all') list = list.filter(x => x.status === _inqFilter);
     if (q) list = list.filter(x =>
-        [x.client, x.title, x.client_contact, x.contact_name, x.contact_dept, x.contact_phone, x.contact_email]
+        [x.client, x.title, x.client_contact, x.contact_name, x.contact_dept, x.contact_phone, x.contact_email, x.purpose, inqItemsSummary(x.items)]
             .some(v => String(v || '').toLowerCase().includes(q)));
     // 할 일 기한 지난 것 → 최근 연락 순
     return list.slice().sort((a, b) => {
@@ -20963,6 +20963,9 @@ async function inqRenderDetail() {
             <label><span>문의 경로</span><select id="inqFChannel">${inqOpt(INQ_CHANNELS, x.channel)}</select></label>
             <label><span>우리 담당</span><select id="inqFAssignee">${assigneeOpts}</select></label>
             <label><span>상담 시작일</span><input type="date" id="inqFStarted" value="${escHtml(x.started_at || '')}"></label>
+              <label class="span2"><span>회사 주소</span><input id="inqFCAddr" value="${escHtml(x.company_address || '')}" placeholder="회사 주소"></label>
+              <label><span>팩스</span><input id="inqFCFax" inputmode="tel" value="${escHtml(x.company_fax || '')}" placeholder="02-0000-0000"></label>
+              <label><span>홈페이지</span><input id="inqFCWeb" value="${escHtml(x.company_website || '')}" placeholder="www.company.co.kr"></label>
           </div>
       </div>
         <div class="inq-stage" id="inqStage"></div>
@@ -20995,6 +20998,7 @@ async function inqRenderDetail() {
         <aside class="inq-side">
           <div id="inqNow"></div>
           <section class="inq-card"><div class="inq-todos" id="inqTodos"><div class="inq-todo-head"><b>다음 할 일</b><em>불러오는 중…</em></div></div></section>
+          <section class="inq-card inq-req" id="inqReq"></section>
           <section class="inq-card inq-pre" id="inqPre"></section>
           <section class="inq-card inq-quotes" id="inqQuotes"></section>
           <section class="inq-card inq-projs" id="inqProjs"></section>
@@ -21005,6 +21009,7 @@ async function inqRenderDetail() {
     if (_inqProjsFor !== x.id) { _inqProjs = []; _inqProjsFor = null; }
     if (_inqPreEditing !== x.id) _inqPreEditing = null;
     inqBindDetail(x);
+    inqRenderReq(x);
     inqRenderPre(x);
     inqRenderQuotes(x);
     inqLoadDeal(x);
@@ -21047,6 +21052,9 @@ function inqBindDetail(x) {
     saveField('inqFChannel', 'channel');
     saveField('inqFAssignee', 'assignee');
     saveField('inqFStarted', 'started_at');
+    saveField('inqFCAddr', 'company_address');
+    saveField('inqFCFax', 'company_fax', inqNormPhone);
+    saveField('inqFCWeb', 'company_website');
 
 
     $('inqFStatus').addEventListener('change', async (e) => {
@@ -21422,6 +21430,8 @@ function inqStartQuote(id) {
     set('tempInDate', getTodayStr());
     set('tempInClient', x.client || '');
     set('tempInClientContact', x.contact_name || x.client_contact || '');
+    const it0 = (x.items || []).find(i => i && i.name);
+    if (it0) { set('tempInItem', it0.name); set('tempInQty', it0.qty ? Number(it0.qty).toLocaleString() : ''); }
     inqRenderLinkBanner();
     const it = document.getElementById('tempInItem');
     if (it) it.focus();
@@ -21506,33 +21516,56 @@ function inqRenderNewForm() {
     const me = currentUser && currentUser.name;
     _inqNewImages.length = 0;
     el.innerHTML = `
-      <div class="inq-new">
-        <h3>새 상담 등록</h3>
-        <div class="inq-new-grid">
-          <label class="span2"><span>거래처 *</span><input id="inqNClient" list="tempClientList" placeholder="거래처 DB에서 고르거나 직접 입력" autocomplete="off"></label>
-          <label><span>문의 경로</span><select id="inqNChannel">${inqOpt(INQ_CHANNELS, '전화')}</select></label>
-          <label><span>우리 담당</span><select id="inqNAssignee"><option value="">-</option>${inqOpt(people, people.includes(me) ? me : '')}</select></label>
-          <label class="span4"><span>무엇을 문의했나요?</span><input id="inqNTitle" placeholder="예) 손목시계 300개 각인 견적"></label>
+      <div class="inq-new inq-new2">
+        <div class="inq-new-main">
+          <h3>새 상담 등록</h3>
+          <div class="inq-new-sec first">메일·카톡 붙여넣기 <em>붙여넣으면 AI가 읽고 아래 칸을 채워요 · 전화 상담이면 건너뛰고 오른쪽 순서대로 물어보세요</em></div>
+          <div class="inq-new-full">
+            <textarea id="inqNBody" rows="5" placeholder="고객이 보낸 내용을 그대로 붙여넣으세요.&#10;사진도 Ctrl+V로 붙여넣거나 여기로 끌어다 놓을 수 있습니다."></textarea>
+            <div class="inq-auto-hint" id="inqNAutoHint"></div>
+            <div class="inq-img-notice" id="inqNImgNotice" hidden></div>
+            <div class="inq-thumbs" id="inqNThumbs"></div>
+          </div>
+          <div class="inq-new-sec">기본</div>
+          <div class="inq-new-grid">
+            <label class="span2"><span>거래처 *</span><input id="inqNClient" list="tempClientList" placeholder="거래처 DB에서 고르거나 직접 입력" autocomplete="off"></label>
+            <label><span>문의 경로</span><select id="inqNChannel">${inqOpt(INQ_CHANNELS, '전화')}</select></label>
+            <label><span>우리 담당</span><select id="inqNAssignee"><option value="">-</option>${inqOpt(people, people.includes(me) ? me : '')}</select></label>
+            <label class="span4"><span>무엇을 문의했나요? <em>비워두면 품목·수량으로 자동</em></span><input id="inqNTitle" placeholder="예) 손목시계 300개 각인 견적"></label>
+          </div>
+          <div class="inq-new-sec">고객 담당자</div>
+          <div class="inq-new-grid c5">
+            <label><span>담당자 이름</span><input id="inqNCName" placeholder="홍길동"></label>
+            <label><span>직함</span><input id="inqNCTitle" placeholder="예) 과장"></label>
+            <label><span>부서</span><input id="inqNCDept" placeholder="예) 총무팀"></label>
+            <label><span>연락처</span><input id="inqNCPhone" inputmode="tel" placeholder="010-0000-0000"></label>
+            <label><span>이메일</span><input id="inqNCEmail" type="email" placeholder="name@company.com"></label>
+          </div>
+          <div class="inq-new-sec">고객 회사 정보 <em>거래처 DB에 없던 회사면 주소·팩스도 같이 등록돼요</em></div>
+          <div class="inq-new-grid">
+            <label class="span2"><span>회사 주소</span><input id="inqNAddr" placeholder="예) 서울시 강서구 까치산로 23"></label>
+            <label><span>팩스</span><input id="inqNFax" inputmode="tel" placeholder="02-0000-0000"></label>
+            <label><span>홈페이지</span><input id="inqNWeb" placeholder="예) www.company.co.kr"></label>
+          </div>
+          <div class="inq-new-sec">요청 사항</div>
+          <div class="inq-req-lab">품목 · 수량</div>
+          <div class="inq-it-list" id="inqNItems">${inqItemRowHtml({})}</div>
+          <button type="button" class="inq-todo-link" id="inqNItemAdd">+ 품목 추가</button>
+          <div class="inq-new-grid" style="margin-top:12px">
+            <label><span>희망 납기</span><input type="date" id="inqNDue"></label>
+            <label><span>예산 · 희망 단가</span><input id="inqNBudget" placeholder="예) 개당 1만원 내외"></label>
+            <label><span>용도 · 행사</span><input id="inqNPurpose" placeholder="예) 창립 20주년 기념품"></label>
+            <label><span>샘플</span><select id="inqNSample">${inqOpt(['', '필요', '불필요'], '')}</select></label>
+            <label class="span2"><span>인쇄 · 각인</span><input id="inqNPrint" placeholder="예) 문자판 로고 인쇄, 뒷면 이름 각인"></label>
+            <label class="span2"><span>포장</span><input id="inqNPack" placeholder="예) 고급 케이스 + 쇼핑백"></label>
+            <label class="span4"><span>배송지</span><input id="inqNDelivery" placeholder="회사 주소와 다르면 적어주세요"></label>
+          </div>
+          <div class="inq-new-actions">
+            <button type="button" class="btn-ghost" id="inqNCancel">취소</button>
+            <button type="button" class="btn-primary" id="inqNSave">등록</button>
+          </div>
         </div>
-        <div class="inq-new-sec">고객 연락처 <em>선택 · 나중에 채워도 됩니다</em></div>
-        <div class="inq-new-grid c5">
-          <label><span>담당자 이름</span><input id="inqNCName" placeholder="홍길동"></label>
-          <label><span>직함</span><input id="inqNCTitle" placeholder="예) 과장"></label>
-          <label><span>부서</span><input id="inqNCDept" placeholder="예) 총무팀"></label>
-          <label><span>연락처</span><input id="inqNCPhone" inputmode="tel" placeholder="010-0000-0000"></label>
-          <label><span>이메일</span><input id="inqNCEmail" type="email" placeholder="name@company.com"></label>
-        </div>
-        <div class="inq-new-full">
-          <div class="inq-new-lab">첫 문의 내용 <em>선택 — 메일·카톡·홈페이지 문의를 붙여넣으면 AI가 읽고 위 칸을 채워줍니다</em></div>
-          <textarea id="inqNBody" rows="9" placeholder="고객이 보낸 내용을 그대로 붙여넣으세요.&#10;사진도 Ctrl+V로 붙여넣거나 여기로 끌어다 놓을 수 있습니다."></textarea>
-          <div class="inq-auto-hint" id="inqNAutoHint"></div>
-          <div class="inq-img-notice" id="inqNImgNotice" hidden></div>
-          <div class="inq-thumbs" id="inqNThumbs"></div>
-        </div>
-        <div class="inq-new-actions">
-          <button type="button" class="btn-ghost" id="inqNCancel">취소</button>
-          <button type="button" class="btn-primary" id="inqNSave">등록</button>
-        </div>
+        <aside class="inq-check" id="inqNCheck"></aside>
       </div>`;
     const $ = id => document.getElementById(id);
     $('inqNCancel').addEventListener('click', () => {
@@ -21544,10 +21577,27 @@ function inqRenderNewForm() {
     $('inqNSave').addEventListener('click', inqCreate);
 
     // 자동 입력된 칸을 사람이 고치면 그 칸은 더 이상 자동으로 덮어쓰지 않는다
-    ['inqNClient', 'inqNTitle', 'inqNCName', 'inqNCDept', 'inqNCTitle', 'inqNCPhone', 'inqNCEmail'].forEach(id => {
+    ['inqNClient', 'inqNTitle', 'inqNCName', 'inqNCDept', 'inqNCTitle', 'inqNCPhone', 'inqNCEmail', 'inqNAddr', 'inqNFax', 'inqNWeb',
+     'inqNDue', 'inqNBudget', 'inqNPurpose', 'inqNSample', 'inqNPrint', 'inqNPack', 'inqNDelivery'].forEach(id => {
         $(id).addEventListener('input', () => { delete $(id).dataset.auto; $(id).classList.remove('inq-autofilled'); });
     });
-    $('inqNCPhone').addEventListener('change', () => { $('inqNCPhone').value = inqNormPhone($('inqNCPhone').value); });
+    ['inqNCPhone', 'inqNFax'].forEach(id => $(id).addEventListener('change', () => { $(id).value = inqNormPhone($(id).value); }));
+
+    // 품목 줄
+    const items = $('inqNItems');
+    inqBindItemRows(items, inqRenderNewCheck);
+    $('inqNItemAdd').addEventListener('click', () => {
+        items.insertAdjacentHTML('beforeend', inqItemRowHtml({}));
+        inqBindItemRows(items, inqRenderNewCheck);
+        items.lastElementChild.querySelector('input').focus();
+    });
+
+    // 체크리스트는 칸이 바뀔 때마다 다시
+    let tc = null;
+    const main = el.querySelector('.inq-new-main');
+    main.addEventListener('input', () => { clearTimeout(tc); tc = setTimeout(inqRenderNewCheck, 150); });
+    main.addEventListener('change', () => { clearTimeout(tc); tc = setTimeout(inqRenderNewCheck, 50); });
+    inqRenderNewCheck();
 
     // 규칙으로 바로 채우고(0.25초), 잠시 멈추면 AI가 한 번 더 읽어 보강(0.9초)
     let t = null, ta = null;
@@ -21568,11 +21618,16 @@ async function inqCreate() {
     const channel = v('inqNChannel');
     const body = v('inqNBody');
     const btn = document.getElementById('inqNSave');
+    const items = inqReadItems(document.getElementById('inqNItems'));
+    const title = v('inqNTitle') || (items.length ? inqItemsSummary(items) + ' 문의' : '');
     btn.disabled = true;
     const { data, error } = await sb.from('inquiries').insert({
-        client, channel, assignee: v('inqNAssignee'), title: v('inqNTitle'),
+        client, channel, assignee: v('inqNAssignee'), title,
         contact_name: v('inqNCName'), contact_dept: v('inqNCDept'), contact_title: v('inqNCTitle'),
         contact_phone: inqNormPhone(v('inqNCPhone')), contact_email: v('inqNCEmail'),
+        company_address: v('inqNAddr'), company_fax: inqNormPhone(v('inqNFax')), company_website: v('inqNWeb'),
+        items, due_date: v('inqNDue') || null, budget: v('inqNBudget'), purpose: v('inqNPurpose'),
+        print_request: v('inqNPrint'), packaging_request: v('inqNPack'), sample_needed: v('inqNSample'), delivery_address: v('inqNDelivery'),
         status: '신규', started_at: getTodayStr(),
         last_contact_at: new Date().toISOString(),
         created_by: (currentUser && currentUser.name) || ''
@@ -21960,7 +22015,11 @@ function inqMatchClient(name) {
 const INQ_AUTO_MAP = [
     ['company', 'inqNClient', '거래처'], ['subject', 'inqNTitle', '문의 내용'],
     ['name', 'inqNCName', '담당자'], ['title', 'inqNCTitle', '직함'], ['dept', 'inqNCDept', '부서'],
-    ['phone', 'inqNCPhone', '연락처'], ['email', 'inqNCEmail', '이메일']
+    ['phone', 'inqNCPhone', '연락처'], ['email', 'inqNCEmail', '이메일'],
+    ['company_address', 'inqNAddr', '회사 주소'], ['company_fax', 'inqNFax', '팩스'], ['company_website', 'inqNWeb', '홈페이지'],
+    ['due_date', 'inqNDue', '희망 납기'], ['budget', 'inqNBudget', '예산'], ['purpose', 'inqNPurpose', '용도'],
+    ['print_request', 'inqNPrint', '인쇄·각인'], ['packaging_request', 'inqNPack', '포장'], ['sample_needed', 'inqNSample', '샘플'],
+    ['delivery_address', 'inqNDelivery', '배송지']
 ];
 const INQ_CHECK_SVG = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>';
 
@@ -21970,7 +22029,7 @@ function inqApplyAuto(p) {
         const el = document.getElementById(id);
         let v = p[k];
         if (!el || !v) return;
-        if (k === 'phone') v = inqNormPhone(v);
+        if (k === 'phone' || k === 'company_fax') v = inqNormPhone(v);
         if (k === 'company') v = inqMatchClient(v);
         if (el.value.trim() && el.dataset.auto !== '1') return;   // 사람이 쓴 칸은 건드리지 않음
         el.value = v;
@@ -21978,6 +22037,7 @@ function inqApplyAuto(p) {
         el.classList.add('inq-autofilled');
         filled.push(label);
     });
+    inqRenderNewCheck();
     return filled;
 }
 
@@ -21989,7 +22049,7 @@ function inqAutoHint(html) {
 function inqAutofillNew() {
     const body = document.getElementById('inqNBody');
     if (!body) return;
-    const filled = inqApplyAuto(inqParseContact(body.value));
+    const filled = inqApplyAuto(Object.assign(inqParseContact(body.value), inqParseExtra(body.value)));
     if (filled.length) inqAutoHint(`${INQ_CHECK_SVG} 붙여넣은 내용에서 자동 입력 — <b>${filled.join(' · ')}</b> <span>틀리면 바로 고쳐주세요</span>`);
     else if (!body.value.trim()) inqAutoHint('');
 }
@@ -22013,16 +22073,23 @@ async function inqAiExtract() {
         const res = await fetch('/api/meeting-summarize?kind=inquiry', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-            body: JSON.stringify({ content, ourCompany: s.brandName || (currentCompany && currentCompany.name) || '' })
+            body: JSON.stringify({ content, today: getTodayStr(), ourCompany: s.brandName || (currentCompany && currentCompany.name) || '' })
         });
         const d = await res.json().catch(() => ({}));
         if (seq !== _inqAiSeq || !document.getElementById('inqNBody')) return;   // 그사이 내용이 바뀜
         if (!res.ok) throw new Error(d.error || ('HTTP ' + res.status));
         const filled = inqApplyAuto({
             company: d.company, subject: d.inquiry_title, name: d.contact_name, dept: d.contact_dept,
-            title: d.contact_title, phone: d.contact_phone, email: d.contact_email
+            title: d.contact_title, phone: d.contact_phone, email: d.contact_email,
+            company_address: d.company_address, company_fax: d.company_fax, company_website: d.company_website,
+            due_date: d.due_date, budget: d.budget, purpose: d.purpose, print_request: d.print_request,
+            packaging_request: d.packaging_request, sample_needed: d.sample_needed, delivery_address: d.delivery_address
         });
+        if (inqApplyItems(d.items)) filled.push('품목·수량');
+        inqRenderNewCheck();
         const got = INQ_AUTO_MAP.filter(([, id]) => { const el = document.getElementById(id); return el && el.dataset.auto === '1'; }).map(a => a[2]);
+        const itBox = document.getElementById('inqNItems');
+        if (itBox && itBox.dataset.auto === '1') got.push('품목·수량');
         inqAutoHint(got.length || filled.length
             ? `${INQ_CHECK_SVG} AI 자동 입력 — <b>${(got.length ? got : filled).join(' · ')}</b> <span>틀리면 바로 고쳐주세요</span>`
             : '');
@@ -23184,13 +23251,14 @@ function tpTourSteps() {
             <p class="tour-tip">키보드 → 다음 · ← 이전 · Esc 그만 보기</p>`,
           prep: () => tpSetView('inq') },
         { sel: '.tp-switch', title: '상담 / 견적 전환', body: '<b>상담</b>은 고객별 대화·진행 기록, <b>견적</b>은 견적 품목 전체 목록이에요. 같은 데이터를 두 방향에서 봐요.', prep: () => tpSetView('inq') },
-        { sel: '.inq-new-btn', title: '① 새 상담 등록 (F2)', body: '고객 문의가 오면 여기서 시작해요. <b>메일·카톡 내용을 그대로 붙여넣으면</b> 거래처·담당자·연락처·문의 내용이 자동으로 채워져요.' },
+        { sel: '.inq-new-btn', title: '① 새 상담 등록 (F2)', body: '고객 문의가 오면 여기서 시작해요. <b>메일·카톡 내용을 붙여넣으면</b> 담당자·회사 정보·품목·수량·납기까지 자동으로 채워져요. <b>전화 상담</b>이면 오른쪽 <b>체크리스트 순서대로</b> 물어보며 칸을 채우면 돼요.' },
         { sel: '#inqChips', title: '상태별로 모아보기', body: '<b>진행 중</b>은 아직 끝나지 않은 모든 상담이에요. 빨간 날짜는 <b>할 일 날짜가 지난 상담</b>이라 맨 위로 올라와요.' },
         { sel: ['#inqList .inq-item.on', '#inqList .inq-item'], title: '상담 열기', body: '목록에서 상담을 누르면 오른쪽에 자세한 내용이 열려요.', missing: needInq, prep: _tourOpenInquiry },
         { sel: '#inqStage', title: '진행 단계', body: '상담 → 견적 → 수주 → 디자인확인 → 작업요청 → 납품·정산. <b>초록</b>=끝난 단계, <b>파랑</b>=지금 단계예요. 대부분 <b>자동으로</b> 넘어가요.', missing: needInq },
         { sel: '#inqNow', title: '지금 할 일', body: '지금 단계에서 해야 할 일과 <b>바로 누를 버튼</b>이 떠요. 무엇을 할지 모를 땐 여기부터 보세요.', missing: needInq },
         { sel: '.inq-cust', title: '고객 정보', body: '고객 담당자·연락처·이메일이에요. <b>편집</b>을 누르면 고칠 수 있어요.', missing: needInq },
         { sel: '#inqTodos', title: '다음 할 일', body: '할 일을 적고 Enter — <b>담당자 일일계획표에 자동으로</b> 들어가요. 계획표에서 완료 체크해도 여기에 반영돼요.', missing: needInq },
+        { sel: '#inqReq', title: '요청 사항', body: '품목·수량·납기·예산·용도·인쇄·포장·샘플·배송지를 칸으로 정리해요. <b>아직 모르는 것</b>은 질문과 함께 보여줘서 다음 통화 때 물어보면 돼요.', missing: needInq },
         { sel: '#inqTimeline', title: '대화 기록', body: '고객과 오간 내용이 날짜순으로 쌓여요. 말풍선에 마우스를 올리면 <b>수정·삭제</b> 버튼이 보여요.', missing: needInq },
         { sel: '.inq-composer', title: '② 기록 남기기', body: '<b>고객</b>(고객이 한 말) · <b>우리 답변</b> · <b>내부 메모</b>(팀만 봄) 중 고르고 적어요. 사진은 Ctrl+V, 저장은 Ctrl+Enter.', missing: needInq },
         { sel: ['#inqPre:not(:empty)', '#inqNow [data-act="pre-new"]', '#inqNow'], title: '③ 가견적 안내 (선택)', body: '디자인이 확정되기 전이라 가격을 <b>범위로</b>(예: 13,000~15,000원) 안내할 때 써요. 안내문을 복사해 보내고 <b>안내 기록</b>을 누르면 상태가 <b>가견적</b>이 돼요. 매출·마진에는 들어가지 않아요.', missing: needInq },
@@ -23232,6 +23300,10 @@ const TP_HELP = [
     ['#inqStage', '진행 단계 — 초록=끝남, 파랑=지금 단계, 날짜=그 단계를 끝낸 날'],
     ['#inqNow .inq-now', '지금 단계에서 할 일과 바로 누를 수 있는 버튼'],
     ['#inqTNew', '할 일 입력 후 Enter — 담당자 일일계획표에도 자동으로 들어가요'],
+    ['#inqNCheck', '상담 체크리스트 — 전화로 물어볼 순서. 누르면 그 칸으로 이동해요'],
+    ['#inqNItemAdd, #inqRItemAdd', '품목을 하나 더 추가'],
+    ['.inq-req-prog', '상담 체크리스트 13가지 중 확인한 개수'],
+    ['.inq-req-miss button', '아직 모르는 항목 — 누르면 그 칸으로 이동해요'],
     ['#inqTNewWho', '할 일 담당자 (기본은 나)'],
     ['.inq-todo-linked', '담당자 일일계획표에 등록됨 — 여기서 고치면 계획표도 같이 바뀌어요'],
     ['.inq-todo-link', '아직 일일계획표에 없는 할 일 — 누르면 등록'],
@@ -23314,3 +23386,224 @@ function _helpHide() { clearTimeout(_helpTimer); if (_helpTip) _helpTip.classLis
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
+
+// ---------- 요청 사항 · 고객 회사 정보 · 상담 체크리스트 (migration 041, 대표님 피드백 2026-09-30) ----------
+// 모든 내용은 칸으로 입력해 DB화. 전화 상담은 체크리스트 순서대로 물어보며 칸을 채운다.
+const INQ_REQ_CHECK = [
+    { key: 'client', label: '회사명', q: '어느 회사(기관)이세요?', req: true },
+    { key: 'contact_name', label: '담당자', q: '성함과 직함이 어떻게 되세요?', req: true },
+    { key: 'contact_phone', label: '연락처', q: '연락 받으실 번호를 알려주세요', req: true },
+    { key: 'contact_email', label: '이메일', q: '견적서 받으실 메일 주소는요?' },
+    { key: 'item', label: '품목', q: '어떤 제품을 찾으세요? (종류·디자인)', req: true },
+    { key: 'qty', label: '수량', q: '몇 개 필요하세요?', req: true },
+    { key: 'due_date', label: '희망 납기', q: '언제까지 받으셔야 하나요?', req: true },
+    { key: 'budget', label: '예산', q: '생각하신 예산(개당 단가)이 있으세요?' },
+    { key: 'purpose', label: '용도·행사', q: '어떤 용도(행사)로 쓰시나요?' },
+    { key: 'print_request', label: '인쇄·각인', q: '로고·문구 인쇄나 각인이 필요하세요?' },
+    { key: 'packaging_request', label: '포장', q: '포장은 어떻게 원하세요?' },
+    { key: 'sample_needed', label: '샘플', q: '샘플을 먼저 보시겠어요?' },
+    { key: 'delivery_address', label: '배송지', q: '받으실 곳 주소는요?' }
+];
+const INQ_REQ_SUFFIX = { due_date: 'Due', budget: 'Budget', purpose: 'Purpose', print_request: 'Print', packaging_request: 'Pack', sample_needed: 'Sample', delivery_address: 'Delivery' };
+const INQ_REQ_CONTACT = {
+    N: { client: 'inqNClient', contact_name: 'inqNCName', contact_phone: 'inqNCPhone', contact_email: 'inqNCEmail' },
+    R: { client: 'inqFClient', contact_name: 'inqFCName', contact_phone: 'inqFCPhone', contact_email: 'inqFCEmail' }
+};
+
+function inqHasVal(v) { return !(v === undefined || v === null || v === '' || v === 0); }
+
+// 체크리스트 항목 → 입력칸 (P: 'N' 새 상담, 'R' 상세 화면)
+function inqReqFieldEl(P, key) {
+    if (key === 'item' || key === 'qty') return document.querySelector(`#inq${P}Items .inq-it-row [data-f="${key === 'item' ? 'name' : 'qty'}"]`);
+    if (INQ_REQ_CONTACT[P][key]) return document.getElementById(INQ_REQ_CONTACT[P][key]);
+    return INQ_REQ_SUFFIX[key] ? document.getElementById(`inq${P}${INQ_REQ_SUFFIX[key]}`) : null;
+}
+
+function inqReqFocus(P, key) {
+    if (P === 'R' && INQ_REQ_CONTACT.R[key] && key !== 'client') {
+        const f = document.getElementById('inqFields');
+        if (f && f.hidden) { const t = document.getElementById('inqCIToggle'); if (t) t.click(); }
+    }
+    const el = inqReqFieldEl(P, key);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setTimeout(() => el.focus(), 250);
+    el.classList.add('inq-flash');
+    setTimeout(() => el.classList.remove('inq-flash'), 1200);
+}
+
+// ---- 품목·수량 줄 ----
+function inqItemRowHtml(it) {
+    it = it || {};
+    return `<div class="inq-it-row">
+        <input data-f="name" placeholder="품목 — 예) 손목시계 남녀 세트" value="${escHtml(it.name || '')}">
+        <input data-f="qty" inputmode="numeric" placeholder="수량" value="${it.qty ? Number(it.qty).toLocaleString() : ''}">
+        <span>개</span>
+        <button type="button" class="inq-todo-del" data-rm title="이 품목 빼기">×</button>
+      </div>`;
+}
+function inqReadItems(box) {
+    if (!box) return [];
+    return [...box.querySelectorAll('.inq-it-row')].map(r => ({
+        name: r.querySelector('[data-f="name"]').value.trim(),
+        qty: inqPreNum(r.querySelector('[data-f="qty"]').value)
+    })).filter(i => i.name || i.qty);
+}
+function inqBindItemRows(box, onChange) {
+    box.querySelectorAll('.inq-it-row').forEach(r => {
+        if (r.dataset.bound) return;
+        r.dataset.bound = '1';
+        const q = r.querySelector('[data-f="qty"]');
+        q.addEventListener('input', () => { const n = inqPreNum(q.value); q.value = n ? n.toLocaleString() : ''; });
+        r.querySelectorAll('input').forEach(i => {
+            i.addEventListener('input', () => { delete box.dataset.auto; box.classList.remove('inq-autofilled-box'); });
+            i.addEventListener('change', () => onChange && onChange());
+        });
+        r.querySelector('[data-rm]').addEventListener('click', () => {
+            if (box.querySelectorAll('.inq-it-row').length > 1) r.remove();
+            else r.querySelectorAll('input').forEach(i => { i.value = ''; });
+            onChange && onChange();
+        });
+    });
+}
+function inqItemsSummary(items) {
+    return (items || []).filter(i => i && i.name).map(i => i.name + (i.qty ? ` ${Number(i.qty).toLocaleString()}개` : '')).join(', ');
+}
+
+// ---- 체크리스트 (새 상담 오른쪽) ----
+function inqNewValues() {
+    const g = id => { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
+    const items = inqReadItems(document.getElementById('inqNItems'));
+    const first = items.find(i => i.name) || items[0] || {};
+    return {
+        client: g('inqNClient'), contact_name: g('inqNCName'), contact_phone: g('inqNCPhone'), contact_email: g('inqNCEmail'),
+        item: first.name, qty: first.qty, due_date: g('inqNDue'), budget: g('inqNBudget'), purpose: g('inqNPurpose'),
+        print_request: g('inqNPrint'), packaging_request: g('inqNPack'), sample_needed: g('inqNSample'), delivery_address: g('inqNDelivery')
+    };
+}
+
+function inqRenderNewCheck() {
+    const el = document.getElementById('inqNCheck');
+    if (!el) return;
+    const vals = inqNewValues();
+    const phone = (document.getElementById('inqNChannel') || {}).value === '전화';
+    const done = INQ_REQ_CHECK.filter(c => inqHasVal(vals[c.key])).length;
+    el.classList.toggle('phone', phone);
+    el.innerHTML = `
+      <div class="inq-check-head"><b>${phone ? '📞 전화 상담 순서' : '상담 체크리스트'}</b><span>${done} / ${INQ_REQ_CHECK.length}</span></div>
+      <div class="inq-check-bar"><i style="width:${Math.round(done / INQ_REQ_CHECK.length * 100)}%"></i></div>
+      <p class="inq-check-tip">${phone ? '통화하면서 <b>위에서부터 차례로</b> 물어보고 칸을 채우세요. 누르면 그 칸으로 이동해요.' : '빠진 항목은 회신할 때 물어보세요. 누르면 그 칸으로 이동해요.'}</p>
+      <ol>${INQ_REQ_CHECK.map(c => {
+          const ok = inqHasVal(vals[c.key]);
+          return `<li class="${ok ? 'ok' : ''} ${c.req ? 'req' : ''}" data-ck="${c.key}"><i>${ok ? '✓' : ''}</i><div><b>${c.label}${c.req ? ' <em>필수</em>' : ''}</b><span>${escHtml(c.q)}</span></div></li>`;
+      }).join('')}</ol>`;
+    el.querySelectorAll('[data-ck]').forEach(li => li.addEventListener('click', () => inqReqFocus('N', li.dataset.ck)));
+}
+
+// 규칙으로 찾는 회사 정보 — 팩스 · 홈페이지 · 주소 (AI 전에 바로 채우기용)
+function inqParseExtra(text) {
+    const t = String(text || '');
+    const out = {};
+    const fax = t.match(/(?:^|[\s(|])(?:F|FAX|Fax|fax|팩스)[\s.:)]*(0\d{1,2}[\s.\-)]*\d{3,4}[\s.\-]*\d{4})/m);
+    if (fax) out.company_fax = inqNormPhone(fax[1]);
+    const web = t.match(/(?:https?:\/\/)?www\.[A-Za-z0-9.\-]+\.[A-Za-z]{2,}(?:\/[^\s]*)?/i)
+        || t.match(/^\s*((?:https?:\/\/)?(?:[a-z0-9\-]+\.)+(?:co\.kr|or\.kr|go\.kr|ac\.kr|kr|com|net|org))\/?\s*$/im);
+    if (web) out.company_website = (web[1] || web[0]).trim();
+    const addr = t.match(/^[^\n]*?((?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|충청|전북|전남|전라|경북|경남|경상|제주)[^\n]*?(?:로|길)\s?\d+[^\n]*)$/m);
+    if (addr) out.company_address = addr[1].replace(/\s*\(\d{5}\)\s*$/, '').trim().slice(0, 150);
+    return out;
+}
+
+// AI가 뽑은 품목을 품목 줄에 (비었거나 자동으로 채운 줄일 때만)
+function inqApplyItems(items) {
+    const box = document.getElementById('inqNItems');
+    if (!box || !Array.isArray(items) || !items.length) return false;
+    const cur = inqReadItems(box);
+    if (cur.length && box.dataset.auto !== '1') return false;   // 사람이 쓴 품목은 그대로
+    box.innerHTML = items.map(inqItemRowHtml).join('');
+    box.dataset.auto = '1';
+    box.classList.add('inq-autofilled-box');
+    inqBindItemRows(box, inqRenderNewCheck);
+    return true;
+}
+
+// ---- 상세 화면: 요청 사항 카드 ----
+function inqReqValues(x) {
+    const it = (x.items || []).find(i => i && i.name) || (x.items || [])[0] || {};
+    return {
+        client: x.client, contact_name: x.contact_name || x.client_contact, contact_phone: x.contact_phone, contact_email: x.contact_email,
+        item: it.name, qty: it.qty, due_date: x.due_date, budget: x.budget, purpose: x.purpose, print_request: x.print_request,
+        packaging_request: x.packaging_request, sample_needed: x.sample_needed, delivery_address: x.delivery_address
+    };
+}
+
+function inqReqMissing(x) {
+    const vals = inqReqValues(x);
+    return INQ_REQ_CHECK.filter(c => !inqHasVal(vals[c.key]));
+}
+
+function inqRenderReq(x) {
+    const el = document.getElementById('inqReq');
+    if (!el || _inqSel !== x.id) return;
+    const open = inqCardOpen('req');
+    const items = (x.items && x.items.length) ? x.items : [{}];
+    const sum = inqItemsSummary(x.items);
+    el.innerHTML = `
+      <div class="inq-q-head">${inqCardToggleBtn('req', open)}<b>요청 사항</b>
+        <span class="inq-q-sum"><em>${escHtml(sum || '품목 미정')}</em></span>
+        <div class="inq-spacer"></div><span id="inqRProgHead"></span>
+      </div>
+      ${open ? `<div class="inq-req-body">
+        <div class="inq-req-lab">품목 · 수량</div>
+        <div class="inq-it-list" id="inqRItems">${items.map(inqItemRowHtml).join('')}</div>
+        <button type="button" class="inq-todo-link" id="inqRItemAdd">+ 품목 추가</button>
+        <div class="inq-req-grid">
+          <label><span>희망 납기</span><input type="date" id="inqRDue" value="${escHtml(x.due_date || '')}"></label>
+          <label><span>예산 · 희망 단가</span><input id="inqRBudget" value="${escHtml(x.budget || '')}" placeholder="예) 개당 1만원 내외"></label>
+          <label><span>용도 · 행사</span><input id="inqRPurpose" value="${escHtml(x.purpose || '')}" placeholder="예) 창립 20주년 기념품"></label>
+          <label><span>샘플</span><select id="inqRSample">${inqOpt(['', '필요', '불필요'], x.sample_needed || '')}</select></label>
+          <label class="span2"><span>인쇄 · 각인</span><input id="inqRPrint" value="${escHtml(x.print_request || '')}" placeholder="예) 문자판 로고 인쇄, 뒷면 이름 각인"></label>
+          <label class="span2"><span>포장</span><input id="inqRPack" value="${escHtml(x.packaging_request || '')}" placeholder="예) 고급 케이스 + 쇼핑백"></label>
+          <label class="span2"><span>배송지</span><input id="inqRDelivery" value="${escHtml(x.delivery_address || '')}" placeholder="회사 주소와 다르면 적어주세요"></label>
+        </div>
+        <div id="inqRProg"></div>
+      </div>` : `<div id="inqRProg" class="inq-req-closed"></div>`}`;
+    const upd = () => {
+        const miss = inqReqMissing(x);
+        const head = document.getElementById('inqRProgHead');
+        if (head) head.innerHTML = `<span class="inq-req-prog ${miss.length ? '' : 'all'}">${INQ_REQ_CHECK.length - miss.length}/${INQ_REQ_CHECK.length} 확인</span>`;
+        const box = document.getElementById('inqRProg');
+        if (!box) return;
+        box.innerHTML = open && miss.length ? `<div class="inq-req-miss"><b>아직 모르는 것 — 고객에게 물어보세요</b>${miss.map(c =>
+            `<button type="button" data-ask="${c.key}"><em>${c.label}${c.req ? '*' : ''}</em>${escHtml(c.q)}</button>`).join('')}</div>` : '';
+        box.querySelectorAll('[data-ask]').forEach(b => b.addEventListener('click', () => inqReqFocus('R', b.dataset.ask)));
+    };
+    inqBindCardToggle(el, 'req', () => inqRenderReq(x));
+    upd();
+    if (!open) return;
+    const save = async (patch) => {
+        const d = await inqPatch(x.id, patch);
+        if (d) { Object.assign(x, d); upd(); const s = el.querySelector('.inq-q-sum em'); if (s) s.textContent = inqItemsSummary(x.items) || '품목 미정'; }
+    };
+    const box = document.getElementById('inqRItems');
+    const saveItems = () => {
+        const items = inqReadItems(box);
+        if (JSON.stringify(items) === JSON.stringify(x.items || [])) return;
+        save({ items });
+    };
+    inqBindItemRows(box, saveItems);
+    document.getElementById('inqRItemAdd').addEventListener('click', () => {
+        box.insertAdjacentHTML('beforeend', inqItemRowHtml({}));
+        inqBindItemRows(box, saveItems);
+        box.lastElementChild.querySelector('input').focus();
+    });
+    [['inqRDue', 'due_date'], ['inqRBudget', 'budget'], ['inqRPurpose', 'purpose'], ['inqRSample', 'sample_needed'],
+     ['inqRPrint', 'print_request'], ['inqRPack', 'packaging_request'], ['inqRDelivery', 'delivery_address']].forEach(([id, key]) => {
+        const f = document.getElementById(id);
+        f.addEventListener('change', () => {
+            const v = f.value.trim();
+            if ((x[key] || '') === v) return;
+            save({ [key]: v || (key === 'due_date' ? null : '') });
+        });
+    });
+}

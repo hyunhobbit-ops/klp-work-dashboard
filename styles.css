@@ -5119,3 +5119,75 @@ textarea.inq-drop{border-color:var(--blue) !important; background:var(--blue-lig
 .tour-act .tour-skip:hover{color:#0F172A}
 .tour-act .tour-next{background:#2563EB; border-color:#2563EB; color:#FFFFFF}
 .tour-act .tour-next:hover:not(:disabled){background:#1D4ED8; border-color:#1D4ED8; color:#FFFFFF}
+
+
+/* ---- 상담: 입력칸 DB화 · 요청 사항 · 상담 체크리스트 (041) ---- */
+.inq-new.inq-new2{max-width:1320px; display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:start}
+.inq-new2 .inq-new-main{min-width:0}
+.inq-new2 .inq-new-sec.first{margin-top:6px}
+.inq-new-grid label span em{font-style:normal; font-weight:600; color:var(--gray-400); margin-left:4px}
+.inq-new2 .inq-new-full textarea{min-height:96px}
+
+.inq-req-lab{font-size:12px; font-weight:700; color:var(--label); margin-bottom:6px}
+.inq-it-list{display:flex; flex-direction:column; gap:6px}
+.inq-it-row{display:grid; grid-template-columns:minmax(0,1fr) 96px 16px 24px; gap:6px; align-items:center}
+.inq-it-row input{height:36px; padding:0 10px; border:1px solid var(--border); border-radius:8px; font-family:inherit; font-size:13.5px;
+    color:var(--gray-900); background:var(--white); outline:none; min-width:0}
+.inq-it-row input[data-f="qty"]{text-align:right; font-variant-numeric:tabular-nums}
+.inq-it-row input:focus{border-color:var(--blue)}
+.inq-it-row span{font-size:12.5px; font-weight:600; color:var(--gray-500)}
+.inq-it-list + .inq-todo-link{margin-top:8px}
+.inq-autofilled-box .inq-it-row input{background:var(--blue-light); border-color:color-mix(in srgb, var(--blue) 45%, transparent)}
+.inq-flash{animation:inqFlash 1.2s ease}
+@keyframes inqFlash{0%,60%{box-shadow:0 0 0 3px rgba(59,130,246,.55)} 100%{box-shadow:none}}
+
+/* 체크리스트 (새 상담 오른쪽) */
+.inq-check{position:sticky; top:0; padding:14px; border:1px solid var(--border); border-radius:12px; background:var(--gray-50)}
+.inq-check.phone{border-color:color-mix(in srgb, #F59E0B 55%, transparent); background:color-mix(in srgb, #F59E0B 7%, var(--white))}
+.inq-check-head{display:flex; align-items:baseline; justify-content:space-between; font-size:14px}
+.inq-check-head b{font-weight:800; color:var(--gray-900)}
+.inq-check-head span{font-size:12.5px; font-weight:800; color:var(--blue); font-variant-numeric:tabular-nums}
+.inq-check-bar{height:5px; border-radius:3px; background:var(--gray-200); margin:8px 0; overflow:hidden}
+.inq-check-bar i{display:block; height:100%; background:#12B76A; transition:width .25s}
+.inq-check-tip{margin:0 0 8px; font-size:12px; line-height:1.5; color:var(--gray-500)}
+.inq-check ol{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px}
+.inq-check li{display:flex; gap:9px; align-items:flex-start; padding:6px 7px; border-radius:8px; cursor:pointer}
+.inq-check li:hover{background:var(--white)}
+.inq-check li > i{flex:none; width:18px; height:18px; margin-top:1px; border-radius:50%; border:1.5px solid var(--gray-300);
+    display:inline-flex; align-items:center; justify-content:center; font-style:normal; font-size:11px; font-weight:900; color:#fff}
+.inq-check li.ok > i{background:#12B76A; border-color:#12B76A}
+.inq-check li > div{display:flex; flex-direction:column; min-width:0}
+.inq-check li b{font-size:12.5px; font-weight:800; color:var(--gray-800)}
+.inq-check li b em{font-style:normal; font-size:10.5px; font-weight:800; color:var(--orange); margin-left:4px}
+.inq-check li span{font-size:12px; color:var(--gray-500); line-height:1.45}
+.inq-check li.ok b{color:var(--gray-400)}
+.inq-check li.ok span{color:var(--gray-400); text-decoration:line-through}
+
+/* 상세 화면 요청 사항 카드 */
+.inq-side .inq-req{padding:10px 12px}
+.inq-req-body{margin-top:10px}
+.inq-req-grid{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px 10px; margin-top:12px}
+.inq-req-grid label{display:flex; flex-direction:column; gap:3px; min-width:0}
+.inq-req-grid label.span2{grid-column:1 / -1}
+.inq-req-grid label span{font-size:11px; font-weight:700; color:var(--label)}
+.inq-req-grid input, .inq-req-grid select{height:32px; padding:0 9px; border:1px solid var(--border); border-radius:8px;
+    font-family:inherit; font-size:13px; color:var(--gray-900); background:var(--white); outline:none; min-width:0}
+.inq-req-grid input:focus, .inq-req-grid select:focus{border-color:var(--blue)}
+.inq-side .inq-it-row{grid-template-columns:minmax(0,1fr) 76px 14px 22px}
+.inq-side .inq-it-row input{height:32px; font-size:13px}
+.inq-req-prog{font-size:11.5px; font-weight:800; color:var(--orange); background:color-mix(in srgb, #F59E0B 14%, transparent); padding:2px 8px; border-radius:6px}
+.inq-req-prog.all{color:#12B76A; background:var(--green-light)}
+.inq-req-miss{margin-top:12px; padding:10px; border-radius:9px; background:color-mix(in srgb, #F59E0B 8%, var(--white));
+    border:1px dashed color-mix(in srgb, #F59E0B 45%, transparent); display:flex; flex-direction:column; gap:3px}
+.inq-req-miss > b{font-size:12px; font-weight:800; color:#B45309; margin-bottom:3px}
+.inq-req-miss button{display:flex; gap:8px; align-items:baseline; text-align:left; border:none; background:none; padding:3px 2px; cursor:pointer;
+    font-family:inherit; font-size:12.5px; color:var(--gray-700); border-radius:5px}
+.inq-req-miss button:hover{background:var(--white)}
+.inq-req-miss button em{flex:none; width:64px; font-style:normal; font-weight:800; color:var(--gray-900)}
+[data-theme="dark"] .inq-req-miss > b{color:#FBBF24}
+.inq-side .inq-fields label.span2, .inq-cust .inq-fields label.span2{grid-column:span 2}
+@media (max-width:1300px){
+    .inq-new.inq-new2{grid-template-columns:1fr}
+    .inq-check{position:static}
+}
+@media (max-width:1800px){ .inq-new2 .inq-new-grid.c5{grid-template-columns:repeat(3, minmax(0,1fr))} }
