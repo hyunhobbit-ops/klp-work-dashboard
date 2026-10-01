@@ -4846,6 +4846,7 @@ async function updateProject(id) {
         finalPaymentDate: (document.getElementById('editCheck-finalPayment') || {}).checked ? readDesignConfirmFields('editFp').date : (newChecks.finalPayment ? (p.finalPaymentDate || '') : ''),
         invoiceDate: (document.getElementById('editCheck-invoice') || {}).checked ? readDesignConfirmFields('editIv').date : (newChecks.invoice ? (p.invoiceDate || '') : ''),
         deliveredDate: (document.getElementById('editCheck-delivered') || {}).checked ? readDesignConfirmFields('editDv').date : (newChecks.delivered ? (p.deliveredDate || '') : ''),
+        supplierPaymentDate: (document.getElementById('editCheck-supplierPayment') || {}).checked ? readDesignConfirmFields('editSp').date : (newChecks.supplierPayment ? (p.supplierPaymentDate || '') : ''),
         memo: getVal('editProjectMemo')
     });
 
@@ -4882,6 +4883,7 @@ async function updateProject(id) {
                 final_payment_date: p.finalPaymentDate || null,
                 invoice_date: p.invoiceDate || null,
                 delivered_date: p.deliveredDate || null,
+                supplier_payment_date: p.supplierPaymentDate || null,
                 memo: p.memo,
                 supplier: p.supplier,
                 supplier_contact: p.supplierContact || '',
@@ -5916,7 +5918,8 @@ function _projectsDomesticRowToObj(r) {
         advancePaymentDate: r.advance_payment_date || '',
         finalPaymentDate: r.final_payment_date || '',
         invoiceDate: r.invoice_date || '',
-        deliveredDate: r.delivered_date || ''
+        deliveredDate: r.delivered_date || '',
+        supplierPaymentDate: r.supplier_payment_date || ''
     };
 }
 
@@ -22563,6 +22566,7 @@ async function inqToggleProjCheck(x, row, key) {
         gp.workOrderChannel = data.work_order_channel || ''; gp.workOrderDate = data.work_order_date || '';
         gp.advancePaymentDate = data.advance_payment_date || ''; gp.finalPaymentDate = data.final_payment_date || '';
         gp.invoiceDate = data.invoice_date || ''; gp.deliveredDate = data.delivered_date || '';
+        gp.supplierPaymentDate = data.supplier_payment_date || '';
         try { renderProjects(); } catch (_) {}
     }
     const it = CHECK_ITEMS.find(c => c.key === key);
@@ -23755,7 +23759,8 @@ const CHECK_INFO = {
     advancePayment: { col: 'advance_payment', prop: 'advancePayment', title: '선금 입금', q: '선금이 언제 입금됐나요?', ok: '입금 확인 체크', dateLabel: '입금 날짜', editPrefix: 'editAp', editBox: 'editAdvanceInfo', noChannel: true },
     finalPayment: { col: 'final_payment', prop: 'finalPayment', title: '잔금 입금', q: '잔금이 언제 입금됐나요?', ok: '입금 확인 체크', dateLabel: '입금 날짜', editPrefix: 'editFp', editBox: 'editFinalInfo', noChannel: true },
     invoice: { col: 'invoice', prop: 'invoice', title: '계산서 발행', q: '세금계산서를 언제 발행했나요?', ok: '발행 완료 체크', dateLabel: '발행 날짜', editPrefix: 'editIv', editBox: 'editInvoiceInfo', noChannel: true },
-    delivered: { col: 'delivered', prop: 'delivered', title: '납품 완료', q: '언제 납품했나요?', ok: '납품 완료 체크', dateLabel: '납품 날짜', editPrefix: 'editDv', editBox: 'editDeliveredInfo', noChannel: true }
+    delivered: { col: 'delivered', prop: 'delivered', title: '납품 완료', q: '언제 납품했나요?', ok: '납품 완료 체크', dateLabel: '납품 날짜', editPrefix: 'editDv', editBox: 'editDeliveredInfo', noChannel: true },
+    supplierPayment: { col: 'supplier_payment', prop: 'supplierPayment', title: '공급처 송금', q: '공급처에 언제 송금했나요?', ok: '송금 완료 체크', dateLabel: '송금 날짜', editPrefix: 'editSp', editBox: 'editSupplierPayInfo', noChannel: true }
 };
 function checkInfoText(channel, date) { return [channel, date ? String(date).slice(5).replace('-', '/') : ''].filter(Boolean).join(' · '); }
 function designConfirmFieldsHtml(prefix, channel, date, dateLabel, noChannel) {
