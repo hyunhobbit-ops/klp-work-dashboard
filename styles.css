@@ -5739,3 +5739,20 @@ body.m-on .theme-toggle{display:none}
 .inq-send-empty{padding:6px 12px 8px; font-size:12.5px; color:var(--gray-400, #9CA3AF)}
 .m-sendbtn{display:block; width:100%; height:44px; margin-top:8px; border:none; border-radius:13px; background:var(--gray-900); color:var(--white);
     font-family:inherit; font-size:15px; font-weight:800}
+
+/* ---- 상담 목록 가독성 (2026-10): 회사명 크게, 상담마다 구분선 ---- */
+.inq-list{padding:4px 8px}
+.inq-item{position:relative; padding:13px 12px 13px 14px; border:none; border-bottom:1px solid var(--border-soft, var(--gray-100)); border-radius:0; margin:0}
+.inq-item:last-child{border-bottom:none}
+.inq-item:hover{background:var(--gray-50); border-radius:10px}
+.inq-item.on{background:var(--blue-light); border-radius:10px; border-bottom-color:transparent}
+.inq-item.on::before{content:''; position:absolute; left:0; top:10px; bottom:10px; width:4px; border-radius:2px; background:var(--blue)}
+.inq-item-tags{display:flex; align-items:center; gap:6px; margin-bottom:6px}
+.inq-item-tags .grade-badge{margin-right:0}
+.inq-item-tags .inq-st{font-size:11px}
+.inq-item-when{margin-left:auto; font-size:11.5px; font-weight:600; color:var(--gray-500); white-space:nowrap}
+.inq-client{display:block; font-size:17px; font-weight:900; letter-spacing:-.4px; line-height:1.3; color:var(--gray-900);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.inq-client em{font-style:normal; font-size:13px; font-weight:700; color:var(--gray-500); margin-left:7px; letter-spacing:0}
+.inq-title{font-size:13.5px; font-weight:600; color:var(--gray-700, #374151); margin-top:4px}
+.inq-next{margin-top:8px; font-size:12.5px; padding:4px 9px}

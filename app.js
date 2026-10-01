@@ -21616,17 +21616,15 @@ function inqRenderList() {
     el.innerHTML = list.map(x => {
         const late = inqIsOverdue(x);
         const who = x.contact_name || x.client_contact || '';
+        // 회사명을 가장 크게 — 등급·상태·시간은 위 작은 줄, 담당자·제목은 아래
         return `<div class="inq-item ${x.id === _inqSel ? 'on' : ''}" data-id="${x.id}">
-            <div class="inq-item-top">
-                <span class="inq-client">${clientGradeBadge(x.grade)}${escHtml(x.client || '(거래처 미정)')}${who ? `<em>${escHtml(who)}</em>` : ''}</span>
-                <span class="inq-st ${INQ_STATUS_CLS[x.status] || ''}">${escHtml(x.status)}</span>
+            <div class="inq-item-tags">
+                ${clientGradeBadge(x.grade)}<span class="inq-st ${INQ_STATUS_CLS[x.status] || ''}">${escHtml(x.status)}</span>
+                <span class="inq-item-when">${x.assignee ? `${escHtml(x.assignee)} · ` : ''}${inqRel(x.last_contact_at)}</span>
             </div>
+            <div class="inq-client">${escHtml(x.client || '(거래처 미정)')}${who ? `<em>${escHtml(who)}</em>` : ''}</div>
             ${x.title ? `<div class="inq-title">${escHtml(x.title)}</div>` : ''}
-            <div class="inq-meta">
-                ${x.assignee ? `<span>담당 ${escHtml(x.assignee)}</span>` : ''}
-                <span>${inqRel(x.last_contact_at)}</span>
-            </div>
-            ${x.next_action ? `<div class="inq-next ${late ? 'late' : ''}">${x.next_action_date ? inqMD(x.next_action_date) + ' · ' : ''}${escHtml(x.next_action)}</div>` : ''}
+            ${x.next_action ? `<div class="inq-next ${late ? 'late' : ''}">▶ ${x.next_action_date ? inqMD(x.next_action_date) + ' · ' : ''}${escHtml(x.next_action)}</div>` : ''}
         </div>`;
     }).join('');
     el.querySelectorAll('[data-id]').forEach(d => d.addEventListener('click', () => {
