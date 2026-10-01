@@ -25,17 +25,17 @@
       (withBody ? '&body=' + encodeURIComponent(m.body || '') : '');
   }
   // 새 탭을 열기 전에 동기로 복사 (탭이 열리면 이 페이지가 포커스를 잃어 비동기 복사는 막힘)
+  // 글자 모양 없이 순수 글만 — 서식 있는 복사는 대시보드 다크 모드 색(검은 배경·흰 글씨)까지 따라 들어감
   function copyHtmlSync(text) {
-    var div = document.createElement('div');
-    div.contentEditable = 'true';
-    div.style.cssText = 'position:fixed;left:-9999px;top:0;white-space:normal';
-    div.innerHTML = esc(text).replace(/\n/g, '<br>');
-    document.body.appendChild(div);
-    var sel = window.getSelection(), r = document.createRange();
-    r.selectNodeContents(div); sel.removeAllRanges(); sel.addRange(r);
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
     var ok = false;
     try { ok = document.execCommand('copy'); } catch (_) {}
-    sel.removeAllRanges(); div.remove();
+    ta.remove();
     return ok;
   }
   var DOC_LABEL = { quote: '견적서', dc: '디자인확인서', wr: '작업요청서', pre: '가견적 안내', msg: '안내 메시지' };
@@ -94,20 +94,13 @@
     clearTimeout(toast._t); toast._t = setTimeout(function () { t.className = ''; }, 2200);
   }
   async function copyText(text, label) {
-    try {
-      if (navigator.clipboard && window.ClipboardItem) {
-        var html = esc(text).replace(/\n/g, '<br>');
-        await navigator.clipboard.write([new ClipboardItem({
-          'text/plain': new Blob([text], { type: 'text/plain' }),
-          'text/html': new Blob(['<div>' + html + '</div>'], { type: 'text/html' })
-        })]);
-      } else { await navigator.clipboard.writeText(text); }
-      toast((label || '내용') + ' 복사됨 — 붙여넣기(Ctrl+V) 하세요');
-    } catch (e) {
-      try { await navigator.clipboard.writeText(text); toast((label || '내용') + ' 복사됨'); }
-      catch (_) { window.prompt('복사가 막혀 있어요. 아래 글을 복사하세요 (Ctrl+C)', text); }
+    try { await navigator.clipboard.writeText(text); toast((label || '내용') + ' 복사됨 — 붙여넣기(Ctrl+V) 하세요'); }
+    catch (e) {
+      if (copyHtmlSync(text)) toast((label || '내용') + ' 복사됨 — 붙여넣기(Ctrl+V) 하세요');
+      else window.prompt('복사가 막혀 있어요. 아래 글을 복사하세요 (Ctrl+C)', text);
     }
   }
+
 
   async function loadTemplates() {
     if (tplCache) return tplCache;
