@@ -40,6 +40,7 @@
 - 체크박스 선택 후 로젠택배 엑셀 내보내기 (SheetJS)
 - 엑셀 양식: 수화주/우편번호/주소/휴대폰번호/수량(1 고정)/금액(2750 고정)/선착불/상품명/옵션/비고
 - 연도별, 월별 필터링 지원
+- **이미지 자동입력** (`analyzeDeliveryImageFile` → `api/analyze-delivery.js`): 2026-10 Sonnet 4.6(사진 1568px 한계) 인식률 문제로 **Claude Sonnet 5.5 + 고해상도**로 교체. 클라이언트가 긴 변 2576px·JPEG 0.92로 보냄. 서버는 구조화 출력(`output_config.format` json_schema, 강제 tool_choice는 5.5에서 400) + effort `high` + `fallbacks: "default"`(beta `server-side-fallback-2026-07-01`), 이름·전화·우편번호를 한 글자씩 대조하라는 지시. 요청이 400이면 예전 방식(Sonnet 4.6 + 도구)으로 한 번 재시도. 응답 `engine`에 실제 모델. Vercel 환경변수 `ANTHROPIC_DELIVERY_MODEL`(예: claude-opus-5-5)·`ANTHROPIC_DELIVERY_EFFORT`로 코드 수정 없이 변경. 대략 장당 20~40원(Opus 5.5는 45~85원)
 
 ## UI/UX 규칙
 - 한국어 UI, Toss 스타일 디자인

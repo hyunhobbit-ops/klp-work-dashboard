@@ -1,17 +1,19 @@
 // 택배 이미지 자동입력 — Vercel 서버리스 함수 (CommonJS, 의존성 0: Node 18+ 내장 fetch 사용)
 // 흐름: 클라이언트가 이미지(base64) + Supabase access_token 전송 →
-//       1) 토큰 검증(로그인 직원만) → 2) Anthropic vision 호출(도구로 JSON 강제) → 3) 추출 필드 반환
+//       1) 토큰 검증(로그인 직원만) → 2) Anthropic vision 호출(구조화 출력 json_schema로 JSON 보장) → 3) 추출 필드 반환
 //
 // 환경변수:
 //   ANTHROPIC_API_KEY (필수) — Anthropic API 키. 서버에만 보관(브라우저 노출 없음).
-//   ANTHROPIC_MODEL   (선택) — 기본 'claude-sonnet-4-6'(이름 등 인식 정확도 우선). 비용 절감하려면 'claude-haiku-4-5'.
+//   ANTHROPIC_DELIVERY_MODEL (선택) — 기본 'claude-sonnet-5-5'(고해상도 2576px 인식 + 생각하며 검증). 2026-10 Sonnet 4.6(1568px 한계) 인식률 문제로 교체. 더 정확히는 'claude-opus-5-5'.
+//   ANTHROPIC_DELIVERY_EFFORT (선택) — 기본 'high'. 더 빠르게/싸게는 'medium'.
 //   SUPABASE_URL / SUPABASE_ANON_KEY (선택) — 미설정 시 아래 기본값(이미 공개된 anon 정보) 사용.
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vtulmuxkriklpiibiues.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
 
-const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_DELIVERY_MODEL || 'claude-sonnet-5-5';
+const ANTHROPIC_EFFORT = process.env.ANTHROPIC_DELIVERY_EFFORT || 'high';
 
 module.exports = async (req, res) => {
     if (req.method !== 'POST') { res.status(405).json({ error: 'POST 요청만 허용됩니다.' }); return; }
@@ -44,11 +46,10 @@ module.exports = async (req, res) => {
     const m = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]*)$/.exec(image);
     if (m) { mediaType = m[1]; data = m[2]; }
 
-    const tool = {
-        name: 'fill_delivery',
-        description: '택배 송장 입력 폼을 채우기 위해 이미지에서 추출한 수취인 정보',
-        input_schema: {
+    // 구조화 출력 스키마 (Sonnet 5.5·Opus 5.5는 강제 tool_choice를 받지 않으므로 output_config.format으로 JSON 보장)
+    const schema = {
             type: 'object',
+            additionalProperties: false,
             properties: {
                 recipient: { type: 'string', description: "받는 사람(수취인) 이름. 반드시 '배송지정보'(받는분/수령인) 칸의 실제 이름을 사용. '거래정보'의 '구매자' 닉네임·별명(예: 동전냠냠이 같은 ID성 이름)은 받는 사람이 아니므로 절대 쓰지 말 것. 없으면 빈 문자열" },
                 phone: { type: 'string', description: "받는 사람 연락처. '배송지정보' 칸의 전화번호를 그대로. 010 휴대폰뿐 아니라 0502·0503·0504·0508 등으로 시작하는 안심번호도 유효한 연락처이니 반드시 추출. '(안심번호)' 같은 괄호 설명은 빼고 번호만. 없으면 빈 문자열" },
@@ -59,41 +60,54 @@ module.exports = async (req, res) => {
                 price: { type: 'string', description: '판매가(상품금액, 숫자만). 수수료 차감 전 상품 판매 금액. 번개장터의 "상품금액", 당근의 거래금액 등. 입금예정금액(수수료 차감 후)이 아니라 상품금액. 없으면 빈 문자열' }
             },
             required: ['recipient', 'phone', 'zipcode', 'address', 'product', 'delivery_type', 'price']
-        }
     };
 
     const prompt = '이 이미지는 택배 발송용 주문 정보입니다(번개장터/당근 주문 상세, 카톡·문자 주문 대화, 또는 주문서/송장). ' +
-        '받는 사람의 이름·연락처·우편번호·주소(동/호수 포함)·품목, 그리고 거래 종류(플랫폼)와 판매가를 이미지에 적힌 그대로 정확히 추출해 fill_delivery 도구로 채워주세요. ' +
+        '받는 사람의 이름·연락처·우편번호·주소(동/호수 포함)·품목, 그리고 거래 종류(플랫폼)와 판매가를 이미지에 적힌 그대로 정확히 추출해 JSON으로 답해주세요. ' +
         '【매우 중요】받는 사람 정보(이름·연락처·우편번호·주소)는 반드시 "배송지정보"(받는분/수령인) 섹션에서만 가져옵니다. ' +
         '"거래정보"의 "구매자" 닉네임/별명(예: 동전냠냠이)이나 판매자 정보는 받는 사람이 아니므로 절대 사용하지 마세요. ' +
         '연락처는 010 휴대폰은 물론 0502·0508 등으로 시작하는 안심번호도 반드시 추출합니다. ' +
         '종류는 정해진 6개 값 중 하나로만(번개장터→번개 등). 판매가는 상품금액(수수료 차감 전, 숫자만). ' +
-        '보이지 않는 항목은 빈 문자열로. 우편번호는 숫자 5자리만. 추측 금지.';
+        '보이지 않는 항목은 빈 문자열로. 우편번호는 숫자 5자리만. 추측 금지. ' +
+        '답하기 전에 이름 글자, 전화번호·우편번호 숫자, 주소의 동/호수를 이미지와 한 글자씩 다시 대조해 확인하세요(비슷한 글자·숫자 혼동 주의: 0/8, 1/7, 3/8, 5/6, 이름의 받침 등).';
+
+    const userContent = [
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data } },
+        { type: 'text', text: prompt }
+    ];
+    const callClaude = (headers, body) => fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: Object.assign({ 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, headers),
+        body: JSON.stringify(body)
+    });
 
     try {
-        const ares = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01',
-                'content-type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: ANTHROPIC_MODEL,
-                max_tokens: 1024,
-                tools: [tool],
-                tool_choice: { type: 'tool', name: 'fill_delivery' },
-                messages: [{
-                    role: 'user',
-                    content: [
-                        { type: 'image', source: { type: 'base64', media_type: mediaType, data } },
-                        { type: 'text', text: prompt }
-                    ]
-                }]
-            })
+        let engine = ANTHROPIC_MODEL;
+        let ares = await callClaude({ 'anthropic-beta': 'server-side-fallback-2026-07-01' }, {
+            model: ANTHROPIC_MODEL,
+            max_tokens: 16000,
+            // 생각(adaptive thinking)은 Sonnet 5.5·Opus 5.5에서 항상 켜짐 — 깊이는 effort로 조절
+            output_config: { effort: ANTHROPIC_EFFORT, format: { type: 'json_schema', schema } },
+            // 안전 분류기가 거절하면 서버에서 다른 모델로 자동 재시도
+            fallbacks: 'default',
+            messages: [{ role: 'user', content: userContent }]
         });
-
-        const j = await ares.json().catch(() => ({}));
+        let j = await ares.json().catch(() => ({}));
+        let legacy = false;
+        // 새 방식 요청이 400(요청 형식 문제)이면 예전 방식(Sonnet 4.6 + 도구로 JSON)으로 한 번 더 — 기능이 멈추지 않게
+        if (ares.status === 400) {
+            console.warn('analyze-delivery: 기본 요청 400 → 예전 방식으로 재시도', j && j.error && j.error.message);
+            legacy = true;
+            engine = 'claude-sonnet-4-6';
+            ares = await callClaude({}, {
+                model: engine,
+                max_tokens: 1024,
+                tools: [{ name: 'fill_delivery', description: '택배 송장 입력 폼을 채우기 위해 이미지에서 추출한 수취인 정보', input_schema: schema }],
+                tool_choice: { type: 'tool', name: 'fill_delivery' },
+                messages: [{ role: 'user', content: userContent }]
+            });
+            j = await ares.json().catch(() => ({}));
+        }
         if (!ares.ok) {
             const s = ares.status;
             let msg = '이미지 분석에 실패했습니다.';
@@ -105,8 +119,18 @@ module.exports = async (req, res) => {
             return;
         }
 
-        const block = (j.content || []).find(b => b.type === 'tool_use');
-        const out = (block && block.input) || {};
+        if (j.stop_reason === 'refusal') {
+            res.status(422).json({ error: '이 이미지는 분석할 수 없습니다. 직접 입력해주세요.' });
+            return;
+        }
+        let out = {};
+        if (legacy) {
+            const tb = (j.content || []).find(b => b.type === 'tool_use');
+            out = (tb && tb.input) || {};
+        } else {
+            const block = (j.content || []).find(b => b.type === 'text');
+            try { out = JSON.parse((block && block.text) || '{}') || {}; } catch (_) { out = {}; }
+        }
         // 모델이 못 읽었을 때 넣는 placeholder(<UNKNOWN>, N/A, 없음 등)를 빈 문자열로 정리 —
         // 폼에 쓰레기 값이 들어가지 않도록.
         const clean = (v) => {
@@ -122,7 +146,8 @@ module.exports = async (req, res) => {
             address: clean(out.address),
             product: clean(out.product),
             type: clean(out.delivery_type),
-            price: clean(out.price)
+            price: clean(out.price),
+            engine: (j && j.model) || engine
         });
     } catch (err) {
         res.status(502).json({ error: '이미지 분석 서버 오류', detail: (err && err.message) || '' });

@@ -7983,7 +7983,7 @@ async function analyzeDeliveryImageFile(file) {
     btns.forEach(b => b.disabled = true);
     if (mainBtn) mainBtn.textContent = '🔍 분석 중...';
     try {
-        const dataUrl = await _resizeImageToDataUrl(file, 1568, 0.8);
+        const dataUrl = await _resizeImageToDataUrl(file, 2576, 0.92);   // Sonnet 5.5·Opus 5.5 고해상도 한계(긴 변 2576px)에 맞춰 글씨가 뭉개지지 않게
         let token = '';
         try { const { data } = await sb.auth.getSession(); token = data && data.session && data.session.access_token; } catch (_) {}
         if (!token) { showToast('로그인이 필요합니다. 다시 로그인해주세요'); return; }
