@@ -2365,8 +2365,21 @@ async function toggleProjectCheck(id, key) {
     const p = projects.find(x => x.id === id);
     if (!p) return;
     if (!p.checks) p.checks = {};
+    // 디자인확인서 컨펌: 어느 채널로·언제 컨펌받았는지 같이 기록 (취소하면 체크 안 함)
+    let dcPatch = null;
+    if (key === 'design') {
+        if (!p.checks.design) {
+            const info = await askDesignConfirm({ channel: p.designConfirmChannel, date: p.designConfirmDate });
+            if (!info) return;
+            dcPatch = { design_confirm_channel: info.channel, design_confirm_date: info.date || null };
+            p.designConfirmChannel = info.channel; p.designConfirmDate = info.date || '';
+        } else {
+            dcPatch = { design_confirm_channel: '', design_confirm_date: null };
+            p.designConfirmChannel = ''; p.designConfirmDate = '';
+        }
+    }
     p.checks[key] = !p.checks[key];
-    const update = { checks: p.checks };
+    const update = Object.assign({ checks: p.checks }, dcPatch || {});
     // 체크리스트 전체 체크 시 상태를 '완료'로 자동 변경
     const allChecked = CHECK_ITEMS.every(item => !!p.checks[item.key]);
     if (allChecked && p.status !== '완료') {
@@ -3943,6 +3956,7 @@ async function showProjectDetail(id) {
         return `<div onclick="toggleProjectCheck(${id},'${item.key}');setTimeout(()=>showProjectDetail(${id}),50)" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:${done ? 'var(--blue-light)' : 'var(--gray-50)'};border:1px solid ${done ? 'var(--blue)' : 'var(--gray-200)'};border-radius:8px;font-size:13px;cursor:pointer;transition:all .15s;color:var(--gray-900)">
             <span style="display:inline-flex;width:18px;height:18px;border-radius:50%;background:${done ? 'var(--blue)' : 'var(--gray-300)'};color:white;align-items:center;justify-content:center;font-size:12px;font-weight:700">${done ? '✓' : ''}</span>
             <span style="font-weight:${done ? '700' : '500'}">${item.label}</span>
+            ${item.key === 'design' && done && (p.designConfirmChannel || p.designConfirmDate) ? `<span style="margin-left:auto;font-size:11.5px;font-weight:700;color:var(--blue)">${escHtml([p.designConfirmChannel, p.designConfirmDate ? p.designConfirmDate.slice(5).replace('-', '/') : ''].filter(Boolean).join(' · '))}</span>` : ''}
         </div>`;
     }).join('');
 
@@ -4334,12 +4348,12 @@ function openEditProject(id) {
 
     const checksHtml = Object.entries(checkDetails).map(([key, info]) => `
         <label style="display:flex;align-items:flex-start;gap:10px;padding:10px;cursor:pointer;font-size:14px;border:1px solid var(--gray-100);border-radius:8px;background:var(--gray-50)">
-            <input type="checkbox" id="editCheck-${key}" ${p.checks && p.checks[key] ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;margin-top:2px">
+            <input type="checkbox" id="editCheck-${key}" ${p.checks && p.checks[key] ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;margin-top:2px"${key === 'design' ? ` onchange="document.getElementById('editDesignConfirm').style.display = this.checked ? '' : 'none'"` : ''}>
             <div style="flex:1">
                 <div style="font-weight:700;color:var(--gray-900)">${info.label}</div>
                 <div style="font-size:12px;color:var(--gray-500);margin-top:2px">${info.desc}</div>
             </div>
-        </label>`).join('');
+        </label>${key === 'design' ? `<div id="editDesignConfirm" class="dc-inline" style="${p.checks && p.checks.design ? '' : 'display:none'}">${designConfirmFieldsHtml('editDc', p.designConfirmChannel, p.designConfirmDate)}</div>` : ''}`).join('');
 
     const secCard = (inner) => `<div style="background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900)">${inner}</div>`;
     const printFeeVat = p.printFeeVat || 'VAT 별도';
@@ -4820,6 +4834,9 @@ async function updateProject(id) {
         phone: getVal('editProjectPhone'),
         address: getVal('editProjectAddress'),
         checks: newChecks,
+        // 디확 컨펌 칸을 직접 체크했을 때만 입력값, '완료'로 자동 체크된 경우엔 기존 값 유지
+        designConfirmChannel: (document.getElementById('editCheck-design') || {}).checked ? readDesignConfirmFields('editDc').channel : (newChecks.design ? (p.designConfirmChannel || '') : ''),
+        designConfirmDate: (document.getElementById('editCheck-design') || {}).checked ? readDesignConfirmFields('editDc').date : (newChecks.design ? (p.designConfirmDate || '') : ''),
         memo: getVal('editProjectMemo')
     });
 
@@ -4848,6 +4865,8 @@ async function updateProject(id) {
                 revenue: p.revenue,
                 status: p.status,
                 checks: p.checks,
+                design_confirm_channel: p.designConfirmChannel || '',
+                design_confirm_date: p.designConfirmDate || null,
                 memo: p.memo,
                 supplier: p.supplier,
                 supplier_contact: p.supplierContact || '',
@@ -5874,7 +5893,9 @@ function _projectsDomesticRowToObj(r) {
         memo: r.memo || '',
         sourceDocNumber: r.source_doc_number || '',
         inquiryId: r.inquiry_id || null,
-        checkDates: r.check_dates || {}
+        checkDates: r.check_dates || {},
+        designConfirmChannel: r.design_confirm_channel || '',
+        designConfirmDate: r.design_confirm_date || ''
     };
 }
 
@@ -22381,7 +22402,13 @@ function inqStages(x) {
         const c = cnt(k);
         st.push({ key, label, done: n > 0 && c === n, sub: n && c === n ? (inqMD(kDate(k)) || '완료') : (c ? `${c}/${n}` : '') });
     };
-    stepK('design', '디자인확인', 'design');
+    {
+        const c = cnt('design');
+        const dDate = inqMaxDate(projs.map(p => p.design_confirm_date || inqDateOf((p.check_dates || {}).design)));
+        const ch = [...new Set(projs.map(p => p.design_confirm_channel).filter(Boolean))].join('·');
+        st.push({ key: 'design', label: '디자인확인', done: n > 0 && c === n,
+            sub: n && c === n ? [inqMD(dDate), ch].filter(Boolean).join(' ') || '완료' : (c ? `${c}/${n}` : '') });
+    }
     stepK('wo', '작업요청', 'workOrder');
     const settled = projs.filter(p => INQ_SETTLE_KEYS.every(k => p.checks && p.checks[k])).length;
     const settleParts = n ? INQ_SETTLE_KEYS.reduce((s, k) => s + cnt(k), 0) : 0;
@@ -22484,14 +22511,29 @@ async function inqDealAction(x, act, btn) {
 async function inqToggleProjCheck(x, row, key) {
     if (!row) return;
     const checks = Object.assign({}, row.checks || {});
-    checks[key] = !checks[key];
     const update = { checks };
+    if (key === 'design') {
+        if (!checks.design) {
+            const info = await askDesignConfirm({ channel: row.design_confirm_channel, date: row.design_confirm_date });
+            if (!info) { inqRenderStage(x); inqRenderProjs(x); return; }
+            update.design_confirm_channel = info.channel;
+            update.design_confirm_date = info.date || null;
+        } else {
+            update.design_confirm_channel = '';
+            update.design_confirm_date = null;
+        }
+    }
+    checks[key] = !checks[key];
     if (CHECK_ITEMS.every(it => !!checks[it.key]) && row.status !== '완료') update.status = '완료';
     const { data, error } = await sb.from('projects_domestic').update(update).eq('id', row.id).select().single();
     if (error) { showToast('저장 실패: ' + error.message); inqRenderStage(x); return; }
     Object.assign(row, data);
     const gp = projects.find(v => v.id === row.id);
-    if (gp) { gp.checks = data.checks; if (update.status) gp.status = update.status; try { renderProjects(); } catch (_) {} }
+    if (gp) {
+        gp.checks = data.checks; if (update.status) gp.status = update.status;
+        gp.designConfirmChannel = data.design_confirm_channel || ''; gp.designConfirmDate = data.design_confirm_date || '';
+        try { renderProjects(); } catch (_) {}
+    }
     const it = CHECK_ITEMS.find(c => c.key === key);
     showToast(`${it ? it.label : key} ${checks[key] ? '체크' : '해제'}`);
     inqRenderProjs(x);
@@ -22528,7 +22570,9 @@ function inqRenderProjs(x) {
           </div>
           <div class="inq-pj-checks">${CHECK_ITEMS.map(it => {
               const on = !!(p.checks && p.checks[it.key]);
-              const d = cd[it.key] ? inqMD(inqDateOf(cd[it.key])) : '';
+              const d = it.key === 'design' && on && (p.design_confirm_channel || p.design_confirm_date)
+                  ? [p.design_confirm_channel, p.design_confirm_date ? inqMD(p.design_confirm_date) : ''].filter(Boolean).join(' · ')
+                  : (cd[it.key] ? inqMD(inqDateOf(cd[it.key])) : '');
               return `<button class="inq-ck ${on ? 'on' : ''}" data-act="chk:${p.id}:${it.key}" title="${escHtml(it.label)}${on ? (d ? ' · ' + d + ' 체크' : ' · 완료') : ' — 누르면 체크'}">
                   <i>${on ? '✓' : ''}</i>${escHtml(it.label)}${d ? `<em>${d}</em>` : ''}</button>`;
           }).join('')}</div>
@@ -23668,4 +23712,76 @@ async function inqFillFromClientDb(name) {
         inqAutoHint(`${INQ_CHECK_SVG} 거래처 DB에서 불러옴 — <b>${filled.join(' · ')}</b> <span>틀리면 바로 고쳐주세요</span>`);
         inqRenderNewCheck();
     }
+}
+
+// ---------- 디자인확인서 컨펌 채널·날짜 (migration 044) ----------
+const DC_CHANNELS = ['카톡', '이메일', '문자'];
+function designConfirmFieldsHtml(prefix, channel, date) {
+    const isEtc = !!channel && !DC_CHANNELS.includes(channel);
+    const sel = isEtc ? '기타' : (channel || '카톡');
+    return `<div class="dc-fields">
+        <div class="dc-ch" id="${prefix}Ch">${DC_CHANNELS.concat(['기타']).map(c =>
+            `<label class="${sel === c ? 'on' : ''}"><input type="radio" name="${prefix}Ch" value="${c}" ${sel === c ? 'checked' : ''}>${c}</label>`).join('')}</div>
+        <input type="text" id="${prefix}Etc" class="dc-etc" placeholder="기타 채널 직접 입력 (예: 전화, 방문)" value="${isEtc ? escHtml(channel) : ''}" style="${sel === '기타' ? '' : 'display:none'}">
+        <label class="dc-date"><span>컨펌 날짜</span><input type="date" id="${prefix}Date" value="${escHtml(date || getTodayStr())}"></label>
+      </div>`;
+}
+function bindDesignConfirmFields(prefix) {
+    const box = document.getElementById(prefix + 'Ch');
+    if (!box) return;
+    box.addEventListener('change', () => {
+        const v = (box.querySelector('input:checked') || {}).value;
+        box.querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked));
+        const etc = document.getElementById(prefix + 'Etc');
+        etc.style.display = v === '기타' ? '' : 'none';
+        if (v === '기타') etc.focus();
+    });
+}
+function readDesignConfirmFields(prefix) {
+    const box = document.getElementById(prefix + 'Ch');
+    if (!box) return { channel: '', date: '' };
+    const v = (box.querySelector('input:checked') || {}).value || '';
+    const etc = (document.getElementById(prefix + 'Etc') || {}).value || '';
+    return { channel: v === '기타' ? (etc.trim() || '기타') : v, date: (document.getElementById(prefix + 'Date') || {}).value || '' };
+}
+// 편집 창이 열린 뒤 기타 칸 토글 연결 (편집 창 HTML은 문자열이라 여기서 바인딩)
+document.addEventListener('change', (e) => {
+    if (e.target && e.target.name === 'editDcCh') {
+        const box = document.getElementById('editDcCh');
+        box.querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked));
+        const etc = document.getElementById('editDcEtc');
+        if (etc) { etc.style.display = e.target.value === '기타' ? '' : 'none'; if (e.target.value === '기타') etc.focus(); }
+    }
+});
+
+// 디확 컨펌을 체크할 때 띄우는 작은 창 → {channel, date} 또는 취소 시 null
+function askDesignConfirm(cur) {
+    cur = cur || {};
+    return new Promise(resolve => {
+        const wrap = document.createElement('div');
+        wrap.className = 'dc-ask';
+        wrap.innerHTML = `<div class="dc-ask-box" role="dialog" aria-modal="true">
+            <h4>디자인확인서 컨펌</h4>
+            <p>어디로, 언제 컨펌받았나요?</p>
+            ${designConfirmFieldsHtml('askDc', cur.channel, cur.date)}
+            <div class="dc-ask-act">
+              <button type="button" class="btn-ghost" data-x>취소</button>
+              <button type="button" class="btn-primary" data-ok>컨펌 완료 체크</button>
+            </div>
+          </div>`;
+        document.body.appendChild(wrap);
+        bindDesignConfirmFields('askDc');
+        const done = (v) => { document.removeEventListener('keydown', onKey, true); wrap.remove(); resolve(v); };
+        const ok = () => {
+            const r = readDesignConfirmFields('askDc');
+            if (!r.date) { showToast('컨펌 날짜를 넣어주세요'); return; }
+            done(r);
+        };
+        const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); done(null); } else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') { e.preventDefault(); ok(); } };
+        document.addEventListener('keydown', onKey, true);
+        wrap.querySelector('[data-x]').onclick = () => done(null);
+        wrap.querySelector('[data-ok]').onclick = ok;
+        wrap.addEventListener('mousedown', (e) => { if (e.target === wrap) done(null); });
+        setTimeout(() => { const f = wrap.querySelector('input:checked'); if (f) f.focus(); }, 30);
+    });
 }
