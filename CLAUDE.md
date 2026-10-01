@@ -166,6 +166,10 @@
 - `☰ 목록 | ▦ 보드` 전환(localStorage `pl_view`) — 보드는 예전 칸반 컬럼(`planningBoardHtml`)
 - `renderPlanning`은 다시 그릴 때 입력 중이던 할 일 칸 값·포커스·목록 스크롤을 유지(실시간 갱신 대비). 프로젝트 열기/닫기는 이미 불러온 데이터로 그림(skipLoad)
 - F2: 프로젝트를 열었으면 할 일 입력칸으로, 아니면 새 프로젝트 (모든 모드)
+- **할 일 / 자료·제안 분리 (migration 049)**: `planning_posts.kind` = task(진행 상태·마감·담당) / note(제안·조사·자료 — 상태 없음). 기존 글은 제안·조사·자료 중 담당자·마감 없는 것만 note로 옮김. 진행률·지금 할 일·요약·홈 '내 할 일'·보드는 task만(`planningTasksOf`)
+  - 본문 탭 `✅ 할 일 | 📎 자료·제안`(`planningTab`, localStorage `pl_tab`). 자료 탭 = 사진 카드 바둑판(`planningNotesHtml`, 분류 칩, 검토 중 제안이 먼저), 올리기 `openNewPlanningNote(category)`(작성 창에서 마감·담당 숨김)
+  - 제안 상태 `note_status` review(null)/adopted/hold. `planningAdoptProposal` → 할 일 생성(`ref_ids`=[제안 id], 담당자 있으면 일일계획표) + 제안 '채택'
+  - `ref_ids`: 할 일에 연결된 자료. 상세 창 '관련 자료'(`planningLinksHtml`, `+ 자료 연결` = `planningOpenLinkPicker`/`planningSaveLinks`), 자료 상세엔 연결된 할 일. 잘못 분류된 글은 상세 창 `할 일로 옮기기`/`자료·제안으로 옮기기`(`planningConvertKind`)
 
 ## 마진계산기 (편의성 그룹)
 - **목적**: 원가 항목들과 판매가를 입력해 마진/마진율을 계산. 기존 엑셀 양식(이니셜D 시계 굿즈 기준)을 발전시킨 자유형 구조

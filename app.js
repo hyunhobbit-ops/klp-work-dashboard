@@ -1498,6 +1498,7 @@ const F2_NEW_ACTIONS = [
     ['tab-planning',           () => {
         const add = currentPlanningProjectId != null && document.getElementById('plAddTitle');
         if (add) { add.focus(); return; }
+        if (currentPlanningProjectId != null && planningTab === 'note') { openNewPlanningNote('propose'); return; }
         if (currentPlanningProjectId != null && planningViewMode === 'board') { openNewPlanningPostForColumn('todo'); return; }
         openNewPlanningModal();
     }]
@@ -12970,6 +12971,9 @@ function planningPostFromDb(r) {
         assignees: Array.isArray(r.assignees) ? r.assignees : [],
         images: Array.isArray(r.images) ? r.images : [],
         taskStatus: r.task_status || 'todo',
+        kind: r.kind === 'note' ? 'note' : 'task',
+        noteStatus: r.note_status || '',
+        refIds: Array.isArray(r.ref_ids) ? r.ref_ids.map(Number) : [],
         sortOrder: r.sort_order != null ? Number(r.sort_order) : null,
         createdAt: r.created_at
     };
@@ -12988,7 +12992,10 @@ function planningPostToDb(post, projectId) {
         deadline: post.deadline || null,
         assignees: post.assignees || [],
         images: post.images || [],
-        task_status: post.taskStatus || 'todo'
+        task_status: post.taskStatus || 'todo',
+        kind: post.kind === 'note' ? 'note' : 'task',
+        note_status: post.noteStatus || null,
+        ref_ids: Array.isArray(post.refIds) ? post.refIds : []
     };
     if (post.sortOrder != null && planningSortOrderColumnAvailable) out.sort_order = post.sortOrder;
     return out;
@@ -13056,7 +13063,7 @@ async function renderPlanningHomeSection() {
         for (const proj of visible) {
             const posts = proj.posts || [];
             for (const post of posts) {
-                if (post.parentId) continue;
+                if (post.parentId || post.kind === 'note') continue;
                 const assignees = Array.isArray(post.assignees) ? post.assignees : [];
                 const isMine = me && assignees.includes(me);
                 if (isMine && (post.taskStatus || 'todo') !== 'done') myTodo++;
@@ -13426,7 +13433,7 @@ let planningViewMode = (() => { try { return localStorage.getItem('pl_view') ===
 let planningDoneOpen = false;
 let planningQuickAdding = false;
 
-function planningTasksOf(p) { return (p.posts || []).filter(x => !x.parentId); }
+function planningTasksOf(p) { return (p.posts || []).filter(x => !x.parentId && x.kind !== 'note'); }
 function planningProgress(p) {
     const t = planningTasksOf(p);
     const done = t.filter(x => (x.taskStatus || 'todo') === 'done').length;
@@ -13470,6 +13477,7 @@ function planningListRowHtml(p) {
         <div class="pl-row-meta">
             ${st}
             ${pr.total ? `<span class="pl-row-bar"><i style="width:${pr.pct}%"></i></span><span>${pr.done}/${pr.total} 완료</span>` : '<span class="muted">할 일 없음</span>'}
+            ${planningNotesOf(p).length ? `<span title="자료·제안">📎 ${planningNotesOf(p).length}</span>` : ''}
             ${late ? `<span class="pl-row-late" title="마감 지났거나 오늘 마감인 할 일">⚠ ${late}</span>` : ''}
             ${dd ? `<span class="pl-row-dd" style="color:${dd.color}">${dd.label}</span>` : ''}
         </div>
@@ -13580,6 +13588,7 @@ function planningOverviewHtml() {
     </div>`;
 }
 function planningJumpToPost(projectId, postId) {
+    planningTab = 'task';
     openPlanningProject(projectId);
     setTimeout(() => { try { openPlanningPostDetail(postId); } catch (_) {} }, 80);
 }
@@ -13608,6 +13617,7 @@ function planningTaskRowHtml(t, replyCount, today) {
             ${st === 'todo' ? `<button class="pl-mini" onclick="event.stopPropagation();planningSetTaskStatusQuiet(${t.id},'doing')" title="진행 중으로 옮기기">▶ 시작</button>` : ''}
             ${st === 'doing' ? `<button class="pl-mini" onclick="event.stopPropagation();planningSetTaskStatusQuiet(${t.id},'todo')" title="할 일로 되돌리기">⏸</button>` : ''}
             ${isAuthor ? `<button class="pl-mini" onclick="event.stopPropagation();openPlanningCardEdit(${t.id})" title="편집">✏️</button>` : ''}
+            ${(t.refIds || []).length ? `<span class="pl-cnt" title="연결된 자료">📎 ${t.refIds.length}</span>` : ''}
             ${replyCount ? `<span class="pl-cnt" title="댓글">💬 ${replyCount}</span>` : ''}
             ${imgs ? `<span class="pl-cnt" title="사진">🖼 ${imgs}</span>` : ''}
             ${assignees.length ? `<span class="pl-who">${planningEsc(assignees.join(', '))}</span>` : ''}
@@ -13722,6 +13732,7 @@ function planningSideHtml(p) {
                 const par = x.parentId ? parentsById[x.parentId] : null;
                 const what = x.parentId
                     ? `💬 <b>${planningEsc((par && (par.title || planningHtmlToText(par.content).slice(0, 24))) || '할 일')}</b>에 댓글`
+                    : x.kind === 'note' ? `📎 <b>${planningEsc(planningPostLabel(x, 24))}</b> 올림`
                     : `<b>${planningEsc(x.title || planningHtmlToText(x.content).slice(0, 24) || '할 일')}</b> 추가`;
                 return `<div class="pl-side-row act" onclick="openPlanningPostDetail(${x.parentId || x.id})"><span class="pl-act-who">${planningEsc(x.author)}</span><span class="pl-side-t">${what}</span><span class="pl-muted">${planningFmtDate(x.createdAt)}</span></div>`;
             }).join('') : '<div class="pl-muted">아직 활동이 없습니다</div>'}
@@ -13770,10 +13781,305 @@ function renderPlanningDetail(p) {
             </div>
         </div>
         <div class="pl-body${board ? ' board' : ''}">
-            <div class="pl-main">${board ? planningBoardHtml(p) : planningTaskListHtml(p)}</div>
+            <div class="pl-main">${planningTabsHtml(p)}${planningTab === 'note' ? planningNotesHtml(p) : (board ? planningBoardHtml(p) : planningTaskListHtml(p))}</div>
             <aside class="pl-side">${planningSideHtml(p)}</aside>
         </div>
     </div>`;
+}
+
+// ----- 자료·제안 (kind = 'note') : 진행 상태가 없는 글. 제안은 검토 중 → 채택(할 일 생성) / 보류 -----
+const PLANNING_NOTE_CATS = ['propose', 'research', 'material'];
+const PLANNING_NOTE_STATUS = { review: '검토 중', adopted: '채택', hold: '보류' };
+let planningTab = (() => { try { return localStorage.getItem('pl_tab') === 'note' ? 'note' : 'task'; } catch (_) { return 'task'; } })();
+let planningNoteFilter = 'all';
+
+function planningNotesOf(p) { return (p.posts || []).filter(x => !x.parentId && x.kind === 'note'); }
+function planningLinkedTasks(p, noteId) { return planningTasksOf(p).filter(t => (t.refIds || []).includes(noteId)); }
+function planningPostLabel(post, n) {
+    return post.title || planningHtmlToText(post.content).replace(/\s+/g, ' ').trim().slice(0, n || 60) || '(사진)';
+}
+function planningThumbOf(post) {
+    const imgs = Array.isArray(post.images) ? post.images : [];
+    let src = imgs[0] || '';
+    if (!src) { const m = String(post.content || '').match(/<img[^>]+src=["']([^"']+)["']/i); if (m) src = m[1]; }
+    return /^(https?:|data:image\/)/i.test(src) ? src : '';
+}
+function planningImgCount(post) {
+    return (Array.isArray(post.images) ? post.images.length : 0) + ((post.content || '').match(/<img\b/gi) || []).length;
+}
+function planningSetModalTitle(t) { const el = document.getElementById('modalTitle'); if (el) el.textContent = t; }
+function planningSetTab(t) {
+    planningTab = t === 'note' ? 'note' : 'task';
+    try { localStorage.setItem('pl_tab', planningTab); } catch (_) {}
+    renderPlanning({ skipLoad: true });
+}
+function planningSetNoteFilter(k) {
+    planningNoteFilter = k;
+    renderPlanning({ skipLoad: true });
+}
+
+function planningTabsHtml(p) {
+    const notes = planningNotesOf(p);
+    const review = notes.filter(n => n.category === 'propose' && (n.noteStatus || 'review') === 'review').length;
+    return `
+    <div class="pl-tabs">
+        <button class="${planningTab === 'task' ? 'on' : ''}" onclick="planningSetTab('task')">✅ 할 일 <b>${planningTasksOf(p).length}</b></button>
+        <button class="${planningTab === 'note' ? 'on' : ''}" onclick="planningSetTab('note')">📎 자료·제안 <b>${notes.length}</b>${review ? `<em>검토 중 ${review}</em>` : ''}</button>
+    </div>`;
+}
+
+function planningNoteCardHtml(p, n, replyCount) {
+    const meta = planningCategoryMeta(n.category);
+    const thumb = planningThumbOf(n);
+    const imgN = planningImgCount(n);
+    const isProp = n.category === 'propose';
+    const ns = n.noteStatus || 'review';
+    const linked = planningLinkedTasks(p, n.id).length;
+    const text = planningHtmlToText(n.content).replace(/\s+/g, ' ').trim();
+    return `
+    <div class="pl-note${isProp && ns === 'hold' ? ' hold' : ''}" onclick="openPlanningPostDetail(${n.id})">
+        ${thumb ? `<div class="pl-note-img"><img src="${planningEsc(thumb)}" loading="lazy" alt=""></div>` : `<div class="pl-note-img empty" style="background:${meta.bg};color:${meta.fg}">${meta.icon}</div>`}
+        <div class="pl-note-body">
+            <div class="pl-note-tags">
+                <span class="pl-cat" style="background:${meta.bg};color:${meta.fg}">${meta.icon} ${meta.label}</span>
+                ${isProp ? `<span class="pl-ns ${ns}">${PLANNING_NOTE_STATUS[ns] || '검토 중'}</span>` : ''}
+                ${imgN > 1 ? `<span class="pl-note-n">🖼 ${imgN}</span>` : ''}
+            </div>
+            <div class="pl-note-title">${planningEsc(planningPostLabel(n))}</div>
+            ${n.title && text ? `<div class="pl-note-text">${planningEsc(text.slice(0, 120))}</div>` : ''}
+            <div class="pl-note-foot">
+                <span>${planningEsc(n.author)} · ${planningFmtDate(n.createdAt)}</span>
+                ${replyCount ? `<span>💬 ${replyCount}</span>` : ''}
+                ${linked ? `<span class="pl-note-link">🔗 할 일 ${linked}</span>` : ''}
+            </div>
+            ${isProp && ns === 'review' ? `<div class="pl-note-act">
+                <button class="ok" onclick="event.stopPropagation();planningAdoptProposal(${n.id})">✅ 채택 → 할 일</button>
+                <button onclick="event.stopPropagation();planningSetNoteStatus(${n.id},'hold')">⏸ 보류</button>
+            </div>` : ''}
+        </div>
+    </div>`;
+}
+
+function planningNotesHtml(p) {
+    const notes = planningNotesOf(p);
+    const replies = (p.posts || []).reduce((acc, x) => { if (x.parentId) acc[x.parentId] = (acc[x.parentId] || 0) + 1; return acc; }, {});
+    const cnt = k => k === 'all' ? notes.length : notes.filter(n => n.category === k).length;
+    const chips = [['all', '전체'], ...PLANNING_NOTE_CATS.map(k => { const m = planningCategoryMeta(k); return [k, `${m.icon} ${m.label}`]; })]
+        .map(([k, l]) => `<button class="${planningNoteFilter === k ? 'on' : ''}" onclick="planningSetNoteFilter('${k}')">${l} <b>${cnt(k)}</b></button>`).join('');
+    const rank = n => (n.category === 'propose' && (n.noteStatus || 'review') === 'review') ? 0 : (n.category === 'propose' && n.noteStatus === 'hold') ? 2 : 1;
+    const list = notes.filter(n => planningNoteFilter === 'all' || n.category === planningNoteFilter)
+        .sort((a, b) => (rank(a) - rank(b)) || (new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
+    return `
+    <div class="pl-note-bar">
+        <div class="pl-chips">${chips}</div>
+        <div class="pl-note-new">
+            <button onclick="openNewPlanningNote('propose')">+ 💡 제안</button>
+            <button onclick="openNewPlanningNote('research')">+ 🔍 조사</button>
+            <button onclick="openNewPlanningNote('material')">+ 📎 자료</button>
+        </div>
+    </div>
+    <div class="pl-note-hint">끝내야 하는 일은 <b>할 일</b>에, 참고할 사진·문서·아이디어는 여기에 모아요. 제안을 <b>채택</b>하면 할 일이 만들어지고 이 제안이 연결됩니다.</div>
+    ${list.length ? `<div class="pl-note-grid">${list.map(n => planningNoteCardHtml(p, n, replies[n.id] || 0)).join('')}</div>`
+        : `<div class="pl-note-empty">${notes.length ? '이 분류의 글이 없습니다' : '아직 자료·제안이 없습니다 — 위 버튼으로 올려보세요'}</div>`}`;
+}
+
+function openNewPlanningNote(category) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!p) return;
+    planningPostEditorMode = { mode: 'new', taskStatus: 'todo', parentId: null, kind: 'note', category: category || 'propose' };
+    openPlanningPostEditor();
+}
+
+// 상세 창 위쪽 버튼: 할 일 = 상태 / 자료 = 제안 상태·채택
+function planningDetailActionsHtml(post, taskStatusBadges) {
+    if (post.kind === 'note') {
+        const isProp = post.category === 'propose';
+        const ns = post.noteStatus || 'review';
+        const nsBtns = isProp ? Object.entries(PLANNING_NOTE_STATUS).map(([k, v]) =>
+            `<button class="pl-ns-btn ${k}${ns === k ? ' on' : ''}" onclick="planningSetNoteStatus(${post.id},'${k}',true)">${v}</button>`).join('') : '<span class="pl-muted">📎 자료·제안 — 진행 상태 없이 모아두는 글</span>';
+        return `<div class="pl-dact">${nsBtns}
+            ${isProp && ns !== 'adopted' ? `<button class="pl-dact-main" onclick="planningAdoptProposal(${post.id})">✅ 채택하고 할 일 만들기</button>` : ''}
+            <span style="flex:1"></span>
+            <button class="pl-dact-sub" onclick="planningConvertKind(${post.id},'task')" title="이 글 자체를 할 일 목록으로 옮깁니다">할 일로 옮기기</button>
+        </div>`;
+    }
+    return `<div class="pl-dact">${taskStatusBadges}<span style="flex:1"></span>
+        <button class="pl-dact-sub" onclick="planningConvertKind(${post.id},'note')" title="끝낼 일이 아니라 참고 자료라면">자료·제안으로 옮기기</button>
+    </div>`;
+}
+
+// 상세 창 아래: 할 일 ↔ 자료 연결
+function planningLinksHtml(p, post) {
+    if (post.parentId) return '';
+    if (post.kind === 'note') {
+        const tasks = planningLinkedTasks(p, post.id);
+        return `<div class="pl-links">
+            <div class="pl-links-h">🔗 이 글과 연결된 할 일 <b>${tasks.length}</b></div>
+            ${tasks.map(t => {
+                const s = PLANNING_TASK_STATUSES.find(x => x.key === (t.taskStatus || 'todo')) || PLANNING_TASK_STATUSES[0];
+                return `<div class="pl-link-row" onclick="openPlanningPostDetail(${t.id})"><span class="pl-dot" style="background:${s.bar}"></span><span class="pl-side-t">${planningEsc(planningPostLabel(t))}</span><span style="color:${s.text};font-weight:800">${s.label}</span></div>`;
+            }).join('') || '<div class="pl-muted">아직 없습니다 — 제안이면 위 ‘채택하고 할 일 만들기’를 누르세요</div>'}
+        </div>`;
+    }
+    const byId = {}; (p.posts || []).forEach(x => { byId[x.id] = x; });
+    const notes = (post.refIds || []).map(id => byId[id]).filter(Boolean);
+    return `<div class="pl-links">
+        <div class="pl-links-h">📎 관련 자료 <b>${notes.length}</b><button onclick="planningOpenLinkPicker(${post.id})">+ 자료 연결</button></div>
+        ${notes.length ? `<div class="pl-link-grid">${notes.map(n => {
+            const th = planningThumbOf(n); const m = planningCategoryMeta(n.category);
+            return `<div class="pl-link-card" onclick="openPlanningPostDetail(${n.id})">
+                ${th ? `<img src="${planningEsc(th)}" alt="">` : `<span class="pl-link-ic" style="background:${m.bg};color:${m.fg}">${m.icon}</span>`}
+                <span class="pl-side-t">${planningEsc(planningPostLabel(n, 40))}</span>
+                <button title="연결 끊기" onclick="event.stopPropagation();planningSaveLinks(${post.id}, ${JSON.stringify((post.refIds || []).filter(i => i !== n.id))})">×</button>
+            </div>`;
+        }).join('')}</div>` : '<div class="pl-muted">연결된 자료가 없습니다 — 제안·사진·문서를 연결해 두면 여기서 바로 볼 수 있어요</div>'}
+        <div id="plLinkPicker"></div>
+    </div>`;
+}
+function planningOpenLinkPicker(taskId) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    const task = p && (p.posts || []).find(x => x.id === taskId);
+    const box = document.getElementById('plLinkPicker');
+    if (!task || !box) return;
+    const notes = planningNotesOf(p).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    if (!notes.length) { showToast('이 프로젝트에 자료·제안이 아직 없습니다'); return; }
+    const on = new Set(task.refIds || []);
+    box.innerHTML = `<div class="pl-picker">
+        <div class="pl-picker-list">${notes.map(n => {
+            const m = planningCategoryMeta(n.category);
+            return `<label><input type="checkbox" value="${n.id}" ${on.has(n.id) ? 'checked' : ''}><span class="pl-cat" style="background:${m.bg};color:${m.fg}">${m.icon} ${m.label}</span><span class="pl-side-t">${planningEsc(planningPostLabel(n, 50))}</span></label>`;
+        }).join('')}</div>
+        <div class="pl-picker-act"><button class="btn-ghost" onclick="document.getElementById('plLinkPicker').innerHTML=''">취소</button>
+        <button class="pl-add-btn" onclick="planningSaveLinks(${taskId})">연결 저장</button></div>
+    </div>`;
+}
+async function planningSaveLinks(taskId, ids) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    const task = p && (p.posts || []).find(x => x.id === taskId);
+    if (!task) return;
+    if (!Array.isArray(ids)) ids = [...document.querySelectorAll('#plLinkPicker input:checked')].map(i => Number(i.value));
+    try {
+        const { error } = await sb.from('planning_posts').update({ ref_ids: ids }).eq('id', taskId);
+        if (error) throw error;
+        task.refIds = ids;
+        openPlanningPostDetail(taskId);
+        await renderPlanning({ skipLoad: true });
+    } catch (err) {
+        console.error(err);
+        showToast('연결 저장 실패: ' + err.message);
+    }
+}
+
+async function planningSetNoteStatus(noteId, st, reopen) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    const note = p && (p.posts || []).find(x => x.id === noteId);
+    if (!note) return;
+    try {
+        const { error } = await sb.from('planning_posts').update({ note_status: st }).eq('id', noteId);
+        if (error) throw error;
+        note.noteStatus = st;
+        if (reopen) openPlanningPostDetail(noteId);
+        await renderPlanning({ skipLoad: true });
+        showToast(`제안 → ${PLANNING_NOTE_STATUS[st] || st}`);
+    } catch (err) {
+        console.error(err);
+        showToast('저장 실패: ' + err.message);
+    }
+}
+
+// 제안 채택 → 할 일 만들기 (할 일에 제안이 연결됨)
+function planningAdoptProposal(noteId) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    const note = p && (p.posts || []).find(x => x.id === noteId);
+    const body = document.getElementById('modalBody');
+    if (!note || !body) return;
+    planningPendingAssignees = [];
+    planningSetModalTitle('제안 채택');
+    body.innerHTML = `
+        <div class="form-section-title">✅ 제안 채택 → 할 일 만들기</div>
+        <div class="pl-adopt-src">💡 ${planningEsc(planningPostLabel(note, 80))}</div>
+        <div class="form-group"><label class="form-label">할 일 (무엇을 하면 되나요?)</label>
+            <input id="plAdoptTitle" class="form-input" style="font-weight:700" value="${planningEsc(planningPostLabel(note, 80))}">
+        </div>
+        <div class="form-group"><label class="form-label">⏰ 마감일 (선택)</label>
+            <input id="plAdoptDate" class="form-input" type="date">
+        </div>
+        <div class="form-group"><label class="form-label">👥 담당자 — 고르면 그 사람 일일계획표에도 들어갑니다</label>
+            <div id="planningAssigneeChips" style="display:flex;flex-wrap:wrap;gap:6px">${renderPlanningAssigneeChips()}</div>
+        </div>
+        <button class="form-submit" style="background:var(--blue);margin-top:6px" onclick="planningSubmitAdopt(${noteId})">채택하고 할 일 만들기</button>`;
+    const ov = document.getElementById('modalOverlay');
+    ov.classList.add('show');
+    ov.classList.remove('modal-wide');
+    setTimeout(() => { const el = document.getElementById('plAdoptTitle'); if (el) { el.focus(); el.select(); } }, 60);
+}
+async function planningSubmitAdopt(noteId) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    const note = p && (p.posts || []).find(x => x.id === noteId);
+    if (!note) return;
+    const title = (document.getElementById('plAdoptTitle').value || '').trim();
+    if (!title) { showToast('할 일을 입력하세요'); return; }
+    const deadline = document.getElementById('plAdoptDate').value || '';
+    const sameCol = planningTasksOf(p).filter(x => (x.taskStatus || 'todo') === 'todo');
+    const maxKey = sameCol.length ? Math.max(...sameCol.map(planningPostSortKeyOf)) : 0;
+    const newPost = {
+        author: currentUser ? currentUser.name : '익명',
+        category: 'normal', title, content: '', vendor: note.vendor || '', deadline,
+        assignees: planningPendingAssignees.slice(), images: [],
+        taskStatus: 'todo', parentId: null, sortOrder: maxKey + 1000,
+        kind: 'task', refIds: [noteId]
+    };
+    try {
+        let { data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single();
+        if (error && planningIsSortOrderSchemaError(error)) {
+            planningSortOrderColumnAvailable = false;
+            ({ data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single());
+        }
+        if (error) throw error;
+        const inserted = planningPostFromDb(data);
+        p.posts.push(inserted);
+        const { error: e2 } = await sb.from('planning_posts').update({ note_status: 'adopted' }).eq('id', noteId);
+        if (!e2) note.noteStatus = 'adopted';
+        planningPendingAssignees = [];
+        closeModal();
+        await renderPlanning({ skipLoad: true });
+        showToast('채택했습니다 — 할 일에 추가됨');
+        if (inserted.assignees.length) {
+            try { await syncPlanningCardToDaily(p, inserted); } catch (e) { console.error('일일계획표 동기화 실패', e); }
+        }
+    } catch (err) {
+        console.error(err);
+        showToast('할 일 만들기 실패: ' + err.message);
+    }
+}
+
+// 할 일 ↔ 자료·제안 옮기기 (잘못 분류된 글 정리용)
+async function planningConvertKind(postId, kind) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    const post = p && (p.posts || []).find(x => x.id === postId);
+    if (!post) return;
+    const patch = { kind };
+    if (kind === 'task') {
+        const sameCol = planningTasksOf(p).filter(x => (x.taskStatus || 'todo') === 'todo');
+        patch.task_status = 'todo';
+        if (planningSortOrderColumnAvailable) patch.sort_order = (sameCol.length ? Math.max(...sameCol.map(planningPostSortKeyOf)) : 0) + 1000;
+    } else if (!PLANNING_NOTE_CATS.includes(post.category)) {
+        patch.category = 'material';
+    }
+    try {
+        const { error } = await sb.from('planning_posts').update(patch).eq('id', postId);
+        if (error) throw error;
+        post.kind = kind;
+        if (patch.task_status) post.taskStatus = 'todo';
+        if (patch.sort_order != null) post.sortOrder = patch.sort_order;
+        if (patch.category) post.category = patch.category;
+        closeModal();
+        await renderPlanning({ skipLoad: true });
+        showToast(kind === 'task' ? '할 일로 옮겼습니다' : '자료·제안으로 옮겼습니다');
+    } catch (err) {
+        console.error(err);
+        showToast('옮기기 실패: ' + err.message);
+    }
 }
 
 async function planningQuickAdd() {
@@ -13907,7 +14213,7 @@ function planningBoardHtml(p) {
         if (sa !== sb) return sa - sb;
         return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
     });
-    const parents = posts.filter(x => !x.parentId);
+    const parents = posts.filter(x => !x.parentId && x.kind !== 'note');
     const byParent = posts.reduce((acc, x) => {
         if (x.parentId) (acc[x.parentId] = acc[x.parentId] || []).push(x);
         return acc;
@@ -14154,6 +14460,7 @@ function openPlanningPostDetail(postId) {
     const isPostAuthor = !!myName && post.author === myName;
     const postEditBtn = isPostAuthor ? `<button onclick="closeModal();openPlanningCardEdit(${post.id})" style="background:var(--white);border:1px solid var(--blue);color:var(--blue);font-size:12px;font-weight:700;padding:4px 12px;border-radius:6px;cursor:pointer">✏️ 편집</button>` : '';
     const postDelBtn = isPostAuthor ? `<button onclick="deletePlanningPost(${post.id});closeModal()" style="background:none;border:none;color:var(--red);font-size:12px;cursor:pointer">삭제</button>` : '';
+    planningSetModalTitle(post.parentId ? '답글' : post.kind === 'note' ? '📎 자료·제안' : '✅ 할 일');
     body.innerHTML = `
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
             <span style="background:${meta.bg};color:${meta.fg};font-size:12px;font-weight:800;padding:4px 10px;border-radius:6px">${meta.icon} ${meta.label}</span>
@@ -14163,11 +14470,12 @@ function openPlanningPostDetail(postId) {
             ${postEditBtn}
             ${postDelBtn}
         </div>
-        <div style="display:flex;gap:6px;margin-bottom:14px">${taskStatusBadges}</div>
+        ${planningDetailActionsHtml(post, taskStatusBadges)}
         ${post.title ? `<div style="font-size:22px;font-weight:800;color:var(--gray-900);line-height:1.35;letter-spacing:-0.01em;margin-bottom:12px">${planningEsc(post.title)}</div>` : ''}
         ${metaBlock}
         ${(post.content && (planningHtmlToText(post.content) || /<img\b/i.test(post.content))) ? `<div class="ql-snow planning-content-readonly" style="padding:12px;background:var(--gray-50);border-radius:8px"><div class="ql-editor" style="padding:0;font-size:14px;color:var(--gray-900);line-height:1.6">${planningSanitizeHtml(post.content)}</div></div>` : `<div style="font-size:14px;color:var(--gray-400);padding:12px;background:var(--gray-50);border-radius:8px">(내용 없음)</div>`}
         ${imgHtml}
+        ${planningLinksHtml(p, post)}
         <div style="margin-top:18px">
             <div style="font-size:13px;font-weight:800;color:var(--gray-900);margin-bottom:10px">↩ 답글 ${replies.length}</div>
             <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">${repliesHtml || `<div style="color:var(--gray-400);font-size:12px;padding:12px;text-align:center;border:1px dashed var(--gray-200);border-radius:8px">아직 답글이 없습니다</div>`}</div>
@@ -14243,10 +14551,14 @@ function openPlanningPostEditor() {
     if (!body) return;
     const mode = planningPostEditorMode || { mode: 'new', taskStatus: 'todo', parentId: null };
     const col = (PLANNING_TASK_STATUSES.find(s => s.key === mode.taskStatus) || PLANNING_TASK_STATUSES[0]);
-    const catOpts = PLANNING_CATEGORIES.map(c => `<option value="${c.key}">${c.icon} ${c.label}</option>`).join('');
+    const isNote = mode.kind === 'note';
+    const defCat = mode.category || (isNote ? 'propose' : 'normal');
+    const catOpts = PLANNING_CATEGORIES.filter(c => !isNote || PLANNING_NOTE_CATS.includes(c.key))
+        .map(c => `<option value="${c.key}" ${c.key === defCat ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('');
     planningPendingAssignees = [];
+    planningSetModalTitle(isNote ? '자료·제안 올리기' : '새 할 일');
     body.innerHTML = `
-        <div class="form-section-title">📌 <span style="color:var(--blue)">${planningEsc(proj.name)}</span>의 새 항목 추가 <span style="background:${col.bg};color:${col.text};font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;margin-left:8px">${col.label}</span></div>
+        <div class="form-section-title">📌 <span style="color:var(--blue)">${planningEsc(proj.name)}</span>의 ${isNote ? '자료·제안 올리기' : '새 할 일'} ${isNote ? '' : `<span style="background:${col.bg};color:${col.text};font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;margin-left:8px">${col.label}</span>`}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
             <div class="form-group" style="margin:0"><label class="form-label">카테고리</label>
                 <select id="planningPostCategory" class="form-select">${catOpts}</select>
@@ -14265,11 +14577,11 @@ function openPlanningPostEditor() {
             <div class="form-group"><label class="form-label">🏭 거래처 (선택)</label>
                 <input id="planningPostVendor" class="form-input" placeholder="예: OO사, XX공장">
             </div>
-            <div class="form-group"><label class="form-label">⏰ 마감일 (선택)</label>
+            <div class="form-group" ${isNote ? 'style="display:none"' : ''}><label class="form-label">⏰ 마감일 (선택)</label>
                 <input id="planningPostDeadline" class="form-input" type="date">
             </div>
         </div>
-        <div class="form-group"><label class="form-label">👥 담당자 (여러 명 선택 가능)</label>
+        <div class="form-group" ${isNote ? 'style="display:none"' : ''}><label class="form-label">👥 담당자 (여러 명 선택 가능)</label>
             <div id="planningAssigneeChips" style="display:flex;flex-wrap:wrap;gap:6px">${renderPlanningAssigneeChips()}</div>
         </div>
         <div class="form-group"><label class="form-label">📷 이미지 (여러 장 선택 가능)</label>
@@ -14304,6 +14616,7 @@ function openPlanningCardEdit(postId) {
     const catOpts = PLANNING_CATEGORIES.map(c => `<option value="${c.key}" ${c.key === post.category ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('');
     planningPendingAssignees = Array.isArray(post.assignees) ? post.assignees.slice() : [];
     planningPendingImages = (Array.isArray(post.images) ? post.images : []).map(url => ({ file: null, url }));
+    planningSetModalTitle(post.kind === 'note' ? '자료·제안 편집' : '할 일 편집');
     body.innerHTML = `
         <div class="form-section-title">✏️ <span style="color:var(--blue)">${planningEsc(proj.name)}</span>의 카드 편집</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
@@ -14324,11 +14637,11 @@ function openPlanningCardEdit(postId) {
             <div class="form-group"><label class="form-label">🏭 거래처</label>
                 <input id="planningPostVendor" class="form-input" value="${planningEsc(post.vendor || '')}">
             </div>
-            <div class="form-group"><label class="form-label">⏰ 마감일</label>
+            <div class="form-group" ${post.kind === 'note' ? 'style="display:none"' : ''}><label class="form-label">⏰ 마감일</label>
                 <input id="planningPostDeadline" class="form-input" type="date" value="${planningEsc(post.deadline || '')}">
             </div>
         </div>
-        <div class="form-group"><label class="form-label">👥 담당자</label>
+        <div class="form-group" ${post.kind === 'note' ? 'style="display:none"' : ''}><label class="form-label">👥 담당자</label>
             <div id="planningAssigneeChips" style="display:flex;flex-wrap:wrap;gap:6px">${renderPlanningAssigneeChips()}</div>
         </div>
         <div class="form-group"><label class="form-label">📷 이미지 (여러 장 선택 가능)</label>
@@ -14412,8 +14725,8 @@ async function submitPlanningCard() {
     const author = (document.getElementById('planningPostAuthor').value || '').trim() || (currentUser ? currentUser.name : '익명');
     const category = document.getElementById('planningPostCategory').value;
     const vendor = (document.getElementById('planningPostVendor').value || '').trim();
-    const deadline = document.getElementById('planningPostDeadline').value || '';
     const mode = planningPostEditorMode || { taskStatus: 'todo', parentId: null };
+    const deadline = mode.kind === 'note' ? '' : (document.getElementById('planningPostDeadline').value || '');
     let imageUrls;
     try {
         imageUrls = await resolvePlanningPendingImages();
@@ -14426,9 +14739,10 @@ async function submitPlanningCard() {
     const maxKey = sameCol.length ? Math.max(...sameCol.map(planningPostSortKeyOf)) : 0;
     const newPost = {
         author, category, title, content, vendor, deadline,
-        assignees: planningPendingAssignees.slice(),
+        assignees: mode.kind === 'note' ? [] : planningPendingAssignees.slice(),
         images: imageUrls,
         taskStatus: targetStatus,
+        kind: mode.kind === 'note' ? 'note' : 'task',
         parentId: mode.parentId || null,
         sortOrder: maxKey + 1000
     };
