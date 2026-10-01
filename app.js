@@ -1494,14 +1494,12 @@ const F2_NEW_ACTIONS = [
     ['tab-proposals',          () => openProposalEditor(null)],
     ['tab-marketing',          () => openMarketingModal(null)],
     ['tab-projects-temp',      () => inqShortcutNew()],   // 견적 의뢰 화면 = 새 상담 (견적 목록 보던 중이면 상담 관리로 넘어감)
-    // 협업 프로젝트 — 펀딩 모드에서만 F2 활성 (회사/개인은 기간 섹션별 버튼이 있어 F2 제외)
+    // 프로젝트 — 프로젝트를 열었으면 할 일 입력칸으로, 아니면 새 프로젝트
     ['tab-planning',           () => {
-        if (currentPlanningMode !== 'funding') return;
-        if (currentPlanningProjectId == null) {
-            openFundingPlanningModal(null);
-        } else {
-            openNewPlanningPostForColumn('todo');
-        }
+        const add = currentPlanningProjectId != null && document.getElementById('plAddTitle');
+        if (add) { add.focus(); return; }
+        if (currentPlanningProjectId != null && planningViewMode === 'board') { openNewPlanningPostForColumn('todo'); return; }
+        openNewPlanningModal();
     }]
 ];
 
@@ -13373,12 +13371,25 @@ async function renderPlanning(opts) {
         }
         await loadPlanningProjects();
     }
-    if (currentPlanningProjectId == null) {
-        root.innerHTML = renderPlanningList();
-    } else {
-        const proj = planningProjects.find(p => p.id === currentPlanningProjectId);
-        if (!proj) { currentPlanningProjectId = null; root.innerHTML = renderPlanningList(); return; }
-        root.innerHTML = renderPlanningDetail(proj);
+    let proj = currentPlanningProjectId == null ? null : planningProjects.find(p => p.id === currentPlanningProjectId);
+    if (!proj) currentPlanningProjectId = null;
+    // 다시 그려도 입력 중이던 할 일 칸·포커스·목록 스크롤은 그대로 (실시간 갱신·저장 후)
+    const ae = document.activeElement;
+    const focusId = ae && ae.id && root.contains(ae) ? ae.id : null;
+    const keep = {};
+    if (renderPlanning._pid === currentPlanningProjectId) {
+        ['plAddTitle', 'plAddWho', 'plAddDate'].forEach(id => { const el = document.getElementById(id); if (el) keep[id] = el.value; });
+    }
+    const lb = document.getElementById('plListBody');
+    const listScroll = lb ? lb.scrollTop : 0;
+    root.innerHTML = `<div class="pl-wrap">${renderPlanningList()}${proj ? renderPlanningDetail(proj) : planningOverviewHtml()}</div>`;
+    renderPlanning._pid = currentPlanningProjectId;
+    Object.entries(keep).forEach(([id, v]) => { const el = document.getElementById(id); if (el) el.value = v; });
+    const lb2 = document.getElementById('plListBody');
+    if (lb2) lb2.scrollTop = listScroll;
+    if (focusId) {
+        const el = document.getElementById(focusId);
+        if (el) { el.focus(); try { if (el.setSelectionRange && el.type === 'text') el.setSelectionRange(el.value.length, el.value.length); } catch (_) {} }
     }
 }
 
@@ -13406,145 +13417,433 @@ function planningCanSeeProject(p) {
     if (currentPlanningMode === 'personal') return acc === 'personal';
     return false;
 }
-function renderPlanningList() {
-    const renderProjectCard = p => {
-        const postCount = (p.posts || []).length;
-        const last = (p.posts || []).reduce((m, x) => (!m || new Date(x.createdAt) > new Date(m.createdAt)) ? x : m, null);
-        const lastStr = last ? `${planningEsc(last.author)} · ${planningFmtDate(last.createdAt)}` : '아직 게시물 없음';
-        const statusColor = p.status === '완료' ? 'var(--green)' : p.status === '보류' ? 'var(--gray-500)' : 'var(--blue)';
-        const statusBg = p.status === '완료' ? 'var(--green-light)' : p.status === '보류' ? 'var(--gray-100)' : 'var(--blue-light)';
-        const posts = p.posts || [];
-        const doneCount = posts.filter(x => (x.taskStatus || 'todo') === 'done').length;
-        const progressPct = posts.length ? Math.round((doneCount / posts.length) * 100) : 0;
-        const dd = planningDDay(p.deadline);
-        const ddBadge = dd ? `<span style="background:${dd.color};color:white;font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap">${dd.label}</span>` : '';
-        const access = PLANNING_CATEGORIES_ACCESS.find(c => c.key === (p.access || 'company')) || PLANNING_CATEGORIES_ACCESS[1];
-        const accessBadge = `<span title="${access.note}" style="background:${access.bg};color:${access.fg};font-size:10px;font-weight:800;padding:3px 7px;border-radius:6px;white-space:nowrap">${access.icon} ${access.label}</span>`;
+// ===== 프로젝트 화면 (2단: 왼쪽 목록 · 오른쪽 할 일 리스트) =====
+// 왼쪽: 주간/월간/연간(펀딩은 하나) 묶음의 한 줄 목록 + 검색 + 상태 칩
+// 오른쪽: 고른 프로젝트의 진행률 + 할 일 리스트(진행 중 → 할 일 → 완료) + 정보 패널 / 아무것도 안 고르면 전체 마감 요약
+let planningListStatus = 'active';   // active | hold | done | all
+let planningListQuery = '';
+let planningViewMode = (() => { try { return localStorage.getItem('pl_view') === 'board' ? 'board' : 'list'; } catch (_) { return 'list'; } })();
+let planningDoneOpen = false;
+let planningQuickAdding = false;
+
+function planningTasksOf(p) { return (p.posts || []).filter(x => !x.parentId); }
+function planningProgress(p) {
+    const t = planningTasksOf(p);
+    const done = t.filter(x => (x.taskStatus || 'todo') === 'done').length;
+    return { total: t.length, done, pct: t.length ? Math.round(done / t.length * 100) : 0 };
+}
+function planningMD(d) { return d ? String(d).slice(5).replace('-', '/') : ''; }
+function planningAddDays(n) {
+    const d = new Date(); d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function planningStatusOk(p) {
+    const st = p.status || '진행 중';
+    if (planningListStatus === 'all') return true;
+    if (planningListStatus === 'done') return st === '완료';
+    if (planningListStatus === 'hold') return st === '보류';
+    return currentPlanningMode === 'funding' ? st !== '완료' : st === '진행 중';
+}
+function planningQueryOk(p) {
+    const q = planningListQuery.trim().toLowerCase();
+    if (!q) return true;
+    const hay = [p.name, planningHtmlToText(p.description || ''), ...(p.posts || []).map(x => x.title || '')].join(' ').toLowerCase();
+    return hay.includes(q);
+}
+function planningSortProjects(a, b) {
+    const da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+    const db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+    if (da !== db) return da - db;
+    return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+}
+
+function planningListRowHtml(p) {
+    const today = getTodayStr();
+    const pr = planningProgress(p);
+    const dd = p.status === '완료' ? null : planningDDay(p.deadline);
+    const late = planningTasksOf(p).filter(x => (x.taskStatus || 'todo') !== 'done' && x.deadline && x.deadline <= today).length;
+    const fam = p.access === 'family' ? '<span title="가족 프로젝트">🏠</span> ' : '';
+    const st = p.status && p.status !== '진행 중' ? `<span class="pl-st ${p.status === '완료' ? 'done' : 'hold'}">${planningEsc(p.status)}</span>` : '';
+    return `
+    <div class="pl-row${p.id === currentPlanningProjectId ? ' on' : ''}" draggable="true" ondragstart="planningProjectDragStart(event,${p.id})" ondragend="planningProjectDragEnd(event)" onclick="openPlanningProject(${p.id})">
+        <div class="pl-row-name">${fam}${planningEsc(p.name)}</div>
+        <div class="pl-row-meta">
+            ${st}
+            ${pr.total ? `<span class="pl-row-bar"><i style="width:${pr.pct}%"></i></span><span>${pr.done}/${pr.total} 완료</span>` : '<span class="muted">할 일 없음</span>'}
+            ${late ? `<span class="pl-row-late" title="마감 지났거나 오늘 마감인 할 일">⚠ ${late}</span>` : ''}
+            ${dd ? `<span class="pl-row-dd" style="color:${dd.color}">${dd.label}</span>` : ''}
+        </div>
+    </div>`;
+}
+
+function planningListBodyHtml() {
+    const vis = planningProjects.filter(planningCanSeeProject).filter(planningQueryOk);
+    const shown = vis.filter(planningStatusOk);
+    if (currentPlanningMode === 'funding') {
+        const items = shown.slice().sort(planningSortProjects);
+        return items.length ? items.map(planningListRowHtml).join('') : `<div class="pl-list-empty">${planningListQuery ? '검색 결과가 없습니다' : '프로젝트가 없습니다'}</div>`;
+    }
+    return PLANNING_PERIODS.map(per => {
+        const items = shown.filter(p => (p.period || 'month') === per.key).sort(planningSortProjects);
         return `
-        <div draggable="true" ondragstart="planningProjectDragStart(event,${p.id})" ondragend="planningProjectDragEnd(event)" onclick="openPlanningProject(${p.id})" style="background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:18px;cursor:grab;transition:all .15s;display:flex;flex-direction:column;gap:10px;user-select:none" onmouseover="this.style.borderColor='var(--blue)';this.style.boxShadow='0 2px 12px rgba(0,0,0,0.06)'" onmouseout="this.style.borderColor='var(--gray-200)';this.style.boxShadow='none'">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-                <div style="font-size:16px;font-weight:800;color:var(--gray-900);line-height:1.3">${planningEsc(p.name)}</div>
-                <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
-                    ${accessBadge}
-                    ${ddBadge}
-                    <span style="background:${statusBg};color:${statusColor};font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;white-space:nowrap">${p.status}</span>
-                </div>
+        <div class="pl-grp-list" ondragover="planningSectionDragOver(event)" ondragleave="planningSectionDragLeave(event)" ondrop="planningSectionDrop(event,'${per.key}')">
+            <div class="pl-grp-list-h">
+                <span>${per.icon} ${per.label.replace(' 프로젝트', '')} <b>${items.length}</b></span>
+                <button onclick="openNewPlanningModal('${per.key}')" title="새 ${per.label}">+</button>
             </div>
-            ${p.deadline ? `<div style="font-size:12px;color:var(--gray-500)">⏰ 마감 ${planningEsc(p.deadline)}</div>` : ''}
-            ${p.description ? `<div style="font-size:13px;color:var(--gray-500);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${planningEsc(planningHtmlToText(p.description))}</div>` : ''}
-            ${(p.access === 'funding' && p.fundingMeta) ? (() => {
-                const m = p.fundingMeta;
-                const sym = m.currency === 'USD' ? '$' : '₩';
-                const amt = m.targetAmount != null ? Number(m.targetAmount).toLocaleString() : '';
-                const qty = m.targetQty != null ? Number(m.targetQty).toLocaleString() : '';
-                const fp = (m.folderPath || '').trim();
-                const fpEsc = fp ? planningEsc(fp).replace(/'/g, '&#39;') : '';
-                return `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;font-size:13px">
-                    ${m.platform ? `<span style="background:#EDE9FE;color:#6D28D9;padding:4px 10px;border-radius:6px;font-weight:700">💸 발행처 : ${planningEsc(m.platform)}</span>` : ''}
-                    ${amt ? `<span style="background:#D1FAE5;color:#047857;padding:4px 10px;border-radius:6px;font-weight:700">🎯 목표금액 : ${sym}${amt}</span>` : ''}
-                    ${qty ? `<span style="background:#DBEAFE;color:#1D4ED8;padding:4px 10px;border-radius:6px;font-weight:700">📦 목표수량 : ${qty}개</span>` : ''}
-                    ${fp ? `<span onclick="event.stopPropagation();openFolderPath('${fpEsc}')" title="클릭하여 경로 복사" style="background:#FEF3C7;color:#92400E;padding:4px 10px;border-radius:6px;font-weight:700;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'Consolas','Courier New',monospace;font-size:12px" onmouseover="this.style.background='#FDE68A'" onmouseout="this.style.background='#FEF3C7'">📁 ${planningEsc(fp)}</span>` : ''}
-                </div>`;
-            })() : ''}
-            ${posts.length ? `
-            <div style="padding-top:4px">
-                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--gray-500);margin-bottom:4px"><span>완료 ${doneCount}/${posts.length}</span><span>${progressPct}%</span></div>
-                <div style="height:6px;background:var(--gray-100);border-radius:3px;overflow:hidden"><div style="width:${progressPct}%;height:100%;background:var(--green);transition:width .2s"></div></div>
-            </div>` : ''}
-            <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px dashed var(--gray-200);font-size:12px;color:var(--gray-500)">
-                <span>💬 <strong style="color:var(--gray-900);font-weight:700">${postCount}</strong>개 카드</span>
-                <span>${lastStr}</span>
-            </div>
+            ${items.map(planningListRowHtml).join('') || '<div class="pl-list-empty">없음</div>'}
         </div>`;
-    };
+    }).join('');
+}
 
-    const quickAddCard = (periodKey) => `
-        <div onclick="openNewPlanningModal('${periodKey}')" style="background:transparent;border:2px dashed var(--gray-300,#D1D5DB);border-radius:12px;padding:18px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:120px;color:var(--gray-500);transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)';this.style.background='var(--blue-light)'" onmouseout="this.style.borderColor='var(--gray-300)';this.style.color='var(--gray-500)';this.style.background='transparent'">
-            <div style="font-size:28px;font-weight:700;line-height:1">+</div>
-            <div style="font-size:12px;font-weight:700">추가하기</div>
-        </div>`;
+function planningOnSearch(v) {
+    planningListQuery = v || '';
+    const box = document.getElementById('plListBody');
+    if (box) box.innerHTML = planningListBodyHtml();
+}
+function planningSetListStatus(k) {
+    planningListStatus = k;
+    renderPlanning({ skipLoad: true });
+}
+function planningSetView(v) {
+    planningViewMode = v === 'board' ? 'board' : 'list';
+    try { localStorage.setItem('pl_view', planningViewMode); } catch (_) {}
+    renderPlanning({ skipLoad: true });
+}
+function planningToggleDoneOpen() {
+    planningDoneOpen = !planningDoneOpen;
+    renderPlanning({ skipLoad: true });
+}
 
-    const visibleProjects = planningProjects.filter(planningCanSeeProject);
-
+function renderPlanningList() {
+    const vis = planningProjects.filter(planningCanSeeProject);
     const modeLabel = currentPlanningMode === 'company' ? '🏢 회사 프로젝트'
                     : currentPlanningMode === 'funding' ? '💸 펀딩 프로젝트'
                     : '🧑 개인 프로젝트';
-    const modeSub = currentPlanningMode === 'company' ? '회사/가족 공유 프로젝트 — 김관택·김현호·이현주만 열람 가능'
-                  : currentPlanningMode === 'funding' ? '펀딩 프로젝트 — 김관택·김현호·이현주만 열람 가능'
-                  : '본인이 작성한 개인 프로젝트만 표시됩니다';
-
-    // 펀딩 모드: 진행/완료 2섹션, 기간 구분 없음
-    if (currentPlanningMode === 'funding') {
-        const fundSections = [
-            { key: 'active', label: '진행 중', icon: '🚀', filter: p => p.status !== '완료' },
-            { key: 'done',   label: '완료',   icon: '✅', filter: p => p.status === '완료' }
-        ].map(sec => {
-            const items = visibleProjects.filter(sec.filter).sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
-            const cards = items.map(renderProjectCard).join('');
-            return `
-            <section style="margin-bottom:28px">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-                    <div style="display:flex;align-items:center;gap:10px">
-                        <span style="font-size:22px">${sec.icon}</span>
-                        <div>
-                            <div style="font-size:16px;font-weight:800;color:var(--gray-900)">${sec.label} <span style="font-size:12px;color:var(--gray-500);font-weight:700;margin-left:6px">${items.length}개</span></div>
-                        </div>
-                    </div>
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px">${cards}${sec.key === 'active' ? quickAddCard('funding') : (cards ? '' : '<div style="padding:16px;color:var(--gray-400);font-size:13px">프로젝트가 없습니다</div>')}</div>
-            </section>`;
-        }).join('');
-        return `
-            <div style="padding:20px 24px">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
-                    <div>
-                        <div style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">${modeLabel}</div>
-                        <div style="font-size:13px;color:var(--gray-500)">${modeSub}</div>
-                    </div>
-                    <button onclick="openNewPlanningModal()" title="F2" style="padding:9px 18px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer">+ 새 프로젝트 (F2)</button>
-                </div>
-                ${fundSections}
-            </div>`;
-    }
-
-    const sections = PLANNING_PERIODS.map(period => {
-        const items = visibleProjects
-            .filter(p => (p.period || 'month') === period.key)
-            .sort((a, b) => {
-                const da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
-                const db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
-                if (da !== db) return da - db;
-                return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
-            });
-        const cards = items.map(renderProjectCard).join('');
-        return `
-        <section style="margin-bottom:28px">
-            <div ondragover="planningSectionDragOver(event)" ondragleave="planningSectionDragLeave(event)" ondrop="planningSectionDrop(event,'${period.key}')" style="border-radius:12px;padding:4px;transition:background .15s">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-                    <div style="display:flex;align-items:center;gap:10px">
-                        <span style="font-size:22px">${period.icon}</span>
-                        <div>
-                            <div style="font-size:16px;font-weight:800;color:var(--gray-900)">${period.label} <span style="font-size:12px;color:var(--gray-500);font-weight:700;margin-left:6px">${items.length}개</span></div>
-                            <div style="font-size:11px;color:var(--gray-500)">${period.sub}</div>
-                        </div>
-                    </div>
-                    <button onclick="openNewPlanningModal('${period.key}')" style="padding:7px 14px;background:var(--blue);color:white;border:none;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">+ 새 ${period.label}</button>
-                </div>
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px">${cards}${quickAddCard(period.key)}</div>
-            </div>
-        </section>`;
-    }).join('');
-
+    const modeSub = currentPlanningMode === 'company' ? '회사·가족 공유 — 김관택·김현호·이현주만 열람'
+                  : currentPlanningMode === 'funding' ? '펀딩 — 김관택·김현호·이현주만 열람'
+                  : '본인이 만든 개인 프로젝트만 보입니다';
+    const cnt = (fn) => vis.filter(fn).length;
+    const chips = (currentPlanningMode === 'funding'
+        ? [['active', '진행 중', p => p.status !== '완료'], ['done', '완료', p => p.status === '완료'], ['all', '전체', () => true]]
+        : [['active', '진행 중', p => (p.status || '진행 중') === '진행 중'], ['hold', '보류', p => p.status === '보류'], ['done', '완료', p => p.status === '완료'], ['all', '전체', () => true]]
+    ).map(([k, label, fn]) => `<button class="${planningListStatus === k ? 'on' : ''}" onclick="planningSetListStatus('${k}')">${label} <b>${cnt(fn)}</b></button>`).join('');
     return `
-        <div style="padding:20px 24px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
-                <div>
-                    <div style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">${modeLabel}</div>
-                    <div style="font-size:13px;color:var(--gray-500)">${modeSub} · 카드를 다른 섹션으로 드래그하면 기간 구분이 바뀝니다</div>
+    <aside class="pl-list">
+        <div class="pl-list-top">
+            <div class="pl-mode">${modeLabel}</div>
+            <div class="pl-mode-sub">${modeSub}</div>
+            <button class="pl-new" onclick="openNewPlanningModal()">+ 새 프로젝트${currentPlanningProjectId == null ? ' <kbd>F2</kbd>' : ''}</button>
+            <input id="plSearch" class="pl-search" placeholder="🔍 프로젝트·할 일 검색" value="${planningEsc(planningListQuery)}" oninput="planningOnSearch(this.value)">
+            <div class="pl-chips">${chips}</div>
+        </div>
+        <div id="plListBody" class="pl-list-body">${planningListBodyHtml()}</div>
+        ${currentPlanningMode === 'funding' ? '' : '<div class="pl-list-hint">프로젝트를 다른 묶음으로 끌어 놓으면 주간·월간·연간이 바뀝니다</div>'}
+    </aside>`;
+}
+
+// 아무 프로젝트도 안 골랐을 때: 전체 프로젝트의 마감 요약
+function planningOverviewHtml() {
+    const today = getTodayStr();
+    const week = planningAddDays(7);
+    const vis = planningProjects.filter(planningCanSeeProject).filter(p => p.status !== '완료');
+    const all = [];
+    vis.forEach(p => planningTasksOf(p).forEach(t => { if ((t.taskStatus || 'todo') !== 'done') all.push({ p, t }); }));
+    const byDue = (a, b) => String(a.t.deadline || '9999').localeCompare(String(b.t.deadline || '9999'));
+    const late = all.filter(x => x.t.deadline && x.t.deadline < today).sort(byDue);
+    const tod = all.filter(x => x.t.deadline === today);
+    const soon = all.filter(x => x.t.deadline && x.t.deadline > today && x.t.deadline <= week).sort(byDue);
+    const doing = all.filter(x => x.t.taskStatus === 'doing' && !(x.t.deadline && x.t.deadline <= week));
+    const row = ({ p, t }) => {
+        const dd = planningDDay(t.deadline);
+        const who = (t.assignees || []).join(', ');
+        return `<div class="pl-ov-row" onclick="planningJumpToPost(${p.id},${t.id})">
+            <span class="pl-ov-proj">${planningEsc(p.name)}</span>
+            <span class="pl-ov-title">${planningEsc(t.title || planningHtmlToText(t.content).slice(0, 60) || '(제목 없음)')}</span>
+            ${who ? `<span class="pl-who">${planningEsc(who)}</span>` : ''}
+            ${t.deadline ? `<span class="pl-due${t.deadline < today ? ' late' : t.deadline === today ? ' today' : ''}">${planningMD(t.deadline)}${dd ? ' · ' + dd.label : ''}</span>` : ''}
+        </div>`;
+    };
+    const sec = (title, list, cls) => list.length ? `<div class="pl-ov-sec ${cls || ''}"><div class="pl-ov-h">${title} <b>${list.length}</b></div>${list.map(row).join('')}</div>` : '';
+    const tiles = [
+        ['진행 중 프로젝트', vis.filter(p => (p.status || '진행 중') !== '보류').length, ''],
+        ['마감 지난 일', late.length, late.length ? 'red' : ''],
+        ['오늘 마감', tod.length, tod.length ? 'orange' : ''],
+        ['7일 안 마감', soon.length, '']
+    ].map(([l, n, c]) => `<div class="pl-tile ${c}"><span>${l}</span><b>${n}</b></div>`).join('');
+    const body = sec('⚠️ 마감 지난 일', late, 'late') + sec('🔥 오늘 마감', tod, 'today') + sec('📅 7일 안에 마감', soon) + sec('▶ 진행 중인 일', doing);
+    return `
+    <div class="pl-ov">
+        <div class="pl-ov-head"><h2>전체 할 일 한눈에</h2><p>왼쪽에서 프로젝트를 고르면 할 일 목록이 열립니다</p></div>
+        <div class="pl-tiles">${tiles}</div>
+        ${body || '<div class="pl-ov-empty">마감이 다가오는 할 일이 없습니다 🎉</div>'}
+    </div>`;
+}
+function planningJumpToPost(projectId, postId) {
+    openPlanningProject(projectId);
+    setTimeout(() => { try { openPlanningPostDetail(postId); } catch (_) {} }, 80);
+}
+
+function planningTaskRowHtml(t, replyCount, today) {
+    const meta = planningCategoryMeta(t.category);
+    const st = t.taskStatus || 'todo';
+    const isDone = st === 'done';
+    const late = !isDone && t.deadline && t.deadline < today;
+    const isToday = !isDone && t.deadline === today;
+    const dd = isDone ? null : planningDDay(t.deadline);
+    const preview = planningHtmlToText(t.content).replace(/\s+/g, ' ').trim();
+    const imgs = (Array.isArray(t.images) ? t.images.length : 0) + ((t.content || '').match(/<img\b/gi) || []).length;
+    const title = t.title || preview.slice(0, 80) || (imgs ? '(사진)' : '(제목 없음)');
+    const sub = [t.vendor ? '🏭 ' + t.vendor : '', t.title ? preview.slice(0, 90) : ''].filter(Boolean).join(' · ');
+    const assignees = Array.isArray(t.assignees) ? t.assignees : [];
+    const isAuthor = currentUser && t.author === currentUser.name;
+    return `
+    <div class="pl-task${isDone ? ' done' : ''}${late ? ' late' : ''}${st === 'doing' ? ' doing' : ''}" draggable="true" ondragstart="planningPostDragStart(event,${t.id})" ondragend="planningPostDragEnd(event)" ondragover="planningCardDragOver(event)" ondragleave="planningCardDragLeave(event)" ondrop="planningCardDrop(event,${t.id})" onclick="openPlanningPostDetail(${t.id})">
+        <button class="pl-chk${isDone ? ' on' : ''}" onclick="event.stopPropagation();planningToggleDone(${t.id})" title="${isDone ? '완료 취소' : '완료로 표시'}">${isDone ? '✓' : ''}</button>
+        <div class="pl-task-main">
+            <div class="pl-task-title">${t.category && t.category !== 'normal' ? `<span class="pl-cat" style="background:${meta.bg};color:${meta.fg}">${meta.icon} ${meta.label}</span>` : ''}${planningEsc(title)}</div>
+            ${sub ? `<div class="pl-task-sub">${planningEsc(sub)}</div>` : ''}
+        </div>
+        <div class="pl-task-meta">
+            ${st === 'todo' ? `<button class="pl-mini" onclick="event.stopPropagation();planningSetTaskStatusQuiet(${t.id},'doing')" title="진행 중으로 옮기기">▶ 시작</button>` : ''}
+            ${st === 'doing' ? `<button class="pl-mini" onclick="event.stopPropagation();planningSetTaskStatusQuiet(${t.id},'todo')" title="할 일로 되돌리기">⏸</button>` : ''}
+            ${isAuthor ? `<button class="pl-mini" onclick="event.stopPropagation();openPlanningCardEdit(${t.id})" title="편집">✏️</button>` : ''}
+            ${replyCount ? `<span class="pl-cnt" title="댓글">💬 ${replyCount}</span>` : ''}
+            ${imgs ? `<span class="pl-cnt" title="사진">🖼 ${imgs}</span>` : ''}
+            ${assignees.length ? `<span class="pl-who">${planningEsc(assignees.join(', '))}</span>` : ''}
+            ${t.deadline ? `<span class="pl-due${late ? ' late' : isToday ? ' today' : ''}">${planningMD(t.deadline)}${dd ? ' · ' + dd.label : ''}</span>` : ''}
+        </div>
+    </div>`;
+}
+
+function planningTaskListHtml(p) {
+    const today = getTodayStr();
+    const tasks = planningTasksOf(p).slice().sort((a, b) => {
+        const sa = planningPostSortKeyOf(a), sb2 = planningPostSortKeyOf(b);
+        if (sa !== sb2) return sa - sb2;
+        return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+    });
+    const replies = (p.posts || []).reduce((acc, x) => { if (x.parentId) acc[x.parentId] = (acc[x.parentId] || 0) + 1; return acc; }, {});
+    const urgent = tasks.filter(t => (t.taskStatus || 'todo') !== 'done' && t.deadline && t.deadline <= today)
+        .sort((a, b) => String(a.deadline).localeCompare(String(b.deadline)));
+    const banner = urgent.length ? `
+        <div class="pl-now">
+            <b>⚠️ 지금 할 일 ${urgent.length}</b>
+            ${urgent.map(t => `<button onclick="openPlanningPostDetail(${t.id})">${planningEsc(t.title || planningHtmlToText(t.content).slice(0, 40) || '(제목 없음)')} <em>${t.deadline < today ? '마감 ' + planningMD(t.deadline) + ' 지남' : '오늘 마감'}</em></button>`).join('')}
+        </div>` : '';
+    let lastWho = '';
+    try { lastWho = localStorage.getItem('pl_add_who') || ''; } catch (_) {}
+    const people = planningAssigneesList();
+    const whoOpts = `<option value="">담당자 없음</option>` + people.map(n => `<option value="${planningEsc(n)}" ${n === lastWho ? 'selected' : ''}>${planningEsc(n)}</option>`).join('');
+    const add = `
+        <div class="pl-add">
+            <span class="pl-add-plus">+</span>
+            <input id="plAddTitle" placeholder="할 일 입력 후 Enter (F2)" autocomplete="off" onkeydown="if(event.key==='Enter'&&!event.isComposing&&event.keyCode!==229){event.preventDefault();planningQuickAdd()}">
+            <select id="plAddWho" title="담당자 — 고르면 그 사람 일일계획표에도 들어갑니다">${whoOpts}</select>
+            <input id="plAddDate" type="date" title="마감일 (선택)">
+            <button class="pl-add-btn" onclick="planningQuickAdd()">추가</button>
+            <button class="pl-add-more" onclick="openNewPlanningPostForColumn('todo')" title="내용·사진·거래처까지 자세히 쓰기">자세히</button>
+        </div>`;
+    const groups = PLANNING_TASK_STATUSES.slice().sort((a, b) => ['doing', 'todo', 'done'].indexOf(a.key) - ['doing', 'todo', 'done'].indexOf(b.key)).map(col => {
+        const items = tasks.filter(t => (t.taskStatus || 'todo') === col.key);
+        const isDoneCol = col.key === 'done';
+        const open = !isDoneCol || planningDoneOpen;
+        const empty = col.key === 'doing' ? '진행 중인 일이 없습니다 — 할 일의 ▶ 시작을 누르세요' : col.key === 'todo' ? '할 일이 없습니다 — 위 칸에 입력하세요' : '';
+        return `
+        <div class="pl-grp" ondragover="planningPostDragOver(event)" ondragleave="planningPostDragLeave(event)" ondrop="planningPostDrop(event,'${col.key}')">
+            <div class="pl-grp-h${isDoneCol ? ' click' : ''}" ${isDoneCol ? 'onclick="planningToggleDoneOpen()"' : ''}>
+                <span class="pl-dot" style="background:${col.bar}"></span>
+                <span style="color:${col.text}">${col.label}</span>
+                <b>${items.length}</b>
+                ${isDoneCol && items.length ? `<span class="pl-grp-tg">${open ? '접기 ▲' : '펼치기 ▼'}</span>` : ''}
+            </div>
+            ${open ? (items.map(t => planningTaskRowHtml(t, replies[t.id] || 0, today)).join('') || (empty ? `<div class="pl-grp-empty">${empty}</div>` : '')) : ''}
+        </div>`;
+    }).join('');
+    return banner + add + groups;
+}
+
+function planningSideHtml(p) {
+    const today = getTodayStr();
+    const tasks = planningTasksOf(p);
+    const open = tasks.filter(t => (t.taskStatus || 'todo') !== 'done');
+    // 정보
+    const hasDesc = p.description && (planningHtmlToText(p.description) || /<img\b/i.test(p.description));
+    let fundHtml = '';
+    if (p.access === 'funding' && p.fundingMeta) {
+        const m = p.fundingMeta;
+        const sym = m.currency === 'USD' ? '$' : '₩';
+        const amt = m.targetAmount != null ? Number(m.targetAmount).toLocaleString() : '';
+        const qty = m.targetQty != null ? Number(m.targetQty).toLocaleString() : '';
+        const unit = (m.targetAmount && m.targetQty) ? (m.currency === 'USD' ? (m.targetAmount / m.targetQty).toFixed(2) : Math.round(m.targetAmount / m.targetQty).toLocaleString()) : '';
+        const period = (m.startDate || m.endDate) ? `${planningEsc(m.startDate || '')} ~ ${planningEsc(m.endDate || '')}` : '';
+        const fp = (m.folderPath || '').trim();
+        const fpEsc = fp ? planningEsc(fp).replace(/'/g, '&#39;') : '';
+        const kv = (k, v) => v ? `<div class="pl-kv"><span>${k}</span><b>${v}</b></div>` : '';
+        fundHtml = kv('진행사', planningEsc(m.client || '')) + kv('제조사', planningEsc(m.manufacturer || '')) + kv('발행처', planningEsc(m.platform || ''))
+            + kv('목표금액', amt ? sym + amt : '') + kv('목표수량', qty ? qty + '개' : '') + kv('예상단가', unit ? sym + unit : '') + kv('기간', period)
+            + (fp ? `<div class="pl-folder" onclick="openFolderPath('${fpEsc}')" title="클릭하여 경로 복사">📁 ${planningEsc(fp)}</div>` : '');
+    }
+    const info = `
+        <div class="pl-card">
+            <div class="pl-card-h">프로젝트 정보</div>
+            ${hasDesc ? `<div class="ql-snow planning-content-readonly pl-desc"><div class="ql-editor" style="padding:0">${planningSanitizeHtml(p.description)}</div></div>` : '<div class="pl-muted">설명 없음 — ✏️ 편집에서 추가</div>'}
+            ${p.location ? `<div class="pl-kv"><span>장소</span><b>📍 ${planningEsc(p.location)}</b></div>` : ''}
+            ${p.cost != null ? `<div class="pl-kv"><span>비용</span><b>💰 ${Number(p.cost).toLocaleString()}원</b></div>` : ''}
+            ${fundHtml}
+            <div class="pl-muted" style="margin-top:8px">만든 사람 ${planningEsc(p.createdBy)} · ${planningFmtDate(p.createdAt)}</div>
+        </div>`;
+    // 다가오는 마감
+    const upcoming = open.filter(t => t.deadline).sort((a, b) => String(a.deadline).localeCompare(String(b.deadline))).slice(0, 6);
+    const up = `
+        <div class="pl-card">
+            <div class="pl-card-h">다가오는 마감</div>
+            ${upcoming.length ? upcoming.map(t => {
+                const dd = planningDDay(t.deadline);
+                return `<div class="pl-side-row" onclick="openPlanningPostDetail(${t.id})"><span class="pl-due${t.deadline < today ? ' late' : t.deadline === today ? ' today' : ''}">${planningMD(t.deadline)}${dd ? ' · ' + dd.label : ''}</span><span class="pl-side-t">${planningEsc(t.title || planningHtmlToText(t.content).slice(0, 40) || '(제목 없음)')}</span></div>`;
+            }).join('') : '<div class="pl-muted">마감일이 있는 남은 할 일이 없습니다</div>'}
+        </div>`;
+    // 담당자별 남은 일
+    const whoCount = {};
+    open.forEach(t => { const a = (t.assignees || []).length ? t.assignees : ['담당자 없음']; a.forEach(n => { whoCount[n] = (whoCount[n] || 0) + 1; }); });
+    const who = Object.keys(whoCount).length ? `
+        <div class="pl-card">
+            <div class="pl-card-h">담당자별 남은 일</div>
+            <div class="pl-who-list">${Object.entries(whoCount).sort((a, b) => b[1] - a[1]).map(([n, c]) => `<span>${planningEsc(n)} <b>${c}</b></span>`).join('')}</div>
+        </div>` : '';
+    // 최근 활동
+    const recent = (p.posts || []).slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 6);
+    const parentsById = {};
+    (p.posts || []).forEach(x => { parentsById[x.id] = x; });
+    const act = `
+        <div class="pl-card">
+            <div class="pl-card-h">최근 활동</div>
+            ${recent.length ? recent.map(x => {
+                const par = x.parentId ? parentsById[x.parentId] : null;
+                const what = x.parentId
+                    ? `💬 <b>${planningEsc((par && (par.title || planningHtmlToText(par.content).slice(0, 24))) || '할 일')}</b>에 댓글`
+                    : `<b>${planningEsc(x.title || planningHtmlToText(x.content).slice(0, 24) || '할 일')}</b> 추가`;
+                return `<div class="pl-side-row act" onclick="openPlanningPostDetail(${x.parentId || x.id})"><span class="pl-act-who">${planningEsc(x.author)}</span><span class="pl-side-t">${what}</span><span class="pl-muted">${planningFmtDate(x.createdAt)}</span></div>`;
+            }).join('') : '<div class="pl-muted">아직 활동이 없습니다</div>'}
+        </div>`;
+    return info + up + who + act;
+}
+
+function renderPlanningDetail(p) {
+    const pr = planningProgress(p);
+    const dd = p.status === '완료' ? null : planningDDay(p.deadline);
+    const per = PLANNING_PERIODS.find(x => x.key === (p.period || 'month'));
+    const statusList = (p.access === 'funding') ? ['진행 중', '완료'] : PLANNING_STATUSES;
+    const statusOpts = statusList.map(s => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('');
+    const tasks = planningTasksOf(p);
+    const nDoing = tasks.filter(t => t.taskStatus === 'doing').length;
+    const nTodo = tasks.filter(t => (t.taskStatus || 'todo') === 'todo').length;
+    const board = planningViewMode === 'board';
+    return `
+    <div class="pl-detail">
+        <div class="pl-head">
+            <div class="pl-head-top">
+                <div class="pl-head-title">
+                    <h2>${planningEsc(p.name)}</h2>
+                    <div class="pl-head-sub">
+                        ${currentPlanningMode !== 'funding' && per ? `<span>${per.icon} ${per.label}</span>` : ''}
+                        ${p.access === 'family' ? '<span>🏠 가족</span>' : ''}
+                        ${p.deadline ? `<span>⏰ 마감 ${planningEsc(p.deadline)}</span>` : ''}
+                        ${dd ? `<span class="pl-dd-badge" style="background:${dd.color}">${dd.label}</span>` : ''}
+                    </div>
+                </div>
+                <div class="pl-head-act">
+                    <div class="pl-view">
+                        <button class="${board ? '' : 'on'}" onclick="planningSetView('list')">☰ 목록</button>
+                        <button class="${board ? 'on' : ''}" onclick="planningSetView('board')">▦ 보드</button>
+                    </div>
+                    <select class="pl-status" onchange="updatePlanningStatus(${p.id}, this.value)">${statusOpts}</select>
+                    <button class="pl-btn" onclick="openEditPlanningModal(${p.id})">✏️ 편집</button>
+                    <button class="pl-btn red" onclick="deletePlanningProject(${p.id})">삭제</button>
+                    <button class="pl-btn" onclick="closePlanningProject()" title="전체 요약으로">✕</button>
                 </div>
             </div>
-            ${sections}
-        </div>`;
+            <div class="pl-prog">
+                <div class="pl-prog-bar"><i style="width:${pr.pct}%"></i></div>
+                <span class="pl-prog-txt"><b>${pr.done}/${pr.total}</b> 완료 · ${pr.pct}%</span>
+                <span class="pl-prog-sub">진행 중 ${nDoing} · 할 일 ${nTodo}</span>
+            </div>
+        </div>
+        <div class="pl-body${board ? ' board' : ''}">
+            <div class="pl-main">${board ? planningBoardHtml(p) : planningTaskListHtml(p)}</div>
+            <aside class="pl-side">${planningSideHtml(p)}</aside>
+        </div>
+    </div>`;
+}
+
+async function planningQuickAdd() {
+    if (planningQuickAdding) return;
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!p) return;
+    const tEl = document.getElementById('plAddTitle');
+    const title = tEl ? tEl.value.trim() : '';
+    if (!title) { if (tEl) tEl.focus(); showToast('할 일을 입력하세요'); return; }
+    const who = (document.getElementById('plAddWho') || {}).value || '';
+    const dEl = document.getElementById('plAddDate');
+    const deadline = dEl ? dEl.value : '';
+    try { localStorage.setItem('pl_add_who', who); } catch (_) {}
+    const sameCol = planningTasksOf(p).filter(x => (x.taskStatus || 'todo') === 'todo');
+    const maxKey = sameCol.length ? Math.max(...sameCol.map(planningPostSortKeyOf)) : 0;
+    const newPost = {
+        author: currentUser ? currentUser.name : '익명',
+        category: 'normal', title, content: '', vendor: '', deadline,
+        assignees: who ? [who] : [], images: [],
+        taskStatus: 'todo', parentId: null, sortOrder: maxKey + 1000
+    };
+    planningQuickAdding = true;
+    try {
+        let { data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single();
+        if (error && planningIsSortOrderSchemaError(error)) {
+            planningSortOrderColumnAvailable = false;
+            ({ data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single());
+        }
+        if (error) throw error;
+        const inserted = planningPostFromDb(data);
+        p.posts = p.posts || [];
+        p.posts.push(inserted);
+        if (tEl) tEl.value = '';
+        if (dEl) dEl.value = '';
+        await renderPlanning({ skipLoad: true });
+        const again = document.getElementById('plAddTitle');
+        if (again) again.focus();
+        if (inserted.assignees.length) {
+            try { await syncPlanningCardToDaily(p, inserted); } catch (e) { console.error('일일계획표 동기화 실패', e); }
+        }
+    } catch (err) {
+        console.error(err);
+        showToast('할 일 저장 실패: ' + err.message);
+    } finally {
+        planningQuickAdding = false;
+    }
+}
+
+async function planningSetTaskStatusQuiet(postId, newStatus) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    if (!p) return;
+    const post = (p.posts || []).find(x => x.id === postId);
+    if (!post) return;
+    try {
+        const { error } = await sb.from('planning_posts').update({ task_status: newStatus }).eq('id', postId);
+        if (error) throw error;
+        post.taskStatus = newStatus;
+        await renderPlanning({ skipLoad: true });
+        const label = (PLANNING_TASK_STATUSES.find(s => s.key === newStatus) || {}).label || newStatus;
+        showToast(`→ ${label}`);
+    } catch (err) {
+        console.error(err);
+        showToast('상태 저장 실패: ' + err.message);
+    }
+}
+function planningToggleDone(postId) {
+    const p = planningProjects.find(x => x.id === currentPlanningProjectId);
+    const post = p && (p.posts || []).find(x => x.id === postId);
+    if (!post) return;
+    planningSetTaskStatusQuiet(postId, (post.taskStatus || 'todo') === 'done' ? 'todo' : 'done');
 }
 
 let planningProjectDragId = null;
@@ -13597,7 +13896,7 @@ const PLANNING_TASK_STATUSES = [
     { key: 'done',  label: '완료',    bar: '#059669', bg: '#ECFDF5', text: '#059669' }
 ];
 
-function renderPlanningDetail(p) {
+function planningBoardHtml(p) {
     const planningPostSortKey = (post) => {
         if (post.sortOrder != null && !isNaN(Number(post.sortOrder))) return Number(post.sortOrder);
         const t = post.createdAt ? new Date(post.createdAt).getTime() : 0;
@@ -13669,53 +13968,7 @@ function renderPlanningDetail(p) {
         </div>`;
     }).join('');
 
-    const statusList = (p.access === 'funding') ? ['진행 중', '완료'] : PLANNING_STATUSES;
-    const statusOpts = statusList.map(s => `<option value="${s}" ${p.status === s ? 'selected' : ''}>${s}</option>`).join('');
-
-    return `
-        <div style="padding:20px 24px">
-            <button onclick="closePlanningProject()" style="background:none;border:none;color:var(--gray-500);font-size:13px;cursor:pointer;padding:4px 0;margin-bottom:12px">← 프로젝트 목록</button>
-            <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:18px 20px;margin-bottom:16px">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
-                    <div style="flex:1;min-width:0">
-                        <div style="font-size:22px;font-weight:800;color:var(--gray-900);margin-bottom:4px">${planningEsc(p.name)}</div>
-                        ${(p.description && (planningHtmlToText(p.description) || /<img\b/i.test(p.description))) ? `<div class="ql-snow planning-content-readonly" style="font-size:13px;color:var(--gray-500);line-height:1.5"><div class="ql-editor" style="padding:0">${planningSanitizeHtml(p.description)}</div></div>` : ''}
-                        ${(p.location || p.cost != null) ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:12px">
-                            ${p.location ? `<span style="background:var(--blue-light,#DBEAFE);color:#1D4ED8;padding:3px 10px;border-radius:6px;font-weight:700">📍 ${planningEsc(p.location)}</span>` : ''}
-                            ${p.cost != null ? `<span style="background:var(--green-light,#D1FAE5);color:#047857;padding:3px 10px;border-radius:6px;font-weight:700">💰 ${Number(p.cost).toLocaleString()}원</span>` : ''}
-                        </div>` : ''}
-                        ${(p.access === 'funding' && p.fundingMeta) ? (() => {
-                            const m = p.fundingMeta;
-                            const sym = m.currency === 'USD' ? '$' : '₩';
-                            const amt = m.targetAmount != null ? Number(m.targetAmount).toLocaleString() : '';
-                            const qty = m.targetQty != null ? Number(m.targetQty).toLocaleString() : '';
-                            const unit = (m.targetAmount && m.targetQty) ? (m.currency === 'USD' ? (m.targetAmount / m.targetQty).toFixed(2) : Math.round(m.targetAmount / m.targetQty).toLocaleString()) : '';
-                            const period = (m.startDate || m.endDate) ? `${planningEsc(m.startDate || '')} ~ ${planningEsc(m.endDate || '')}` : '';
-                            const fp = (m.folderPath || '').trim();
-                            const fpEsc = fp ? planningEsc(fp).replace(/'/g, '&#39;') : '';
-                            return `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:14px">
-                                ${m.client ? `<span style="background:#F3F4F6;color:#374151;padding:5px 12px;border-radius:7px;font-weight:700">🏢 진행사 : ${planningEsc(m.client)}</span>` : ''}
-                                ${m.manufacturer ? `<span style="background:#F3F4F6;color:#374151;padding:5px 12px;border-radius:7px;font-weight:700">🏭 제조사 : ${planningEsc(m.manufacturer)}</span>` : ''}
-                                ${m.platform ? `<span style="background:#EDE9FE;color:#6D28D9;padding:5px 12px;border-radius:7px;font-weight:700">💸 발행처 : ${planningEsc(m.platform)}</span>` : ''}
-                                ${amt ? `<span style="background:#D1FAE5;color:#047857;padding:5px 12px;border-radius:7px;font-weight:700">🎯 목표금액 : ${sym}${amt}</span>` : ''}
-                                ${qty ? `<span style="background:#DBEAFE;color:#1D4ED8;padding:5px 12px;border-radius:7px;font-weight:700">📦 목표수량 : ${qty}개</span>` : ''}
-                                ${unit ? `<span style="background:#FEF3C7;color:#92400E;padding:5px 12px;border-radius:7px;font-weight:700">💵 예상단가 : ${sym}${unit}</span>` : ''}
-                                ${period ? `<span style="background:#FFE4E6;color:#BE123C;padding:5px 12px;border-radius:7px;font-weight:700">📅 기간 : ${period}</span>` : ''}
-                            </div>
-                            ${fp ? `<div style="margin-top:10px"><span onclick="openFolderPath('${fpEsc}')" title="클릭하여 경로 복사" style="display:inline-flex;align-items:center;gap:6px;background:#FEF3C7;color:#92400E;padding:6px 12px;border-radius:7px;font-weight:700;cursor:pointer;font-family:'Consolas','Courier New',monospace;font-size:13px;max-width:100%" onmouseover="this.style.background='#FDE68A'" onmouseout="this.style.background='#FEF3C7'">📁 ${planningEsc(fp)} <span style="font-size:11px;color:#A16207;font-family:Pretendard,sans-serif">📋 클릭하여 복사</span></span></div>` : ''}`;
-                        })() : ''}
-                        <div style="font-size:11px;color:var(--gray-500);margin-top:8px">만든 사람: ${planningEsc(p.createdBy)} · ${planningFmtDate(p.createdAt)}</div>
-                    </div>
-                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-                        <select onchange="updatePlanningStatus(${p.id}, this.value)" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:8px;font-weight:700;font-size:12px">${statusOpts}</select>
-                        <button onclick="openNewPlanningPostForColumn('todo')" ${currentPlanningMode === 'funding' ? 'title="F2"' : ''} style="padding:6px 12px;background:var(--blue);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ 새 카드${currentPlanningMode === 'funding' ? ' (F2)' : ''}</button>
-                        <button onclick="openEditPlanningModal(${p.id})" style="padding:6px 10px;background:var(--gray-100);border:none;border-radius:8px;font-size:12px;cursor:pointer">✏️ 편집</button>
-                        <button onclick="deletePlanningProject(${p.id})" style="padding:6px 10px;background:var(--red-light,#FEE);color:var(--red);border:none;border-radius:8px;font-size:12px;cursor:pointer">삭제</button>
-                    </div>
-                </div>
-            </div>
-            <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch">${columns}</div>
-        </div>`;
+    return `<div class="pl-board-cols">${columns}</div>`;
 }
 
 let planningPostDragId = null;
@@ -14360,7 +14613,7 @@ function openPlanningProject(id) {
     if (location.hash !== newHash) {
         history.pushState({ tab: 'planning', planningProjectId: id }, '', newHash);
     }
-    renderPlanning();
+    renderPlanning({ skipLoad: planningLoaded });
 }
 function closePlanningProject() {
     currentPlanningProjectId = null;
@@ -14369,7 +14622,7 @@ function closePlanningProject() {
     if (location.hash !== newHash) {
         history.pushState({ tab: `planning-${currentPlanningMode}` }, '', newHash);
     }
-    renderPlanning();
+    renderPlanning({ skipLoad: planningLoaded });
 }
 
 function openNewPlanningModal(defaultPeriod) {

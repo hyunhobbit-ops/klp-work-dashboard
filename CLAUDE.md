@@ -157,6 +157,16 @@
 - 주요 함수: `tpInitView`, `inqEnter`, `inqRenderList`, `inqRenderDetail`, `inqSubmit`, `inqPatch`, `inqAddLog`, `inqCreate`, `inqParseContact`, `inqAutofillNew`
 - `.btn-ghost`는 전역 스타일(styles.css 끝). 예전엔 `#tab-meetings` 안에서만 정의돼 다른 화면에서 기본 버튼으로 깨졌음
 
+## 프로젝트 (회사·개인·펀딩) — 2026-10-01 2단 화면 개편
+- 칸반 카드 나열 → **왼쪽 목록 · 오른쪽 할 일 리스트** (매입매출 같은 흐름형). DB(planning_projects/planning_posts)는 그대로
+- 왼쪽 `renderPlanningList`: 주간/월간/연간 묶음(펀딩은 한 목록)의 한 줄 행(`planningListRowHtml`: n/m 완료 · 마감 임박 ⚠ · D-n), 검색 `planningOnSearch`(목록만 다시 그림), 상태 칩 `planningListStatus`(진행 중/보류/완료/전체). 행을 다른 묶음으로 끌면 기간 변경(기존 `planningSectionDrop`)
+- 오른쪽: 고른 프로젝트 없으면 `planningOverviewHtml`(전체 프로젝트의 마감 지난 일·오늘·7일 안·진행 중), 고르면 `renderPlanningDetail`(제목·상태·진행률) + `planningTaskListHtml`(지금 할 일 배너 → 빠른 추가 → 진행 중/할 일/완료(접힘) 묶음) + `planningSideHtml`(정보·다가오는 마감·담당자별 남은 일·최근 활동)
+- 빠른 추가 `planningQuickAdd`: 제목 + 담당자(마지막 선택 localStorage `pl_add_who`) + 마감일, Enter(한글 조합 중 Enter 무시). 담당자 있으면 `syncPlanningCardToDaily`. '자세히'는 기존 카드 작성 창
+- 체크 = 완료(`planningToggleDone`), ▶ 시작/⏸ = 진행 중↔할 일(`planningSetTaskStatusQuiet`). 행 클릭 = 기존 `openPlanningPostDetail`. 드래그 순서 변경은 기존 `planningCardDrop`/`planningPostDrop`
+- `☰ 목록 | ▦ 보드` 전환(localStorage `pl_view`) — 보드는 예전 칸반 컬럼(`planningBoardHtml`)
+- `renderPlanning`은 다시 그릴 때 입력 중이던 할 일 칸 값·포커스·목록 스크롤을 유지(실시간 갱신 대비). 프로젝트 열기/닫기는 이미 불러온 데이터로 그림(skipLoad)
+- F2: 프로젝트를 열었으면 할 일 입력칸으로, 아니면 새 프로젝트 (모든 모드)
+
 ## 마진계산기 (편의성 그룹)
 - **목적**: 원가 항목들과 판매가를 입력해 마진/마진율을 계산. 기존 엑셀 양식(이니셜D 시계 굿즈 기준)을 발전시킨 자유형 구조
 - **데이터 모델**: `margin_simulations` 테이블 (margin_simulations.sql 참조). 자유형 카테고리/항목을 `categories` jsonb 컬럼에 저장
