@@ -177,7 +177,8 @@
 - **거래처 등급 (migration 043)**: `CLIENT_GRADES` S 중요 · A 우수 · B 일반 · C 관심 (이름은 여기 한 곳). clients.grade와 inquiries.grade가 트리거로 서로 동기화(상담에서 바꾸면 거래처 DB도, 거래처 DB에서 바꾸면 그 거래처 상담 전부). 표시는 `clientGradeBadge`, 선택은 `clientGradeOptions`. 거래처 표 인라인 선택·등록 창·일괄 수정·상세, 상담 목록 배지·상세 머리·새 상담(거래처 고르면 DB 등급 불러옴)
 - **사업자등록증 자동 입력**: 새 고객사/수정 모달 위 `bizregBoxHtml` — 사진·PDF(끌어놓기·Ctrl+V·파일 선택) 또는 복사한 글 → `/api/meeting-summarize?kind=bizreg` → `api/_bizreg-extract.js`(Claude 비전, PDF는 document 블록). 빈 칸/자동 입력 칸만 채움. AI 실패 시 글이면 `bizregParseText` 규칙으로. `bizregDupCheck`가 사업자번호·이름으로 기존 거래처 경고
 
-## 디자인확인서 컨펌 · 작업요청서 발송 채널·날짜 (migration 044·045)
+## 디자인확인서 컨펌 · 작업요청서 발송 채널·날짜 / 선금·잔금 입금 날짜 (migration 044·045·046)
+- 선금·잔금은 `CHECK_INFO`의 `noChannel: true` — 날짜만(advance_payment_date / final_payment_date)
 - 공통 설정 `CHECK_INFO` (design → design_confirm_*, workOrder → work_order_*), 입력창 `askCheckInfo(key)`. 아래 044 설명은 design 기준이며 workOrder도 똑같이 동작
 - `projects_domestic.design_confirm_channel`(카톡/이메일/문자/기타 직접 입력한 글) · `design_confirm_date`
 - 디확 컨펌을 **켤 때** `askDesignConfirm()` 창(채널 버튼 + 기타 글칸 + 날짜, 취소 시 체크 안 함) — 국내 목록·상세(`toggleProjectCheck`), 상담 화면(`inqToggleProjCheck`). 편집 창은 체크 아래 `designConfirmFieldsHtml('editDc')` 칸. 끄면 채널·날짜 지움. '완료'로 자동 체크될 땐 기존 값 유지

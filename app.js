@@ -2372,11 +2372,13 @@ async function toggleProjectCheck(id, key) {
         if (!p.checks[key]) {
             const info = await askCheckInfo(key, { channel: p[ci.prop + 'Channel'], date: p[ci.prop + 'Date'] });
             if (!info) return;
-            dcPatch = { [ci.col + '_channel']: info.channel, [ci.col + '_date']: info.date || null };
-            p[ci.prop + 'Channel'] = info.channel; p[ci.prop + 'Date'] = info.date || '';
+            dcPatch = { [ci.col + '_date']: info.date || null };
+            if (!ci.noChannel) { dcPatch[ci.col + '_channel'] = info.channel; p[ci.prop + 'Channel'] = info.channel; }
+            p[ci.prop + 'Date'] = info.date || '';
         } else {
-            dcPatch = { [ci.col + '_channel']: '', [ci.col + '_date']: null };
-            p[ci.prop + 'Channel'] = ''; p[ci.prop + 'Date'] = '';
+            dcPatch = { [ci.col + '_date']: null };
+            if (!ci.noChannel) { dcPatch[ci.col + '_channel'] = ''; p[ci.prop + 'Channel'] = ''; }
+            p[ci.prop + 'Date'] = '';
         }
     }
     p.checks[key] = !p.checks[key];
@@ -4354,7 +4356,7 @@ function openEditProject(id) {
                 <div style="font-weight:700;color:var(--gray-900)">${info.label}</div>
                 <div style="font-size:12px;color:var(--gray-500);margin-top:2px">${info.desc}</div>
             </div>
-        </label>${CHECK_INFO[key] ? `<div id="${CHECK_INFO[key].editBox}" class="dc-inline" style="${p.checks && p.checks[key] ? '' : 'display:none'}">${designConfirmFieldsHtml(CHECK_INFO[key].editPrefix, p[CHECK_INFO[key].prop + 'Channel'], p[CHECK_INFO[key].prop + 'Date'], CHECK_INFO[key].dateLabel)}</div>` : ''}`).join('');
+        </label>${CHECK_INFO[key] ? `<div id="${CHECK_INFO[key].editBox}" class="dc-inline" style="${p.checks && p.checks[key] ? '' : 'display:none'}">${designConfirmFieldsHtml(CHECK_INFO[key].editPrefix, p[CHECK_INFO[key].prop + 'Channel'], p[CHECK_INFO[key].prop + 'Date'], CHECK_INFO[key].dateLabel, CHECK_INFO[key].noChannel)}</div>` : ''}`).join('');
 
     const secCard = (inner) => `<div style="background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900)">${inner}</div>`;
     const printFeeVat = p.printFeeVat || 'VAT 별도';
@@ -4840,6 +4842,8 @@ async function updateProject(id) {
         designConfirmDate: (document.getElementById('editCheck-design') || {}).checked ? readDesignConfirmFields('editDc').date : (newChecks.design ? (p.designConfirmDate || '') : ''),
         workOrderChannel: (document.getElementById('editCheck-workOrder') || {}).checked ? readDesignConfirmFields('editWo').channel : (newChecks.workOrder ? (p.workOrderChannel || '') : ''),
         workOrderDate: (document.getElementById('editCheck-workOrder') || {}).checked ? readDesignConfirmFields('editWo').date : (newChecks.workOrder ? (p.workOrderDate || '') : ''),
+        advancePaymentDate: (document.getElementById('editCheck-advancePayment') || {}).checked ? readDesignConfirmFields('editAp').date : (newChecks.advancePayment ? (p.advancePaymentDate || '') : ''),
+        finalPaymentDate: (document.getElementById('editCheck-finalPayment') || {}).checked ? readDesignConfirmFields('editFp').date : (newChecks.finalPayment ? (p.finalPaymentDate || '') : ''),
         memo: getVal('editProjectMemo')
     });
 
@@ -4872,6 +4876,8 @@ async function updateProject(id) {
                 design_confirm_date: p.designConfirmDate || null,
                 work_order_channel: p.workOrderChannel || '',
                 work_order_date: p.workOrderDate || null,
+                advance_payment_date: p.advancePaymentDate || null,
+                final_payment_date: p.finalPaymentDate || null,
                 memo: p.memo,
                 supplier: p.supplier,
                 supplier_contact: p.supplierContact || '',
@@ -5902,7 +5908,9 @@ function _projectsDomesticRowToObj(r) {
         designConfirmChannel: r.design_confirm_channel || '',
         designConfirmDate: r.design_confirm_date || '',
         workOrderChannel: r.work_order_channel || '',
-        workOrderDate: r.work_order_date || ''
+        workOrderDate: r.work_order_date || '',
+        advancePaymentDate: r.advance_payment_date || '',
+        finalPaymentDate: r.final_payment_date || ''
     };
 }
 
@@ -22530,10 +22538,10 @@ async function inqToggleProjCheck(x, row, key) {
         if (!checks[key]) {
             const info = await askCheckInfo(key, { channel: row[ci.col + '_channel'], date: row[ci.col + '_date'] });
             if (!info) { inqRenderStage(x); inqRenderProjs(x); return; }
-            update[ci.col + '_channel'] = info.channel;
+            if (!ci.noChannel) update[ci.col + '_channel'] = info.channel;
             update[ci.col + '_date'] = info.date || null;
         } else {
-            update[ci.col + '_channel'] = '';
+            if (!ci.noChannel) update[ci.col + '_channel'] = '';
             update[ci.col + '_date'] = null;
         }
     }
@@ -22547,6 +22555,7 @@ async function inqToggleProjCheck(x, row, key) {
         gp.checks = data.checks; if (update.status) gp.status = update.status;
         gp.designConfirmChannel = data.design_confirm_channel || ''; gp.designConfirmDate = data.design_confirm_date || '';
         gp.workOrderChannel = data.work_order_channel || ''; gp.workOrderDate = data.work_order_date || '';
+        gp.advancePaymentDate = data.advance_payment_date || ''; gp.finalPaymentDate = data.final_payment_date || '';
         try { renderProjects(); } catch (_) {}
     }
     const it = CHECK_ITEMS.find(c => c.key === key);
@@ -23735,10 +23744,13 @@ const DC_CHANNELS = ['카톡', '이메일', '문자'];
 // 채널·날짜를 같이 남기는 체크 항목 (컬럼: {col}_channel / {col}_date, 객체: {prop}Channel / {prop}Date)
 const CHECK_INFO = {
     design: { col: 'design_confirm', prop: 'designConfirm', title: '디자인확인서 컨펌', q: '어디로, 언제 컨펌받았나요?', ok: '컨펌 완료 체크', dateLabel: '컨펌 날짜', editPrefix: 'editDc', editBox: 'editDesignConfirm' },
-    workOrder: { col: 'work_order', prop: 'workOrder', title: '작업요청서 발송', q: '공장에 어디로, 언제 보냈나요?', ok: '발송 완료 체크', dateLabel: '발송 날짜', editPrefix: 'editWo', editBox: 'editWorkOrderInfo' }
+    workOrder: { col: 'work_order', prop: 'workOrder', title: '작업요청서 발송', q: '공장에 어디로, 언제 보냈나요?', ok: '발송 완료 체크', dateLabel: '발송 날짜', editPrefix: 'editWo', editBox: 'editWorkOrderInfo' },
+    advancePayment: { col: 'advance_payment', prop: 'advancePayment', title: '선금 입금', q: '선금이 언제 입금됐나요?', ok: '입금 확인 체크', dateLabel: '입금 날짜', editPrefix: 'editAp', editBox: 'editAdvanceInfo', noChannel: true },
+    finalPayment: { col: 'final_payment', prop: 'finalPayment', title: '잔금 입금', q: '잔금이 언제 입금됐나요?', ok: '입금 확인 체크', dateLabel: '입금 날짜', editPrefix: 'editFp', editBox: 'editFinalInfo', noChannel: true }
 };
 function checkInfoText(channel, date) { return [channel, date ? String(date).slice(5).replace('-', '/') : ''].filter(Boolean).join(' · '); }
-function designConfirmFieldsHtml(prefix, channel, date, dateLabel) {
+function designConfirmFieldsHtml(prefix, channel, date, dateLabel, noChannel) {
+    if (noChannel) return `<div class="dc-fields"><label class="dc-date"><span>${dateLabel || '날짜'}</span><input type="date" id="${prefix}Date" value="${escHtml(date || getTodayStr())}"></label></div>`;
     const isEtc = !!channel && !DC_CHANNELS.includes(channel);
     const sel = isEtc ? '기타' : (channel || '카톡');
     return `<div class="dc-fields">
@@ -23761,7 +23773,7 @@ function bindDesignConfirmFields(prefix) {
 }
 function readDesignConfirmFields(prefix) {
     const box = document.getElementById(prefix + 'Ch');
-    if (!box) return { channel: '', date: '' };
+    if (!box) return { channel: '', date: (document.getElementById(prefix + 'Date') || {}).value || '' };   // 날짜만 받는 항목
     const v = (box.querySelector('input:checked') || {}).value || '';
     const etc = (document.getElementById(prefix + 'Etc') || {}).value || '';
     return { channel: v === '기타' ? (etc.trim() || '기타') : v, date: (document.getElementById(prefix + 'Date') || {}).value || '' };
@@ -23788,7 +23800,7 @@ function askCheckInfo(key, cur) {
         wrap.innerHTML = `<div class="dc-ask-box" role="dialog" aria-modal="true">
             <h4>${ci.title}</h4>
             <p>${ci.q}</p>
-            ${designConfirmFieldsHtml('askDc', cur.channel, cur.date, ci.dateLabel)}
+            ${designConfirmFieldsHtml('askDc', cur.channel, cur.date, ci.dateLabel, ci.noChannel)}
             <div class="dc-ask-act">
               <button type="button" class="btn-ghost" data-x>취소</button>
               <button type="button" class="btn-primary" data-ok>${ci.ok}</button>
@@ -23796,6 +23808,7 @@ function askCheckInfo(key, cur) {
           </div>`;
         document.body.appendChild(wrap);
         bindDesignConfirmFields('askDc');
+        if (ci.noChannel) wrap.querySelector('.dc-ask-box').classList.add('narrow');
         const done = (v) => { document.removeEventListener('keydown', onKey, true); wrap.remove(); resolve(v); };
         const ok = () => {
             const r = readDesignConfirmFields('askDc');
@@ -23807,6 +23820,6 @@ function askCheckInfo(key, cur) {
         wrap.querySelector('[data-x]').onclick = () => done(null);
         wrap.querySelector('[data-ok]').onclick = ok;
         wrap.addEventListener('mousedown', (e) => { if (e.target === wrap) done(null); });
-        setTimeout(() => { const f = wrap.querySelector('input:checked'); if (f) f.focus(); }, 30);
+        setTimeout(() => { const f = wrap.querySelector('input:checked') || wrap.querySelector('input[type="date"]'); if (f) f.focus(); }, 30);
     });
 }
