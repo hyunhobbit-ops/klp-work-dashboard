@@ -5768,3 +5768,16 @@ body.m-on .theme-toggle{display:none}
 .inq-client em{font-size:14.5px; font-weight:500; color:var(--gray-500); margin-left:8px}
 .inq-title{font-size:14px; font-weight:400; line-height:1.55; color:var(--gray-600); margin-top:5px}
 .inq-next{margin-top:10px; font-size:13px; font-weight:500; line-height:1.5; padding:5px 10px}
+
+/* ---- 저장된 디자인확인서·작업요청서 보기 (viewSavedDoc) ---- */
+.docview{position:fixed; inset:0; z-index:9990; background:rgba(15,23,42,.72); display:flex; flex-direction:column; backdrop-filter:blur(3px)}
+.docview-bar{flex:none; display:flex; align-items:center; gap:8px; padding:12px 18px; background:var(--white); border-bottom:1px solid var(--border)}
+.docview-bar b{font-size:16px; font-weight:800; color:var(--gray-900); white-space:nowrap}
+.docview-bar b em{font-style:normal; font-size:13px; font-weight:700; color:var(--gray-500); margin-left:6px}
+.docview-t{font-size:13.5px; color:var(--gray-600); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.docview-bar button{height:36px; padding:0 14px; border:1px solid var(--border); border-radius:10px; background:var(--white); color:var(--gray-800, #1F2937);
+    font-family:inherit; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap}
+.docview-bar button.primary{background:var(--gray-900); border-color:var(--gray-900); color:var(--white)}
+.docview-bar button:hover{border-color:var(--blue)}
+.docview-body{flex:1; overflow:auto; padding:24px; display:flex; justify-content:center; align-items:flex-start}
+.docview-body img{width:100%; max-width:860px; background:#fff; border-radius:6px; box-shadow:0 12px 40px rgba(0,0,0,.35)}

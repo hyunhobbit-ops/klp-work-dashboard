@@ -23156,7 +23156,7 @@ function inqRenderStage(x) {
     } else if (cur.key === 'wo') {
         const p = firstLack('workOrder');
         msg = `공장에 작업요청서를 보내세요${projs.length > 1 ? ` · ${p.product_name || ''}` : ''}`;
-        btns.push([`wr:${p.id}`, '작업요청서 만들기', 1]);
+        btns.push([`wr:${p.id}`, '작업요청서 열기·만들기', 1]);
         btns.push([`chk:${p.id}:workOrder`, '발송 완료 체크']);
     } else {
         const ps = INQ_PAY_STAGES.find(v => v[0] === cur.key);
@@ -23203,7 +23203,13 @@ async function inqDealAction(x, act, btn) {
         else { await transferGroupToDomestic(gi); }
         return;
     }
-    if (kind === 'dc' || kind === 'wr') { if (inqEnsureProject(row)) createDocFromProject(row.id, kind); return; }
+    if (kind === 'dc' || kind === 'wr') {
+        // 이미 만든 문서는 보기 화면으로 (편집·덮어쓰기 확인 없이), 없을 때만 만들기
+        const num = row ? await inqSavedDocNumber(row, kind) : null;
+        if (num) { await viewSavedDoc(num, kind === 'dc' ? '디자인확인서' : '작업요청서', kind === 'dc' ? x : null); return; }
+        if (inqEnsureProject(row)) createDocFromProject(row.id, kind);
+        return;
+    }
     if (kind === 'open') { if (inqEnsureProject(row)) showProjectDetail(row.id); return; }
     if (kind === 'chk') { if (btn) btn.disabled = true; await inqToggleProjCheck(x, row, key); }
 }
@@ -23616,29 +23622,29 @@ async function inqSendGo(x, what) {
 }
 // 이미 저장된 디자인확인서·작업요청서를 그대로 열어 보내기 창까지 (문서 생성기 #send-문서번호)
 // — '만들기'(createDocFromProject)는 프로젝트 데이터로 덮어쓸지 묻기 때문에 보내기에서는 쓰지 않음
-async function inqSendSavedDoc(row, kind, x) {
-    const make = () => { if (inqEnsureProject(row)) createDocFromProject(row.id, kind); };
-    if (!row.source_doc_number) {
-        if (kind === 'wr') { showToast('디자인확인서를 먼저 만들어주세요'); return; }
-        if (confirm('아직 디자인확인서가 없습니다. 지금 만들까요?')) make();
-        return;
-    }
-    if (kind === 'dc') { await sendSavedDocHere(row.source_doc_number, x, '디자인확인서'); return; }
+// 상담에 연결된 국내 품목의 저장된 디자인확인서·작업요청서 문서번호 (없으면 null)
+async function inqSavedDocNumber(row, kind) {
+    if (!row || !row.source_doc_number) return null;
+    if (kind === 'dc') return row.source_doc_number;
     const prefix = row.source_doc_number + '_';
     const { data, error } = await sb.from('confirmations').select('doc_number, created_at, status')
         .like('doc_number', prefix + '%').order('created_at', { ascending: false });
-    if (error) { showToast('작업요청서 찾기 실패: ' + error.message); return; }
+    if (error) { showToast('작업요청서 찾기 실패: ' + error.message); return null; }
     const wr = (data || []).find(d => d.status === '작업요청서' && String(d.doc_number || '').startsWith(prefix));
-    if (!wr) { if (confirm('아직 작업요청서가 없습니다. 지금 만들까요?')) make(); return; }
-    await sendSavedDocHere(wr.doc_number, null, '작업요청서');   // 공장에 보내는 거라 상담 기록은 안 남김
+    return wr ? wr.doc_number : null;
+}
+async function inqSendSavedDoc(row, kind, x) {
+    const label = kind === 'dc' ? '디자인확인서' : '작업요청서';
+    const make = () => { if (inqEnsureProject(row)) createDocFromProject(row.id, kind); };
+    if (kind === 'wr' && !row.source_doc_number) { showToast('디자인확인서를 먼저 만들어주세요'); return; }
+    const num = await inqSavedDocNumber(row, kind);
+    if (!num) { if (confirm(`아직 ${label}가 없습니다. 지금 만들까요?`)) make(); return; }
+    await sendSavedDocHere(num, kind === 'dc' ? x : null, label);   // 작업요청서는 공장에 보내는 거라 상담 기록은 안 남김
 }
 
-// 화면 이동 없이: 문서 생성기를 숨은 창(iframe, #render-문서번호)으로 열어 저장된 문서를 그리고, 보내기 창은 이 화면에서
+// 화면 이동 없이: 문서 생성기를 숨은 창(iframe, #render-문서번호)으로 열어 저장된 문서를 그리고 보내기 정보를 받아옴
 let _sendDocBusy = false;
-async function sendSavedDocHere(docNumber, x, label) {
-    if (_sendDocBusy) return;
-    if (!window.SendKit) { showToast('보내기 기능을 불러오지 못했습니다. 새로고침 해주세요'); return; }
-    _sendDocBusy = true;
+async function loadSavedDocOpts(docNumber, label) {
     showToast(`${label} 불러오는 중…`);
     const old = document.getElementById('docRenderFrame');
     if (old) old.remove();
@@ -23649,23 +23655,84 @@ async function sendSavedDocHere(docNumber, x, label) {
     fr.style.cssText = 'position:fixed;left:-12000px;top:0;width:1000px;height:1400px;border:0;';
     fr.src = 'doc-generator.html#render-' + encodeURIComponent(docNumber);
     document.body.appendChild(fr);
+    await new Promise((ok, no) => { fr.onload = ok; setTimeout(() => no(new Error('불러오기 시간 초과')), 25000); });
+    const ready = fr.contentWindow && fr.contentWindow.klpDocReady;
+    if (!ready) throw new Error('문서 생성기를 열지 못했습니다 (로그인 확인)');
+    const opts = await Promise.race([ready, new Promise((_, no) => setTimeout(() => no(new Error('문서 그리기 시간 초과')), 25000))]);
+    if (!opts) throw new Error('문서 내용을 읽지 못했습니다');
+    return opts;
+}
+function savedDocOnSent(opts, x, label) {
+    if (!x) return opts;
+    opts.onSent = async ({ channel, text }) => {
+        const saved = await inqAddLog(x.id, { direction: 'out', channel, body: `[${label} 발송]\n${text}` });
+        if (!saved) throw new Error('기록 저장 실패');
+        await inqPatch(x.id, { last_contact_at: new Date().toISOString() });
+    };
+    return opts;
+}
+async function sendSavedDocHere(docNumber, x, label) {
+    if (_sendDocBusy) return;
+    if (!window.SendKit) { showToast('보내기 기능을 불러오지 못했습니다. 새로고침 해주세요'); return; }
+    _sendDocBusy = true;
     try {
-        await new Promise((ok, no) => { fr.onload = ok; setTimeout(() => no(new Error('불러오기 시간 초과')), 25000); });
-        const ready = fr.contentWindow && fr.contentWindow.klpDocReady;
-        if (!ready) throw new Error('문서 생성기를 열지 못했습니다 (로그인 확인)');
-        const opts = await Promise.race([ready, new Promise((_, no) => setTimeout(() => no(new Error('문서 그리기 시간 초과')), 25000))]);
-        if (!opts) throw new Error('문서 내용을 읽지 못했습니다');
+        const opts = savedDocOnSent(await loadSavedDocOpts(docNumber, label), x, label);
         sendKitSetup();
-        if (x) {
-            opts.onSent = async ({ channel, text }) => {
-                const saved = await inqAddLog(x.id, { direction: 'out', channel, body: `[${label} 발송]\n${text}` });
-                if (!saved) throw new Error('기록 저장 실패');
-                await inqPatch(x.id, { last_contact_at: new Date().toISOString() });
-            };
-        }
         SendKit.open(opts);
     } catch (e) {
         console.error('문서 보내기 준비 실패', e);
+        showToast(`${label} 불러오기 실패: ${e.message}`);
+    } finally {
+        _sendDocBusy = false;
+    }
+}
+
+// 저장된 디자인확인서·작업요청서 '보기' (편집 화면으로 가지 않음) — 보내기·PDF·JPG·편집 버튼
+async function viewSavedDoc(docNumber, label, x) {
+    if (_sendDocBusy) return;
+    _sendDocBusy = true;
+    try {
+        const opts = savedDocOnSent(await loadSavedDocOpts(docNumber, label), x, label);
+        const canvas = await opts.makeCanvas();
+        const jpg = canvas.toDataURL('image/jpeg', 0.92);
+        const old = document.getElementById('docViewOverlay');
+        if (old) old.remove();
+        const ov = document.createElement('div');
+        ov.id = 'docViewOverlay';
+        ov.className = 'docview';
+        ov.innerHTML = `
+          <div class="docview-bar">
+            <b>${escHtml(label)} <em>${escHtml(docNumber)}</em></b>
+            <span class="docview-t">${escHtml(opts.title || '')}</span>
+            <div class="inq-spacer"></div>
+            <button data-v="send" class="primary">📤 보내기</button>
+            <button data-v="pdf">PDF</button>
+            <button data-v="jpg">JPG</button>
+            <button data-v="edit">✏️ 편집</button>
+            <button data-v="close" aria-label="닫기">✕</button>
+          </div>
+          <div class="docview-body"><img src="${jpg}" alt="${escHtml(label)}"></div>`;
+        document.body.appendChild(ov);
+        const close = () => { ov.remove(); document.removeEventListener('keydown', onKey, true); };
+        const onKey = e => { if (e.key === 'Escape' && !document.getElementById('skWrap')) { e.stopPropagation(); close(); } };
+        document.addEventListener('keydown', onKey, true);
+        ov.addEventListener('click', e => {
+            if (e.target === ov) { close(); return; }
+            const b = e.target.closest('[data-v]');
+            if (!b) return;
+            const v = b.dataset.v;
+            if (v === 'close') close();
+            else if (v === 'send') { if (window.SendKit) { sendKitSetup(); SendKit.open(opts); } }
+            else if (v === 'jpg') { const a = document.createElement('a'); a.href = jpg; a.download = (opts.fileBase || label) + '.jpg'; a.click(); }
+            else if (v === 'pdf') {
+                const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                pdf.addImage(jpg, 'JPEG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
+                pdf.save((opts.fileBase || label) + '.pdf');
+            }
+            else if (v === 'edit') { if (confirm(`${label}(${docNumber}) 편집 화면으로 이동할까요?`)) location.href = 'doc-generator.html#edit-' + encodeURIComponent(docNumber); }
+        });
+    } catch (e) {
+        console.error('문서 보기 실패', e);
         showToast(`${label} 불러오기 실패: ${e.message}`);
     } finally {
         _sendDocBusy = false;
