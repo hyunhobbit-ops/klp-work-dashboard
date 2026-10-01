@@ -12828,6 +12828,11 @@ function sendKitSetup() {
         }
     });
 }
+// 보내는 사람 '이름 직함' (메일 첫인사 '케이엘피코리아 김현호 팀장입니다')
+function sendMyTitle() {
+    const n = (currentUser && currentUser.name) || '';
+    return ({ '이현주': '이현주 실장', '김현호': '김현호 팀장', '유지은': '유지은 대리', '김관택': '김관택 대표' })[n] || n;
+}
 // 거래처 DB에서 이름으로 찾기 ((주)·공백 차이 무시)
 function sendFindClient(name) {
     if (!name || typeof clients === 'undefined') return null;
@@ -12861,7 +12866,7 @@ async function sendTempQuote() {
             거래처: g.client || '', 담당자: contact, 품목: itemLabel, 수량: qtyLabel,
             합계: g._quoteGrand ? Number(g._quoteGrand).toLocaleString() + '원' : '',
             납기: inq && inq.due_date ? inqMD(inq.due_date) : '',
-            문서번호: '', 작성자: (currentUser && currentUser.name) || ''
+            문서번호: '', 작성자: (currentUser && currentUser.name) || '', 작성자직함: sendMyTitle()
         },
         to: { email: (inq && inq.contact_email) || (cli && (cli.staffEmail || cli.email)) || '', phone: (inq && inq.contact_phone) || (cli && (cli.staffMobile || cli.mobile)) || '' },
         fileBase: dateP + '_케이엘피코리아_' + (g.client || '업체') + '_견적서',
@@ -23499,7 +23504,7 @@ function inqSendVars(x, extra) {
     return Object.assign({
         거래처: x.client || '', 담당자: [x.contact_name || x.client_contact, x.contact_title].filter(Boolean).join(' '),
         품목: itemLabel, 수량: qty, 합계: '', 납기: x.due_date ? inqMD(x.due_date) : '', 문서번호: '',
-        작성자: (currentUser && currentUser.name) || '', 내용: ''
+        작성자: (currentUser && currentUser.name) || '', 작성자직함: sendMyTitle(), 내용: ''
     }, extra || {});
 }
 function inqSendTo(x) {
