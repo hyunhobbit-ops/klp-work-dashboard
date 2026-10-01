@@ -6482,7 +6482,8 @@ function clientToDb(c) {
         staff_email: c.staffEmail || '',
         grade: c.grade || '',
         category: c.category || '',
-        website: c.website || ''
+        website: c.website || '',
+        items: c.items || ''
     };
 }
 function clientFromDb(r) {
@@ -6504,7 +6505,8 @@ function clientFromDb(r) {
         staffEmail: r.staff_email || '',
         grade: r.grade || '',
         category: r.category || '',
-        website: r.website || ''
+        website: r.website || '',
+        items: r.items || ''
     };
 }
 async function loadClientsFromDb() {
@@ -6557,7 +6559,8 @@ const CLIENT_FIELD_MAP = {
     staffEmail: 'staff_email',
     grade: 'grade',
     category: 'category',
-    website: 'website'
+    website: 'website',
+    items: 'items'
 };
 async function dbUpdateClient(id, patch) {
     const dbPatch = {};
@@ -6621,6 +6624,7 @@ function filterClients() {
         const q = clientSearch.toLowerCase();
         list = list.filter(c =>
             (c.companyName || '').toLowerCase().includes(q) ||
+            (c.items || '').toLowerCase().includes(q) ||
             (c.ceo || '').toLowerCase().includes(q) ||
             (c.phone || '').toLowerCase().includes(q) ||
             (c.mobile || '').toLowerCase().includes(q) ||
@@ -6818,6 +6822,7 @@ function renderClients() {
         <td style="text-align:center" onclick="event.stopPropagation()"><input type="checkbox" class="client-row-check" data-id="${c.id}" ${checked} onclick="toggleClientSelect(${c.id}, this)" style="width:16px;height:16px;cursor:pointer"></td>
         ${ed('category', 'select', catBadge(c.category), '매출처,매입처,서비스(비용),')}
         ${ed('companyName', 'text', `<strong>${esc(c.companyName)}</strong>`)}
+        <td class="cell-editable" data-entity="client" data-id="${c.id}" data-field="items" data-type="text" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(c.items)}">${esc(c.items) || '-'}</td>
         ${ed('ceo', 'text', esc(c.ceo) || '-')}
         ${ed('phone', 'text', esc(c.phone) || '-')}
         ${ed('mobile', 'text', esc(c.mobile) || '-')}
@@ -6829,7 +6834,7 @@ function renderClients() {
         ${ed('grade', 'select', clientGradeBadge(c.grade) || '-', 'S,A,B,C,')}
         <td><button class="edit-btn" onclick="event.stopPropagation();openEditClient(${c.id})">편집</button></td>
     </tr>`;
-    }).join('') || `<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
+    }).join('') || `<tr><td colspan="14" style="text-align:center;padding:40px;color:var(--text-tertiary)">고객사가 없습니다</td></tr>`;
 
     // 일괄 수정 바 / 전체선택 체크박스 동기화
     updateClientBulkBar();
@@ -6892,6 +6897,9 @@ function openClientModal(existing) {
         <div class="form-row">
             <div class="form-group"><label class="form-label">회사명 <span style="color:var(--red)">*</span></label><input type="text" class="form-input" id="cliCompanyName" value="${v('companyName')}" placeholder="회사명" ></div>
             <div class="form-group"><label class="form-label">대표자</label><input type="text" class="form-input" id="cliCeo" value="${v('ceo')}"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group" style="grid-column:1 / -1"><label class="form-label">품목 <span style="font-weight:500;color:var(--gray-500)">— 주로 거래하는 품목 (상담에 적은 품목이 비어 있는 칸에 자동으로 들어가요)</span></label><input type="text" class="form-input" id="cliItems" value="${v('items')}" placeholder="예) 손목시계, 상패, 트로피"></div>
         </div>
         <div class="form-row">
             <div class="form-group"><label class="form-label">사업자등록번호</label><input type="text" class="form-input" id="cliBusinessNo" value="${v('businessNo')}"></div>
@@ -6960,7 +6968,8 @@ function readClientForm() {
         staffMobile: document.getElementById('cliStaffMobile').value.trim(),
         staffEmail: document.getElementById('cliStaffEmail').value.trim(),
         grade: document.getElementById('cliGrade').value.trim(),
-        website: document.getElementById('cliWebsite').value.trim()
+        website: document.getElementById('cliWebsite').value.trim(),
+        items: document.getElementById('cliItems').value.trim()
     };
 }
 
@@ -7040,6 +7049,7 @@ async function openClientDetail(id) {
             <div>
                 <div class="form-section-title">📋 기본 정보</div>
                 <div style="background:var(--gray-50);border-radius:8px;padding:8px 14px;margin-bottom:12px">
+                    ${row('품목', c.items)}
                     ${row('대표자', c.ceo)}
                     ${row('사업자번호', c.businessNo)}
                     ${row('전화', c.phone)}

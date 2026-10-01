@@ -209,6 +209,8 @@
 - **자동 추가**: 상담(inquiries.client)·견적 의뢰(projects_temp.client/supplier)·국내 프로젝트(projects_domestic.client/supplier)에 저장된 거래처가 국내/해외 거래처 DB에 없으면 트리거가 `clients`에 추가 (매출처 칸→'매출처', 매입처 칸→'매입처', 상담은 고객 담당자·연락처·이메일을 담당직원 칸에). 같은 회사 판단은 `client_name_key()` ((주)·주식회사·㈜·공백 제거). '개인'·'자체'·'(회사명 모름)' 등은 건너뜀. 앱은 저장 뒤 `clientAutoAddNotice`로 새로 생긴 거래처를 토스트로 알림
 - **상담 → 거래처 DB 빈 칸 채우기 (migration 042)**: 상담의 회사 주소·팩스·홈페이지·담당자(이름·연락처·이메일)가 바뀌면 트리거 `fill_client_blanks_from_inquiry`가 같은 거래처(`client_name_key`)의 **비어 있는 칸만** 채움(사업자등록증으로 넣은 정식 값은 안 덮음). `clients.website`(홈페이지) 칸 추가 — 거래처 모달·상세에 표시. 새 상담에서 거래처를 고르면 `inqFillFromClientDb`가 거래처 DB 정보를 빈 칸에 불러옴
 - **거래처 등급 (migration 043)**: `CLIENT_GRADES` S 중요 · A 우수 · B 일반 · C 관심 (이름은 여기 한 곳). clients.grade와 inquiries.grade가 트리거로 서로 동기화(상담에서 바꾸면 거래처 DB도, 거래처 DB에서 바꾸면 그 거래처 상담 전부). 표시는 `clientGradeBadge`, 선택은 `clientGradeOptions`. 거래처 표 인라인 선택·등록 창·일괄 수정·상세, 상담 목록 배지·상세 머리·새 상담(거래처 고르면 DB 등급 불러옴)
+- **품목 칸 (migration 055)**: `clients.items`(주로 거래하는 품목, 쉼표 구분). 거래처 모달(회사명 아래)·상세·표(회사명 옆, 인라인 편집)·검색. 상담 품목(`inquiries.items`)이 있으면 거래처 품목 **빈 칸**에 자동(`inquiries_ensure_client`, `inquiry_items_text()`; 트리거가 items 변경에도 돎). 기존 상담 품목으로 한 번 채움
+- 자동 추가 제외 이름에서 '테스트'를 뺌(2026-10 시연 때 '테스트' 회사가 거래처 DB에 안 생겨 혼란) — 남은 제외: 개인·자체·본사·기타·고객·개인고객·(모름/미정/없음/미상 포함)
 - **사업자등록증 자동 입력**: 새 고객사/수정 모달 위 `bizregBoxHtml` — 사진·PDF(끌어놓기·Ctrl+V·파일 선택) 또는 복사한 글 → `/api/meeting-summarize?kind=bizreg` → `api/_bizreg-extract.js`(Claude 비전, PDF는 document 블록). 빈 칸/자동 입력 칸만 채움. AI 실패 시 글이면 `bizregParseText` 규칙으로. `bizregDupCheck`가 사업자번호·이름으로 기존 거래처 경고
 
 ## 디자인확인서 컨펌 · 작업요청서 발송 채널·날짜 / 선금·잔금 입금 날짜 (migration 044·045·046)
