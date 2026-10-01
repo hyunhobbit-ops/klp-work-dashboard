@@ -10,20 +10,34 @@
  *    makeCanvas : async () => canvas (문서 1장 A4)
  *    onSent  : async ({ channel, text }) => {}   (있으면 '보냈어요 — 기록 남기기' 버튼)
  *
- * 메일: 네이버웍스 메일쓰기 주소(to·subject·body)로 칸을 채움. 단 body를 넣으면 네이버웍스 기본 서명이 사라져서
- *       '기본 서명 쓰기'(기본 켬)면 본문은 주소에 넣지 않고 클립보드에 복사 → 본문 맨 위에 Ctrl+V. 첨부는 직접
+ * 메일: 네이버웍스 메일쓰기 주소(to·subject·body)로 칸을 채움. body는 HTML도 받음(굵게·링크·이미지 OK, 2026-10 확인)
+ *       body를 넣으면 네이버웍스 기본 서명이 사라져서 → 회사 서명(HTML)을 본문 끝에 우리가 붙임(send_templates doc_type 'sig'). 첨부만 직접
  * 카톡: 폰 = 공유 시트(파일+문구) / PC = 문서 이미지 복사 → 문구 복사 (채팅방에서 Ctrl+V)
  * ===================================================================== */
 (function () {
   'use strict';
   var MAIL_URL = 'https://mail.worksmobile.com/';
   // 네이버웍스 메일쓰기는 주소 뒤 to·subject·body를 받아 칸을 채워줌 (2026-10 실제 확인). 첨부만 직접
-  // body를 넣으면 기본 서명이 사라짐(본문을 통째로 바꿈) → 서명 쓸 땐 body 없이 열고 본문은 붙여넣기
-  function composeUrl(m, withBody) {
+  // body를 넣으면 기본 서명이 사라짐(본문을 통째로 바꿈) → 회사 서명을 본문 끝에 같이 넣음
+  function composeUrl(m, bodyHtml) {
     return 'https://mail.worksmobile.com/w/compose?orderType=new' +
       '&to=' + encodeURIComponent(m.to || '') + '&subject=' + encodeURIComponent(m.subject || '') +
-      (withBody ? '&body=' + encodeURIComponent(m.body || '') : '');
+      '&body=' + encodeURIComponent(bodyHtml || '');
   }
+  function textToHtml(t) { return '<div style="font-weight:normal">' + esc(t).replace(/\n/g, '<br>') + '</div>'; }
+  // 네이버웍스 '기본 서명'을 그대로 옮긴 것 (2026-10). 양식 수정 → 서명에서 바꿀 수 있음
+  var SIG_DEFAULT = '<div style="font-size:12px;line-height:1.6;color:#000;font-weight:normal">' +
+    '<img src="https://static.worksmobile.net/static/pwe/nworks/sign_bar1.png" width="36" height="16" alt=""><br>' +
+    '<b>케이엘피코리아 (주)</b><br>' +
+    '<span style="color:#888">서울특별시 구로구 디지털로32길 30, 901호(구로동)</span><br>' +
+    '<b>Tel</b> 02 2103 5757<br><b>Fax</b> 02 2103 5759<br>' +
+    '<b>Email</b> <a href="mailto:klpkorea@agift.kr">klpkorea@agift.kr</a><br><br>' +
+    '▶ 회사 소개 : <a href="http://klpkorea.co.kr">http://klpkorea.co.kr</a><br>' +
+    '▶ 시계 쇼핑몰 : <a href="http://showroom.co.kr">http://showroom.co.kr</a><br>' +
+    '▶ 판촉·선물 쇼핑몰 : <a href="http://agift.kr">http://agift.kr</a><br><br>' +
+    '<a href="http://pf.kakao.com/_xmGyUM"><img src="http://klp01.imghost.cafe24.com/2018shop/kakaotalk_mail.jpg" alt="카카오톡 상담 바로가기"></a>' +
+    '</div>';
+  function sigHtml() { var t = tplCache && tplCache['sig:email']; return (t && t.body) || SIG_DEFAULT; }
   // 새 탭을 열기 전에 동기로 복사 (탭이 열리면 이 페이지가 포커스를 잃어 비동기 복사는 막힘)
   // 글자 모양 없이 순수 글만 — 서식 있는 복사는 대시보드 다크 모드 색(검은 배경·흰 글씨)까지 따라 들어감
   function copyHtmlSync(text) {
@@ -180,6 +194,9 @@
       '#skBox .sk-tip{font-size:12.5px;color:#6b7684;line-height:1.55;margin:2px 0 10px}',
       '#skBox .sk-sig{display:flex;align-items:center;gap:7px;margin:0 0 6px;font-size:13.5px;font-weight:700;color:#374151;cursor:pointer}',
       '#skBox .sk-sig input{width:17px;height:17px;flex:none;margin:0;accent-color:#1F85FF}',
+      '#skBox .sk-sigprev{width:100%;height:230px;border:1.5px solid #e5e8eb;border-radius:11px;background:#fff}',
+      '#skBox .sk-sigcode{margin-top:6px;font-size:13px;color:#4b5563}',
+      '#skBox .sk-sigcode summary{cursor:pointer;font-weight:700;margin-bottom:6px}',
       '#skBox .sk-tip b{color:#374151}',
       '#skBox .sk-foot{display:flex;gap:8px;align-items:center;padding:12px 20px;border-top:1px solid #eef0f3;background:#fafbfc}',
       '#skBox .sk-foot .sp{flex:1}',
@@ -211,15 +228,15 @@
         '<div class="sk-vars">' + VARS.map(function (v) { return '<button data-a="var:' + v + '">{' + v + '}</button>'; }).join('') + '</div>' +
         (st.ch === 'email' ? '<div class="sk-f"><label>제목 양식</label><input id="skTplSubject" value="' + esc(t.subject) + '"></div>' : '') +
         '<div class="sk-f"><label>' + (st.ch === 'email' ? '본문 양식' : '문구 양식') + '</label><textarea id="skTplBody" rows="12">' + esc(t.body) + '</textarea></div>' +
+        (st.ch === 'email' ? '<div class="sk-f"><label>회사 서명 (모든 메일 공통 · 본문 끝에 붙음)</label><iframe class="sk-sigprev" sandbox="" srcdoc="' + esc('<body style="margin:8px;font-family:sans-serif">' + sigHtml() + '</body>') + '"></iframe>' +
+          '<details class="sk-sigcode"><summary>서명 고치기 (HTML 코드)</summary><textarea id="skTplSig" rows="8">' + esc(sigHtml()) + '</textarea></details></div>' : '') +
         '<div class="sk-row"><button class="sk-c light" data-a="tpl-reset">기본 양식으로</button><span style="flex:1"></span><button class="sk-c light" data-a="tpl-cancel">취소</button><button class="sk-c" data-a="tpl-save">양식 저장</button></div></div>';
     } else if (st.ch === 'email') {
       var m = st.draft.email;
       body = '<div class="sk-b">' +
         '<button class="sk-main" data-a="mail-go">✉️ 네이버웍스 메일쓰기 열기' + (st.hasFile ? ' + PDF 내려받기' : '') + '</button>' +
-        '<label class="sk-sig"><input type="checkbox" data-a="sig"' + (st.useSig ? ' checked' : '') + '> 네이버웍스 <b>기본 서명</b> 쓰기</label>' +
-        (st.useSig
-          ? '<div class="sk-tip">메일쓰기 창에 <b>받는 사람·제목</b>이 채워지고 서명이 붙어요. 본문은 <b>자동으로 복사</b>돼 있으니 본문 맨 위를 클릭하고 <b>Ctrl+V</b>' + (st.hasFile ? ', 내려받은 <b>PDF를 끌어다 놓고</b>' : '') + ' 보내세요.</div>'
-          : '<div class="sk-tip">메일쓰기 창에 <b>받는 사람·제목·본문</b>이 모두 채워져요(네이버웍스 서명은 빠짐).' + (st.hasFile ? ' 내려받은 <b>PDF만 끌어다 놓고</b> 보내세요.' : '') + '</div>') +
+        '<label class="sk-sig"><input type="checkbox" data-a="sig"' + (st.useSig ? ' checked' : '') + '> 회사 <b>서명</b> 붙이기</label>' +
+        '<div class="sk-tip">메일쓰기 창에 <b>받는 사람·제목·본문' + (st.useSig ? '·서명' : '') + '</b>이 모두 채워져요.' + (st.hasFile ? ' 내려받은 <b>PDF만 끌어다 놓고</b> 보내세요.' : ' 확인 후 보내세요.') + '</div>' +
         '<div class="sk-f"><label><span class="n">1</span>받는 사람</label><div class="sk-row"><input id="skTo" value="' + esc(m.to) + '" placeholder="이메일 주소"><button class="sk-c" data-a="copy:skTo:받는 사람">복사</button></div></div>' +
         '<div class="sk-f"><label><span class="n">2</span>제목</label><div class="sk-row"><input id="skSubject" value="' + esc(m.subject) + '"><button class="sk-c" data-a="copy:skSubject:제목">복사</button></div></div>' +
         '<div class="sk-f"><label><span class="n">3</span>본문 <span style="font-weight:600">(여기서 고쳐도 돼요)</span></label><textarea id="skBody" rows="11">' + esc(m.body) + '</textarea><div class="sk-row" style="margin-top:6px"><span style="flex:1"></span><button class="sk-c" data-a="copy:skBody:본문">본문 복사</button></div></div>' +
@@ -274,9 +291,9 @@
       b.disabled = false; return;
     }
     if (a === 'mail-go') {
-      var copied = st.useSig ? copyHtmlSync(st.draft.email.body) : false;
-      var w = window.open(composeUrl(st.draft.email, !st.useSig), '_blank');   // 팝업 차단을 피하려고 먼저 연다
-      var doneMsg = st.useSig ? (copied ? '본문 복사됨 — 메일 본문 맨 위를 클릭하고 Ctrl+V' : '본문 복사가 막혔어요 — ③ 본문 복사 버튼을 눌러주세요') : '메일쓰기 창에 채워 두었어요';
+      var html = textToHtml(st.draft.email.body) + (st.useSig ? '<br><br>' + sigHtml() : '');
+      var w = window.open(composeUrl(st.draft.email, html), '_blank');   // 팝업 차단을 피하려고 먼저 연다
+      var doneMsg = '메일쓰기 창에 채워 두었어요 — 확인 후 보내세요';
       if (!st.hasFile) { toast(w ? doneMsg : '팝업이 막혔어요 — 주소창 오른쪽에서 팝업을 허용해주세요'); return; }
       b.disabled = true; b.textContent = '파일 만드는 중…';
       try { download(await getPdfBlob(), st.fileBase + '.pdf'); toast(doneMsg + ' · PDF는 끌어다 놓기'); }
@@ -328,6 +345,7 @@
       var d = DEFAULTS[st.docType][st.ch];
       var sub = document.getElementById('skTplSubject'); if (sub) sub.value = d.subject;
       document.getElementById('skTplBody').value = d.body;
+      var sg = document.getElementById('skTplSig'); if (sg) sg.value = SIG_DEFAULT;
       return;
     }
     if (a === 'tpl-save') {
@@ -338,6 +356,12 @@
         if (!cfg.save) throw new Error('저장 기능이 연결되지 않았습니다');
         await cfg.save(row);
         tplCache = tplCache || {};
+        var sgEl = document.getElementById('skTplSig');
+        if (sgEl && sgEl.value.trim() !== sigHtml().trim()) {
+          var sigRow = { doc_type: 'sig', channel: 'email', subject: '', body: sgEl.value.trim() || SIG_DEFAULT };
+          await cfg.save(sigRow);
+          tplCache['sig:email'] = { subject: '', body: sigRow.body };
+        }
         tplCache[st.docType + ':' + st.ch] = { subject: row.subject, body: row.body };
         st.editing = false; resetDrafts(); render();
         toast('양식을 저장했습니다 (회사 공용)');
