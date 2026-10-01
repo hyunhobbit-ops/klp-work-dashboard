@@ -870,6 +870,7 @@ function hydrateAllFromCache() {
 async function showApp(goHome = false) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
+    try { mInit(); } catch (e) { console.warn('폰 화면 준비 실패', e); }
 
     // 🚀 1) 캐시 즉시 복원 + 렌더 — 이전 방문이 있으면 100ms 안에 화면 표시
     const hadCache = hydrateAllFromCache();
@@ -14082,6 +14083,32 @@ async function planningConvertKind(postId, kind) {
     }
 }
 
+// 할 일 하나 만들기 — PC 빠른 추가·폰 화면 공용. 담당자가 있으면 그 사람 일일계획표에도 등록
+async function planningCreateTask(p, { title, who, deadline }) {
+    const sameCol = planningTasksOf(p).filter(x => (x.taskStatus || 'todo') === 'todo');
+    const maxKey = sameCol.length ? Math.max(...sameCol.map(planningPostSortKeyOf)) : 0;
+    const newPost = {
+        author: currentUser ? currentUser.name : '익명',
+        category: 'normal', title, content: '', vendor: '', deadline: deadline || '',
+        assignees: who ? [who] : [], images: [],
+        taskStatus: 'todo', parentId: null, sortOrder: maxKey + 1000
+    };
+    let { data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single();
+    if (error && planningIsSortOrderSchemaError(error)) {
+        planningSortOrderColumnAvailable = false;
+        ({ data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single());
+    }
+    if (error) throw error;
+    const inserted = planningPostFromDb(data);
+    p.posts = p.posts || [];
+    p.posts.push(inserted);
+    await renderPlanning({ skipLoad: true });
+    if (inserted.assignees.length) {
+        try { await syncPlanningCardToDaily(p, inserted); } catch (e) { console.error('일일계획표 동기화 실패', e); }
+    }
+    return inserted;
+}
+
 async function planningQuickAdd() {
     if (planningQuickAdding) return;
     const p = planningProjects.find(x => x.id === currentPlanningProjectId);
@@ -14093,34 +14120,16 @@ async function planningQuickAdd() {
     const dEl = document.getElementById('plAddDate');
     const deadline = dEl ? dEl.value : '';
     try { localStorage.setItem('pl_add_who', who); } catch (_) {}
-    const sameCol = planningTasksOf(p).filter(x => (x.taskStatus || 'todo') === 'todo');
-    const maxKey = sameCol.length ? Math.max(...sameCol.map(planningPostSortKeyOf)) : 0;
-    const newPost = {
-        author: currentUser ? currentUser.name : '익명',
-        category: 'normal', title, content: '', vendor: '', deadline,
-        assignees: who ? [who] : [], images: [],
-        taskStatus: 'todo', parentId: null, sortOrder: maxKey + 1000
-    };
     planningQuickAdding = true;
+    if (tEl) tEl.value = '';
+    if (dEl) dEl.value = '';
     try {
-        let { data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single();
-        if (error && planningIsSortOrderSchemaError(error)) {
-            planningSortOrderColumnAvailable = false;
-            ({ data, error } = await sb.from('planning_posts').insert(planningPostToDb(newPost, p.id)).select().single());
-        }
-        if (error) throw error;
-        const inserted = planningPostFromDb(data);
-        p.posts = p.posts || [];
-        p.posts.push(inserted);
-        if (tEl) tEl.value = '';
-        if (dEl) dEl.value = '';
-        await renderPlanning({ skipLoad: true });
+        await planningCreateTask(p, { title, who, deadline });
         const again = document.getElementById('plAddTitle');
         if (again) again.focus();
-        if (inserted.assignees.length) {
-            try { await syncPlanningCardToDaily(p, inserted); } catch (e) { console.error('일일계획표 동기화 실패', e); }
-        }
     } catch (err) {
+        if (tEl) tEl.value = title;
+        if (dEl) dEl.value = deadline;
         console.error(err);
         showToast('할 일 저장 실패: ' + err.message);
     } finally {
@@ -24403,4 +24412,585 @@ function askCheckInfo(key, cur) {
         wrap.addEventListener('mousedown', (e) => { if (e.target === wrap) done(null); });
         setTimeout(() => { const f = wrap.querySelector('input:checked') || wrap.querySelector('input[type="date"]'); if (f) f.focus(); }, 30);
     });
+}
+
+
+// ============================================================
+// 폰 전용 간단 화면 (2026-10) — 내 하루 · 계획표 · 프로젝트 · 매입매출
+// 화면 폭 820px 이하에서 자동으로 켜짐. 'PC 화면'을 누르면 localStorage m_full=1 → 전체 대시보드,
+// 전체 대시보드 오른쪽 아래 '📱 간단 화면'으로 돌아옴.
+// 저장·불러오기는 기존 함수 재사용: 일일계획표(dailyTasks·toggleTask·dbInsertTask), 내 하루(tbx*),
+// 프로젝트(planning*), 상담(inq*), 국내(toggleProjectCheck) → PC와 항상 같은 데이터
+// ============================================================
+const M_TABS = [
+    { key: 'day', icon: '☀️', label: '내 하루' },
+    { key: 'daily', icon: '✅', label: '계획표' },
+    { key: 'plan', icon: '📁', label: '프로젝트' },
+    { key: 'biz', icon: '💼', label: '매입매출' }
+];
+const M_WEEK = ['일', '월', '화', '수', '목', '금', '토'];
+let mTab = (() => { try { return localStorage.getItem('m_tab') || 'day'; } catch (_) { return 'day'; } })();
+let mStack = [];            // 상세 화면 [{type:'proj'|'inq', id}]
+let mActive = false;
+let mLoaded = {};
+let mDailyDate = null, mDailyWho = '나';
+let mPlanMode = null, mPlanShowAll = false, mPlanTab = 'task', mPlanDoneOpen = false;
+let mBizSeg = 'inq', mBizQ = '', mInqDir = 'out';
+let _mRefreshTimer = null;
+
+function mIsPhone() { return window.matchMedia('(max-width: 820px)').matches; }
+function mWantFull() { try { return localStorage.getItem('m_full') === '1'; } catch (_) { return false; } }
+function mEsc(s) { return escHtml(s == null ? '' : String(s)); }
+function mMD(ds) { if (!ds) return ''; const d = new Date(ds + 'T00:00:00'); return `${d.getMonth() + 1}/${d.getDate()} (${M_WEEK[d.getDay()]})`; }
+function mShiftDate(ds, n) { const d = new Date(ds + 'T00:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function mEmpty(t) { return `<div class="m-empty">${t}</div>`; }
+function mLoading() { return '<div class="m-empty">불러오는 중…</div>'; }
+
+function mInit() {
+    if (!document.getElementById('mRoot')) return;
+    if (!mInit._bound) {
+        mInit._bound = true;
+        window.matchMedia('(max-width: 820px)').addEventListener('change', mApply);
+        window.addEventListener('popstate', mOnPop);
+        // 저장·실시간 갱신으로 PC 화면이 다시 그려질 때 폰 화면도 같이 갱신
+        ['renderDaily', 'renderProjects', 'renderPlanning', 'inqRenderList'].forEach(name => {
+            const f = window[name];
+            if (typeof f !== 'function') return;
+            window[name] = function () { const r = f.apply(this, arguments); mRefreshSoon(); return r; };
+        });
+    }
+    mApply();
+}
+function mApply() {
+    const root = document.getElementById('mRoot');
+    if (!root) return;
+    const on = mIsPhone() && !mWantFull();
+    mActive = on;
+    document.body.classList.toggle('m-on', on);
+    root.hidden = !on;
+    const back = document.getElementById('mBackSimple');
+    if (back) back.hidden = !(mIsPhone() && mWantFull());
+    if (on) mRender();
+}
+function mSetFull(full) {
+    try { if (full) localStorage.setItem('m_full', '1'); else localStorage.removeItem('m_full'); } catch (_) {}
+    mApply();
+}
+// 지금 보던 것을 PC 화면에서 이어서 보기
+function mOpenFull(kind, id) {
+    mSetFull(true);
+    try {
+        if (kind === 'inq') {
+            try { localStorage.setItem('tp_view', 'inq'); } catch (_) {}
+            _inqSel = id;
+            switchTab('projects-temp');
+        } else if (kind === 'proj') {
+            const p = planningProjects.find(x => x.id === id);
+            const acc = p ? (p.access || 'company') : 'company';
+            switchTab('planning-' + (acc === 'personal' ? 'personal' : acc === 'funding' ? 'funding' : 'company'));
+            setTimeout(() => openPlanningProject(id), 80);
+        }
+    } catch (e) { console.error(e); }
+}
+function mRefreshSoon() {
+    if (!mActive) return;
+    clearTimeout(_mRefreshTimer);
+    _mRefreshTimer = setTimeout(mRender, 120);
+}
+function mGo(tab) {
+    mTab = tab;
+    mStack = [];
+    try { localStorage.setItem('m_tab', tab); } catch (_) {}
+    mRender();
+    const b = document.querySelector('#mRoot .m-body'); if (b) b.scrollTop = 0;
+}
+function mPush(view) {
+    mStack.push(view);
+    try { history.pushState({ mDepth: mStack.length }, ''); } catch (_) {}
+    mRender();
+    const b = document.querySelector('#mRoot .m-body'); if (b) b.scrollTop = 0;
+}
+function mBack() {
+    if (!mStack.length) return;
+    if (history.state && history.state.mDepth === mStack.length) { history.back(); return; }
+    mStack.pop(); mRender();
+}
+function mOnPop(e) {
+    if (!mActive) return;
+    const d = (e.state && e.state.mDepth) || 0;
+    if (d < mStack.length) { mStack.length = d; mRender(); }
+}
+// 처음 보는 탭 데이터는 한 번만 불러옴
+function mEnsure(key, fn) {
+    if (mLoaded[key] === true) return true;
+    if (mLoaded[key] === undefined) {
+        mLoaded[key] = false;
+        Promise.resolve().then(fn).catch(e => console.error('폰 화면 불러오기 실패', key, e))
+            .finally(() => { mLoaded[key] = true; mRender(); });
+    }
+    return false;
+}
+async function mReload() {
+    const v = mStack[mStack.length - 1];
+    try {
+        if (v && v.type === 'inq') { delete mLoaded['inq:' + v.id]; await inqLoad(); }
+        else if (v && v.type === 'proj') await loadPlanningProjects();
+        else if (mTab === 'day') await tbxLoad();
+        else if (mTab === 'daily') await loadDailyTasksFromDb();
+        else if (mTab === 'plan') await loadPlanningProjects();
+        else if (mTab === 'biz') { await inqLoad(); await loadDomesticProjectsFromDb(); }
+        showToast('새로 불러왔습니다');
+    } catch (e) { showToast('불러오기 실패: ' + e.message); }
+    mRender();
+}
+
+function mRender() {
+    const root = document.getElementById('mRoot');
+    if (!root || !mActive) return;
+    // 다시 그려도 입력 중이던 칸·포커스·스크롤 유지
+    const keep = {};
+    root.querySelectorAll('input[id], textarea[id], select[id]').forEach(el => { keep[el.id] = el.value; });
+    const ae = document.activeElement;
+    const focusId = ae && ae.id && root.contains(ae) ? ae.id : null;
+    const oldBody = root.querySelector('.m-body');
+    const viewKey = JSON.stringify([mTab, mStack[mStack.length - 1] || null]);
+    const scroll = oldBody && root.dataset.view === viewKey ? oldBody.scrollTop : 0;
+
+    const view = mStack[mStack.length - 1];
+    const tabDef = M_TABS.find(t => t.key === mTab) || M_TABS[0];
+    let title = tabDef.label, inner = '';
+    try {
+        if (view && view.type === 'proj') [title, inner] = mProjDetailHtml(view.id);
+        else if (view && view.type === 'inq') [title, inner] = mInqDetailHtml(view.id);
+        else if (mTab === 'day') inner = mDayHtml();
+        else if (mTab === 'daily') inner = mDailyHtml();
+        else if (mTab === 'plan') inner = mPlanHtml();
+        else inner = mBizHtml();
+    } catch (e) {
+        console.error('폰 화면 그리기 실패', e);
+        inner = mEmpty('화면을 그리지 못했습니다: ' + mEsc(e.message));
+    }
+    root.innerHTML = `
+        <header class="m-top">
+            ${view ? '<button class="m-back" onclick="mBack()" aria-label="뒤로">‹</button>' : '<span class="m-logo">KLP</span>'}
+            <div class="m-title">${mEsc(title)}</div>
+            <button class="m-icon" onclick="mReload()" aria-label="새로고침">⟳</button>
+            <button class="m-pc" onclick="mSetFull(true)">PC 화면</button>
+        </header>
+        <main class="m-body">${inner}</main>
+        <nav class="m-tabs">${M_TABS.map(t => `<button class="${t.key === mTab ? 'on' : ''}" onclick="mGo('${t.key}')"><span>${t.icon}</span>${t.label}</button>`).join('')}</nav>`;
+    root.dataset.view = viewKey;
+    Object.entries(keep).forEach(([id, v]) => { const el = document.getElementById(id); if (el && root.contains(el)) el.value = v; });
+    const nb = root.querySelector('.m-body');
+    if (nb && scroll) nb.scrollTop = scroll;
+    if (focusId) { const el = document.getElementById(focusId); if (el) { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } } }
+}
+
+function mRowHtml({ done, onCheck, title, sub, right, onClick, cls }) {
+    return `<div class="m-row${done ? ' done' : ''}${cls ? ' ' + cls : ''}"${onClick ? ` onclick="${onClick}"` : ''}>
+        <button class="m-chk${done ? ' on' : ''}" onclick="event.stopPropagation();${onCheck}" aria-label="${done ? '완료 취소' : '완료'}">${done ? '✓' : ''}</button>
+        <div class="m-row-main"><div class="m-row-t">${title}</div>${sub ? `<div class="m-row-s">${sub}</div>` : ''}</div>
+        ${right || ''}
+    </div>`;
+}
+function mDueHtml(ds, done) {
+    if (!ds || done) return ds ? `<span class="m-due">${mEsc(planningMD(ds))}</span>` : '';
+    const dd = planningDDay(ds);
+    const today = getTodayStr();
+    return `<span class="m-due${ds < today ? ' late' : ds === today ? ' today' : ''}">${mEsc(planningMD(ds))}${dd ? ' · ' + dd.label : ''}</span>`;
+}
+function mAddHtml(id, placeholder, onAdd, extra) {
+    return `<div class="m-add">
+        <input id="${id}" placeholder="${placeholder}" autocomplete="off" enterkeyhint="done"
+            onkeydown="if(event.key==='Enter'&&!event.isComposing&&event.keyCode!==229){event.preventDefault();${onAdd}}">
+        ${extra || ''}
+        <button onclick="${onAdd}">추가</button>
+    </div>`;
+}
+
+// ---------- ☀️ 내 하루 (타임박스 데이터) ----------
+function mDayHtml() {
+    if (!mEnsure('tbx', () => tbxLoad())) return mLoading();
+    const today = getTodayStr();
+    const now = tbxNowMin();
+    const tasks = _tbxTasks || [];
+    const blocks = tasks.filter(t => t.date === today && t.start_min != null).sort((a, b) => a.start_min - b.start_min);
+    const cur = blocks.find(b => !b.done && b.start_min <= now && now < b.start_min + tbxDur(b));
+    const next = blocks.find(b => !b.done && b.start_min > now);
+    const big3 = tasks.filter(t => t.big3_rank != null && (!t.done || t.date === today)).sort((a, b) => a.big3_rank - b.big3_rank);
+    const inbox = tasks.filter(t => !t.done && t.big3_rank == null && !(t.date === today && t.start_min != null))
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.id - b.id);
+    const todayAll = tasks.filter(t => t.date === today);
+    const doneN = todayAll.filter(t => t.done).length;
+    const pct = todayAll.length ? Math.round(doneN / todayAll.length * 100) : 0;
+    const row = (t, time) => mRowHtml({
+        done: t.done, onCheck: `mDayToggle(${t.id})`,
+        title: mEsc(t.task),
+        sub: [time, t.date < today ? `밀림 · ${mMD(t.date)}` : ''].filter(Boolean).join(' · '),
+        right: `<button class="m-star${t.big3_rank != null ? ' on' : ''}" onclick="event.stopPropagation();mDayBig3(${t.id})" aria-label="BIG 3">★</button>`,
+        cls: t.date < today && !t.done ? 'late' : ''
+    });
+    const nowCard = cur ? `<div class="m-now on"><span>지금</span><b>${tbxFmt(cur.start_min)}–${tbxFmt(cur.start_min + tbxDur(cur))}</b> ${mEsc(cur.task)}</div>`
+        : next ? `<div class="m-now"><span>다음</span><b>${tbxFmt(next.start_min)}</b> ${mEsc(next.task)}</div>`
+        : '<div class="m-now"><span>일정</span>시간을 정해둔 일이 없습니다</div>';
+    return `
+        <div class="m-hello"><b>${mEsc(inqMe())}</b>님의 ${mEsc(mMD(today))}</div>
+        <div class="m-prog"><i style="width:${pct}%"></i></div>
+        <div class="m-prog-t">오늘 ${doneN}/${todayAll.length} 완료</div>
+        ${nowCard}
+        <section class="m-sec"><h3>⭐ 오늘의 BIG 3 <em>${big3.length}/3</em></h3>
+            ${big3.map(t => row(t, t.start_min != null && t.date === today ? tbxFmt(t.start_min) : '')).join('') || '<div class="m-hint">할 일의 ★을 누르면 BIG 3에 올라가요</div>'}
+        </section>
+        ${blocks.length ? `<section class="m-sec"><h3>🕘 오늘 일정 <em>${blocks.length}</em></h3>
+            ${blocks.map(t => row(t, `${tbxFmt(t.start_min)}–${tbxFmt(t.start_min + tbxDur(t))}`)).join('')}</section>` : ''}
+        <section class="m-sec"><h3>📝 할 일 <em>${inbox.length}</em></h3>
+            ${mAddHtml('mDayNew', '오늘 할 일 입력', 'mDayAdd()')}
+            ${inbox.map(t => row(t, '')).join('') || '<div class="m-hint">남은 할 일이 없습니다 🎉</div>'}
+        </section>
+        <div class="m-foot-hint">시간 배치·루틴은 PC 화면의 ‘내 하루’에서</div>`;
+}
+async function mDayToggle(id) {
+    const t = (_tbxTasks || []).find(x => x.id === id); if (!t) return;
+    const done = !t.done;
+    await tbxUpdate(id, { done, completed_at: done ? new Date().toISOString() : null });
+    mRender();
+}
+async function mDayBig3(id) {
+    try { await tbxToggleBig3(id); } catch (e) { console.warn(e); }
+    mRender();
+}
+async function mDayAdd() {
+    const inp = document.getElementById('mDayNew');
+    const v = (inp && inp.value || '').trim(); if (!v) return;
+    const p = tbxParse(v);
+    const row = { task: p.title, date: getTodayStr(), assignee: currentUser.name, done: false,
+        category: p.cat, duration_min: p.est, label: TBX_CAT_LABEL[p.cat] };
+    inp.value = '';
+    const { data, error } = await sb.from('daily_tasks').insert(row).select().single();
+    if (error) { inp.value = v; showToast('추가 실패: ' + error.message); return; }
+    _tbxTasks.push(data);
+    try { if (!dailyTasks.find(x => x.id === data.id)) dailyTasks.push(taskFromDb(data)); } catch (_) {}
+    tbxSyncViews();
+    mRender();
+    const again = document.getElementById('mDayNew'); if (again) again.focus();
+}
+
+// ---------- ✅ 계획표 (일일계획표) ----------
+function mDailyPeople() {
+    const me = inqMe();
+    const list = ['나', '전체'];
+    if (_isKlpCompany() && (isExecUser() || isAdminUser())) list.push('임원');
+    if (_isKlpCompany() && isAdminUser() && me !== '대표님') list.push('대표님');
+    getVisiblePeople().forEach(p => { if (p !== currentUser.name && p !== me && !list.includes(p)) list.push(p); });
+    return list;
+}
+function mDailyWhoName() { return mDailyWho === '나' ? inqMe() : mDailyWho; }
+function mDailyHtml() {
+    const today = getTodayStr();
+    const date = mDailyDate || today;
+    const who = mDailyWhoName();
+    const list = dailyTasks.filter(t => t.date === date && t.assignee === who)
+        .sort((a, b) => (a.done - b.done) || (a.id - b.id));
+    const late = date === today ? dailyTasks.filter(t => t.assignee === who && !t.done && t.date && t.date < today && !t.isDeadlineCopy)
+        .sort((a, b) => String(a.date).localeCompare(String(b.date))) : [];
+    const doneN = list.filter(t => t.done).length;
+    const row = t => mRowHtml({
+        done: t.done, onCheck: `mDailyToggle(${t.id})`,
+        title: `${String(t.priority || '').startsWith('🔴') ? '<span class="m-urgent">긴급</span>' : ''}${mEsc(t.task)}`,
+        sub: [t.client ? mEsc(t.client) : '', t.label ? mEsc(t.label) : '', t.date !== date ? `밀림 · ${mEsc(mMD(t.date))}` : ''].filter(Boolean).join(' · '),
+        right: t.deadline && t.deadline !== t.date ? mDueHtml(t.deadline, t.done) : '',
+        cls: t.date !== date ? 'late' : ''
+    });
+    return `
+        <div class="m-datebar">
+            <button onclick="mDailyShift(-1)" aria-label="전날">‹</button>
+            <b>${mEsc(mMD(date))}</b>${date !== today ? '<button class="m-today" onclick="mDailyShift(0)">오늘</button>' : '<span class="m-today-tag">오늘</span>'}
+            <button onclick="mDailyShift(1)" aria-label="다음날">›</button>
+        </div>
+        <div class="m-chips">${mDailyPeople().map(p => `<button class="${p === mDailyWho ? 'on' : ''}" onclick="mDailySetWho('${mEsc(p)}')">${mEsc(p === '나' ? '나 (' + inqMe() + ')' : p)}</button>`).join('')}</div>
+        <div class="m-prog-t">${doneN}/${list.length} 완료</div>
+        <section class="m-sec">
+            ${mAddHtml('mDailyNew', `${mEsc(who)} · ${mEsc(mMD(date))} 할 일 입력`, 'mDailyAdd()')}
+            ${list.map(row).join('') || '<div class="m-hint">이 날 할 일이 없습니다</div>'}
+        </section>
+        ${late.length ? `<section class="m-sec"><h3>⏰ 밀린 일 <em>${late.length}</em></h3>${late.map(row).join('')}</section>` : ''}`;
+}
+function mDailyShift(n) { mDailyDate = n === 0 ? null : mShiftDate(mDailyDate || getTodayStr(), n); mRender(); }
+function mDailySetWho(p) { mDailyWho = p; mRender(); }
+async function mDailyToggle(id) { await toggleTask(id); mRender(); }
+async function mDailyAdd() {
+    const inp = document.getElementById('mDailyNew');
+    const task = (inp && inp.value || '').trim(); if (!task) return;
+    inp.value = '';
+    const saved = await dbInsertTask({ task, date: mDailyDate || getTodayStr(), assignee: mDailyWhoName(), target: '본사', priority: '🟡 보통', done: false });
+    if (!saved) { inp.value = task; return; }
+    if (!dailyTasks.find(t => t.id === saved.id)) dailyTasks.push(saved);
+    renderDaily(); renderHome();
+    mRender();
+    const again = document.getElementById('mDailyNew'); if (again) again.focus();
+}
+
+// ---------- 📁 프로젝트 ----------
+function mPlanModes() { return [['company', '🏢 회사'], ['personal', '🧑 개인'], ['funding', '💸 펀딩']].filter(([k]) => planningCanAccessMode(k)); }
+function mPlanVisible(mode) {
+    const prev = currentPlanningMode;
+    currentPlanningMode = mode;
+    try { return planningProjects.filter(planningCanSeeProject); } finally { currentPlanningMode = prev; }
+}
+function mPlanHtml() {
+    if (!planningCanAccess()) return mEmpty('프로젝트를 볼 권한이 없습니다');
+    if (!mEnsure('plan', () => planningLoaded ? null : loadPlanningProjects())) return mLoading();
+    const modes = mPlanModes();
+    if (!modes.length) return mEmpty('프로젝트를 볼 권한이 없습니다');
+    if (!mPlanMode || !modes.find(m => m[0] === mPlanMode)) mPlanMode = modes[0][0];
+    const vis = mPlanVisible(mPlanMode);
+    const live = p => mPlanMode === 'funding' ? p.status !== '완료' : (p.status || '진행 중') === '진행 중';
+    const active = vis.filter(live).sort(planningSortProjects);
+    const rest = vis.filter(p => !live(p)).sort(planningSortProjects);
+    const today = getTodayStr();
+    const row = p => {
+        const pr = planningProgress(p);
+        const late = planningTasksOf(p).filter(t => (t.taskStatus || 'todo') !== 'done' && t.deadline && t.deadline <= today).length;
+        const dd = p.status === '완료' ? null : planningDDay(p.deadline);
+        const notes = planningNotesOf(p).length;
+        return `<div class="m-card" onclick="mPush({type:'proj',id:${p.id}})">
+            <div class="m-card-t">${p.access === 'family' ? '🏠 ' : ''}${mEsc(p.name)}${p.status && p.status !== '진행 중' ? ` <span class="m-pill">${mEsc(p.status)}</span>` : ''}</div>
+            <div class="m-card-m">
+                ${pr.total ? `<span class="m-bar"><i style="width:${pr.pct}%"></i></span><span>${pr.done}/${pr.total} 완료</span>` : '<span>할 일 없음</span>'}
+                ${late ? `<span class="m-red">⚠ ${late}</span>` : ''}${notes ? `<span>📎 ${notes}</span>` : ''}
+                ${dd ? `<span class="m-dd" style="color:${dd.color}">${dd.label}</span>` : ''}
+            </div>
+        </div>`;
+    };
+    return `
+        <div class="m-seg">${modes.map(([k, l]) => `<button class="${k === mPlanMode ? 'on' : ''}" onclick="mPlanMode='${k}';mRender()">${l}</button>`).join('')}</div>
+        ${active.map(row).join('') || mEmpty('진행 중인 프로젝트가 없습니다')}
+        ${rest.length ? `<button class="m-more" onclick="mPlanShowAll=!mPlanShowAll;mRender()">${mPlanShowAll ? '접기 ▲' : `보류·완료 ${rest.length}개 보기 ▼`}</button>${mPlanShowAll ? rest.map(row).join('') : ''}` : ''}
+        <div class="m-foot-hint">새 프로젝트 만들기는 PC 화면에서</div>`;
+}
+function mProjDetailHtml(id) {
+    const p = planningProjects.find(x => x.id === id);
+    if (!p) return ['프로젝트', mEmpty('프로젝트를 찾을 수 없습니다')];
+    currentPlanningProjectId = id;   // 기존 상세 창·완료 처리 함수가 이 값을 씀
+    const today = getTodayStr();
+    const pr = planningProgress(p);
+    const dd = p.status === '완료' ? null : planningDDay(p.deadline);
+    const tasks = planningTasksOf(p).slice().sort((a, b) => planningPostSortKeyOf(a) - planningPostSortKeyOf(b));
+    const notes = planningNotesOf(p);
+    const replies = (p.posts || []).reduce((acc, x) => { if (x.parentId) acc[x.parentId] = (acc[x.parentId] || 0) + 1; return acc; }, {});
+    const urgent = tasks.filter(t => (t.taskStatus || 'todo') !== 'done' && t.deadline && t.deadline <= today);
+    const taskRow = t => {
+        const st = t.taskStatus || 'todo';
+        return mRowHtml({
+            done: st === 'done', onCheck: `mPlanToggle(${p.id},${t.id})`, onClick: `mPlanOpen(${p.id},${t.id})`,
+            title: `${st === 'doing' ? '<span class="m-doing">진행 중</span>' : ''}${mEsc(planningPostLabel(t, 80))}`,
+            sub: [(t.assignees || []).join(', '), replies[t.id] ? `💬 ${replies[t.id]}` : '', (t.refIds || []).length ? `📎 ${t.refIds.length}` : ''].filter(Boolean).map(mEsc).join(' · '),
+            right: (st === 'todo' ? `<button class="m-mini" onclick="event.stopPropagation();mPlanStatus(${p.id},${t.id},'doing')">▶ 시작</button>` : '') + mDueHtml(t.deadline, st === 'done'),
+            cls: st !== 'done' && t.deadline && t.deadline < today ? 'late' : ''
+        });
+    };
+    const grp = (key, label) => {
+        const items = tasks.filter(t => (t.taskStatus || 'todo') === key);
+        if (key === 'done') return items.length ? `<button class="m-more" onclick="mPlanDoneOpen=!mPlanDoneOpen;mRender()">완료 ${items.length} ${mPlanDoneOpen ? '접기 ▲' : '보기 ▼'}</button>${mPlanDoneOpen ? items.map(taskRow).join('') : ''}` : '';
+        return items.length ? `<section class="m-sec"><h3>${label} <em>${items.length}</em></h3>${items.map(taskRow).join('')}</section>` : '';
+    };
+    let lastWho = '';
+    try { lastWho = localStorage.getItem('pl_add_who') || ''; } catch (_) {}
+    const whoSel = `<select id="mPlanWho" aria-label="담당자"><option value="">담당 없음</option>${planningAssigneesList().map(n => `<option value="${mEsc(n)}" ${n === lastWho ? 'selected' : ''}>${mEsc(n)}</option>`).join('')}</select>`;
+    const taskTab = `
+        ${urgent.length ? `<div class="m-alert"><b>⚠️ 지금 할 일 ${urgent.length}</b>${urgent.map(t => `<div onclick="mPlanOpen(${p.id},${t.id})">${mEsc(planningPostLabel(t, 40))} <em>${t.deadline < today ? '마감 지남' : '오늘 마감'}</em></div>`).join('')}</div>` : ''}
+        ${mAddHtml('mPlanNew', '할 일 입력', `mPlanAdd(${p.id})`, whoSel)}
+        ${grp('doing', '▶ 진행 중')}${grp('todo', '📝 할 일')}${grp('done')}
+        ${tasks.length ? '' : '<div class="m-hint">아직 할 일이 없습니다</div>'}`;
+    const noteTab = notes.length ? `<div class="m-notes">${notes.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).map(n => {
+        const meta = planningCategoryMeta(n.category);
+        const th = planningThumbOf(n);
+        const ns = n.noteStatus || 'review';
+        return `<div class="m-note" onclick="mPlanOpen(${p.id},${n.id})">
+            ${th ? `<img src="${mEsc(th)}" alt="" loading="lazy">` : `<div class="m-note-ic" style="background:${meta.bg};color:${meta.fg}">${meta.icon}</div>`}
+            <div class="m-note-b"><div><span class="pl-cat" style="background:${meta.bg};color:${meta.fg}">${meta.icon} ${meta.label}</span>${n.category === 'propose' ? ` <span class="pl-ns ${ns}">${PLANNING_NOTE_STATUS[ns] || '검토 중'}</span>` : ''}</div>
+            <b>${mEsc(planningPostLabel(n, 60))}</b><span>${mEsc(n.author)} · ${mEsc(planningFmtDate(n.createdAt))}${replies[n.id] ? ' · 💬 ' + replies[n.id] : ''}</span></div>
+        </div>`;
+    }).join('')}</div>` : '<div class="m-hint">자료·제안이 없습니다 — 사진 올리기는 PC 화면에서</div>';
+    return [p.name, `
+        <div class="m-phead">
+            <div class="m-phead-s">${p.status ? `<span class="m-pill">${mEsc(p.status)}</span>` : ''}${p.deadline ? `<span>⏰ ${mEsc(p.deadline)}</span>` : ''}${dd ? `<span class="m-dd" style="color:${dd.color}">${dd.label}</span>` : ''}</div>
+            <div class="m-prog"><i style="width:${pr.pct}%"></i></div>
+            <div class="m-prog-t">${pr.done}/${pr.total} 완료 · ${pr.pct}%</div>
+        </div>
+        <div class="m-seg">
+            <button class="${mPlanTab === 'task' ? 'on' : ''}" onclick="mPlanTab='task';mRender()">✅ 할 일 ${tasks.length}</button>
+            <button class="${mPlanTab === 'note' ? 'on' : ''}" onclick="mPlanTab='note';mRender()">📎 자료·제안 ${notes.length}</button>
+        </div>
+        ${mPlanTab === 'note' ? noteTab : taskTab}
+        <button class="m-pcbtn" onclick="mOpenFull('proj',${p.id})">🖥 PC 화면에서 열기</button>`];
+}
+function mPlanOpen(projId, postId) { currentPlanningProjectId = projId; openPlanningPostDetail(postId); }
+function mPlanToggle(projId, postId) { currentPlanningProjectId = projId; planningToggleDone(postId); }
+function mPlanStatus(projId, postId, st) { currentPlanningProjectId = projId; planningSetTaskStatusQuiet(postId, st); }
+async function mPlanAdd(projId) {
+    const p = planningProjects.find(x => x.id === projId); if (!p) return;
+    const inp = document.getElementById('mPlanNew');
+    const title = (inp && inp.value || '').trim(); if (!title) { if (inp) inp.focus(); return; }
+    const who = (document.getElementById('mPlanWho') || {}).value || '';
+    try { localStorage.setItem('pl_add_who', who); } catch (_) {}
+    inp.value = '';
+    try {
+        await planningCreateTask(p, { title, who, deadline: '' });
+        currentPlanningProjectId = projId;
+        mRender();
+        const again = document.getElementById('mPlanNew'); if (again) again.focus();
+    } catch (err) {
+        inp.value = title;
+        console.error(err); showToast('할 일 저장 실패: ' + err.message);
+    }
+}
+
+// ---------- 💼 매입매출 (상담 · 국내 진행) ----------
+function mBizHtml() {
+    if (!mEnsure('inqList', () => inqLoad())) return mLoading();
+    const q = mBizQ.trim().toLowerCase();
+    const today = getTodayStr();
+    const inqs = _inqList.filter(x => INQ_ACTIVE.includes(x.status))
+        .filter(x => !q || [x.client, x.title, x.contact_name, x.next_action].join(' ').toLowerCase().includes(q))
+        .sort((a, b) => String(a.next_action_date || '9999').localeCompare(String(b.next_action_date || '9999'))
+            || String(b.last_contact_at || '').localeCompare(String(a.last_contact_at || '')));
+    const doms = domesticProjects.filter(p => p.status !== '완료' && p.status !== '취소')
+        .filter(p => !q || [p.client, p.name, p.supplier].join(' ').toLowerCase().includes(q));
+    const inqRow = x => `<div class="m-card" onclick="mPush({type:'inq',id:${x.id}})">
+        <div class="m-card-t">${mEsc(x.client || '(거래처 미정)')} ${x.grade ? clientGradeBadge(x.grade) : ''}<span class="m-st ${INQ_STATUS_CLS[x.status] || ''}">${mEsc(x.status)}</span></div>
+        ${x.title ? `<div class="m-card-s">${mEsc(x.title)}</div>` : ''}
+        ${x.next_action ? `<div class="m-next${x.next_action_date && x.next_action_date <= today ? ' late' : ''}">▶ ${mEsc(x.next_action)}${x.next_action_date ? ' · ' + mEsc(inqMD(x.next_action_date)) : ''}</div>` : ''}
+    </div>`;
+    const domRow = p => {
+        const done = CHECK_ITEMS.filter(it => p.checks && p.checks[it.key]).length;
+        return `<div class="m-card">
+            <div class="m-card-t">${mEsc(p.client || '')}<span class="m-card-r">${done}/${CHECK_ITEMS.length}</span></div>
+            <div class="m-card-s">${mEsc(p.name || '(품목 없음)')}${p.qty ? ' · ' + Number(p.qty).toLocaleString() + mEsc(p.unit || '개') : ''}${p.supplier ? ' · ' + mEsc(p.supplier) : ''}</div>
+            <div class="m-cks">${CHECK_ITEMS.map(it => { const on = !!(p.checks && p.checks[it.key]); return `<button class="${on ? 'on' : ''}" onclick="mDomCheck(${p.id},'${it.key}')">${on ? '✓ ' : ''}${mEsc(it.short)}</button>`; }).join('')}</div>
+        </div>`;
+    };
+    return `
+        <div class="m-seg">
+            <button class="${mBizSeg === 'inq' ? 'on' : ''}" onclick="mBizSeg='inq';mRender()">💬 상담 ${_inqList.filter(x => INQ_ACTIVE.includes(x.status)).length}</button>
+            <button class="${mBizSeg === 'dom' ? 'on' : ''}" onclick="mBizSeg='dom';mRender()">📦 국내 진행 ${domesticProjects.filter(p => p.status !== '완료' && p.status !== '취소').length}</button>
+        </div>
+        <input id="mBizSearch" class="m-search" placeholder="🔍 거래처·품목 검색" value="${mEsc(mBizQ)}" oninput="mBizQ=this.value;mRefreshSoon()">
+        ${mBizSeg === 'inq' ? (inqs.map(inqRow).join('') || mEmpty('진행 중인 상담이 없습니다')) : (doms.map(domRow).join('') || mEmpty('진행 중인 국내 건이 없습니다'))}
+        <div class="m-foot-hint">새 상담 등록·견적 작성은 PC 화면에서</div>`;
+}
+async function mDomCheck(id, key) { await toggleProjectCheck(id, key); mRender(); }
+
+function mInqDetailHtml(id) {
+    const x = inqFind(id);
+    if (!x) return ['상담', mEmpty('상담을 찾을 수 없습니다')];
+    if (!mEnsure('inq:' + id, async () => {
+        _inqSel = id;
+        await Promise.all([inqLoadTodos(x), inqLoadLogs(id), inqLoadDeal(x)]);
+    })) return [x.client || '상담', mLoading()];
+    if (_inqSel !== id) {   // 다른 상담을 PC에서 열었다면 다시 불러오기
+        delete mLoaded['inq:' + id];
+        return [x.client || '상담', mLoading()];
+    }
+    const today = getTodayStr();
+    const phone = x.contact_phone || '';
+    const tel = phone.replace(/[^0-9+]/g, '');
+    const todos = _inqTodos.slice().sort(inqTodoSort);
+    const projs = _inqProjsFor === id ? _inqProjs : [];
+    const logs = _inqLogs.slice().reverse().slice(0, 20);
+    const who = [x.contact_name || x.client_contact, [x.contact_dept, x.contact_title].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+    const dirs = [['in', '고객'], ['out', '우리'], ['memo', '메모']];
+    return [x.client || '상담', `
+        <div class="m-phead">
+            <div class="m-phead-s"><span class="m-st ${INQ_STATUS_CLS[x.status] || ''}">${mEsc(x.status)}</span>${x.grade ? clientGradeBadge(x.grade) : ''}${x.due_date ? `<span>납기 ${mEsc(inqMD(x.due_date))}</span>` : ''}</div>
+            ${x.title ? `<div class="m-phead-t">${mEsc(x.title)}</div>` : ''}
+            ${who ? `<div class="m-phead-w">👤 ${mEsc(who)}</div>` : ''}
+            <div class="m-contact">
+                ${tel ? `<a href="tel:${mEsc(tel)}">📞 전화</a><a href="sms:${mEsc(tel)}">💬 문자</a>` : ''}
+                ${x.contact_email ? `<a href="mailto:${mEsc(x.contact_email)}">✉️ 메일</a>` : ''}
+            </div>
+        </div>
+        <section class="m-sec"><h3>▶ 다음 할 일 <em>${todos.filter(t => !t.done).length}</em></h3>
+            ${todos.map(t => mRowHtml({
+                done: !!t.done, onCheck: `mInqTodoToggle(${id},${t.id})`,
+                title: mEsc(t.task), sub: mEsc(t.assignee || ''),
+                right: mDueHtml(t.due_date, t.done), cls: !t.done && t.due_date && t.due_date < today ? 'late' : ''
+            })).join('')}
+            ${mAddHtml('mInqTodoNew', '할 일 입력 → 내 일일계획표에도 등록', `mInqTodoAdd(${id})`, '<input id="mInqTodoDate" type="date" aria-label="날짜">')}
+        </section>
+        <section class="m-sec"><h3>✍️ 기록 남기기</h3>
+            <div class="m-seg sm">${dirs.map(([k, l]) => `<button class="${mInqDir === k ? 'on' : ''}" onclick="mInqDir='${k}';mRender()">${l}</button>`).join('')}</div>
+            ${mInqDir !== 'memo' ? `<select id="mInqCh" class="m-select">${INQ_CHANNELS.map(c => `<option>${mEsc(c)}</option>`).join('')}</select>` : ''}
+            <textarea id="mInqLog" class="m-text" rows="3" placeholder="${mInqDir === 'in' ? '고객이 한 말' : mInqDir === 'out' ? '우리가 답한 내용' : '내부 메모'}"></textarea>
+            <button class="m-save" onclick="mInqLogAdd(${id})">기록 저장</button>
+        </section>
+        ${projs.length ? `<section class="m-sec"><h3>📦 국내 진행 <em>${projs.length}</em></h3>${projs.map(pj => `
+            <div class="m-card flat"><div class="m-card-s"><b>${mEsc(pj.product_name || '(품목 없음)')}</b>${pj.quantity ? ' · ' + Number(pj.quantity).toLocaleString() + mEsc(pj.unit || '개') : ''}</div>
+            <div class="m-cks">${CHECK_ITEMS.map(it => { const on = !!(pj.checks && pj.checks[it.key]); return `<button class="${on ? 'on' : ''}" onclick="mInqCheck(${id},${pj.id},'${it.key}')">${on ? '✓ ' : ''}${mEsc(it.short)}</button>`; }).join('')}</div></div>`).join('')}</section>` : ''}
+        <section class="m-sec"><h3>💬 최근 기록 <em>${_inqLogs.length}</em></h3>
+            ${logs.map(l => `<div class="m-log ${mEsc(l.direction)}">
+                <div class="m-log-h"><b>${l.direction === 'system' ? '자동' : mEsc(INQ_DIR_LABEL[l.direction] || l.direction)}</b>${l.channel ? ' · ' + mEsc(l.channel) : ''}${l.author ? ' · ' + mEsc(l.author) : ''}<span>${mEsc(planningFmtDate(l.at || l.created_at))}</span></div>
+                ${l.body ? `<div class="m-log-b">${mEsc(l.body).replace(/\n/g, '<br>')}</div>` : ''}
+                ${Array.isArray(l.images) && l.images.length ? `<div class="m-log-imgs">${l.images.slice(0, 4).map(src => /^(https?:|data:image\/)/i.test(src) ? `<img src="${mEsc(src)}" alt="" loading="lazy">` : '').join('')}</div>` : ''}
+            </div>`).join('') || '<div class="m-hint">기록이 없습니다</div>'}
+        </section>
+        <button class="m-pcbtn" onclick="mOpenFull('inq',${id})">🖥 PC 화면에서 열기</button>`];
+}
+async function mInqTodoToggle(inqId, todoId) {
+    const x = inqFind(inqId); const t = _inqTodos.find(v => v.id === todoId);
+    if (!x || !t) return;
+    await inqTodoToggle(x, t, !t.done);
+    mRender();
+}
+async function mInqTodoAdd(inqId) {
+    const x = inqFind(inqId); if (!x) return;
+    const inp = document.getElementById('mInqTodoNew');
+    const task = (inp && inp.value || '').trim(); if (!task) { if (inp) inp.focus(); return; }
+    const due = (document.getElementById('mInqTodoDate') || {}).value || null;
+    const who = inqMe();
+    inp.value = '';
+    const dailyId = await inqTodoCreateDaily(x, task, due, who);
+    const { data, error } = await sb.from('inquiry_todos').insert({
+        inquiry_id: x.id, task, due_date: due, assignee: who, daily_task_id: dailyId, created_by: who
+    }).select().single();
+    if (error) {
+        inp.value = task;
+        showToast('할 일 저장 실패: ' + error.message);
+        if (dailyId) { await dbDeleteTask(dailyId); inqDailyRemoveLocal(dailyId); tbxSyncViews(); }
+        return;
+    }
+    _inqTodos.push(data);
+    showToast(dailyId ? `내 일일계획표(${inqMD(due || getTodayStr())})에도 등록했습니다` : '할 일을 추가했습니다');
+    await inqAddLog(x.id, { direction: 'system', body: `할 일 추가 · ${task} (${who}${due ? ' · ' + inqMD(due) : ''})` });
+    await inqSyncNextSummary(x);
+    const dEl = document.getElementById('mInqTodoDate'); if (dEl) dEl.value = '';
+    mRender();
+}
+async function mInqLogAdd(inqId) {
+    const x = inqFind(inqId); if (!x) return;
+    const el = document.getElementById('mInqLog');
+    const body = (el && el.value || '').trim();
+    if (!body) { showToast('내용을 입력하세요'); if (el) el.focus(); return; }
+    const dir = mInqDir;
+    const saved = await inqAddLog(x.id, { direction: dir, channel: dir === 'memo' ? '' : ((document.getElementById('mInqCh') || {}).value || ''), body });
+    if (!saved) return;
+    if (!_inqLogs.find(l => l.id === saved.id)) _inqLogs.push(saved);
+    el.value = '';
+    if (dir !== 'memo') {
+        const patch = { last_contact_at: new Date().toISOString() };
+        const bump = x.status === '신규' && dir === 'out';
+        if (bump) patch.status = '상담중';
+        const d = await inqPatch(x.id, patch, bump ? '상태 변경 · 신규 → 상담중' : null);
+        if (d) Object.assign(x, d);
+        if (bump) await inqLoadLogs(x.id);
+    }
+    showToast('기록했습니다');
+    mRender();
+}
+async function mInqCheck(inqId, projId, key) {
+    const x = inqFind(inqId);
+    const row = _inqProjs.find(r => r.id === projId);
+    if (!x || !row) return;
+    await inqToggleProjCheck(x, row, key);
+    mRender();
 }
