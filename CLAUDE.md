@@ -208,6 +208,13 @@
 - 디확 컨펌을 **켤 때** `askDesignConfirm()` 창(채널 버튼 + 기타 글칸 + 날짜, 취소 시 체크 안 함) — 국내 목록·상세(`toggleProjectCheck`), 상담 화면(`inqToggleProjCheck`). 편집 창은 체크 아래 `designConfirmFieldsHtml('editDc')` 칸. 끄면 채널·날짜 지움. '완료'로 자동 체크될 땐 기존 값 유지
 - 상담 타임라인 자동 기록: "디자인확인서 컨펌 · 품목 (카톡 · 9/30)", 단계 막대 디자인확인 날짜는 컨펌 날짜 우선
 
+## 보내기 — 견적서·디자인확인서·작업요청서 메일·카톡 '발송 직전까지' (2026-10, migration 050)
+- 공용 모듈 `send-kit.js` (index.html·doc-generator.html 둘 다 로드, 단일 파일 원칙의 예외 — 두 페이지가 같이 써야 해서). `SendKit.configure({load, save})` + `SendKit.open({docType, title, vars, to, fileBase, makeCanvas, onSent})`
+- 버튼: 상담·견적 견적서 창 `📤 보내기`(`sendTempQuote` — 받는 사람은 연결된 상담 담당자 이메일 → 거래처 DB staff_email/email, `{합계}`는 `renderTempQuoteDoc`가 `g._quoteGrand`에 기록, 상담 연결 시 '보냈어요' → 상담 기록(우리·채널)), doc-generator의 DC·WR·견적서 미리보기 `📤 보내기`(`sendDoc('dc'|'wr'|'quote')`, 거래처 DB에서 이메일)
+- 양식: `send_templates`(doc_type quote/dc/wr × channel email/kakao, 회사 공용, 행 없으면 send-kit.js `DEFAULTS`). 창 아래 `✏️ 양식 수정`에서 `{거래처} {담당자} {품목} {수량} {합계} {납기} {문서번호} {작성자}` 칸으로 편집
+- 메일: 네이버웍스 웹메일은 받는 사람·첨부를 웹에서 자동으로 넣을 방법이 없음 → `메일 준비하기` = PDF 내려받기 + mail.worksmobile.com 새 탭, ①받는 사람 ②제목 ③본문 복사 버튼(본문은 text/html로 줄바꿈 유지)
+- 카톡: PC = ①문서 이미지 복사(ClipboardItem png, Promise로 넘겨 버튼 권한 유지) ②문구 복사 → 채팅방 Ctrl+V / 폰 = `navigator.share({files, text})` 공유 시트(문구는 미리 클립보드에도). 문서 이미지는 창을 열 때 미리 만들어 둠(공유·복사는 클릭 직후에만 허용)
+
 ## 문서 생성기 (DC/WR) 연동
 - **생성 흐름**: 프로젝트 진행사항 → 상세/편집 모달의 `📄 디자인확인서 만들기` / `📋 작업요청서 만들기` 버튼 → `doc-generator.html`로 이동하여 pre-fill
   - 프로젝트 데이터는 `localStorage.klp_doc_prefill`로 전달 (doc-generator가 로드 시 읽고 즉시 삭제)

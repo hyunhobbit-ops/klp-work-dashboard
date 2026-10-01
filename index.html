@@ -832,6 +832,7 @@
                     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
                         <button id="btnTempQuoteJpg" onclick="dlTempQuote('jpg')" style="padding:8px 16px;border-radius:10px;border:none;background:#1B64DA;color:#fff;font-weight:700;cursor:pointer;font-family:inherit">JPG 다운로드</button>
                         <button id="btnTempQuotePdf" onclick="dlTempQuote('pdf')" style="padding:8px 16px;border-radius:10px;border:none;background:#16A34A;color:#fff;font-weight:700;cursor:pointer;font-family:inherit">PDF 다운로드</button>
+                        <button onclick="sendTempQuote()" style="padding:8px 16px;border-radius:10px;border:none;background:#111827;color:#fff;font-weight:800;cursor:pointer;font-family:inherit">📤 보내기 (메일·카톡)</button>
                         <button onclick="closeTempQuote()" style="margin-left:auto;padding:8px 16px;border-radius:10px;border:none;background:var(--gray-200);color:var(--gray-700);font-weight:700;cursor:pointer;font-family:inherit">닫기</button>
                     </div>
                     <div style="padding:20px;background:#f0f0f0;border-radius:12px"><div id="tempQuoteDocEl" style="margin:0 auto"></div></div>
@@ -1941,6 +1942,7 @@
         <div class="label-scroll" id="labelScroll"></div>
     </div>
 
-    <script src="app.js?v=20261001k"></script>
+    <script src="send-kit.js?v=20261001a"></script>
+    <script src="app.js?v=20261001l"></script>
 </body>
 </html>

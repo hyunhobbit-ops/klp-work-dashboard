@@ -12681,6 +12681,7 @@ function renderTempQuoteDoc(g) {
     }).join('');
 
     const grand = totalSup + totalVat;
+    g._quoteGrand = grand;   // 보내기 문구의 {합계}
     const koreanAmt = numToKoreanAmountTemp(grand);
 
     const headCell = 'background:#f5f7fa;color:#4a5568;padding:8px 6px;font-weight:700;font-size:10px;letter-spacing:.5px;border-bottom:1px solid #d5dae3';
@@ -12804,6 +12805,73 @@ async function dlTempQuote(type) {
     b1.disabled = b2.disabled = false;
     b1.textContent = 'JPG 다운로드';
     b2.textContent = 'PDF 다운로드';
+}
+
+// ===== 보내기 (send-kit.js) — 메일·카톡 발송 직전까지 준비 =====
+function sendKitSetup() {
+    if (sendKitSetup._done || !window.SendKit) return;
+    sendKitSetup._done = true;
+    SendKit.configure({
+        load: async () => {
+            const { data, error } = await sb.from('send_templates').select('doc_type, channel, subject, body');
+            if (error) throw error;
+            return data || [];
+        },
+        save: async (row) => {
+            const payload = Object.assign({}, row, { updated_by: (currentUser && currentUser.name) || '', updated_at: new Date().toISOString() });
+            const { data: ex, error: e1 } = await sb.from('send_templates').select('id').eq('doc_type', row.doc_type).eq('channel', row.channel).maybeSingle();
+            if (e1) throw e1;
+            const { error } = ex
+                ? await sb.from('send_templates').update(payload).eq('id', ex.id)
+                : await sb.from('send_templates').insert(payload);
+            if (error) throw error;
+        }
+    });
+}
+// 거래처 DB에서 이름으로 찾기 ((주)·공백 차이 무시)
+function sendFindClient(name) {
+    if (!name || typeof clients === 'undefined') return null;
+    const k = clientNameKey(name);
+    return clients.find(c => clientNameKey(c.companyName) === k) || null;
+}
+async function sendTempQuote() {
+    const g = _tempQuoteGroup;
+    if (!g) return;
+    if (!window.SendKit) { showToast('보내기 기능을 불러오지 못했습니다. 새로고침 해주세요'); return; }
+    sendKitSetup();
+    const inqId = (g.items.find(x => x.inquiryId) || {}).inquiryId || null;
+    let inq = inqId && typeof inqFind === 'function' ? inqFind(inqId) : null;
+    if (inqId && !inq) {
+        const { data } = await sb.from('inquiries').select('*').eq('id', inqId).maybeSingle();
+        inq = data || null;
+    }
+    const cli = sendFindClient(g.client);
+    const contact = inq && inq.contact_name
+        ? [inq.contact_name, inq.contact_title].filter(Boolean).join(' ')
+        : (g.clientContact || (cli && cli.staffName) || '');
+    const items = g.items || [];
+    const first = items[0] || {};
+    const itemLabel = (first.item || '') + (items.length > 1 ? ` 외 ${items.length - 1}건` : '');
+    const qtyLabel = first.qty ? Number(first.qty).toLocaleString() + '개' + (items.length > 1 ? ' 외' : '') : '';
+    const dateP = (g.date || '').replace(/-/g, '');
+    SendKit.open({
+        docType: 'quote',
+        title: `${g.client || '업체'} · ${itemLabel || '견적서'}`,
+        vars: {
+            거래처: g.client || '', 담당자: contact, 품목: itemLabel, 수량: qtyLabel,
+            합계: g._quoteGrand ? Number(g._quoteGrand).toLocaleString() + '원' : '',
+            납기: inq && inq.due_date ? inqMD(inq.due_date) : '',
+            문서번호: '', 작성자: (currentUser && currentUser.name) || ''
+        },
+        to: { email: (inq && inq.contact_email) || (cli && (cli.staffEmail || cli.email)) || '', phone: (inq && inq.contact_phone) || (cli && (cli.staffMobile || cli.mobile)) || '' },
+        fileBase: dateP + '_케이엘피코리아_' + (g.client || '업체') + '_견적서',
+        makeCanvas: () => html2canvas(document.getElementById('tempQuoteDocEl'), { scale: 3, useCORS: true, backgroundColor: '#fff', logging: false, width: 794, height: 1123, windowWidth: 794, windowHeight: 1123 }),
+        onSent: inqId ? async ({ channel, text }) => {
+            const saved = await inqAddLog(inqId, { direction: 'out', channel, body: `[견적서 발송]\n${text}` });
+            if (!saved) throw new Error('기록 저장 실패');
+            await inqPatch(inqId, { last_contact_at: new Date().toISOString() });
+        } : null
+    });
 }
 
 // ===== 프로젝트 (계획/협업) — localStorage 프로토타입 =====

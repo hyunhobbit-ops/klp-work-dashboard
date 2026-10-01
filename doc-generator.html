@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="send-kit.js?v=20261001a"></script>
 <style>
 :root{--klp-blue:#3182f6;--klp-dark:#191f28;--klp-beige:#f2f4f6;--klp-light-blue:#e8f3ff;--klp-white:#FFFFFF;--klp-red:#f04452;--klp-border:#e5e8eb;--klp-orange:#f59e0b;--klp-orange-light:#fef9ee;--toss-gray-50:#f9fafb;--toss-gray-100:#f2f4f6;--toss-gray-200:#e5e8eb;--toss-gray-300:#d1d6db;--toss-gray-400:#b0b8c1;--toss-gray-500:#8b95a1;--toss-gray-600:#6b7684;--toss-gray-700:#4e5968;--toss-gray-800:#333d4b;--toss-gray-900:#191f28;--toss-radius:16px;--toss-shadow:0 2px 8px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.06)}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -233,6 +234,7 @@ body.quote-only-mode .logo-area h1::after{content:' · 견적서 작성';color:#
     <button class="btn-back" onclick="showDcTab('form')">← 수정하기</button>
     <button class="btn-dl png" id="btnJpg" onclick="dl('jpg')">📷 JPG</button>
     <button class="btn-dl pdf" id="btnPdf" onclick="dl('pdf')">📄 PDF</button>
+    <button class="btn-dl" style="background:#111827;color:#fff" onclick="sendDoc('dc')">📤 보내기</button>
     <button class="btn-dl" style="background:#16A34A;color:#fff" onclick="openQuoteFromForm()">💰 견적서 만들기</button>
   </div>
   <div class="preview-wrap"><div id="docEl"></div></div>
@@ -246,6 +248,7 @@ body.quote-only-mode .logo-area h1::after{content:' · 견적서 작성';color:#
       <div style="display:flex;gap:8px">
         <button class="btn-dl png" id="btnQuoteJpg" onclick="dlQuote('jpg')">📷 JPG</button>
         <button class="btn-dl pdf" id="btnQuotePdf" onclick="dlQuote('pdf')">📄 PDF</button>
+        <button class="btn-dl" style="background:#111827;color:#fff" onclick="sendDoc('quote')">📤 보내기</button>
         <button onclick="closeQuoteOverlay()" style="padding:8px 14px;border:1px solid #ccc;border-radius:6px;background:#fff;cursor:pointer;font-weight:700">닫기</button>
       </div>
     </div>
@@ -338,6 +341,7 @@ body.quote-only-mode .logo-area h1::after{content:' · 견적서 작성';color:#
     <button class="btn-back" onclick="showWrTab('form')">← 수정하기</button>
     <button class="btn-dl wr-png" id="btnWrJpg" onclick="dlWr('jpg')">📷 JPG</button>
     <button class="btn-dl wr-pdf" id="btnWrPdf" onclick="dlWr('pdf')">📄 PDF</button>
+    <button class="btn-dl" style="background:#111827;color:#fff" onclick="sendDoc('wr')">📤 보내기</button>
   </div>
   <div class="preview-wrap"><div id="wrDocEl"></div></div>
 </div>
@@ -1373,6 +1377,60 @@ async function dlQuote(type){
     else{var pdf=new jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});var pw=pdf.internal.pageSize.getWidth();var ph=pdf.internal.pageSize.getHeight();pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',0,0,pw,ph);pdf.save(fname+'.pdf')}
   }catch(err){alert('오류: '+err.message)}
   b1.disabled=b2.disabled=false;b1.textContent='📷 JPG';b2.textContent='📄 PDF';
+}
+
+/* === 보내기 (send-kit.js) — 메일·카톡 발송 직전까지 준비 (양식은 send_templates, 회사 공용) === */
+var _sendKitReady=false;
+function sendKitSetupDoc(){
+  if(_sendKitReady||!window.SendKit)return;
+  _sendKitReady=true;
+  SendKit.configure({
+    load:function(){return sbFetch('send_templates?select=doc_type,channel,subject,body');},
+    save:async function(row){
+      var who='';try{var u=JSON.parse(localStorage.getItem('klp_user')||'{}');who=u.name||'';}catch(_){}
+      var payload=Object.assign({},row,{updated_by:who,updated_at:new Date().toISOString()});
+      var ex=await sbFetch('send_templates?select=id&doc_type=eq.'+row.doc_type+'&channel=eq.'+row.channel);
+      if(ex&&ex.length)await sbFetch('send_templates?id=eq.'+ex[0].id,'PATCH',payload);
+      else await sbFetch('send_templates','POST',payload);
+    }
+  });
+}
+async function sendFindClientDoc(name){
+  if(!name)return null;
+  try{var rows=await sbFetch('clients?select=email,mobile,staff_name,staff_email,staff_mobile&company_name=eq.'+encodeURIComponent(name)+'&limit=1');return (rows&&rows[0])||null;}
+  catch(e){return null;}
+}
+function sendCanvasOf(id){return html2canvas(document.getElementById(id),{scale:3,useCORS:true,backgroundColor:'#fff',logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123});}
+function sendMD(d){if(!d)return'';var p=String(d).split('-');return p.length<3?d:(+p[1])+'/'+(+p[2]);}
+async function sendDoc(kind){
+  if(!window.SendKit){alert('보내기 기능을 불러오지 못했습니다. 새로고침 해주세요');return;}
+  sendKitSetupDoc();
+  var me=val('manager')||getLoginManager()||'';
+  if(kind==='wr'){
+    var co=val('wrCompany'),cli=await sendFindClientDoc(co),qty=val('wrQty');
+    SendKit.open({docType:'wr',title:(co||'공장')+' · '+(val('wrProduct')||'작업요청서'),
+      vars:{'거래처':co,'담당자':val('wrContact'),'품목':val('wrProduct'),'수량':qty?qty+'개':'','합계':'','납기':sendMD(val('wrDeliveryDate')),'문서번호':val('wrDocNum'),'작성자':me},
+      to:{email:cli?(cli.staff_email||cli.email||''):'',phone:cli?(cli.staff_mobile||cli.mobile||''):''},
+      fileBase:getYYMMDD(val('wrDate'))+'_케이엘피코리아_'+(co||'업체')+'_'+(val('wrProduct')||'품명')+'_작업요청서',
+      makeCanvas:function(){return sendCanvasOf('wrDocEl');}});
+    return;
+  }
+  if(kind==='quote'){
+    if(!_quoteData)return;
+    var q=_quoteData,cq=await sendFindClientDoc(q.companyName);
+    SendKit.open({docType:'quote',title:(q.companyName||'업체')+' · '+(q.productName||'견적서'),
+      vars:{'거래처':q.companyName,'담당자':q.contactPerson,'품목':q.productName,'수량':q.quantity?Number(q.quantity).toLocaleString()+(q.unit||'개'):'','합계':(q.est&&q.est.grand)?Number(q.est.grand).toLocaleString()+'원':'','납기':sendMD(q.deliveryDate),'문서번호':q.docNumber||'','작성자':q.manager||me},
+      to:{email:cq?(cq.staff_email||cq.email||''):'',phone:cq?(cq.staff_mobile||cq.mobile||''):''},
+      fileBase:getYYMMDD(q.date)+'_케이엘피코리아_'+(q.companyName||'업체')+'_'+(q.productName||'품명')+'_견적서',
+      makeCanvas:function(){return sendCanvasOf('quoteDocEl');}});
+    return;
+  }
+  var co2=val('companyName'),cd=await sendFindClientDoc(co2),dn=document.getElementById('docNumPreview');
+  SendKit.open({docType:'dc',title:(co2||'업체')+' · '+(val('productName')||'디자인확인서'),
+    vars:{'거래처':co2,'담당자':val('contactPerson'),'품목':val('productName'),'수량':val('quantity')?val('quantity')+(val('unit')||'개'):'','합계':'','납기':sendMD(val('deliveryDate')),'문서번호':dn?dn.textContent:'','작성자':me},
+    to:{email:cd?(cd.staff_email||cd.email||''):'',phone:cd?(cd.staff_mobile||cd.mobile||''):''},
+    fileBase:getYYMMDD(val('date'))+'_케이엘피코리아_'+(co2||'업체')+'_'+(val('productName')||'품명')+'_디자인확인서',
+    makeCanvas:function(){return sendCanvasOf('docEl');}});
 }
 
 /* === SUPABASE - DC 저장 (FIX #10: 이미지, FIX #11: 문서번호 기준 덮어쓰기) === */
