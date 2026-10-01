@@ -176,6 +176,7 @@
 - 화면 폭 820px 이하면 `#mRoot`(index.html `#app` 맨 앞, z-index 260 — 모달 300·토스트 400·체크 입력창 10080보다 아래)가 전체 화면을 덮음. 아래 탭 4개: ☀️ 내 하루 · ✅ 계획표 · 📁 프로젝트 · 💼 매입매출 (마지막 탭 localStorage `m_tab`)
 - `PC 화면` = localStorage `m_full=1` → 원래 대시보드, 오른쪽 아래 `📱 간단 화면`(`#mBackSimple`)으로 복귀. 상세 화면의 `PC 화면에서 열기`(`mOpenFull`)는 해당 메뉴·상담·프로젝트를 바로 엶
 - **저장은 전부 기존 함수**: 내 하루 = `tbxLoad`/`tbxUpdate`/`tbxToggleBig3`/`tbxParse`, 계획표 = `dailyTasks`·`toggleTask`·`dbInsertTask`(사람 칩: 나·전체·임원·대표님·`getVisiblePeople`), 프로젝트 = `planningToggleDone`/`planningSetTaskStatusQuiet`/`planningCreateTask`(PC 빠른 추가와 공용)/`openPlanningPostDetail`, 매입매출 = 상담 `inqLoadTodos`/`inqLoadLogs`/`inqLoadDeal`/`inqTodoToggle`/`inqAddLog`/`inqPatch`/`inqToggleProjCheck`(열 때 `_inqSel`을 그 상담으로), 국내 = `domesticProjects`·`toggleProjectCheck`
+- 상담 상세는 `대화 | 할 일 | 진행` 탭(`mInqTab`). 대화 = PC와 같은 말풍선(고객 왼쪽 흰색·우리 오른쪽 파랑·메모 가운데 노랑·자동 기록 작은 글, 날짜 구분), 입력창은 화면 아래 고정(`mInqComposerHtml`, mRender의 footer 자리), 열면 맨 아래(최신)로 스크롤(`mScrollBottom`)
 - 갱신: `mInit`이 `renderDaily`·`renderProjects`·`renderPlanning`·`inqRenderList`를 감싸서 저장·실시간 갱신 때 `mRefreshSoon`. `mRender`는 입력 중 값·포커스·스크롤 유지. 상세 화면은 `history.pushState({mDepth})` → 폰 뒤로가기로 목록 복귀(`mOnPop`)
 - 폰에서 안 하는 것(일부러): 새 상담·견적 작성, 새 프로젝트, 사진 올리기, 시간 배치 → PC 화면 안내
 - 위젯: 안드로이드 앱 위젯은 `syncAndroidWidget`(오늘 할 일·요약). 아이폰 위젯은 아직 없음(Scriptable 방식 예정)

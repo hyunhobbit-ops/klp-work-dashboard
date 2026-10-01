@@ -24502,13 +24502,11 @@ function mGo(tab) {
     mStack = [];
     try { localStorage.setItem('m_tab', tab); } catch (_) {}
     mRender();
-    const b = document.querySelector('#mRoot .m-body'); if (b) b.scrollTop = 0;
 }
 function mPush(view) {
     mStack.push(view);
     try { history.pushState({ mDepth: mStack.length }, ''); } catch (_) {}
-    mRender();
-    const b = document.querySelector('#mRoot .m-body'); if (b) b.scrollTop = 0;
+    mRender();   // 새 화면은 맨 위부터 (대화는 mScrollBottom으로 맨 아래)
 }
 function mBack() {
     if (!mStack.length) return;
@@ -24558,10 +24556,10 @@ function mRender() {
 
     const view = mStack[mStack.length - 1];
     const tabDef = M_TABS.find(t => t.key === mTab) || M_TABS[0];
-    let title = tabDef.label, inner = '';
+    let title = tabDef.label, inner = '', footer = '';
     try {
         if (view && view.type === 'proj') [title, inner] = mProjDetailHtml(view.id);
-        else if (view && view.type === 'inq') [title, inner] = mInqDetailHtml(view.id);
+        else if (view && view.type === 'inq') [title, inner, footer = ''] = mInqDetailHtml(view.id);
         else if (mTab === 'day') inner = mDayHtml();
         else if (mTab === 'daily') inner = mDailyHtml();
         else if (mTab === 'plan') inner = mPlanHtml();
@@ -24578,11 +24576,13 @@ function mRender() {
             <button class="m-pc" onclick="mSetFull(true)">PC 화면</button>
         </header>
         <main class="m-body">${inner}</main>
+        ${footer}
         <nav class="m-tabs">${M_TABS.map(t => `<button class="${t.key === mTab ? 'on' : ''}" onclick="mGo('${t.key}')"><span>${t.icon}</span>${t.label}</button>`).join('')}</nav>`;
     root.dataset.view = viewKey;
-    Object.entries(keep).forEach(([id, v]) => { const el = document.getElementById(id); if (el && root.contains(el)) el.value = v; });
+    Object.entries(keep).forEach(([id, v]) => { const el = document.getElementById(id); if (el && root.contains(el)) { el.value = v; if (el.tagName === 'TEXTAREA' && v) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 140) + 'px'; } } });
     const nb = root.querySelector('.m-body');
-    if (nb && scroll) nb.scrollTop = scroll;
+    if (nb && mScrollBottom) { nb.scrollTop = nb.scrollHeight; mScrollBottom = false; }
+    else if (nb && scroll) nb.scrollTop = scroll;
     if (focusId) { const el = document.getElementById(focusId); if (el) { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } } }
 }
 
@@ -24857,7 +24857,7 @@ function mBizHtml() {
             || String(b.last_contact_at || '').localeCompare(String(a.last_contact_at || '')));
     const doms = domesticProjects.filter(p => p.status !== '완료' && p.status !== '취소')
         .filter(p => !q || [p.client, p.name, p.supplier].join(' ').toLowerCase().includes(q));
-    const inqRow = x => `<div class="m-card" onclick="mPush({type:'inq',id:${x.id}})">
+    const inqRow = x => `<div class="m-card" onclick="mInqOpen(${x.id})">
         <div class="m-card-t">${mEsc(x.client || '(거래처 미정)')} ${x.grade ? clientGradeBadge(x.grade) : ''}<span class="m-st ${INQ_STATUS_CLS[x.status] || ''}">${mEsc(x.status)}</span></div>
         ${x.title ? `<div class="m-card-s">${mEsc(x.title)}</div>` : ''}
         ${x.next_action ? `<div class="m-next${x.next_action_date && x.next_action_date <= today ? ' late' : ''}">▶ ${mEsc(x.next_action)}${x.next_action_date ? ' · ' + mEsc(inqMD(x.next_action_date)) : ''}</div>` : ''}
@@ -24881,60 +24881,112 @@ function mBizHtml() {
 }
 async function mDomCheck(id, key) { await toggleProjectCheck(id, key); mRender(); }
 
+let mInqTab = 'chat', mInqCh = '전화', mInqShowAll = false, mScrollBottom = false;
+function mInqOpen(id) { mInqTab = 'chat'; mInqShowAll = false; mScrollBottom = true; mPush({ type: 'inq', id }); }
+function mInqSetTab(t) { mInqTab = t; if (t === 'chat') mScrollBottom = true; mRender(); }
+
+// 상담 대화 — PC처럼 고객(왼쪽 흰 말풍선) / 우리(오른쪽 파란 말풍선) / 메모(가운데 노란 쪽지) / 자동 기록(가운데 작은 글)
+function mInqChatHtml() {
+    const all = _inqLogs.slice();
+    const LIMIT = 40;
+    const logs = mInqShowAll ? all : all.slice(-LIMIT);
+    let html = all.length > logs.length ? `<button class="m-more" onclick="mInqShowAll=true;mRender()">이전 기록 ${all.length - logs.length}개 더 보기</button>` : '';
+    let lastDay = '';
+    logs.forEach(l => {
+        const ts = l.at || l.created_at;
+        const day = inqDayLabel(ts);
+        if (day !== lastDay) { html += `<div class="m-chat-day"><span>${mEsc(day)}</span></div>`; lastDay = day; }
+        if (l.direction === 'system') {
+            html += `<div class="m-chat-sys">${mEsc(l.body)} · ${inqTime(ts)}</div>`;
+            return;
+        }
+        const imgs = inqLogImages(l).filter(src => /^(https?:|data:image\/)/i.test(src));
+        const who = l.direction === 'in' ? '고객' : l.direction === 'out' ? '우리' : '메모';
+        html += `<div class="m-msg ${l.direction === 'in' ? 'in' : l.direction === 'out' ? 'out' : 'memo'}">
+            <div class="m-msg-meta"><b>${who}</b>${l.channel ? `<span>${mEsc(l.channel)}</span>` : ''}${l.author && l.direction !== 'in' ? `<span>${mEsc(l.author)}</span>` : ''}</div>
+            <div class="m-msg-bubble">
+                ${l.body ? `<div class="m-msg-body">${mEsc(l.body).replace(/\n/g, '<br>')}</div>` : ''}
+                ${imgs.length ? `<div class="m-msg-imgs">${imgs.map(src => `<img src="${mEsc(src)}" alt="첨부 사진" loading="lazy" onclick="this.classList.toggle('zoom')">`).join('')}</div>` : ''}
+            </div>
+            <div class="m-msg-time">${inqTime(ts)}</div>
+        </div>`;
+    });
+    return `<div class="m-chat">${html || '<div class="m-hint center">아직 기록이 없습니다.<br>아래에 첫 대화를 남겨보세요.</div>'}</div>`;
+}
+function mInqComposerHtml(id) {
+    const dirs = [['in', '고객'], ['out', '우리'], ['memo', '메모']];
+    return `<div class="m-composer">
+        <div class="m-comp-top">
+            <div class="m-comp-dirs">${dirs.map(([k, l]) => `<button class="${mInqDir === k ? 'on ' + k : ''}" onclick="mInqDir='${k}';mRender()">${l}</button>`).join('')}</div>
+            ${mInqDir !== 'memo' ? `<select class="m-comp-ch" aria-label="경로" onchange="mInqCh=this.value">${INQ_CHANNELS.map(c => `<option ${mInqCh === c ? 'selected' : ''}>${mEsc(c)}</option>`).join('')}</select>` : ''}
+        </div>
+        <div class="m-comp-row">
+            <textarea id="mInqLog" rows="1" placeholder="${mInqDir === 'in' ? '고객이 한 말' : mInqDir === 'out' ? '우리가 답한 내용' : '내부 메모'}"
+                oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,140)+'px'"></textarea>
+            <button onclick="mInqLogAdd(${id})" aria-label="기록 저장">저장</button>
+        </div>
+    </div>`;
+}
+
 function mInqDetailHtml(id) {
     const x = inqFind(id);
     if (!x) return ['상담', mEmpty('상담을 찾을 수 없습니다')];
     if (!mEnsure('inq:' + id, async () => {
         _inqSel = id;
         await Promise.all([inqLoadTodos(x), inqLoadLogs(id), inqLoadDeal(x)]);
+        mScrollBottom = mInqTab === 'chat';
     })) return [x.client || '상담', mLoading()];
     if (_inqSel !== id) {   // 다른 상담을 PC에서 열었다면 다시 불러오기
         delete mLoaded['inq:' + id];
         return [x.client || '상담', mLoading()];
     }
     const today = getTodayStr();
-    const phone = x.contact_phone || '';
-    const tel = phone.replace(/[^0-9+]/g, '');
+    const tel = (x.contact_phone || '').replace(/[^0-9+]/g, '');
     const todos = _inqTodos.slice().sort(inqTodoSort);
+    const openTodos = todos.filter(t => !t.done).length;
     const projs = _inqProjsFor === id ? _inqProjs : [];
-    const logs = _inqLogs.slice().reverse().slice(0, 20);
+    const talkN = _inqLogs.filter(l => l.direction !== 'system').length;
     const who = [x.contact_name || x.client_contact, [x.contact_dept, x.contact_title].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
-    const dirs = [['in', '고객'], ['out', '우리'], ['memo', '메모']];
-    return [x.client || '상담', `
-        <div class="m-phead">
-            <div class="m-phead-s"><span class="m-st ${INQ_STATUS_CLS[x.status] || ''}">${mEsc(x.status)}</span>${x.grade ? clientGradeBadge(x.grade) : ''}${x.due_date ? `<span>납기 ${mEsc(inqMD(x.due_date))}</span>` : ''}</div>
-            ${x.title ? `<div class="m-phead-t">${mEsc(x.title)}</div>` : ''}
-            ${who ? `<div class="m-phead-w">👤 ${mEsc(who)}</div>` : ''}
-            <div class="m-contact">
+    const head = `
+        <div class="m-ihead">
+            <div class="m-ihead-top"><span class="m-st ${INQ_STATUS_CLS[x.status] || ''}">${mEsc(x.status)}</span>${x.grade ? clientGradeBadge(x.grade) : ''}${x.due_date ? `<span class="m-ihead-due">납기 ${mEsc(inqMD(x.due_date))}</span>` : ''}</div>
+            ${x.title ? `<div class="m-ihead-t">${mEsc(x.title)}</div>` : ''}
+            ${who ? `<div class="m-ihead-w">${mEsc(who)}</div>` : ''}
+            ${tel || x.contact_email ? `<div class="m-contact">
                 ${tel ? `<a href="tel:${mEsc(tel)}">📞 전화</a><a href="sms:${mEsc(tel)}">💬 문자</a>` : ''}
                 ${x.contact_email ? `<a href="mailto:${mEsc(x.contact_email)}">✉️ 메일</a>` : ''}
-            </div>
+            </div>` : ''}
         </div>
-        <section class="m-sec"><h3>▶ 다음 할 일 <em>${todos.filter(t => !t.done).length}</em></h3>
+        <div class="m-itabs">
+            <button class="${mInqTab === 'chat' ? 'on' : ''}" onclick="mInqSetTab('chat')">대화 <b>${talkN}</b></button>
+            <button class="${mInqTab === 'todo' ? 'on' : ''}" onclick="mInqSetTab('todo')">할 일 <b class="${openTodos ? 'hot' : ''}">${openTodos}</b></button>
+            <button class="${mInqTab === 'deal' ? 'on' : ''}" onclick="mInqSetTab('deal')">진행 <b>${projs.length}</b></button>
+        </div>`;
+    let body = '';
+    if (mInqTab === 'todo') {
+        body = `<section class="m-sec">
+            ${mAddHtml('mInqTodoNew', '할 일 입력 → 내 일일계획표에도 등록', `mInqTodoAdd(${id})`, '<input id="mInqTodoDate" type="date" aria-label="날짜">')}
             ${todos.map(t => mRowHtml({
                 done: !!t.done, onCheck: `mInqTodoToggle(${id},${t.id})`,
                 title: mEsc(t.task), sub: mEsc(t.assignee || ''),
                 right: mDueHtml(t.due_date, t.done), cls: !t.done && t.due_date && t.due_date < today ? 'late' : ''
-            })).join('')}
-            ${mAddHtml('mInqTodoNew', '할 일 입력 → 내 일일계획표에도 등록', `mInqTodoAdd(${id})`, '<input id="mInqTodoDate" type="date" aria-label="날짜">')}
-        </section>
-        <section class="m-sec"><h3>✍️ 기록 남기기</h3>
-            <div class="m-seg sm">${dirs.map(([k, l]) => `<button class="${mInqDir === k ? 'on' : ''}" onclick="mInqDir='${k}';mRender()">${l}</button>`).join('')}</div>
-            ${mInqDir !== 'memo' ? `<select id="mInqCh" class="m-select">${INQ_CHANNELS.map(c => `<option>${mEsc(c)}</option>`).join('')}</select>` : ''}
-            <textarea id="mInqLog" class="m-text" rows="3" placeholder="${mInqDir === 'in' ? '고객이 한 말' : mInqDir === 'out' ? '우리가 답한 내용' : '내부 메모'}"></textarea>
-            <button class="m-save" onclick="mInqLogAdd(${id})">기록 저장</button>
-        </section>
-        ${projs.length ? `<section class="m-sec"><h3>📦 국내 진행 <em>${projs.length}</em></h3>${projs.map(pj => `
-            <div class="m-card flat"><div class="m-card-s"><b>${mEsc(pj.product_name || '(품목 없음)')}</b>${pj.quantity ? ' · ' + Number(pj.quantity).toLocaleString() + mEsc(pj.unit || '개') : ''}</div>
-            <div class="m-cks">${CHECK_ITEMS.map(it => { const on = !!(pj.checks && pj.checks[it.key]); return `<button class="${on ? 'on' : ''}" onclick="mInqCheck(${id},${pj.id},'${it.key}')">${on ? '✓ ' : ''}${mEsc(it.short)}</button>`; }).join('')}</div></div>`).join('')}</section>` : ''}
-        <section class="m-sec"><h3>💬 최근 기록 <em>${_inqLogs.length}</em></h3>
-            ${logs.map(l => `<div class="m-log ${mEsc(l.direction)}">
-                <div class="m-log-h"><b>${l.direction === 'system' ? '자동' : mEsc(INQ_DIR_LABEL[l.direction] || l.direction)}</b>${l.channel ? ' · ' + mEsc(l.channel) : ''}${l.author ? ' · ' + mEsc(l.author) : ''}<span>${mEsc(planningFmtDate(l.at || l.created_at))}</span></div>
-                ${l.body ? `<div class="m-log-b">${mEsc(l.body).replace(/\n/g, '<br>')}</div>` : ''}
-                ${Array.isArray(l.images) && l.images.length ? `<div class="m-log-imgs">${l.images.slice(0, 4).map(src => /^(https?:|data:image\/)/i.test(src) ? `<img src="${mEsc(src)}" alt="" loading="lazy">` : '').join('')}</div>` : ''}
-            </div>`).join('') || '<div class="m-hint">기록이 없습니다</div>'}
-        </section>
-        <button class="m-pcbtn" onclick="mOpenFull('inq',${id})">🖥 PC 화면에서 열기</button>`];
+            })).join('') || '<div class="m-hint">할 일이 없습니다</div>'}
+        </section>`;
+    } else if (mInqTab === 'deal') {
+        body = projs.length ? projs.map(pj => {
+            const done = CHECK_ITEMS.filter(it => pj.checks && pj.checks[it.key]).length;
+            return `<div class="m-card">
+                <div class="m-card-t">${mEsc(pj.product_name || '(품목 없음)')}<span class="m-card-r">${done}/${CHECK_ITEMS.length}</span></div>
+                <div class="m-card-s">${pj.quantity ? Number(pj.quantity).toLocaleString() + mEsc(pj.unit || '개') : ''}${pj.supplier ? ' · ' + mEsc(pj.supplier) : ''}</div>
+                <div class="m-cks">${CHECK_ITEMS.map(it => { const on = !!(pj.checks && pj.checks[it.key]); return `<button class="${on ? 'on' : ''}" onclick="mInqCheck(${id},${pj.id},'${it.key}')">${on ? '✓ ' : ''}${mEsc(it.short)}</button>`; }).join('')}</div>
+            </div>`;
+        }).join('') : mEmpty('아직 국내 진행으로 넘어간 품목이 없습니다');
+    } else {
+        body = mInqChatHtml();
+    }
+    return [x.client || '상담', `${head}${body}
+        ${mInqTab !== 'chat' ? `<button class="m-pcbtn" onclick="mOpenFull('inq',${id})">🖥 PC 화면에서 열기</button>` : ''}`,
+        mInqTab === 'chat' ? mInqComposerHtml(id) : ''];
 }
 async function mInqTodoToggle(inqId, todoId) {
     const x = inqFind(inqId); const t = _inqTodos.find(v => v.id === todoId);
@@ -24972,10 +25024,12 @@ async function mInqLogAdd(inqId) {
     const body = (el && el.value || '').trim();
     if (!body) { showToast('내용을 입력하세요'); if (el) el.focus(); return; }
     const dir = mInqDir;
-    const saved = await inqAddLog(x.id, { direction: dir, channel: dir === 'memo' ? '' : ((document.getElementById('mInqCh') || {}).value || ''), body });
+    const saved = await inqAddLog(x.id, { direction: dir, channel: dir === 'memo' ? '' : mInqCh, body });
     if (!saved) return;
     if (!_inqLogs.find(l => l.id === saved.id)) _inqLogs.push(saved);
     el.value = '';
+    el.style.height = '';
+    mScrollBottom = true;
     if (dir !== 'memo') {
         const patch = { last_contact_at: new Date().toISOString() };
         const bump = x.status === '신규' && dir === 'out';
