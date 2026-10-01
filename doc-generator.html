@@ -8,7 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="send-kit.js?v=20261001g"></script>
+<script src="send-kit.js?v=20261001h"></script>
 <style>
 :root{--klp-blue:#3182f6;--klp-dark:#191f28;--klp-beige:#f2f4f6;--klp-light-blue:#e8f3ff;--klp-white:#FFFFFF;--klp-red:#f04452;--klp-border:#e5e8eb;--klp-orange:#f59e0b;--klp-orange-light:#fef9ee;--toss-gray-50:#f9fafb;--toss-gray-100:#f2f4f6;--toss-gray-200:#e5e8eb;--toss-gray-300:#d1d6db;--toss-gray-400:#b0b8c1;--toss-gray-500:#8b95a1;--toss-gray-600:#6b7684;--toss-gray-700:#4e5968;--toss-gray-800:#333d4b;--toss-gray-900:#191f28;--toss-radius:16px;--toss-shadow:0 2px 8px rgba(0,0,0,.04),0 1px 2px rgba(0,0,0,.06)}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -1413,10 +1413,13 @@ async function sendDocOptions(kind){
   /* {작성자}는 보내는 사람 이름만 (직함 없이 — '김현호 드림') */
   var me=(function(){try{var u=JSON.parse(localStorage.getItem('klp_user')||'{}');return u.name||'';}catch(_){return '';}})()||String(val('manager')||getLoginManager()||'').split(' ')[0];
   var meT=getLoginManager()||me; if(meT==='대표님')meT=(me?me+' 대표':'대표');
+  /* 메일 요약용: '10월 6일 택배 출고', '25,000원 (VAT 별도)' */
+  var kd=function(dt,ship){if(!dt)return '';var q=String(dt).split('-');var t=q.length<3?dt:(+q[1])+'월 '+(+q[2])+'일';return ship?t+' '+ship+' 출고':t;};
+  var won=function(n,vat){n=toNum(n);return n?n.toLocaleString()+'원'+(vat?' ('+vat+')':''):'';};
   if(kind==='wr'){
     var co=val('wrCompany'),cli=await sendFindClientDoc(co),qty=val('wrQty');
     return ({docType:'wr',title:(co||'공장')+' · '+(val('wrProduct')||'작업요청서'),
-      vars:{'거래처':co,'담당자':val('wrContact'),'품목':val('wrProduct'),'수량':qty?qty+'개':'','합계':'','납기':sendMD(val('wrDeliveryDate')),'문서번호':val('wrDocNum'),'작성자':me,'작성자직함':meT},
+      vars:{'거래처':co,'담당자':val('wrContact'),'품목':val('wrProduct'),'수량':qty?qty+'개':'','단가':won(val('wrUnitPrice'),val('wrUnitPriceVat')),'합계':'','납기':sendMD(val('wrDeliveryDate')),'납기일':kd(val('wrDeliveryDate'),val('wrShippingType')),'문서번호':val('wrDocNum'),'작성자':me,'작성자직함':meT},
       to:{email:cli?(cli.staff_email||cli.email||''):'',phone:cli?(cli.staff_mobile||cli.mobile||''):''},
       fileBase:getYYMMDD(val('wrDate'))+'_케이엘피코리아_'+(co||'업체')+'_'+(val('wrProduct')||'품명')+'_작업요청서',
       makeCanvas:function(){return sendCanvasOf('wrDocEl');}});
@@ -1426,7 +1429,7 @@ async function sendDocOptions(kind){
     if(!_quoteData)return;
     var q=_quoteData,cq=await sendFindClientDoc(q.companyName);
     return ({docType:'quote',title:(q.companyName||'업체')+' · '+(q.productName||'견적서'),
-      vars:{'거래처':q.companyName,'담당자':q.contactPerson,'품목':q.productName,'수량':q.quantity?Number(q.quantity).toLocaleString()+(q.unit||'개'):'','합계':(q.est&&q.est.grand)?Number(q.est.grand).toLocaleString()+'원':'','납기':sendMD(q.deliveryDate),'문서번호':q.docNumber||'','작성자':me,'작성자직함':meT},
+      vars:{'거래처':q.companyName,'담당자':q.contactPerson,'품목':q.productName,'수량':q.quantity?Number(q.quantity).toLocaleString()+(q.unit||'개'):'','단가':won(q.unitPrice,q.unitPriceVat),'합계':(q.est&&q.est.grand)?Number(q.est.grand).toLocaleString()+'원':'','납기':sendMD(q.deliveryDate),'납기일':kd(q.deliveryDate,q.shippingType),'문서번호':q.docNumber||'','작성자':me,'작성자직함':meT},
       to:{email:cq?(cq.staff_email||cq.email||''):'',phone:cq?(cq.staff_mobile||cq.mobile||''):''},
       fileBase:getYYMMDD(q.date)+'_케이엘피코리아_'+(q.companyName||'업체')+'_'+(q.productName||'품명')+'_견적서',
       makeCanvas:function(){return sendCanvasOf('quoteDocEl');}});
@@ -1434,7 +1437,7 @@ async function sendDocOptions(kind){
   }
   var co2=val('companyName'),cd=await sendFindClientDoc(co2),dn=document.getElementById('docNumPreview');
   return ({docType:'dc',title:(co2||'업체')+' · '+(val('productName')||'디자인확인서'),
-    vars:{'거래처':co2,'담당자':val('contactPerson'),'품목':val('productName'),'수량':val('quantity')?val('quantity')+(val('unit')||'개'):'','합계':'','납기':sendMD(val('deliveryDate')),'문서번호':dn?dn.textContent:'','작성자':me,'작성자직함':meT},
+    vars:{'거래처':co2,'담당자':val('contactPerson'),'품목':val('productName'),'수량':val('quantity')?val('quantity')+(val('unit')||'개'):'','단가':won(val('unitPrice'),val('unitPriceVat')),'합계':(function(){try{calcEst();}catch(_){}var e=window._est;return e&&e.grand?Number(e.grand).toLocaleString()+'원 (VAT 포함)':'';})(),'납기':sendMD(val('deliveryDate')),'납기일':kd(val('deliveryDate'),val('shippingType')),'문서번호':dn?dn.textContent:'','작성자':me,'작성자직함':meT},
     to:{email:cd?(cd.staff_email||cd.email||''):'',phone:cd?(cd.staff_mobile||cd.mobile||''):''},
     fileBase:getYYMMDD(val('date'))+'_케이엘피코리아_'+(co2||'업체')+'_'+(val('productName')||'품명')+'_디자인확인서',
     makeCanvas:function(){return sendCanvasOf('docEl');}});
