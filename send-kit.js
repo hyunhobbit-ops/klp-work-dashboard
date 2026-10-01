@@ -10,21 +10,37 @@
  *    makeCanvas : async () => canvas (문서 1장 A4)
  *    onSent  : async ({ channel, text }) => {}   (있으면 '보냈어요 — 기록 남기기' 버튼)
  *
- * 메일: 네이버웍스 웹메일은 웹에서 첨부·받는 사람을 자동으로 넣을 방법이 없어
- *       → 파일 내려받기 + 메일 열기 + 받는 사람/제목/본문 복사 버튼(순서대로 붙여넣기)
+ * 메일: 네이버웍스 메일쓰기 주소(to·subject·body)로 칸을 채움. 단 body를 넣으면 네이버웍스 기본 서명이 사라져서
+ *       '기본 서명 쓰기'(기본 켬)면 본문은 주소에 넣지 않고 클립보드에 복사 → 본문 맨 위에 Ctrl+V. 첨부는 직접
  * 카톡: 폰 = 공유 시트(파일+문구) / PC = 문서 이미지 복사 → 문구 복사 (채팅방에서 Ctrl+V)
  * ===================================================================== */
 (function () {
   'use strict';
   var MAIL_URL = 'https://mail.worksmobile.com/';
   // 네이버웍스 메일쓰기는 주소 뒤 to·subject·body를 받아 칸을 채워줌 (2026-10 실제 확인). 첨부만 직접
-  function composeUrl(m) {
+  // body를 넣으면 기본 서명이 사라짐(본문을 통째로 바꿈) → 서명 쓸 땐 body 없이 열고 본문은 붙여넣기
+  function composeUrl(m, withBody) {
     return 'https://mail.worksmobile.com/w/compose?orderType=new' +
-      '&to=' + encodeURIComponent(m.to || '') + '&subject=' + encodeURIComponent(m.subject || '') + '&body=' + encodeURIComponent(m.body || '');
+      '&to=' + encodeURIComponent(m.to || '') + '&subject=' + encodeURIComponent(m.subject || '') +
+      (withBody ? '&body=' + encodeURIComponent(m.body || '') : '');
+  }
+  // 새 탭을 열기 전에 동기로 복사 (탭이 열리면 이 페이지가 포커스를 잃어 비동기 복사는 막힘)
+  function copyHtmlSync(text) {
+    var div = document.createElement('div');
+    div.contentEditable = 'true';
+    div.style.cssText = 'position:fixed;left:-9999px;top:0;white-space:normal';
+    div.innerHTML = esc(text).replace(/\n/g, '<br>');
+    document.body.appendChild(div);
+    var sel = window.getSelection(), r = document.createRange();
+    r.selectNodeContents(div); sel.removeAllRanges(); sel.addRange(r);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (_) {}
+    sel.removeAllRanges(); div.remove();
+    return ok;
   }
   var DOC_LABEL = { quote: '견적서', dc: '디자인확인서', wr: '작업요청서', pre: '가견적 안내', msg: '안내 메시지' };
   var VARS = ['거래처', '담당자', '품목', '수량', '합계', '납기', '문서번호', '작성자', '내용'];
-  var SIGN = '\n\n{작성자} 드림\n케이엘피코리아 | Tel 02-2103-5757 | klpkorea@agift.kr';
+  var SIGN = '\n\n{작성자} 드림';   // 회사 정보는 네이버웍스 기본 서명이 붙임
   var DEFAULTS = {
     quote: {
       email: { subject: '[케이엘피코리아] {품목} 견적서 송부의 건',
@@ -166,6 +182,8 @@
       '#skBox .sk-file{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:11px;background:#f7f8fa;font-size:13.5px;font-weight:600}',
       '#skBox .sk-file span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '#skBox .sk-tip{font-size:12.5px;color:#6b7684;line-height:1.55;margin:2px 0 10px}',
+      '#skBox .sk-sig{display:flex;align-items:center;gap:7px;margin:0 0 6px;font-size:13.5px;font-weight:700;color:#374151;cursor:pointer}',
+      '#skBox .sk-sig input{width:17px;height:17px;flex:none;margin:0;accent-color:#1F85FF}',
       '#skBox .sk-tip b{color:#374151}',
       '#skBox .sk-foot{display:flex;gap:8px;align-items:center;padding:12px 20px;border-top:1px solid #eef0f3;background:#fafbfc}',
       '#skBox .sk-foot .sp{flex:1}',
@@ -202,7 +220,10 @@
       var m = st.draft.email;
       body = '<div class="sk-b">' +
         '<button class="sk-main" data-a="mail-go">✉️ 네이버웍스 메일쓰기 열기' + (st.hasFile ? ' + PDF 내려받기' : '') + '</button>' +
-        '<div class="sk-tip">새 탭의 메일쓰기 창에 아래 <b>받는 사람·제목·본문이 자동으로 채워져요.</b>' + (st.hasFile ? ' 내려받은 <b>PDF만 끌어다 놓고</b> 확인 후 보내세요.' : ' 확인 후 보내세요.') + ' (안 채워지면 옆의 복사 버튼으로)</div>' +
+        '<label class="sk-sig"><input type="checkbox" data-a="sig"' + (st.useSig ? ' checked' : '') + '> 네이버웍스 <b>기본 서명</b> 쓰기</label>' +
+        (st.useSig
+          ? '<div class="sk-tip">메일쓰기 창에 <b>받는 사람·제목</b>이 채워지고 서명이 붙어요. 본문은 <b>자동으로 복사</b>돼 있으니 본문 맨 위를 클릭하고 <b>Ctrl+V</b>' + (st.hasFile ? ', 내려받은 <b>PDF를 끌어다 놓고</b>' : '') + ' 보내세요.</div>'
+          : '<div class="sk-tip">메일쓰기 창에 <b>받는 사람·제목·본문</b>이 모두 채워져요(네이버웍스 서명은 빠짐).' + (st.hasFile ? ' 내려받은 <b>PDF만 끌어다 놓고</b> 보내세요.' : '') + '</div>') +
         '<div class="sk-f"><label><span class="n">1</span>받는 사람</label><div class="sk-row"><input id="skTo" value="' + esc(m.to) + '" placeholder="이메일 주소"><button class="sk-c" data-a="copy:skTo:받는 사람">복사</button></div></div>' +
         '<div class="sk-f"><label><span class="n">2</span>제목</label><div class="sk-row"><input id="skSubject" value="' + esc(m.subject) + '"><button class="sk-c" data-a="copy:skSubject:제목">복사</button></div></div>' +
         '<div class="sk-f"><label><span class="n">3</span>본문 <span style="font-weight:600">(여기서 고쳐도 돼요)</span></label><textarea id="skBody" rows="11">' + esc(m.body) + '</textarea><div class="sk-row" style="margin-top:6px"><span style="flex:1"></span><button class="sk-c" data-a="copy:skBody:본문">본문 복사</button></div></div>' +
@@ -244,6 +265,7 @@
     if (a === 'close') { close(); return; }
     saveDraftFromInputs();
     if (a.indexOf('ch:') === 0) { st.ch = a.slice(3); st.editing = false; render(); return; }
+    if (a === 'sig') { st.useSig = !!b.checked; try { localStorage.setItem('sk_sig', st.useSig ? '1' : '0'); } catch (_) {} render(); return; }
     if (a.indexOf('copy:') === 0) {
       var parts = a.split(':'); var el = document.getElementById(parts[1]);
       if (el) await copyText(el.value, parts[2]);
@@ -256,10 +278,12 @@
       b.disabled = false; return;
     }
     if (a === 'mail-go') {
-      var w = window.open(composeUrl(st.draft.email), '_blank');   // 팝업 차단을 피하려고 먼저 연다
-      if (!st.hasFile) { toast(w ? '메일쓰기 창에 채워 두었어요 — 확인 후 보내세요' : '팝업이 막혔어요 — 주소창 오른쪽에서 팝업을 허용해주세요'); return; }
+      var copied = st.useSig ? copyHtmlSync(st.draft.email.body) : false;
+      var w = window.open(composeUrl(st.draft.email, !st.useSig), '_blank');   // 팝업 차단을 피하려고 먼저 연다
+      var doneMsg = st.useSig ? (copied ? '본문 복사됨 — 메일 본문 맨 위를 클릭하고 Ctrl+V' : '본문 복사가 막혔어요 — ③ 본문 복사 버튼을 눌러주세요') : '메일쓰기 창에 채워 두었어요';
+      if (!st.hasFile) { toast(w ? doneMsg : '팝업이 막혔어요 — 주소창 오른쪽에서 팝업을 허용해주세요'); return; }
       b.disabled = true; b.textContent = '파일 만드는 중…';
-      try { download(await getPdfBlob(), st.fileBase + '.pdf'); toast('메일쓰기 창에 채워 두었어요 — 내려받은 PDF를 끌어다 놓으세요'); }
+      try { download(await getPdfBlob(), st.fileBase + '.pdf'); toast(doneMsg + ' · PDF는 끌어다 놓기'); }
       catch (err) { alert('PDF 만들기 실패: ' + err.message); }
       b.disabled = false; b.textContent = '✉️ 네이버웍스 메일쓰기 열기 + PDF 내려받기';
       if (!w) toast('팝업이 막혔어요 — 주소창 오른쪽에서 팝업을 허용해주세요');
@@ -349,6 +373,7 @@
       fileBase: (opts.fileBase || DOC_LABEL[opts.docType]).replace(/[\\/:*?"<>|]/g, '_'),
       makeCanvas: opts.makeCanvas || null, hasFile: !!opts.makeCanvas, onSent: opts.onSent || null,
       sentLabel: opts.sentLabel || '',
+      useSig: (function () { try { return localStorage.getItem('sk_sig') !== '0'; } catch (_) { return true; } })(),
       ch: (function () { try { return localStorage.getItem('sk_ch') === 'kakao' ? 'kakao' : 'email'; } catch (_) { return 'email'; } })(),
       editing: false
     };
