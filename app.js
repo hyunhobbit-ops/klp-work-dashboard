@@ -12876,8 +12876,10 @@ async function sendTempQuote() {
         title: `${g.client || '업체'} · ${itemLabel || '견적서'}`,
         vars: {
             거래처: g.client || '', 담당자: contact, 품목: itemLabel, 수량: qtyLabel,
-            합계: g._quoteGrand ? Number(g._quoteGrand).toLocaleString() + '원' : '',
+            단가: first.unitPrice ? Number(first.unitPrice).toLocaleString() + '원 (' + (first.unitPriceVat || 'VAT 별도') + ')' + (items.length > 1 ? ' 외' : '') : '',
+            합계: g._quoteGrand ? Number(g._quoteGrand).toLocaleString() + '원 (VAT 포함)' : '',
             납기: inq && inq.due_date ? inqMD(inq.due_date) : '',
+            납기일: inq && inq.due_date ? (() => { const q = String(inq.due_date).split('-'); const ship = items.some(p => (p.shippingFee || 0) > 0 || (p.shippingBoxes || 0) > 0) ? ' 택배 출고' : ''; return `${+q[1]}월 ${+q[2]}일${ship}`; })() : '',
             문서번호: '', 작성자: (currentUser && currentUser.name) || '', 작성자직함: sendMyTitle()
         },
         to: { email: (inq && inq.contact_email) || (cli && (cli.staffEmail || cli.email)) || '', phone: (inq && inq.contact_phone) || (cli && (cli.staffMobile || cli.mobile)) || '' },
