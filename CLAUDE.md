@@ -213,6 +213,7 @@
 - 버튼: 상담·견적 견적서 창 `📤 보내기`(`sendTempQuote` — 받는 사람은 연결된 상담 담당자 이메일 → 거래처 DB staff_email/email, `{합계}`는 `renderTempQuoteDoc`가 `g._quoteGrand`에 기록, 상담 연결 시 '보냈어요' → 상담 기록(우리·채널)), doc-generator의 DC·WR·견적서 미리보기 `📤 보내기`(`sendDoc('dc'|'wr'|'quote')`, 거래처 DB에서 이메일)
 - 양식: `send_templates`(doc_type quote/dc/wr × channel email/kakao, 회사 공용, 행 없으면 send-kit.js `DEFAULTS`). 창 아래 `✏️ 양식 수정`에서 `{거래처} {담당자} {품목} {수량} {합계} {납기} {문서번호} {작성자}` 칸으로 편집
 - 메일: 네이버웍스 웹메일은 받는 사람·첨부를 웹에서 자동으로 넣을 방법이 없음 → `메일 준비하기` = PDF 내려받기 + mail.worksmobile.com 새 탭, ①받는 사람 ②제목 ③본문 복사 버튼(본문은 text/html로 줄바꿈 유지)
+- **상담 화면 `📤 보내기`** (머리줄 `#inqFSend`, 폰 상담 상세에도): 메뉴(`inqSendMenu`) — 연결된 견적서(→ `openTempQuote`+`sendTempQuote`), 💡 가견적 안내(`pre`, 첨부 없음, {내용}=`inqPreText`에서 제목·서명 뺀 부분, '보냈어요'= `inqPreMarkSent` → 상태 가견적), ✉️ 안내 메시지(`msg`, 글만, '보냈어요'=`inqSendLogged`), 디자인확인서·작업요청서(→ 문서 생성기 `createDocFromProject`, 거기서 보내기). 첨부 없는 종류는 send-kit에서 파일 칸·이미지 복사가 빠짐(`makeCanvas` 없음). migration 051로 doc_type에 pre·msg 추가
 - 카톡: PC = ①문서 이미지 복사(ClipboardItem png, Promise로 넘겨 버튼 권한 유지) ②문구 복사 → 채팅방 Ctrl+V / 폰 = `navigator.share({files, text})` 공유 시트(문구는 미리 클립보드에도). 문서 이미지는 창을 열 때 미리 만들어 둠(공유·복사는 클릭 직후에만 허용)
 
 ## 문서 생성기 (DC/WR) 연동

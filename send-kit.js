@@ -17,8 +17,8 @@
 (function () {
   'use strict';
   var MAIL_URL = 'https://mail.worksmobile.com/';
-  var DOC_LABEL = { quote: '견적서', dc: '디자인확인서', wr: '작업요청서' };
-  var VARS = ['거래처', '담당자', '품목', '수량', '합계', '납기', '문서번호', '작성자'];
+  var DOC_LABEL = { quote: '견적서', dc: '디자인확인서', wr: '작업요청서', pre: '가견적 안내', msg: '안내 메시지' };
+  var VARS = ['거래처', '담당자', '품목', '수량', '합계', '납기', '문서번호', '작성자', '내용'];
   var SIGN = '\n\n{작성자} 드림\n케이엘피코리아 | Tel 02-2103-5757 | klpkorea@agift.kr';
   var DEFAULTS = {
     quote: {
@@ -32,6 +32,18 @@
         body: '안녕하세요, {거래처} {담당자}님.\n케이엘피코리아 {작성자}입니다.\n\n{품목} 디자인확인서를 첨부와 같이 보내드립니다.\n아래 내용 확인하시고 이상 없으시면 회신으로 "컨펌" 부탁드립니다.\n\n- 로고·문구·색상·인쇄 위치\n- 수량: {수량}\n- 납기: {납기}\n\n컨펌 주시는 날 바로 제작에 들어가겠습니다.\n감사합니다.' + SIGN },
       kakao: { subject: '',
         body: '안녕하세요 {담당자}님, 케이엘피코리아 {작성자}입니다.\n{품목} 디자인확인서 보내드립니다.\n로고·문구·색상·수량({수량})·납기({납기}) 확인하시고 이상 없으면 "컨펌" 말씀 부탁드립니다!' }
+    },
+    pre: {
+      email: { subject: '[케이엘피코리아] {품목} 가견적 안내드립니다',
+        body: '안녕하세요, {거래처} {담당자}님.\n케이엘피코리아 {작성자}입니다.\n\n문의 주신 {품목} 예상 견적을 안내드립니다.\n디자인·수량이 확정되면 정확한 견적서로 다시 보내드리겠습니다.\n\n{내용}\n\n궁금하신 점은 편하게 연락 주세요.\n감사합니다.' + SIGN },
+      kakao: { subject: '',
+        body: '안녕하세요 {담당자}님, 케이엘피코리아 {작성자}입니다.\n문의 주신 {품목} 가견적 안내드려요.\n\n{내용}\n\n디자인·수량 확정되면 정확한 견적서 보내드릴게요!' }
+    },
+    msg: {
+      email: { subject: '[케이엘피코리아] {품목} 관련 안내드립니다',
+        body: '안녕하세요, {거래처} {담당자}님.\n케이엘피코리아 {작성자}입니다.\n\n\n\n감사합니다.' + SIGN },
+      kakao: { subject: '',
+        body: '안녕하세요 {담당자}님, 케이엘피코리아 {작성자}입니다.\n' }
     },
     wr: {
       email: { subject: '[케이엘피코리아] {품목} 작업요청서 ({문서번호})',
@@ -184,27 +196,29 @@
     } else if (st.ch === 'email') {
       var m = st.draft.email;
       body = '<div class="sk-b">' +
-        '<button class="sk-main" data-a="mail-go">✉️ 메일 준비하기 (파일 내려받기 + 네이버웍스 메일 열기)</button>' +
-        '<div class="sk-tip">네이버웍스에서 <b>메일쓰기</b>를 누른 뒤, 아래 <b>①②③</b>을 차례로 복사 → 붙여넣기 하고, 내려받은 파일을 끌어다 놓으면 끝이에요.</div>' +
+        '<button class="sk-main" data-a="mail-go">' + (st.hasFile ? '✉️ 메일 준비하기 (파일 내려받기 + 네이버웍스 메일 열기)' : '✉️ 네이버웍스 메일 열기') + '</button>' +
+        '<div class="sk-tip">네이버웍스에서 <b>메일쓰기</b>를 누른 뒤, 아래 <b>①②③</b>을 차례로 복사 → 붙여넣기' + (st.hasFile ? ' 하고, 내려받은 파일을 끌어다 놓으면 끝이에요.' : ' 하면 끝이에요.') + '</div>' +
         '<div class="sk-f"><label><span class="n">1</span>받는 사람</label><div class="sk-row"><input id="skTo" value="' + esc(m.to) + '" placeholder="이메일 주소"><button class="sk-c" data-a="copy:skTo:받는 사람">복사</button></div></div>' +
         '<div class="sk-f"><label><span class="n">2</span>제목</label><div class="sk-row"><input id="skSubject" value="' + esc(m.subject) + '"><button class="sk-c" data-a="copy:skSubject:제목">복사</button></div></div>' +
         '<div class="sk-f"><label><span class="n">3</span>본문 <span style="font-weight:600">(여기서 고쳐도 돼요)</span></label><textarea id="skBody" rows="11">' + esc(m.body) + '</textarea><div class="sk-row" style="margin-top:6px"><span style="flex:1"></span><button class="sk-c" data-a="copy:skBody:본문">본문 복사</button></div></div>' +
-        '<div class="sk-f"><label><span class="n">4</span>첨부 파일</label><div class="sk-file">📄 <span>' + esc(st.fileBase) + '.pdf</span><button class="sk-c light" data-a="dl:pdf">PDF 받기</button><button class="sk-c light" data-a="dl:jpg">JPG 받기</button></div></div>' +
+        (st.hasFile ? '<div class="sk-f"><label><span class="n">4</span>첨부 파일</label><div class="sk-file">📄 <span>' + esc(st.fileBase) + '.pdf</span><button class="sk-c light" data-a="dl:pdf">PDF 받기</button><button class="sk-c light" data-a="dl:jpg">JPG 받기</button></div></div>' : '') +
         '</div>';
     } else {
       var k = st.draft.kakao;
       var phone = isPhone() && navigator.canShare;
       body = '<div class="sk-b">' +
         (phone
-          ? '<button class="sk-main kakao" data-a="kakao-share">💬 카톡으로 보내기 (문서 이미지 + 문구)</button><div class="sk-tip">공유 창에서 <b>카카오톡</b> → 채팅방을 고르고 <b>전송</b>만 누르세요. 문구가 안 붙으면 입력칸을 길게 눌러 <b>붙여넣기</b> 하세요(미리 복사해 둠).</div>'
-          : '<div class="sk-tip">PC 카톡에서 보낼 채팅방을 연 다음, <b>①</b>을 누르고 채팅방에 <b>Ctrl+V</b> → <b>②</b>를 누르고 <b>Ctrl+V</b> → 전송.</div>' +
-            '<div class="sk-row" style="margin-bottom:12px"><button class="sk-main kakao" style="margin:0" data-a="kakao-img">① 문서 이미지 복사</button><button class="sk-main kakao" style="margin:0" data-a="kakao-text">② 문구 복사</button></div>') +
-        '<div class="sk-f"><label>보낼 문구 <span style="font-weight:600">(여기서 고쳐도 돼요)</span></label><textarea id="skKakao" rows="7">' + esc(k.body) + '</textarea></div>' +
-        '<div class="sk-file">🖼 <span>' + esc(st.fileBase) + '.jpg</span><button class="sk-c light" data-a="dl:jpg">이미지 받기</button><button class="sk-c light" data-a="dl:pdf">PDF 받기</button></div>' +
+          ? '<button class="sk-main kakao" data-a="kakao-share">💬 카톡으로 보내기' + (st.hasFile ? ' (문서 이미지 + 문구)' : '') + '</button><div class="sk-tip">공유 창에서 <b>카카오톡</b> → 채팅방을 고르고 <b>전송</b>만 누르세요.' + (st.hasFile ? ' 문구가 안 붙으면 입력칸을 길게 눌러 <b>붙여넣기</b> 하세요(미리 복사해 둠).' : '') + '</div>'
+          : st.hasFile
+            ? '<div class="sk-tip">PC 카톡에서 보낼 채팅방을 연 다음, <b>①</b>을 누르고 채팅방에 <b>Ctrl+V</b> → <b>②</b>를 누르고 <b>Ctrl+V</b> → 전송.</div>' +
+              '<div class="sk-row" style="margin-bottom:12px"><button class="sk-main kakao" style="margin:0" data-a="kakao-img">① 문서 이미지 복사</button><button class="sk-main kakao" style="margin:0" data-a="kakao-text">② 문구 복사</button></div>'
+            : '<button class="sk-main kakao" data-a="kakao-text">📋 문구 복사</button><div class="sk-tip">PC 카톡 채팅방에서 <b>Ctrl+V</b> → 전송.</div>') +
+        '<div class="sk-f"><label>보낼 문구 <span style="font-weight:600">(여기서 고쳐도 돼요)</span></label><textarea id="skKakao" rows="' + (st.hasFile ? 7 : 11) + '">' + esc(k.body) + '</textarea></div>' +
+        (st.hasFile ? '<div class="sk-file">🖼 <span>' + esc(st.fileBase) + '.jpg</span><button class="sk-c light" data-a="dl:jpg">이미지 받기</button><button class="sk-c light" data-a="dl:pdf">PDF 받기</button></div>' : '') +
         '</div>';
     }
     var foot = st.editing ? '' : '<div class="sk-foot"><button class="sk-link" data-a="tpl-edit">✏️ 양식 수정</button><span class="sp"></span>' +
-      (st.onSent ? '<button class="sk-sent" data-a="sent">✓ 보냈어요 — 상담 기록에 남기기</button>' : '') + '</div>';
+      (st.onSent ? '<button class="sk-sent" data-a="sent">' + esc(st.sentLabel || '✓ 보냈어요 — 상담 기록에 남기기') + '</button>' : '') + '</div>';
     box.innerHTML = head + body + foot;
   }
   function saveDraftFromInputs() {
@@ -238,6 +252,7 @@
     }
     if (a === 'mail-go') {
       var w = window.open(MAIL_URL, '_blank');   // 팝업 차단을 피하려고 먼저 연다
+      if (!st.hasFile) { if (!w) toast('팝업이 막혔어요 — 네이버웍스 메일을 직접 열어주세요'); else toast('메일쓰기 → ①②③ 복사해서 붙여넣기'); return; }
       b.disabled = true; b.textContent = '파일 만드는 중…';
       try { download(await getPdfBlob(), st.fileBase + '.pdf'); toast('PDF 내려받음 · 메일쓰기 → ①②③ 복사해서 붙여넣기'); }
       catch (err) { alert('PDF 만들기 실패: ' + err.message); }
@@ -260,6 +275,11 @@
     if (a === 'kakao-text') { await copyText(st.draft.kakao.body, '문구'); return; }
     if (a === 'kakao-share') {
       b.disabled = true;
+      if (!st.hasFile) {
+        try { await navigator.share({ text: st.draft.kakao.body }); }
+        catch (err) { if (err && err.name !== 'AbortError') await copyText(st.draft.kakao.body, '문구'); }
+        b.disabled = false; return;
+      }
       try {
         var jpg = await getImgBlob('image/jpeg');
         var file = new File([jpg], st.fileBase + '.jpg', { type: 'image/jpeg' });
@@ -322,7 +342,8 @@
     st = {
       docType: opts.docType, title: opts.title || '', vars: opts.vars || {}, to: opts.to || {},
       fileBase: (opts.fileBase || DOC_LABEL[opts.docType]).replace(/[\\/:*?"<>|]/g, '_'),
-      makeCanvas: opts.makeCanvas, onSent: opts.onSent || null,
+      makeCanvas: opts.makeCanvas || null, hasFile: !!opts.makeCanvas, onSent: opts.onSent || null,
+      sentLabel: opts.sentLabel || '',
       ch: (function () { try { return localStorage.getItem('sk_ch') === 'kakao' ? 'kakao' : 'email'; } catch (_) { return 'email'; } })(),
       editing: false
     };
@@ -339,7 +360,7 @@
     render();
     // 문서 이미지는 미리 만들어 둠 (버튼 누를 때 기다리지 않게)
     // (폰 공유·이미지 복사는 버튼 누른 직후에만 허용돼서 파일이 미리 준비돼 있어야 함)
-    try {
+    if (st.hasFile) try {
       var mine = st;
       st.canvasP = st.makeCanvas();
       st.canvasP.then(function (c) {

@@ -21654,6 +21654,7 @@ async function inqRenderDetail() {
           <select class="inq-h-status ${INQ_STATUS_CLS[x.status] || ''}" id="inqFStatus">${inqOpt(INQ_STATUSES, x.status)}</select>
           <select class="inq-h-grade g-${escHtml(x.grade || 'none')}" id="inqFGrade" title="거래처 등급 — 바꾸면 거래처 DB 등급도 같이 바뀌어요">${clientGradeOptions(x.grade || '')}</select>
           <input class="inq-h-title" id="inqFTitle" value="${escHtml(x.title || '')}" placeholder="무엇을 문의했나요? 예) 손목시계 300개 각인 견적">
+          <button class="inq-send-btn" id="inqFSend" type="button">📤 보내기</button>
           <button class="inq-icon-btn" id="inqFDelete" title="상담 삭제">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
           </button>
@@ -21783,6 +21784,7 @@ function inqBindDetail(x) {
         if (d) inqRenderDetail();
     });
 
+    $('inqFSend').addEventListener('click', e => inqSendMenu(x, e.currentTarget));
     $('inqFDelete').addEventListener('click', async () => {
         if (!confirm(`'${x.client || '이 상담'}' 상담과 모든 기록을 삭제할까요?\n연결된 견적 품목은 그대로 남습니다.`)) return;
         const { error } = await sb.from('inquiries').delete().eq('id', x.id);
@@ -23453,24 +23455,11 @@ async function inqPreAction(x, act) {
         return;
     }
     if (act === 'send') {
-        // 우리 답변으로 기록 + 안내 날짜 + 상태 '가견적'
-        const saved = await inqAddLog(x.id, { direction: 'out', channel: x.channel || '', body: inqPreText(x), images: [] });
-        if (!saved) return;
-        const next = Object.assign({}, pe, { sent_at: new Date().toISOString(), sent_count: (pe.sent_count || 0) + 1 });
-        const patch = { pre_estimate: next, last_contact_at: new Date().toISOString() };
-        const bump = ['신규', '상담중'].includes(x.status);
-        if (bump) patch.status = '가견적';
-        const d = await inqPatch(x.id, patch, bump ? `상태 변경 · ${x.status} → 가견적` : null);
-        if (d) {
-            Object.assign(x, d);
-            const sel = document.getElementById('inqFStatus');
-            if (sel) { sel.value = d.status; sel.className = 'inq-h-status ' + (INQ_STATUS_CLS[d.status] || ''); }
-        }
-        inqRenderPre(x); inqRenderStage(x);
-        showToast('가견적 안내를 기록했습니다 · 안내문 복사로 고객에게 보내세요');
+        if (await inqPreMarkSent(x, x.channel || '', inqPreText(x))) showToast('가견적 안내를 기록했습니다 · 안내문 복사로 고객에게 보내세요');
         return;
     }
     if (act === 'quote') {
+
         // 가견적 품목으로 확정 견적 시작 — 단가는 확정가로 직접 입력
         inqStartQuote(x.id);
         const it = pe.items[0];
@@ -23480,6 +23469,141 @@ async function inqPreAction(x, act) {
         const up = document.getElementById('tempInUnitPrice');
         if (up) { up.value = ''; up.placeholder = `확정 단가 (가견적 ${inqPreRange(it.min, it.max)})`; up.focus(); }
         showToast(pe.items.length > 1 ? `첫 품목을 채웠어요. 나머지 ${pe.items.length - 1}개 품목도 추가해주세요` : '가견적 품목을 채웠어요 — 확정 단가를 입력하세요');
+    }
+}
+
+// 가견적 안내를 보냈다고 기록: 우리 답변 + 안내 날짜·횟수 + 상태 신규·상담중 → 가견적
+async function inqPreMarkSent(x, channel, text) {
+    const pe = x.pre_estimate || {};
+    const saved = await inqAddLog(x.id, { direction: 'out', channel: channel || '', body: text, images: [] });
+    if (!saved) return false;
+    const next = Object.assign({}, pe, { sent_at: new Date().toISOString(), sent_count: (pe.sent_count || 0) + 1 });
+    const patch = { pre_estimate: next, last_contact_at: new Date().toISOString() };
+    const bump = ['신규', '상담중'].includes(x.status);
+    if (bump) patch.status = '가견적';
+    const d = await inqPatch(x.id, patch, bump ? `상태 변경 · ${x.status} → 가견적` : null);
+    if (d) {
+        Object.assign(x, d);
+        const sel = document.getElementById('inqFStatus');
+        if (sel) { sel.value = d.status; sel.className = 'inq-h-status ' + (INQ_STATUS_CLS[d.status] || ''); }
+    }
+    inqRenderPre(x); inqRenderStage(x);
+    return true;
+}
+
+// ---------- 보내기 (send-kit.js) — 견적서 · 가견적 안내 · 안내 메시지 · 디자인확인서/작업요청서(문서 생성기) ----------
+function inqSendVars(x, extra) {
+    const items = Array.isArray(x.items) ? x.items.filter(i => i && i.name) : [];
+    const itemLabel = items.length ? items[0].name + (items.length > 1 ? ` 외 ${items.length - 1}건` : '') : (x.title || '');
+    const qty = items.length && items[0].qty && !items[0].tbd ? Number(items[0].qty).toLocaleString() + '개' : '';
+    return Object.assign({
+        거래처: x.client || '', 담당자: [x.contact_name || x.client_contact, x.contact_title].filter(Boolean).join(' '),
+        품목: itemLabel, 수량: qty, 합계: '', 납기: x.due_date ? inqMD(x.due_date) : '', 문서번호: '',
+        작성자: (currentUser && currentUser.name) || '', 내용: ''
+    }, extra || {});
+}
+function inqSendTo(x) {
+    const cli = sendFindClient(x.client);
+    return {
+        email: x.contact_email || (cli && (cli.staffEmail || cli.email)) || '',
+        phone: x.contact_phone || (cli && (cli.staffMobile || cli.mobile)) || ''
+    };
+}
+function inqSendMenu(x, btn) {
+    const old = document.getElementById('inqSendMenu');
+    if (old) { old.remove(); return; }
+    x = inqFind(x.id) || x;                                                      // 화면이 다시 그려졌어도 최신 상담으로
+    if (!btn || !btn.isConnected) btn = document.getElementById('inqFSend') || btn;
+    const groups = [];
+    tempProjects.filter(p => p.inquiryId === x.id).forEach(p => {
+        const k = (p.date || '') + '||' + (p.client || '');
+        let g = groups.find(v => v.k === k);
+        if (!g) { g = { k, date: p.date, n: 0 }; groups.push(g); }
+        g.n++;
+    });
+    groups.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const projs = _inqProjsFor === x.id ? _inqProjs : [];
+    const hasPre = x.pre_estimate && (x.pre_estimate.items || []).length;
+    const rows = [];
+    rows.push('<div class="inq-send-cap">고객에게</div>');
+    groups.forEach(g => rows.push(`<button data-s="quote:${escHtml(g.k)}">📄 견적서 <em>${escHtml(inqMD(g.date))} · ${g.n}품목 · PDF 첨부</em></button>`));
+    if (!groups.length) rows.push('<div class="inq-send-empty">연결된 견적서가 없어요 — 견적을 만들면 여기서 보낼 수 있어요</div>');
+    if (hasPre) rows.push('<button data-s="pre">💡 가견적 안내 <em>금액 범위 · 첨부 없음</em></button>');
+    rows.push('<button data-s="msg">✉️ 안내 메시지 <em>글만 · 양식에서 시작</em></button>');
+    projs.forEach(p => rows.push(`<button data-s="dc:${p.id}">🎨 디자인확인서 <em>${escHtml(p.product_name || '')} · 문서 생성기에서</em></button>`));
+    if (projs.length) {
+        rows.push('<div class="inq-send-cap">공장·공급처에게</div>');
+        projs.forEach(p => rows.push(`<button data-s="wr:${p.id}">📋 작업요청서 <em>${escHtml(p.product_name || '')}${p.supplier ? ' → ' + escHtml(p.supplier) : ''} · 문서 생성기에서</em></button>`));
+    }
+    const m = document.createElement('div');
+    m.id = 'inqSendMenu';
+    m.className = 'inq-send-menu';
+    m.innerHTML = rows.join('');
+    document.body.appendChild(m);
+    const r = btn.getBoundingClientRect();
+    m.style.top = Math.max(8, Math.min(r.bottom + 6, window.innerHeight - m.offsetHeight - 8)) + 'px';
+    m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.right - m.offsetWidth)) + 'px';
+    const off = e => { if (!m.contains(e.target) && e.target !== btn) { m.remove(); document.removeEventListener('mousedown', off, true); } };
+    setTimeout(() => document.addEventListener('mousedown', off, true), 0);
+    m.addEventListener('click', e => {
+        const b = e.target.closest('[data-s]');
+        if (!b) return;
+        m.remove();
+        document.removeEventListener('mousedown', off, true);
+        inqSendGo(x, b.dataset.s);
+    });
+}
+async function inqSendGo(x, what) {
+    if (!window.SendKit) { showToast('보내기 기능을 불러오지 못했습니다. 새로고침 해주세요'); return; }
+    sendKitSetup();
+    if (what.startsWith('quote:')) {
+        const [date, client] = what.slice(6).split('||');
+        const gi = inqQuoteGroupIndex(date, client);
+        if (gi < 0) { showToast('견적서를 찾지 못했습니다'); return; }
+        openTempQuote(gi);
+        await sendTempQuote();
+        return;
+    }
+    if (what.startsWith('dc:') || what.startsWith('wr:')) {
+        const [kind, id] = what.split(':');
+        const row = _inqProjs.find(p => p.id === Number(id));
+        if (inqEnsureProject(row)) {
+            showToast('문서 생성기에서 문서를 확인하고 📤 보내기를 누르세요');
+            createDocFromProject(row.id, kind);
+        }
+        return;
+    }
+    if (what === 'pre') {
+        // 안내문에서 제목 줄과 끝 서명은 빼고 품목·금액 부분만 {내용}으로
+        let lines = inqPreText(x).split('\n').slice(2);
+        while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+        if (lines.length && / 드림$/.test(lines[lines.length - 1])) { lines.pop(); while (lines.length && !lines[lines.length - 1].trim()) lines.pop(); }
+        SendKit.open({
+            docType: 'pre', title: `${x.client || '고객'} · 가견적 안내`,
+            vars: inqSendVars(x, { 내용: lines.join('\n') }), to: inqSendTo(x),
+            sentLabel: '✓ 보냈어요 — 가견적 안내로 기록',
+            onSent: async ({ channel, text }) => { if (!(await inqPreMarkSent(x, channel, text))) throw new Error('기록 저장 실패'); }
+        });
+        return;
+    }
+    SendKit.open({
+        docType: 'msg', title: `${x.client || '고객'} · 안내 메시지`,
+        vars: inqSendVars(x), to: inqSendTo(x),
+        onSent: async ({ channel, text }) => { await inqSendLogged(x, channel, text); }
+    });
+}
+// 보낸 글을 '우리' 기록으로 + 마지막 연락 + 신규 → 상담중
+async function inqSendLogged(x, channel, text) {
+    const saved = await inqAddLog(x.id, { direction: 'out', channel, body: text });
+    if (!saved) throw new Error('기록 저장 실패');
+    const patch = { last_contact_at: new Date().toISOString() };
+    const bump = x.status === '신규';
+    if (bump) patch.status = '상담중';
+    const d = await inqPatch(x.id, patch, bump ? '상태 변경 · 신규 → 상담중' : null);
+    if (d) {
+        Object.assign(x, d);
+        const sel = document.getElementById('inqFStatus');
+        if (sel) { sel.value = d.status; sel.className = 'inq-h-status ' + (INQ_STATUS_CLS[d.status] || ''); }
     }
 }
 
@@ -24042,6 +24166,7 @@ const TP_HELP = [
     ['#inqSearch', '거래처·담당자·문의 내용으로 찾기'],
     ['#inqChips .inq-chip', '상태별로 모아보기 — 진행 중 = 정산완료·보류·실패를 뺀 전체'],
     ['#inqFStatus', '상담 상태 — 대부분 자동으로 바뀌어요 (답변→상담중, 가견적 안내→가견적, 견적 작성→견적발송, 국내로 넘기기→수주, 작지 발송→제작중, 납품→납품완료, 정산→정산완료)'],
+    ['#inqFSend', '견적서·가견적·안내 메시지를 메일·카톡으로 보낼 준비 (보내기 직전까지)'],
     ['#inqFDelete', '상담과 모든 기록 삭제 (연결된 견적은 남아요)'],
     ['#inqFGrade, #inqNGrade', '거래처 등급 S 중요 · A 우수 · B 일반 · C 관심 — 바꾸면 거래처 DB 등급도 같이 바뀌어요'],
     ['#inqFTitle', '무엇을 문의했는지 한 줄 — 목록에 보여요'],
@@ -25024,6 +25149,7 @@ function mInqDetailHtml(id) {
                 ${tel ? `<a href="tel:${mEsc(tel)}">📞 전화</a><a href="sms:${mEsc(tel)}">💬 문자</a>` : ''}
                 ${x.contact_email ? `<a href="mailto:${mEsc(x.contact_email)}">✉️ 메일</a>` : ''}
             </div>` : ''}
+            <button class="m-sendbtn" onclick="inqSendMenu(inqFind(${id}), this)">📤 견적서·안내 보내기</button>
         </div>
         <div class="m-itabs">
             <button class="${mInqTab === 'chat' ? 'on' : ''}" onclick="mInqSetTab('chat')">대화 <b>${talkN}</b></button>
