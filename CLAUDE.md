@@ -145,7 +145,7 @@
 - **거래 흐름 (migration 038)**: 상담 한 건에서 상담 → 견적 → 수주 → 디자인확인 → 작업요청 → 납품·정산까지. 견적 의뢰·국내 메뉴는 그대로(목록·장부용)
   - `projects_domestic.inquiry_id`: `transferGroupToDomestic`이 견적의 inquiryId를 넣음. `check_dates` jsonb: 체크한 시각 — BEFORE UPDATE 트리거 `projects_domestic_stamp_checks`가 어디서 체크하든 기록
   - AFTER 트리거 `projects_domestic_inquiry_sync` → 체크 시 상담 타임라인에 system 기록 + `inq_sync_stage()`로 상담 상태 자동: 국내 연결 있으면 수주 → 작지 발송 체크 시 제작중 → 전부 납품 시 납품완료 → 납품+잔금+계산서+송금 전부 시 정산완료 (보류·실패는 안 건드림). 그래서 앱은 상태를 직접 바꾸지 않고 `inqReloadInquiry`로 다시 읽음
-  - 화면: `inqRenderStage`(6단계 막대 + '지금 할 일' 버튼 — 견적 작성/국내로 넘기기/디자인확인서·작업요청서 만들기/체크), `inqRenderProjs`(국내 진행 칸, 7개 체크 칩 = `inqToggleProjCheck`, 국내 메뉴와 같은 규칙), 고객 정보는 한 줄 요약으로 접힘(`inqContactSummary`)
+  - 화면: `inqRenderStage`(10칸 막대 — 상담·견적·수주·디자인확인·작업요청 + `INQ_PAY_STAGES` 선금 입금·잔금 입금·계산서 발행·공급처 송금·납품(2026-10 '납품·정산' 한 칸을 쪼갬) + '지금 할 일' 버튼 — 견적 작성/국내로 넘기기/디자인확인서·작업요청서 만들기/체크), `inqRenderProjs`(국내 진행 칸, 7개 체크 칩 = `inqToggleProjCheck`, 국내 메뉴와 같은 규칙), 고객 정보는 한 줄 요약으로 접힘(`inqContactSummary`)
   - 문서 만들기·국내 상세는 전역 `projects` 배열을 쓰므로 `inqEnsureProject`로 없으면 넣고 호출
   - 상태 목록: 신규/상담중/견적발송/수주/제작중/납품완료/정산완료/보류/실패. '진행 중' 필터 = 정산완료·보류·실패 제외
 - **연결된 견적 품목 명세**: `inqQuoteItemHtml`/`inqQuoteBreakdown` — 품목마다 판매·매입 나란히 표(제품 단가×수량, 인쇄·포장·라벨·택배 금액 또는 '단가에 포함', 공급가·부가세·합계, 마진=판매합계−매입합계). 합계는 `calcTempRevenueWithVat`/`calcTempSupRevenueWithVat`와 동일
@@ -180,6 +180,14 @@
 - 갱신: `mInit`이 `renderDaily`·`renderProjects`·`renderPlanning`·`inqRenderList`를 감싸서 저장·실시간 갱신 때 `mRefreshSoon`. `mRender`는 입력 중 값·포커스·스크롤 유지. 상세 화면은 `history.pushState({mDepth})` → 폰 뒤로가기로 목록 복귀(`mOnPop`)
 - 폰에서 안 하는 것(일부러): 새 상담·견적 작성, 새 프로젝트, 사진 올리기, 시간 배치 → PC 화면 안내
 - 위젯: 안드로이드 앱 위젯은 `syncAndroidWidget`(오늘 할 일·요약). 아이폰 위젯은 아직 없음(Scriptable 방식 예정)
+
+## 납기·배송 서류 간 자동 공유 (migration 053)
+- 납기·배송(납기일·받는 분·연락처·주소)을 어느 서류에 적든 **비어 있는 칸만** 서로 채움(덮어쓰지 않음). DB 트리거라 앱 코드가 어디서 저장하든 동작
+  - `confirmations_share_shipping`: 디자인확인서·작업요청서 저장 → `source_doc_number`로 연결된 국내 프로젝트 빈 칸 (`delivery_address`는 JSON ["받는 분","연락처","주소"] → `ship_parts()`로 풂, 구버전 'a / b / c' 호환)
+  - `trg_zz_projects_domestic_fill_shipping`(BEFORE, set_company_id 다음에 돌게 이름 zz): 국내 프로젝트가 디확(`source_doc_number`)·상담(`inquiry_id`)과 연결될 때 그쪽 값으로 빈 칸. 상담은 due_date→납기, delivery_address→주소(이때 받는 분·연락처는 상담 담당자)
+  - `projects_domestic_share_to_inquiry`: 국내 프로젝트 납기·주소 → 연결된 상담의 빈 희망 납기·배송지
+- DC를 먼저 저장하고 나중에 프로젝트에 `source_doc_number`를 붙이는 순서(doc-generator saveToDb)라서 양쪽 트리거가 모두 필요
+- 앱: `createDocFromProject`가 문서 만들기 전에 DB에서 납기·배송 최신값을 다시 읽음 (전역 `projects`가 낡았을 수 있어서)
 
 ## 마진계산기 (편의성 그룹)
 - **목적**: 원가 항목들과 판매가를 입력해 마진/마진율을 계산. 기존 엑셀 양식(이니셜D 시계 굿즈 기준)을 발전시킨 자유형 구조

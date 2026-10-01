@@ -4234,6 +4234,18 @@ function downloadDoc(docNum, fmt) {
 async function createDocFromProject(id, type) {
     const p = projects.find(x => x.id === id);
     if (!p) return;
+    // 납기·배송은 다른 서류(디자인확인서·작업요청서·상담)에서 채워졌을 수 있어 DB에서 최신으로 (migration 053 트리거)
+    try {
+        const { data: fresh } = await sb.from('projects_domestic')
+            .select('delivery_date, recipient, phone, address, source_doc_number').eq('id', id).maybeSingle();
+        if (fresh) {
+            p.deadline = fresh.delivery_date || p.deadline || '';
+            p.recipient = fresh.recipient || p.recipient || '';
+            p.phone = fresh.phone || p.phone || '';
+            p.address = fresh.address || p.address || '';
+            p.sourceDocNumber = fresh.source_doc_number || p.sourceDocNumber || '';
+        }
+    } catch (e) { console.warn('납기·배송 최신값 불러오기 실패', e); }
 
     // WR 사전 조건 체크
     if (type === 'wr') {
@@ -23030,6 +23042,14 @@ async function inqSyncNextSummary(x) {
 let _inqProjs = [];
 let _inqProjsFor = null;
 const INQ_SETTLE_KEYS = ['delivered', 'finalPayment', 'invoice', 'supplierPayment'];
+// 단계 막대 뒤쪽 5칸: [단계 key, 표시 이름, 국내 체크 key]
+const INQ_PAY_STAGES = [
+    ['ap', '선금 입금', 'advancePayment'],
+    ['fp', '잔금 입금', 'finalPayment'],
+    ['inv', '계산서 발행', 'invoice'],
+    ['sp', '공급처 송금', 'supplierPayment'],
+    ['dlv', '납품', 'delivered']
+];
 
 async function inqLoadDeal(x) {
     const { data, error } = await sb.from('projects_domestic').select('*').eq('inquiry_id', x.id).order('id');
@@ -23089,10 +23109,8 @@ function inqStages(x) {
         st.push({ key: 'wo', label: '작업요청', done: n > 0 && c === n,
             sub: n && c === n ? [inqMD(wDate), ch].filter(Boolean).join(' ') || '완료' : (c ? `${c}/${n}` : '') });
     }
-    const settled = projs.filter(p => INQ_SETTLE_KEYS.every(k => p.checks && p.checks[k])).length;
-    const settleParts = n ? INQ_SETTLE_KEYS.reduce((s, k) => s + cnt(k), 0) : 0;
-    st.push({ key: 'settle', label: '납품·정산', done: n > 0 && settled === n,
-        sub: n && settled === n ? (inqMD(inqMaxDate(INQ_SETTLE_KEYS.map(kDate))) || '완료') : (settleParts ? `${settleParts}/${n * 4}` : '') });
+    // 납품·정산은 체크마다 따로 (2026-10 현호님 요청) — 날짜는 체크할 때 입력한 날짜
+    INQ_PAY_STAGES.forEach(([key, label, k]) => stepK(key, label, k));
     const ci = st.findIndex(s => !s.done);
     st.forEach((s, i) => { s.state = s.done ? 'done' : (i === ci ? 'cur' : 'todo'); });
     return { st, cur: ci < 0 ? null : st[ci], quotes, projs };
@@ -23140,11 +23158,15 @@ function inqRenderStage(x) {
         msg = `공장에 작업요청서를 보내세요${projs.length > 1 ? ` · ${p.product_name || ''}` : ''}`;
         btns.push([`wr:${p.id}`, '작업요청서 만들기', 1]);
         btns.push([`chk:${p.id}:workOrder`, '발송 완료 체크']);
-    } else if (cur.key === 'settle') {
-        const p = projs.find(v => INQ_SETTLE_KEYS.some(k => !(v.checks && v.checks[k])));
-        const lack = INQ_SETTLE_KEYS.concat(['advancePayment']).filter(k => !(p.checks && p.checks[k]));
-        msg = `납품·잔금·계산서·공급처 송금을 확인하세요${projs.length > 1 ? ` · ${p.product_name || ''}` : ''}`;
-        lack.forEach(k => { const it = CHECK_ITEMS.find(c => c.key === k); if (it) btns.push([`chk:${p.id}:${k}`, it.label + ' ✓']); });
+    } else {
+        const ps = INQ_PAY_STAGES.find(v => v[0] === cur.key);
+        if (ps) {
+            // 순서가 바뀌어도(납품 먼저 등) 바로 체크할 수 있게 남은 것 전부 버튼으로, 지금 단계가 강조
+            const p = firstLack(ps[2]);
+            const lack = INQ_PAY_STAGES.filter(v => !(p.checks && p.checks[v[2]]));
+            msg = `${ps[1]} 확인 — 끝났으면 체크하세요${projs.length > 1 ? ` · ${p.product_name || ''}` : ''}`;
+            lack.forEach(v => btns.push([`chk:${p.id}:${v[2]}`, v[1] + ' ✓', v[0] === ps[0] ? 1 : 0]));
+        }
     }
     const nowHtml = `
       <div class="inq-now ${stopped ? 'stopped' : !cur ? 'done' : ''}">
@@ -24177,14 +24199,14 @@ function tpTourSteps() {
     const needInq = '※ 등록된 상담이 없어서 이 부분은 아직 화면에 없어요. 상담을 하나 등록하면 보여요.';
     return [
         { title: '상담·견적 사용법', body: `<p>고객 문의가 들어와서 <b>국내 프로젝트로 넘어가기까지</b>를 이 화면에서 처리해요.</p>
-            <ol class="tour-flow"><li>상담 등록</li><li>대화 기록</li><li>가견적 안내 <em>(선택)</em></li><li>견적 작성</li><li>국내로 넘기기 (수주)</li><li>디자인확인서 → 작업요청서 → 납품·정산</li></ol>
+            <ol class="tour-flow"><li>상담 등록</li><li>대화 기록</li><li>가견적 안내 <em>(선택)</em></li><li>견적 작성</li><li>국내로 넘기기 (수주)</li><li>디자인확인서 → 작업요청서 → 선금·잔금·계산서·송금·납품</li></ol>
             <p class="tour-tip">키보드 → 다음 · ← 이전 · Esc 그만 보기</p>`,
           prep: () => tpSetView('inq') },
         { sel: '.tp-switch', title: '상담 / 견적 전환', body: '<b>상담</b>은 고객별 대화·진행 기록, <b>견적</b>은 견적 품목 전체 목록이에요. 같은 데이터를 두 방향에서 봐요.', prep: () => tpSetView('inq') },
         { sel: '.inq-new-btn', title: '① 새 상담 등록 (F2)', body: '고객 문의가 오면 여기서 시작해요. <b>메일·카톡 내용을 붙여넣으면</b> 담당자·회사 정보·품목·수량·납기까지 자동으로 채워져요. <b>전화 상담</b>이면 오른쪽 <b>체크리스트 순서대로</b> 물어보며 칸을 채우면 돼요.' },
         { sel: '#inqChips', title: '상태별로 모아보기', body: '<b>진행 중</b>은 아직 끝나지 않은 모든 상담이에요. 빨간 날짜는 <b>할 일 날짜가 지난 상담</b>이라 맨 위로 올라와요.' },
         { sel: ['#inqList .inq-item.on', '#inqList .inq-item'], title: '상담 열기', body: '목록에서 상담을 누르면 오른쪽에 자세한 내용이 열려요.', missing: needInq, prep: _tourOpenInquiry },
-        { sel: '#inqStage', title: '진행 단계', body: '상담 → 견적 → 수주 → 디자인확인 → 작업요청 → 납품·정산. <b>초록</b>=끝난 단계, <b>파랑</b>=지금 단계예요. 대부분 <b>자동으로</b> 넘어가요.', missing: needInq },
+        { sel: '#inqStage', title: '진행 단계', body: '상담 → 견적 → 수주 → 디자인확인 → 작업요청 → 선금 입금·잔금 입금·계산서 발행·공급처 송금·납품. <b>초록</b>=끝난 단계, <b>파랑</b>=지금 단계예요. 대부분 <b>자동으로</b> 넘어가요.', missing: needInq },
         { sel: '#inqNow', title: '지금 할 일', body: '지금 단계에서 해야 할 일과 <b>바로 누를 버튼</b>이 떠요. 무엇을 할지 모를 땐 여기부터 보세요.', missing: needInq },
         { sel: '#inqFields', title: '고객 정보', body: '담당자(이름·직함·부서·연락처·이메일)와 회사(주소·팩스·홈페이지), 문의 경로·우리 담당이에요. 칸을 눌러 <b>바로 고치면 저장</b>돼요.', missing: needInq },
         { sel: '#inqTodos', title: '다음 할 일', body: '할 일을 적고 Enter — <b>담당자 일일계획표에 자동으로</b> 들어가요. 계획표에서 완료 체크해도 여기에 반영돼요.', missing: needInq },
