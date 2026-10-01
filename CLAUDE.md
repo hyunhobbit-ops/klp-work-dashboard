@@ -212,7 +212,8 @@
 - 공용 모듈 `send-kit.js` (index.html·doc-generator.html 둘 다 로드, 단일 파일 원칙의 예외 — 두 페이지가 같이 써야 해서). `SendKit.configure({load, save})` + `SendKit.open({docType, title, vars, to, fileBase, makeCanvas, onSent})`
 - 버튼: 상담·견적 견적서 창 `📤 보내기`(`sendTempQuote` — 받는 사람은 연결된 상담 담당자 이메일 → 거래처 DB staff_email/email, `{합계}`는 `renderTempQuoteDoc`가 `g._quoteGrand`에 기록, 상담 연결 시 '보냈어요' → 상담 기록(우리·채널)), doc-generator의 DC·WR·견적서 미리보기 `📤 보내기`(`sendDoc('dc'|'wr'|'quote')`, 거래처 DB에서 이메일)
 - 양식: `send_templates`(doc_type quote/dc/wr × channel email/kakao, 회사 공용, 행 없으면 send-kit.js `DEFAULTS`). 창 아래 `✏️ 양식 수정`에서 `{거래처} {담당자} {품목} {수량} {합계} {납기} {문서번호} {작성자}` 칸으로 편집
-- 메일: 네이버웍스 웹메일은 받는 사람·첨부를 웹에서 자동으로 넣을 방법이 없음 → `메일 준비하기` = PDF 내려받기 + mail.worksmobile.com 새 탭, ①받는 사람 ②제목 ③본문 복사 버튼(본문은 text/html로 줄바꿈 유지)
+- 메일: 네이버웍스 메일쓰기 주소 `https://mail.worksmobile.com/w/compose?orderType=new&to=&subject=&body=`가 칸을 채워줌(2026-10 실제 확인, 줄바꿈 OK) → `메일쓰기 열기 + PDF 내려받기`. **첨부만** 직접 끌어다 놓기. 복사 버튼은 예비
+- 디자인확인서·작업요청서는 화면 이동 없이: `sendSavedDocHere(문서번호)`가 숨은 iframe `doc-generator.html#render-문서번호`를 열고, doc-generator의 `window.klpDocReady`(→ `sendDocOptions`)가 돌려준 정보로 부모 화면에서 `SendKit.open` (문서 이미지는 iframe 안 html2canvas). `#send-문서번호`는 문서 생성기에서 직접 보내기용으로 남아 있음
 - **상담 화면 `📤 보내기`** (머리줄 `#inqFSend`, 폰 상담 상세에도): 메뉴(`inqSendMenu`) — 연결된 견적서(→ `openTempQuote`+`sendTempQuote`), 💡 가견적 안내(`pre`, 첨부 없음, {내용}=`inqPreText`에서 제목·서명 뺀 부분, '보냈어요'= `inqPreMarkSent` → 상태 가견적), ✉️ 안내 메시지(`msg`, 글만, '보냈어요'=`inqSendLogged`), 디자인확인서·작업요청서(저장된 문서가 있으면 `inqSendSavedDoc` → `doc-generator.html#send-문서번호`로 그대로 열어 보내기 창 자동 — `createDocFromProject`는 덮어쓰기 확인이 떠서 보내기에 안 씀, 없으면 만들기). 첨부 없는 종류는 send-kit에서 파일 칸·이미지 복사가 빠짐(`makeCanvas` 없음). migration 051로 doc_type에 pre·msg 추가
 - 카톡: PC = ①문서 이미지 복사(ClipboardItem png, Promise로 넘겨 버튼 권한 유지) ②문구 복사 → 채팅방 Ctrl+V / 폰 = `navigator.share({files, text})` 공유 시트(문구는 미리 클립보드에도). 문서 이미지는 창을 열 때 미리 만들어 둠(공유·복사는 클릭 직후에만 허용)
 

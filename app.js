@@ -23567,7 +23567,7 @@ async function inqSendGo(x, what) {
     if (what.startsWith('dc:') || what.startsWith('wr:')) {
         const [kind, id] = what.split(':');
         const row = _inqProjs.find(p => p.id === Number(id));
-        if (row) await inqSendSavedDoc(row, kind);
+        if (row) await inqSendSavedDoc(row, kind, x);
         return;
     }
     if (what === 'pre') {
@@ -23591,21 +23591,60 @@ async function inqSendGo(x, what) {
 }
 // 이미 저장된 디자인확인서·작업요청서를 그대로 열어 보내기 창까지 (문서 생성기 #send-문서번호)
 // — '만들기'(createDocFromProject)는 프로젝트 데이터로 덮어쓸지 묻기 때문에 보내기에서는 쓰지 않음
-async function inqSendSavedDoc(row, kind) {
+async function inqSendSavedDoc(row, kind, x) {
     const make = () => { if (inqEnsureProject(row)) createDocFromProject(row.id, kind); };
     if (!row.source_doc_number) {
         if (kind === 'wr') { showToast('디자인확인서를 먼저 만들어주세요'); return; }
         if (confirm('아직 디자인확인서가 없습니다. 지금 만들까요?')) make();
         return;
     }
-    if (kind === 'dc') { location.href = 'doc-generator.html#send-' + encodeURIComponent(row.source_doc_number); return; }
+    if (kind === 'dc') { await sendSavedDocHere(row.source_doc_number, x, '디자인확인서'); return; }
     const prefix = row.source_doc_number + '_';
     const { data, error } = await sb.from('confirmations').select('doc_number, created_at, status')
         .like('doc_number', prefix + '%').order('created_at', { ascending: false });
     if (error) { showToast('작업요청서 찾기 실패: ' + error.message); return; }
     const wr = (data || []).find(d => d.status === '작업요청서' && String(d.doc_number || '').startsWith(prefix));
     if (!wr) { if (confirm('아직 작업요청서가 없습니다. 지금 만들까요?')) make(); return; }
-    location.href = 'doc-generator.html#send-' + encodeURIComponent(wr.doc_number);
+    await sendSavedDocHere(wr.doc_number, null, '작업요청서');   // 공장에 보내는 거라 상담 기록은 안 남김
+}
+
+// 화면 이동 없이: 문서 생성기를 숨은 창(iframe, #render-문서번호)으로 열어 저장된 문서를 그리고, 보내기 창은 이 화면에서
+let _sendDocBusy = false;
+async function sendSavedDocHere(docNumber, x, label) {
+    if (_sendDocBusy) return;
+    if (!window.SendKit) { showToast('보내기 기능을 불러오지 못했습니다. 새로고침 해주세요'); return; }
+    _sendDocBusy = true;
+    showToast(`${label} 불러오는 중…`);
+    const old = document.getElementById('docRenderFrame');
+    if (old) old.remove();
+    const fr = document.createElement('iframe');
+    fr.id = 'docRenderFrame';
+    fr.setAttribute('aria-hidden', 'true');
+    fr.tabIndex = -1;
+    fr.style.cssText = 'position:fixed;left:-12000px;top:0;width:1000px;height:1400px;border:0;';
+    fr.src = 'doc-generator.html#render-' + encodeURIComponent(docNumber);
+    document.body.appendChild(fr);
+    try {
+        await new Promise((ok, no) => { fr.onload = ok; setTimeout(() => no(new Error('불러오기 시간 초과')), 25000); });
+        const ready = fr.contentWindow && fr.contentWindow.klpDocReady;
+        if (!ready) throw new Error('문서 생성기를 열지 못했습니다 (로그인 확인)');
+        const opts = await Promise.race([ready, new Promise((_, no) => setTimeout(() => no(new Error('문서 그리기 시간 초과')), 25000))]);
+        if (!opts) throw new Error('문서 내용을 읽지 못했습니다');
+        sendKitSetup();
+        if (x) {
+            opts.onSent = async ({ channel, text }) => {
+                const saved = await inqAddLog(x.id, { direction: 'out', channel, body: `[${label} 발송]\n${text}` });
+                if (!saved) throw new Error('기록 저장 실패');
+                await inqPatch(x.id, { last_contact_at: new Date().toISOString() });
+            };
+        }
+        SendKit.open(opts);
+    } catch (e) {
+        console.error('문서 보내기 준비 실패', e);
+        showToast(`${label} 불러오기 실패: ${e.message}`);
+    } finally {
+        _sendDocBusy = false;
+    }
 }
 
 // 보낸 글을 '우리' 기록으로 + 마지막 연락 + 신규 → 상담중
