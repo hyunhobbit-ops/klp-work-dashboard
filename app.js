@@ -2365,17 +2365,18 @@ async function toggleProjectCheck(id, key) {
     const p = projects.find(x => x.id === id);
     if (!p) return;
     if (!p.checks) p.checks = {};
-    // 디자인확인서 컨펌: 어느 채널로·언제 컨펌받았는지 같이 기록 (취소하면 체크 안 함)
+    // 디확 컨펌·작지 발송: 어느 채널로·언제 했는지 같이 기록 (취소하면 체크 안 함)
     let dcPatch = null;
-    if (key === 'design') {
-        if (!p.checks.design) {
-            const info = await askDesignConfirm({ channel: p.designConfirmChannel, date: p.designConfirmDate });
+    const ci = CHECK_INFO[key];
+    if (ci) {
+        if (!p.checks[key]) {
+            const info = await askCheckInfo(key, { channel: p[ci.prop + 'Channel'], date: p[ci.prop + 'Date'] });
             if (!info) return;
-            dcPatch = { design_confirm_channel: info.channel, design_confirm_date: info.date || null };
-            p.designConfirmChannel = info.channel; p.designConfirmDate = info.date || '';
+            dcPatch = { [ci.col + '_channel']: info.channel, [ci.col + '_date']: info.date || null };
+            p[ci.prop + 'Channel'] = info.channel; p[ci.prop + 'Date'] = info.date || '';
         } else {
-            dcPatch = { design_confirm_channel: '', design_confirm_date: null };
-            p.designConfirmChannel = ''; p.designConfirmDate = '';
+            dcPatch = { [ci.col + '_channel']: '', [ci.col + '_date']: null };
+            p[ci.prop + 'Channel'] = ''; p[ci.prop + 'Date'] = '';
         }
     }
     p.checks[key] = !p.checks[key];
@@ -3956,7 +3957,7 @@ async function showProjectDetail(id) {
         return `<div onclick="toggleProjectCheck(${id},'${item.key}');setTimeout(()=>showProjectDetail(${id}),50)" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:${done ? 'var(--blue-light)' : 'var(--gray-50)'};border:1px solid ${done ? 'var(--blue)' : 'var(--gray-200)'};border-radius:8px;font-size:13px;cursor:pointer;transition:all .15s;color:var(--gray-900)">
             <span style="display:inline-flex;width:18px;height:18px;border-radius:50%;background:${done ? 'var(--blue)' : 'var(--gray-300)'};color:white;align-items:center;justify-content:center;font-size:12px;font-weight:700">${done ? '✓' : ''}</span>
             <span style="font-weight:${done ? '700' : '500'}">${item.label}</span>
-            ${item.key === 'design' && done && (p.designConfirmChannel || p.designConfirmDate) ? `<span style="margin-left:auto;font-size:11.5px;font-weight:700;color:var(--blue)">${escHtml([p.designConfirmChannel, p.designConfirmDate ? p.designConfirmDate.slice(5).replace('-', '/') : ''].filter(Boolean).join(' · '))}</span>` : ''}
+            ${CHECK_INFO[item.key] && done && (p[CHECK_INFO[item.key].prop + 'Channel'] || p[CHECK_INFO[item.key].prop + 'Date']) ? `<span style="margin-left:auto;font-size:11.5px;font-weight:700;color:var(--blue)">${escHtml(checkInfoText(p[CHECK_INFO[item.key].prop + 'Channel'], p[CHECK_INFO[item.key].prop + 'Date']))}</span>` : ''}
         </div>`;
     }).join('');
 
@@ -4348,12 +4349,12 @@ function openEditProject(id) {
 
     const checksHtml = Object.entries(checkDetails).map(([key, info]) => `
         <label style="display:flex;align-items:flex-start;gap:10px;padding:10px;cursor:pointer;font-size:14px;border:1px solid var(--gray-100);border-radius:8px;background:var(--gray-50)">
-            <input type="checkbox" id="editCheck-${key}" ${p.checks && p.checks[key] ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;margin-top:2px"${key === 'design' ? ` onchange="document.getElementById('editDesignConfirm').style.display = this.checked ? '' : 'none'"` : ''}>
+            <input type="checkbox" id="editCheck-${key}" ${p.checks && p.checks[key] ? 'checked' : ''} style="width:18px;height:18px;cursor:pointer;margin-top:2px"${CHECK_INFO[key] ? ` onchange="document.getElementById('${CHECK_INFO[key].editBox}').style.display = this.checked ? '' : 'none'"` : ''}>
             <div style="flex:1">
                 <div style="font-weight:700;color:var(--gray-900)">${info.label}</div>
                 <div style="font-size:12px;color:var(--gray-500);margin-top:2px">${info.desc}</div>
             </div>
-        </label>${key === 'design' ? `<div id="editDesignConfirm" class="dc-inline" style="${p.checks && p.checks.design ? '' : 'display:none'}">${designConfirmFieldsHtml('editDc', p.designConfirmChannel, p.designConfirmDate)}</div>` : ''}`).join('');
+        </label>${CHECK_INFO[key] ? `<div id="${CHECK_INFO[key].editBox}" class="dc-inline" style="${p.checks && p.checks[key] ? '' : 'display:none'}">${designConfirmFieldsHtml(CHECK_INFO[key].editPrefix, p[CHECK_INFO[key].prop + 'Channel'], p[CHECK_INFO[key].prop + 'Date'], CHECK_INFO[key].dateLabel)}</div>` : ''}`).join('');
 
     const secCard = (inner) => `<div style="background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900)">${inner}</div>`;
     const printFeeVat = p.printFeeVat || 'VAT 별도';
@@ -4837,6 +4838,8 @@ async function updateProject(id) {
         // 디확 컨펌 칸을 직접 체크했을 때만 입력값, '완료'로 자동 체크된 경우엔 기존 값 유지
         designConfirmChannel: (document.getElementById('editCheck-design') || {}).checked ? readDesignConfirmFields('editDc').channel : (newChecks.design ? (p.designConfirmChannel || '') : ''),
         designConfirmDate: (document.getElementById('editCheck-design') || {}).checked ? readDesignConfirmFields('editDc').date : (newChecks.design ? (p.designConfirmDate || '') : ''),
+        workOrderChannel: (document.getElementById('editCheck-workOrder') || {}).checked ? readDesignConfirmFields('editWo').channel : (newChecks.workOrder ? (p.workOrderChannel || '') : ''),
+        workOrderDate: (document.getElementById('editCheck-workOrder') || {}).checked ? readDesignConfirmFields('editWo').date : (newChecks.workOrder ? (p.workOrderDate || '') : ''),
         memo: getVal('editProjectMemo')
     });
 
@@ -4867,6 +4870,8 @@ async function updateProject(id) {
                 checks: p.checks,
                 design_confirm_channel: p.designConfirmChannel || '',
                 design_confirm_date: p.designConfirmDate || null,
+                work_order_channel: p.workOrderChannel || '',
+                work_order_date: p.workOrderDate || null,
                 memo: p.memo,
                 supplier: p.supplier,
                 supplier_contact: p.supplierContact || '',
@@ -5895,7 +5900,9 @@ function _projectsDomesticRowToObj(r) {
         inquiryId: r.inquiry_id || null,
         checkDates: r.check_dates || {},
         designConfirmChannel: r.design_confirm_channel || '',
-        designConfirmDate: r.design_confirm_date || ''
+        designConfirmDate: r.design_confirm_date || '',
+        workOrderChannel: r.work_order_channel || '',
+        workOrderDate: r.work_order_date || ''
     };
 }
 
@@ -22409,7 +22416,13 @@ function inqStages(x) {
         st.push({ key: 'design', label: '디자인확인', done: n > 0 && c === n,
             sub: n && c === n ? [inqMD(dDate), ch].filter(Boolean).join(' ') || '완료' : (c ? `${c}/${n}` : '') });
     }
-    stepK('wo', '작업요청', 'workOrder');
+    {
+        const c = cnt('workOrder');
+        const wDate = inqMaxDate(projs.map(p => p.work_order_date || inqDateOf((p.check_dates || {}).workOrder)));
+        const ch = [...new Set(projs.map(p => p.work_order_channel).filter(Boolean))].join('·');
+        st.push({ key: 'wo', label: '작업요청', done: n > 0 && c === n,
+            sub: n && c === n ? [inqMD(wDate), ch].filter(Boolean).join(' ') || '완료' : (c ? `${c}/${n}` : '') });
+    }
     const settled = projs.filter(p => INQ_SETTLE_KEYS.every(k => p.checks && p.checks[k])).length;
     const settleParts = n ? INQ_SETTLE_KEYS.reduce((s, k) => s + cnt(k), 0) : 0;
     st.push({ key: 'settle', label: '납품·정산', done: n > 0 && settled === n,
@@ -22512,15 +22525,16 @@ async function inqToggleProjCheck(x, row, key) {
     if (!row) return;
     const checks = Object.assign({}, row.checks || {});
     const update = { checks };
-    if (key === 'design') {
-        if (!checks.design) {
-            const info = await askDesignConfirm({ channel: row.design_confirm_channel, date: row.design_confirm_date });
+    const ci = CHECK_INFO[key];
+    if (ci) {
+        if (!checks[key]) {
+            const info = await askCheckInfo(key, { channel: row[ci.col + '_channel'], date: row[ci.col + '_date'] });
             if (!info) { inqRenderStage(x); inqRenderProjs(x); return; }
-            update.design_confirm_channel = info.channel;
-            update.design_confirm_date = info.date || null;
+            update[ci.col + '_channel'] = info.channel;
+            update[ci.col + '_date'] = info.date || null;
         } else {
-            update.design_confirm_channel = '';
-            update.design_confirm_date = null;
+            update[ci.col + '_channel'] = '';
+            update[ci.col + '_date'] = null;
         }
     }
     checks[key] = !checks[key];
@@ -22532,6 +22546,7 @@ async function inqToggleProjCheck(x, row, key) {
     if (gp) {
         gp.checks = data.checks; if (update.status) gp.status = update.status;
         gp.designConfirmChannel = data.design_confirm_channel || ''; gp.designConfirmDate = data.design_confirm_date || '';
+        gp.workOrderChannel = data.work_order_channel || ''; gp.workOrderDate = data.work_order_date || '';
         try { renderProjects(); } catch (_) {}
     }
     const it = CHECK_ITEMS.find(c => c.key === key);
@@ -22570,8 +22585,9 @@ function inqRenderProjs(x) {
           </div>
           <div class="inq-pj-checks">${CHECK_ITEMS.map(it => {
               const on = !!(p.checks && p.checks[it.key]);
-              const d = it.key === 'design' && on && (p.design_confirm_channel || p.design_confirm_date)
-                  ? [p.design_confirm_channel, p.design_confirm_date ? inqMD(p.design_confirm_date) : ''].filter(Boolean).join(' · ')
+              const ciK = CHECK_INFO[it.key];
+              const d = ciK && on && (p[ciK.col + '_channel'] || p[ciK.col + '_date'])
+                  ? [p[ciK.col + '_channel'], p[ciK.col + '_date'] ? inqMD(p[ciK.col + '_date']) : ''].filter(Boolean).join(' · ')
                   : (cd[it.key] ? inqMD(inqDateOf(cd[it.key])) : '');
               return `<button class="inq-ck ${on ? 'on' : ''}" data-act="chk:${p.id}:${it.key}" title="${escHtml(it.label)}${on ? (d ? ' · ' + d + ' 체크' : ' · 완료') : ' — 누르면 체크'}">
                   <i>${on ? '✓' : ''}</i>${escHtml(it.label)}${d ? `<em>${d}</em>` : ''}</button>`;
@@ -23716,14 +23732,20 @@ async function inqFillFromClientDb(name) {
 
 // ---------- 디자인확인서 컨펌 채널·날짜 (migration 044) ----------
 const DC_CHANNELS = ['카톡', '이메일', '문자'];
-function designConfirmFieldsHtml(prefix, channel, date) {
+// 채널·날짜를 같이 남기는 체크 항목 (컬럼: {col}_channel / {col}_date, 객체: {prop}Channel / {prop}Date)
+const CHECK_INFO = {
+    design: { col: 'design_confirm', prop: 'designConfirm', title: '디자인확인서 컨펌', q: '어디로, 언제 컨펌받았나요?', ok: '컨펌 완료 체크', dateLabel: '컨펌 날짜', editPrefix: 'editDc', editBox: 'editDesignConfirm' },
+    workOrder: { col: 'work_order', prop: 'workOrder', title: '작업요청서 발송', q: '공장에 어디로, 언제 보냈나요?', ok: '발송 완료 체크', dateLabel: '발송 날짜', editPrefix: 'editWo', editBox: 'editWorkOrderInfo' }
+};
+function checkInfoText(channel, date) { return [channel, date ? String(date).slice(5).replace('-', '/') : ''].filter(Boolean).join(' · '); }
+function designConfirmFieldsHtml(prefix, channel, date, dateLabel) {
     const isEtc = !!channel && !DC_CHANNELS.includes(channel);
     const sel = isEtc ? '기타' : (channel || '카톡');
     return `<div class="dc-fields">
         <div class="dc-ch" id="${prefix}Ch">${DC_CHANNELS.concat(['기타']).map(c =>
             `<label class="${sel === c ? 'on' : ''}"><input type="radio" name="${prefix}Ch" value="${c}" ${sel === c ? 'checked' : ''}>${c}</label>`).join('')}</div>
         <input type="text" id="${prefix}Etc" class="dc-etc" placeholder="기타 채널 직접 입력 (예: 전화, 방문)" value="${isEtc ? escHtml(channel) : ''}" style="${sel === '기타' ? '' : 'display:none'}">
-        <label class="dc-date"><span>컨펌 날짜</span><input type="date" id="${prefix}Date" value="${escHtml(date || getTodayStr())}"></label>
+        <label class="dc-date"><span>${dateLabel || '컨펌 날짜'}</span><input type="date" id="${prefix}Date" value="${escHtml(date || getTodayStr())}"></label>
       </div>`;
 }
 function bindDesignConfirmFields(prefix) {
@@ -23746,27 +23768,30 @@ function readDesignConfirmFields(prefix) {
 }
 // 편집 창이 열린 뒤 기타 칸 토글 연결 (편집 창 HTML은 문자열이라 여기서 바인딩)
 document.addEventListener('change', (e) => {
-    if (e.target && e.target.name === 'editDcCh') {
-        const box = document.getElementById('editDcCh');
+    if (e.target && (e.target.name === 'editDcCh' || e.target.name === 'editWoCh')) {
+        const pre = e.target.name.slice(0, -2);
+        const box = document.getElementById(pre + 'Ch');
         box.querySelectorAll('label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked));
-        const etc = document.getElementById('editDcEtc');
+        const etc = document.getElementById(pre + 'Etc');
         if (etc) { etc.style.display = e.target.value === '기타' ? '' : 'none'; if (e.target.value === '기타') etc.focus(); }
     }
 });
 
 // 디확 컨펌을 체크할 때 띄우는 작은 창 → {channel, date} 또는 취소 시 null
-function askDesignConfirm(cur) {
+function askDesignConfirm(cur) { return askCheckInfo('design', cur); }
+function askCheckInfo(key, cur) {
     cur = cur || {};
+    const ci = CHECK_INFO[key] || CHECK_INFO.design;
     return new Promise(resolve => {
         const wrap = document.createElement('div');
         wrap.className = 'dc-ask';
         wrap.innerHTML = `<div class="dc-ask-box" role="dialog" aria-modal="true">
-            <h4>디자인확인서 컨펌</h4>
-            <p>어디로, 언제 컨펌받았나요?</p>
-            ${designConfirmFieldsHtml('askDc', cur.channel, cur.date)}
+            <h4>${ci.title}</h4>
+            <p>${ci.q}</p>
+            ${designConfirmFieldsHtml('askDc', cur.channel, cur.date, ci.dateLabel)}
             <div class="dc-ask-act">
               <button type="button" class="btn-ghost" data-x>취소</button>
-              <button type="button" class="btn-primary" data-ok>컨펌 완료 체크</button>
+              <button type="button" class="btn-primary" data-ok>${ci.ok}</button>
             </div>
           </div>`;
         document.body.appendChild(wrap);
@@ -23774,7 +23799,7 @@ function askDesignConfirm(cur) {
         const done = (v) => { document.removeEventListener('keydown', onKey, true); wrap.remove(); resolve(v); };
         const ok = () => {
             const r = readDesignConfirmFields('askDc');
-            if (!r.date) { showToast('컨펌 날짜를 넣어주세요'); return; }
+            if (!r.date) { showToast(ci.dateLabel + '를 넣어주세요'); return; }
             done(r);
         };
         const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); done(null); } else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') { e.preventDefault(); ok(); } };
