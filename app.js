@@ -23530,10 +23530,10 @@ function inqSendMenu(x, btn) {
     if (!groups.length) rows.push('<div class="inq-send-empty">연결된 견적서가 없어요 — 견적을 만들면 여기서 보낼 수 있어요</div>');
     if (hasPre) rows.push('<button data-s="pre">💡 가견적 안내 <em>금액 범위 · 첨부 없음</em></button>');
     rows.push('<button data-s="msg">✉️ 안내 메시지 <em>글만 · 양식에서 시작</em></button>');
-    projs.forEach(p => rows.push(`<button data-s="dc:${p.id}">🎨 디자인확인서 <em>${escHtml(p.product_name || '')} · 문서 생성기에서</em></button>`));
+    projs.forEach(p => rows.push(`<button data-s="dc:${p.id}">🎨 디자인확인서 <em>${escHtml(p.product_name || '')} · ${p.source_doc_number ? escHtml(p.source_doc_number) + ' 저장된 문서 그대로' : '아직 없음 — 만들기'}</em></button>`));
     if (projs.length) {
         rows.push('<div class="inq-send-cap">공장·공급처에게</div>');
-        projs.forEach(p => rows.push(`<button data-s="wr:${p.id}">📋 작업요청서 <em>${escHtml(p.product_name || '')}${p.supplier ? ' → ' + escHtml(p.supplier) : ''} · 문서 생성기에서</em></button>`));
+        projs.forEach(p => rows.push(`<button data-s="wr:${p.id}">📋 작업요청서 <em>${escHtml(p.product_name || '')}${p.supplier ? ' → ' + escHtml(p.supplier) : ''} · ${p.source_doc_number ? '저장된 문서 그대로' : '디자인확인서 먼저'}</em></button>`));
     }
     const m = document.createElement('div');
     m.id = 'inqSendMenu';
@@ -23567,10 +23567,7 @@ async function inqSendGo(x, what) {
     if (what.startsWith('dc:') || what.startsWith('wr:')) {
         const [kind, id] = what.split(':');
         const row = _inqProjs.find(p => p.id === Number(id));
-        if (inqEnsureProject(row)) {
-            showToast('문서 생성기에서 문서를 확인하고 📤 보내기를 누르세요');
-            createDocFromProject(row.id, kind);
-        }
+        if (row) await inqSendSavedDoc(row, kind);
         return;
     }
     if (what === 'pre') {
@@ -23592,6 +23589,25 @@ async function inqSendGo(x, what) {
         onSent: async ({ channel, text }) => { await inqSendLogged(x, channel, text); }
     });
 }
+// 이미 저장된 디자인확인서·작업요청서를 그대로 열어 보내기 창까지 (문서 생성기 #send-문서번호)
+// — '만들기'(createDocFromProject)는 프로젝트 데이터로 덮어쓸지 묻기 때문에 보내기에서는 쓰지 않음
+async function inqSendSavedDoc(row, kind) {
+    const make = () => { if (inqEnsureProject(row)) createDocFromProject(row.id, kind); };
+    if (!row.source_doc_number) {
+        if (kind === 'wr') { showToast('디자인확인서를 먼저 만들어주세요'); return; }
+        if (confirm('아직 디자인확인서가 없습니다. 지금 만들까요?')) make();
+        return;
+    }
+    if (kind === 'dc') { location.href = 'doc-generator.html#send-' + encodeURIComponent(row.source_doc_number); return; }
+    const prefix = row.source_doc_number + '_';
+    const { data, error } = await sb.from('confirmations').select('doc_number, created_at, status')
+        .like('doc_number', prefix + '%').order('created_at', { ascending: false });
+    if (error) { showToast('작업요청서 찾기 실패: ' + error.message); return; }
+    const wr = (data || []).find(d => d.status === '작업요청서' && String(d.doc_number || '').startsWith(prefix));
+    if (!wr) { if (confirm('아직 작업요청서가 없습니다. 지금 만들까요?')) make(); return; }
+    location.href = 'doc-generator.html#send-' + encodeURIComponent(wr.doc_number);
+}
+
 // 보낸 글을 '우리' 기록으로 + 마지막 연락 + 신규 → 상담중
 async function inqSendLogged(x, channel, text) {
     const saved = await inqAddLog(x.id, { direction: 'out', channel, body: text });

@@ -1987,7 +1987,7 @@ async function applyProjectPrefillData(pf, opts){
   try{
     /* 편집 모드면 applyEditHash에서 loadRecord 이후에 덮어쓴다 */
     var hash=(location.hash||'').replace(/^#/,'');
-    if(hash.startsWith('edit-'))return;
+    if(hash.startsWith('edit-')||hash.startsWith('send-'))return;
     var raw=localStorage.getItem('klp_doc_prefill');
     if(!raw)return;
     var pf=JSON.parse(raw);
@@ -2022,6 +2022,25 @@ async function applyProjectPrefillData(pf, opts){
       }catch(pe){console.error('edit prefill 적용 실패',pe);}
     }
   }catch(e){console.error('edit load failed',e);showMsg('❌ 불러오기 실패: '+e.message,true);}
+})();
+
+/* === URL 해시 기반 보내기 (#send-DOCNUM) — 저장된 문서를 그대로 열고 보내기 창 (덮어쓰기 없음) === */
+(async function applySendHash(){
+  var hash=(location.hash||'').replace(/^#/,'');
+  if(!hash.startsWith('send-'))return;
+  var docNum=decodeURIComponent(hash.substring(5));
+  history.replaceState(null,'',location.pathname);
+  try{
+    var res=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(docNum),'GET');
+    if(!res||res.length===0){showMsg('❌ 문서를 찾을 수 없습니다: '+docNum,true);return;}
+    var r=res[0];
+    await loadRecord(r.id);
+    await new Promise(function(ok){setTimeout(ok,400);});
+    var isWr=r.status==='작업요청서';
+    if(isWr)showWrTab('preview');else showDcTab('preview');
+    await new Promise(function(ok){setTimeout(ok,600);});
+    await sendDoc(isWr?'wr':'dc');
+  }catch(e){console.error('send open failed',e);showMsg('❌ 불러오기 실패: '+e.message,true);}
 })();
 
 /* === URL 해시 기반 자동 다운로드 (#dl-jpg-DOCNUM 또는 #dl-pdf-DOCNUM) === */
