@@ -23326,10 +23326,9 @@ function inqRenderProjs(x) {
             <span class="inq-pj-amt">${won(p.revenue)}</span>
             <span class="inq-pj-prog">${done}/${CHECK_ITEMS.length}</span>
             <div class="inq-spacer"></div>
-            <button class="inq-mini" data-act="dc:${p.id}">${p.source_doc_number ? '디자인확인서' : '디자인확인서 만들기'}</button>
-            <button class="inq-mini" data-act="wr:${p.id}">작업요청서</button>
             <button class="inq-mini" data-act="open:${p.id}">국내에서 보기</button>
           </div>
+          <div class="inq-pj-docs">${['dc', 'wr'].map(k => inqDocTileHtml(p, k)).join('')}</div>
           <div class="inq-pj-checks">${CHECK_ITEMS.map(it => {
               const on = !!(p.checks && p.checks[it.key]);
               const ciK = CHECK_INFO[it.key];
@@ -23343,6 +23342,59 @@ function inqRenderProjs(x) {
       }).join('')}</div>` : ''}`;
     inqBindCardToggle(el, 'pj', () => inqRenderProjs(x));
     el.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => inqDealAction(x, b.dataset.act, b)));
+    if (open) inqFillDocTiles(x);
+}
+
+// ---------- 국내 진행 카드의 디자인확인서·작업요청서 미리보기 (누르면 크게 = viewSavedDoc) ----------
+const _inqDocNum = new Map();   // 'dc:DC번호' / 'wr:DC번호' → 저장된 문서번호(없으면 null)
+function inqDocTileState(p, kind) {
+    if (!p.source_doc_number) return { st: kind === 'wr' ? 'needdc' : 'empty' };
+    const ck = kind + ':' + p.source_doc_number;
+    if (!_inqDocNum.has(ck)) return { st: 'loading' };
+    const num = _inqDocNum.get(ck);
+    if (!num) return { st: 'empty' };
+    const th = _savedDocThumb.get(num);
+    if (th) return { st: 'img', src: th, num };
+    if (_savedDocFail.has(num)) return { st: 'err', num };
+    return { st: 'loading', num };
+}
+function inqDocTileInner(kind, t) {
+    const label = kind === 'dc' ? '디자인확인서' : '작업요청서';
+    if (t.st === 'img') return `<img src="${t.src}" alt="${label} 미리보기"><span class="inq-doc-lb">${label}</span>`;
+    if (t.st === 'empty') return `<div class="inq-doc-ph"><b>＋</b>${label} 만들기</div>`;
+    if (t.st === 'needdc') return `<div class="inq-doc-ph"><b>＋</b>${label}<em>디자인확인서를 먼저 만들어주세요</em></div>`;
+    if (t.st === 'err') return `<div class="inq-doc-ph">미리보기를 못 그렸어요<em>눌러서 열기</em></div><span class="inq-doc-lb">${label}</span>`;
+    return `<div class="inq-doc-ph"><i class="inq-doc-spin"></i>불러오는 중…</div><span class="inq-doc-lb">${label}</span>`;
+}
+function inqDocTileHtml(p, kind) {
+    const t = inqDocTileState(p, kind);
+    const empty = t.st === 'empty' || t.st === 'needdc';
+    return `<button type="button" class="inq-doc-th ${empty ? 'empty' : ''}" data-act="${kind}:${p.id}" data-doctile="${kind}:${p.id}"
+        title="${kind === 'dc' ? '디자인확인서' : '작업요청서'}${empty ? ' 만들기' : ' — 누르면 크게 보기'}">${inqDocTileInner(kind, t)}</button>`;
+}
+function inqSetDocTile(p, kind) {
+    const b = document.querySelector(`#inqProjs [data-doctile="${kind}:${p.id}"]`);
+    if (!b) return;
+    const t = inqDocTileState(p, kind);
+    b.classList.toggle('empty', t.st === 'empty' || t.st === 'needdc');
+    b.innerHTML = inqDocTileInner(kind, t);
+}
+async function inqFillDocTiles(x) {
+    const projs = _inqProjsFor === x.id ? _inqProjs.slice() : [];
+    for (const p of projs) for (const kind of ['dc', 'wr']) {
+        if (_inqSel !== x.id) return;
+        if (!p.source_doc_number) continue;
+        const ck = kind + ':' + p.source_doc_number;
+        if (!_inqDocNum.has(ck)) {
+            try { _inqDocNum.set(ck, await inqSavedDocNumber(p, kind)); } catch (_) { continue; }
+            inqSetDocTile(p, kind);
+        }
+        const num = _inqDocNum.get(ck);
+        if (!num || _savedDocThumb.has(num) || _savedDocFail.has(num)) continue;
+        try { await getSavedDoc(num, kind === 'dc' ? '디자인확인서' : '작업요청서'); }
+        catch (e) { console.warn('문서 미리보기 실패', num, e); _savedDocFail.add(num); }
+        inqSetDocTile(p, kind);
+    }
 }
 
 // 고객 정보 한 줄 요약 (접힌 상태)
@@ -23694,8 +23746,8 @@ async function inqSendSavedDoc(row, kind, x) {
 
 // 화면 이동 없이: 문서 생성기를 숨은 창(iframe, #render-문서번호)으로 열어 저장된 문서를 그리고 보내기 정보를 받아옴
 let _sendDocBusy = false;
-async function loadSavedDocOpts(docNumber, label) {
-    showToast(`${label} 불러오는 중…`);
+async function loadSavedDocOpts(docNumber, label, quiet) {
+    if (!quiet) showToast(`${label} 불러오는 중…`);
     const old = document.getElementById('docRenderFrame');
     if (old) old.remove();
     const fr = document.createElement('iframe');
@@ -23712,6 +23764,42 @@ async function loadSavedDocOpts(docNumber, label) {
     if (!opts) throw new Error('문서 내용을 읽지 못했습니다');
     return opts;
 }
+// 문서번호 → Promise<{ jpg(원본), thumb(작은 그림), opts(보내기 정보 — makeCanvas는 원본 그림에서 다시 만듦) }>
+// 이 화면에 있는 동안만 기억 (문서를 고치려면 문서 생성기로 이동 → 돌아오면 새로 그림)
+const _savedDocCache = new Map();
+const _savedDocThumb = new Map();
+const _savedDocFail = new Set();
+let _docFrameChain = Promise.resolve();
+function getSavedDoc(docNumber, label) {
+    if (_savedDocCache.has(docNumber)) return _savedDocCache.get(docNumber);
+    const job = _docFrameChain.then(async () => {
+        const opts = await loadSavedDocOpts(docNumber, label, true);
+        const canvas = await opts.makeCanvas();
+        const jpg = canvas.toDataURL('image/jpeg', 0.92);
+        const tw = 480, th = Math.max(1, Math.round(canvas.height * tw / canvas.width));
+        const t = document.createElement('canvas');
+        t.width = tw; t.height = th;
+        const g = t.getContext('2d');
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(canvas, 0, 0, tw, th);
+        const thumb = t.toDataURL('image/jpeg', 0.86);
+        opts.makeCanvas = () => new Promise((ok, no) => {
+            const im = new Image();
+            im.onload = () => { const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; c.getContext('2d').drawImage(im, 0, 0); ok(c); };
+            im.onerror = () => no(new Error('문서 그림을 읽지 못했습니다'));
+            im.src = jpg;
+        });
+        const fr = document.getElementById('docRenderFrame');
+        if (fr) fr.remove();
+        _savedDocThumb.set(docNumber, thumb);
+        _savedDocFail.delete(docNumber);
+        return { jpg, thumb, opts };
+    });
+    _docFrameChain = job.catch(() => {});
+    _savedDocCache.set(docNumber, job);
+    job.catch(() => _savedDocCache.delete(docNumber));
+    return job;
+}
 function savedDocOnSent(opts, x, label) {
     if (!x) return opts;
     opts.onSent = async ({ channel, text }) => {
@@ -23726,7 +23814,9 @@ async function sendSavedDocHere(docNumber, x, label) {
     if (!window.SendKit) { showToast('보내기 기능을 불러오지 못했습니다. 새로고침 해주세요'); return; }
     _sendDocBusy = true;
     try {
-        const opts = savedDocOnSent(await loadSavedDocOpts(docNumber, label), x, label);
+        if (!_savedDocThumb.has(docNumber)) showToast(`${label} 불러오는 중…`);
+        const d = await getSavedDoc(docNumber, label);
+        const opts = savedDocOnSent(Object.assign({}, d.opts), x, label);
         sendKitSetup();
         SendKit.open(opts);
     } catch (e) {
@@ -23742,9 +23832,10 @@ async function viewSavedDoc(docNumber, label, x) {
     if (_sendDocBusy) return;
     _sendDocBusy = true;
     try {
-        const opts = savedDocOnSent(await loadSavedDocOpts(docNumber, label), x, label);
-        const canvas = await opts.makeCanvas();
-        const jpg = canvas.toDataURL('image/jpeg', 0.92);
+        if (!_savedDocThumb.has(docNumber)) showToast(`${label} 불러오는 중…`);
+        const d = await getSavedDoc(docNumber, label);
+        const opts = savedDocOnSent(Object.assign({}, d.opts), x, label);
+        const jpg = d.jpg;
         const old = document.getElementById('docViewOverlay');
         if (old) old.remove();
         const ov = document.createElement('div');
