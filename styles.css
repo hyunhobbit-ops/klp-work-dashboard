@@ -5789,3 +5789,74 @@ body.m-on .theme-toggle{display:none}
     font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px}
 .inq-sort button.on{background:var(--blue-light); border-color:color-mix(in srgb, var(--blue) 45%, transparent); color:var(--blue); font-weight:700}
 .inq-sort button b{font-size:11px; font-weight:800; color:#fff; background:var(--red); border-radius:9px; padding:0 6px; line-height:17px}
+
+/* ==== 프로젝트 화면을 상담·견적 화면 기준으로 맞춤 (2026-10-06) ====
+   같은 폭·높이(목록 clamp(300,19vw,360) + 오른쪽 패널, 화면 높이에 맞춰 각자 스크롤), 같은 칩·검색·목록 카드 모양 */
+#tab-planning.content{padding:20px 28px 24px}
+.pl-wrap{grid-template-columns:clamp(300px, 19vw, 360px) minmax(0,1fr); gap:14px; height:calc(100vh - var(--topbar-h, 64px) - 44px); min-height:540px; align-items:stretch}
+.pl-list{position:static; top:auto; max-height:none; height:100%; border:1px solid var(--border); border-radius:12px}
+.pl-list-top{padding:12px 12px 8px; border-bottom:none}
+.pl-mode{display:flex; align-items:baseline; gap:8px; font-size:15px; font-weight:800; margin-bottom:8px; min-width:0}
+.pl-mode span{font-size:11.5px; font-weight:500; color:var(--gray-500); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.pl-mode-sub{display:none}
+.pl-list-tools{display:flex; gap:8px}
+.pl-search-box{flex:1; display:flex; align-items:center; gap:7px; height:36px; padding:0 11px; border:1px solid var(--border); border-radius:9px; color:var(--gray-400); background:var(--gray-50); min-width:0}
+.pl-search-box input{flex:1; min-width:0; border:none; outline:none; background:none; font-family:inherit; font-size:13px; color:var(--gray-900)}
+.pl-search-box:focus-within{border-color:var(--blue)}
+.pl-new{width:auto; flex:none; height:36px; padding:0 13px; border-radius:9px; font-size:13px; font-weight:700; white-space:nowrap}
+.pl-chips{display:flex; flex-wrap:wrap; gap:5px; margin:0; padding:0 12px 10px; border-bottom:1px solid var(--border-soft, var(--gray-100))}
+.pl-chips button{height:27px; padding:0 10px; border:1px solid var(--border); border-radius:14px; background:var(--white); font-size:12px; font-weight:700; color:var(--gray-600)}
+.pl-chips button b{font-size:11px; color:var(--gray-400); margin-left:3px}
+.pl-chips button.on{background:var(--gray-900); border-color:var(--gray-900); color:var(--white)}
+.pl-chips button.on b{color:var(--gray-400); opacity:1}
+.pl-list-body{padding:4px 8px}
+.pl-grp-list-h{padding:12px 8px 6px; font-size:12px}
+.pl-row{position:relative; padding:16px 14px 16px 16px; border:none; border-bottom:1px solid var(--border-soft, var(--gray-100)); border-radius:0}
+.pl-row:hover{background:var(--gray-50); border-radius:10px}
+.pl-row.on{background:var(--blue-light); border-radius:10px; border-color:transparent}
+.pl-row.on::before{content:''; position:absolute; left:0; top:10px; bottom:10px; width:4px; border-radius:2px; background:var(--blue)}
+.pl-row-tags{display:flex; align-items:center; gap:6px; margin-bottom:8px}
+.pl-st{font-size:11px; font-weight:600; padding:2px 8px; border-radius:6px}
+.pl-st.live{background:var(--blue-light); color:var(--blue)}
+.pl-st.fam{background:#FCE7F3; color:#BE185D}
+.pl-row-dd{margin-left:auto; font-size:12.5px; font-weight:600}
+.pl-row-name{font-size:16.5px; font-weight:700; letter-spacing:-.3px; line-height:1.45; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.pl-row-meta{margin-top:5px; gap:8px; font-size:13px; font-weight:500; color:var(--gray-600)}
+.pl-row-bar{width:56px; height:6px}
+.pl-row-next{display:inline-block; max-width:100%; margin-top:10px; padding:5px 10px; border-radius:6px; background:var(--gray-100); color:var(--gray-600);
+    font-size:13px; font-weight:500; line-height:1.5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pl-row-next.late{background:var(--red-light); color:var(--red)}
+.pl-row-next b{font-weight:700}
+.pl-list-hint{padding:8px 14px}
+
+/* 오른쪽: 상담 상세처럼 흰 패널 하나 — 머리 + (본문 | 정보) 각자 스크롤 */
+.pl-detail{display:flex; flex-direction:column; min-height:0; height:100%; background:var(--white); border:1px solid var(--border); border-radius:12px; overflow:hidden}
+.pl-head{flex:none; margin:0; padding:12px 18px; border:none; border-bottom:1px solid var(--border-soft, var(--gray-100)); border-radius:0}
+.pl-head-title h2{font-size:19px; font-weight:900; letter-spacing:-.5px}
+.pl-head-sub{margin-top:4px; font-size:12.5px}
+.pl-prog{margin-top:10px}
+.pl-prog-bar{height:8px}
+.pl-prog-txt{font-size:13px}
+.pl-prog-txt b{font-size:14px}
+.pl-body{flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) clamp(320px, 30%, 440px); gap:0}
+.pl-main{min-height:0; overflow-y:auto; padding:12px 16px 20px; border-right:1px solid var(--border)}
+.pl-side{min-height:0; overflow-y:auto; background:var(--gray-50); padding:12px; gap:10px}
+.pl-card{border-radius:10px; padding:11px 13px}
+.pl-grp, .pl-add{border-radius:10px}
+.pl-task-title{font-size:14px}
+.pl-tabs{margin-bottom:12px}
+.pl-tabs button{height:40px; font-size:14px}
+.pl-body.board .pl-main{padding-right:12px}
+/* 프로젝트 안 고른 화면(전체 요약)도 같은 패널 */
+.pl-ov{height:100%; min-height:0; overflow-y:auto; background:var(--white); border:1px solid var(--border); border-radius:12px; padding:16px 20px}
+.pl-ov-head h2{font-size:19px; font-weight:900}
+
+@media (max-width:1100px){
+    .pl-wrap{grid-template-columns:minmax(0,1fr); height:auto}
+    .pl-list{height:auto; max-height:50vh}
+    .pl-detail, .pl-ov{height:auto; overflow:visible}
+    .pl-body{grid-template-columns:minmax(0,1fr)}
+    .pl-main, .pl-side{overflow:visible; border-right:none}
+}
+.pl-mode{white-space:nowrap; overflow:hidden}
+.pl-mode span{flex:1; min-width:0}

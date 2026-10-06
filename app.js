@@ -13487,11 +13487,18 @@ async function renderPlanning(opts) {
     }
     const lb = document.getElementById('plListBody');
     const listScroll = lb ? lb.scrollTop : 0;
+    const samePid = renderPlanning._pid === currentPlanningProjectId;
+    const mainScroll = samePid ? ((root.querySelector('.pl-main') || root.querySelector('.pl-ov') || {}).scrollTop || 0) : 0;
+    const sideScroll = samePid ? ((root.querySelector('.pl-side') || {}).scrollTop || 0) : 0;
     root.innerHTML = `<div class="pl-wrap">${renderPlanningList()}${proj ? renderPlanningDetail(proj) : planningOverviewHtml()}</div>`;
     renderPlanning._pid = currentPlanningProjectId;
     Object.entries(keep).forEach(([id, v]) => { const el = document.getElementById(id); if (el) el.value = v; });
     const lb2 = document.getElementById('plListBody');
     if (lb2) lb2.scrollTop = listScroll;
+    const m2 = root.querySelector('.pl-main') || root.querySelector('.pl-ov');
+    if (m2 && mainScroll) m2.scrollTop = mainScroll;
+    const s2 = root.querySelector('.pl-side');
+    if (s2 && sideScroll) s2.scrollTop = sideScroll;
     if (focusId) {
         const el = document.getElementById(focusId);
         if (el) { el.focus(); try { if (el.setSelectionRange && el.type === 'text') el.setSelectionRange(el.value.length, el.value.length); } catch (_) {} }
@@ -13566,19 +13573,25 @@ function planningListRowHtml(p) {
     const today = getTodayStr();
     const pr = planningProgress(p);
     const dd = p.status === '완료' ? null : planningDDay(p.deadline);
-    const late = planningTasksOf(p).filter(x => (x.taskStatus || 'todo') !== 'done' && x.deadline && x.deadline <= today).length;
-    const fam = p.access === 'family' ? '<span title="가족 프로젝트">🏠</span> ' : '';
-    const st = p.status && p.status !== '진행 중' ? `<span class="pl-st ${p.status === '완료' ? 'done' : 'hold'}">${planningEsc(p.status)}</span>` : '';
+    const open = planningTasksOf(p).filter(x => (x.taskStatus || 'todo') !== 'done');
+    const late = open.filter(x => x.deadline && x.deadline <= today).length;
+    const next = open.filter(x => x.deadline).sort((x, y) => String(x.deadline).localeCompare(String(y.deadline)))[0];
+    const notes = planningNotesOf(p).length;
+    const st = p.status || '진행 중';
+    const stCls = st === '완료' ? 'done' : st === '보류' ? 'hold' : 'live';
     return `
     <div class="pl-row${p.id === currentPlanningProjectId ? ' on' : ''}" draggable="true" ondragstart="planningProjectDragStart(event,${p.id})" ondragend="planningProjectDragEnd(event)" onclick="openPlanningProject(${p.id})">
-        <div class="pl-row-name">${fam}${planningEsc(p.name)}</div>
-        <div class="pl-row-meta">
-            ${st}
-            ${pr.total ? `<span class="pl-row-bar"><i style="width:${pr.pct}%"></i></span><span>${pr.done}/${pr.total} 완료</span>` : '<span class="muted">할 일 없음</span>'}
-            ${planningNotesOf(p).length ? `<span title="자료·제안">📎 ${planningNotesOf(p).length}</span>` : ''}
-            ${late ? `<span class="pl-row-late" title="마감 지났거나 오늘 마감인 할 일">⚠ ${late}</span>` : ''}
-            ${dd ? `<span class="pl-row-dd" style="color:${dd.color}">${dd.label}</span>` : ''}
+        <div class="pl-row-tags">
+            <span class="pl-st ${stCls}">${planningEsc(st)}</span>
+            ${p.access === 'family' ? '<span class="pl-st fam">🏠 가족</span>' : ''}
+            ${dd ? `<span class="pl-row-dd" style="color:${dd.color}">${dd.label}${p.deadline ? ' · ' + planningMD(p.deadline) : ''}</span>` : ''}
         </div>
+        <div class="pl-row-name">${planningEsc(p.name)}</div>
+        <div class="pl-row-meta">
+            ${pr.total ? `<span class="pl-row-bar"><i style="width:${pr.pct}%"></i></span><span>${pr.done}/${pr.total} 완료</span>` : '<span class="muted">할 일 없음</span>'}
+            ${notes ? `<span title="자료·제안">📎 ${notes}</span>` : ''}
+        </div>
+        ${next ? `<div class="pl-row-next${late ? ' late' : ''}">▶ ${planningEsc(planningMD(next.deadline))} · ${planningEsc(planningPostLabel(next, 40))}${late > 1 ? ` <b>외 급한 일 ${late - 1}</b>` : ''}</div>` : ''}
     </div>`;
 }
 
@@ -13637,12 +13650,16 @@ function renderPlanningList() {
     return `
     <aside class="pl-list">
         <div class="pl-list-top">
-            <div class="pl-mode">${modeLabel}</div>
-            <div class="pl-mode-sub">${modeSub}</div>
-            <button class="pl-new" onclick="openNewPlanningModal()">+ 새 프로젝트${currentPlanningProjectId == null ? ' <kbd>F2</kbd>' : ''}</button>
-            <input id="plSearch" class="pl-search" placeholder="🔍 프로젝트·할 일 검색" value="${planningEsc(planningListQuery)}" oninput="planningOnSearch(this.value)">
-            <div class="pl-chips">${chips}</div>
+            <div class="pl-mode" title="${planningEsc(modeSub)}">${modeLabel}<span>${planningEsc(modeSub)}</span></div>
+            <div class="pl-list-tools">
+                <label class="pl-search-box">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                    <input id="plSearch" placeholder="프로젝트·할 일 검색" value="${planningEsc(planningListQuery)}" oninput="planningOnSearch(this.value)">
+                </label>
+                <button class="pl-new" onclick="openNewPlanningModal()">+ 새 프로젝트${currentPlanningProjectId == null ? ' (F2)' : ''}</button>
+            </div>
         </div>
+        <div class="pl-chips">${chips}</div>
         <div id="plListBody" class="pl-list-body">${planningListBodyHtml()}</div>
         ${currentPlanningMode === 'funding' ? '' : '<div class="pl-list-hint">프로젝트를 다른 묶음으로 끌어 놓으면 주간·월간·연간이 바뀝니다</div>'}
     </aside>`;

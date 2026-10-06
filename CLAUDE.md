@@ -168,6 +168,7 @@
 - `☰ 목록 | ▦ 보드` 전환(localStorage `pl_view`) — 보드는 예전 칸반 컬럼(`planningBoardHtml`)
 - `renderPlanning`은 다시 그릴 때 입력 중이던 할 일 칸 값·포커스·목록 스크롤을 유지(실시간 갱신 대비). 프로젝트 열기/닫기는 이미 불러온 데이터로 그림(skipLoad)
 - F2: 프로젝트를 열었으면 할 일 입력칸으로, 아니면 새 프로젝트 (모든 모드)
+- **2026-10-06 상담·견적 화면 기준으로 맞춤**: 목록 폭 `clamp(300px,19vw,360px)`, 화면 높이 고정(`.pl-wrap` height calc(100vh-…)) + 목록·본문·정보 패널 각자 스크롤(`renderPlanning`이 `.pl-main`/`.pl-side` 스크롤 유지), 목록 위 = 제목 한 줄 + 검색·새 프로젝트 한 줄 + 상태 칩(상담 칩과 같은 크기), 목록 행 = 상담 목록과 같은 모양(위 작은 줄 상태·가족·D-day / 이름 16.5px / 진행률 / '다음 할 일' 상자 — 급하면 빨강), 오른쪽은 흰 패널 하나(머리 19px + 본문 | 정보 clamp(320px,30%,440px) 회색 배경)
 - **할 일 / 자료·제안 분리 (migration 049)**: `planning_posts.kind` = task(진행 상태·마감·담당) / note(제안·조사·자료 — 상태 없음). 기존 글은 제안·조사·자료 중 담당자·마감 없는 것만 note로 옮김. 진행률·지금 할 일·요약·홈 '내 할 일'·보드는 task만(`planningTasksOf`)
   - 본문 탭 `✅ 할 일 | 📎 자료·제안`(`planningTab`, localStorage `pl_tab`). 자료 탭 = 사진 카드 바둑판(`planningNotesHtml`, 분류 칩, 검토 중 제안이 먼저), 올리기 `openNewPlanningNote(category)`(작성 창에서 마감·담당 숨김)
   - 제안 상태 `note_status` review(null)/adopted/hold. `planningAdoptProposal` → 할 일 생성(`ref_ids`=[제안 id], 담당자 있으면 일일계획표) + 제안 '채택'
