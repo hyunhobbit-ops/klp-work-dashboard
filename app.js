@@ -21606,13 +21606,17 @@ function inqFiltered() {
     if (q) list = list.filter(x =>
         [x.client, x.title, x.client_contact, x.contact_name, x.contact_dept, x.contact_phone, x.contact_email, x.purpose, inqItemsSummary(x.items)]
             .some(v => String(v || '').toLowerCase().includes(q)));
-    // 할 일 기한 지난 것 → 최근 연락 순
+    // 정렬: '최근순'(기본) = 최근 연락 순 / '급한 일 먼저' = 오늘·지난 할 일 있는 상담 먼저 → 최근 연락 순
+    const urgentFirst = _inqSort === 'urgent';
     return list.slice().sort((a, b) => {
-        const ao = inqIsOverdue(a) ? 0 : 1, bo = inqIsOverdue(b) ? 0 : 1;
-        if (ao !== bo) return ao - bo;
-        return String(b.last_contact_at || '').localeCompare(String(a.last_contact_at || ''));
+        if (urgentFirst) {
+            const ao = inqIsOverdue(a) ? 0 : 1, bo = inqIsOverdue(b) ? 0 : 1;
+            if (ao !== bo) return ao - bo;
+        }
+        return String(b.last_contact_at || b.created_at || '').localeCompare(String(a.last_contact_at || a.created_at || ''));
     });
 }
+let _inqSort = (() => { try { return localStorage.getItem('inq_sort') === 'urgent' ? 'urgent' : 'recent'; } catch (_) { return 'recent'; } })();
 
 function inqRenderChips() {
     const el = document.getElementById('inqChips');
@@ -21620,10 +21624,20 @@ function inqRenderChips() {
     const cnt = s => _inqList.filter(x => x.status === s).length;
     const act = _inqList.filter(x => INQ_ACTIVE.includes(x.status)).length;
     const chips = [['active', '진행 중', act]].concat(INQ_STATUSES.map(s => [s, s, cnt(s)])).concat([['all', '전체', _inqList.length]]);
+    const urgentN = _inqList.filter(inqIsOverdue).length;
     el.innerHTML = chips.map(([k, l, n]) =>
-        `<button class="inq-chip ${_inqFilter === k ? 'on' : ''}" data-f="${escHtml(k)}">${escHtml(l)}<b>${n}</b></button>`).join('');
+        `<button class="inq-chip ${_inqFilter === k ? 'on' : ''}" data-f="${escHtml(k)}">${escHtml(l)}<b>${n}</b></button>`).join('') +
+        `<div class="inq-sort"><span>정렬</span>
+            <button class="${_inqSort === 'recent' ? 'on' : ''}" data-sort="recent">최근순</button>
+            <button class="${_inqSort === 'urgent' ? 'on' : ''}" data-sort="urgent">급한 일 먼저${urgentN ? `<b>${urgentN}</b>` : ''}</button>
+        </div>`;
     el.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => {
         _inqFilter = b.dataset.f; inqRenderChips(); inqRenderList();
+    }));
+    el.querySelectorAll('[data-sort]').forEach(b => b.addEventListener('click', () => {
+        _inqSort = b.dataset.sort;
+        try { localStorage.setItem('inq_sort', _inqSort); } catch (_) {}
+        inqRenderChips(); inqRenderList();
     }));
 }
 

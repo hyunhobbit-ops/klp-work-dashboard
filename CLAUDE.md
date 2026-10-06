@@ -155,6 +155,7 @@
 - **입력칸 DB화 (migration 041, 대표님 피드백)**: inquiries에 company_address/company_fax/company_website, items jsonb [{name,qty,tbd?}] (tbd=수량 미정 체크), due_date, budget, purpose, print_request, packaging_request, sample_needed('필요'/'불필요'), delivery_address. 새 상담 화면 = 붙여넣기 → 기본 → 담당자 → 회사 정보 → 요청 사항 + 오른쪽 **상담 체크리스트** `INQ_REQ_CHECK`(13개, 전화 선택 시 '전화 상담 순서'로 강조, 누르면 그 칸으로). AI(`_inquiry-extract.js`)·규칙(`inqParseExtra`: 팩스·홈페이지·주소)이 새 칸도 채움, 품목은 `inqApplyItems`. 제목이 비면 품목·수량으로 자동. 상세 화면 오른쪽 **요청 사항** 카드(`inqRenderReq`, 바로 수정·저장, 모르는 항목은 질문과 함께). 거래처 자동 추가 트리거가 주소·팩스도 넣음. 이 상담으로 견적 작성 시 첫 품목·수량 미리 채움
 - **기록 수정**: 타임라인 연필 버튼 → `inqEditLog`(글·사진·고객/우리/메모·경로 수정, `inquiry_logs.edited_at` → '수정됨' 표시). 자동 기록(system)은 수정 불가
 - ⚠️ `inquiry_logs`를 배열로 한 번에 insert할 때는 모든 행의 키를 같게 — `images`가 NOT NULL이라 한 행에서 빠지면 전체가 거부됨
+- **목록 정렬**: 상태 칩 아래 `최근순 | 급한 일 먼저`(`_inqSort`, localStorage `inq_sort`, 기본 최근순). 최근순 = `last_contact_at` 내림차순, 급한 일 먼저 = 오늘·지난 '다음 할 일'(`inqIsOverdue`) 먼저 → 최근 연락 순. 버튼 옆 빨간 숫자 = 급한 상담 수
 - 주요 함수: `tpInitView`, `inqEnter`, `inqRenderList`, `inqRenderDetail`, `inqSubmit`, `inqPatch`, `inqAddLog`, `inqCreate`, `inqParseContact`, `inqAutofillNew`
 - `.btn-ghost`는 전역 스타일(styles.css 끝). 예전엔 `#tab-meetings` 안에서만 정의돼 다른 화면에서 기본 버튼으로 깨졌음
 
