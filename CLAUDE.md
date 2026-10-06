@@ -192,6 +192,7 @@
 - DC를 먼저 저장하고 나중에 프로젝트에 `source_doc_number`를 붙이는 순서(doc-generator saveToDb)라서 양쪽 트리거가 모두 필요
 - 앱: `createDocFromProject`가 문서 만들기 전에 DB에서 납기·배송 최신값을 다시 읽음 (전역 `projects`가 낡았을 수 있어서)
 - **상담 화면 디확·작지 버튼 = 보기**: 국내 진행 카드·지금 할 일의 `dc:`/`wr:`는 저장된 문서가 있으면 `viewSavedDoc`(숨은 iframe `#render-`로 그린 이미지 + 보내기·PDF·JPG·편집 버튼, 편집은 `doc-generator.html#edit-문서번호`), 없을 때만 `createDocFromProject`(만들기). 문서번호 찾기는 `inqSavedDocNumber`, iframe 로드는 `loadSavedDocOpts` 공용
+- **국내 진행 카드 미리보기 2칸 (2026-10-06)**: 품목마다 `디자인확인서 | 작업요청서` 그림 칸(`inqDocTileHtml`, A4 비율, 없으면 점선 '＋ 만들기'). 누르면 `viewSavedDoc` 크게 보기. 그림은 `getSavedDoc(문서번호)`가 숨은 iframe 하나로 **차례대로**(`_docFrameChain`) 그려 `_savedDocCache`(원본 jpg + 작은 그림 + 보내기 opts, opts.makeCanvas는 원본 jpg에서 다시 만듦 → iframe 지워도 보내기 됨)에 기억 — 보기·보내기·미리보기 모두 이걸 씀(페이지 새로고침 전까지). WR 문서번호는 `_inqDocNum`에 기억. 채우기는 `inqFillDocTiles`(상담 바뀌면 중단)
 - **작업요청서 납기일 → 출고 확인 할 일 (migration 054)**: `confirmations_wr_ship_todo` 트리거 — 작업요청서(status '작업요청서')에 납기일이 있으면, DC번호(문서번호 앞 두 마디)로 연결된 국내 프로젝트의 상담에 `inquiry_todos` "(공급처) 출고 확인하기"(due=납기일, 담당=상담 '우리 담당' → 없으면 WR 요청자 이름) + 그 사람 `daily_tasks`([거래처] …, label 회사 업무) + 상담 타임라인 자동 기록 + `next_action` 요약 갱신. 같은 WR은 `inquiry_todos.source_key='wr-ship:문서번호'`로 한 번만, 납기일 바꾸면 날짜가 따라감(완료 전만). 기존 WR은 소급 안 함
 
 ## 마진계산기 (편의성 그룹)
