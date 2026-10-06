@@ -21586,6 +21586,13 @@ async function inqAddLog(id, log) {
         _inqLogs.push(data);
         inqRenderTimeline();
     }
+    // 기록(상태 변경 등 자동 기록 포함)이 생기면 목록 시간·순서도 최신으로 (DB는 트리거 inquiry_logs_touch_inquiry가 맞춤)
+    const it = (typeof _inqList !== 'undefined') && _inqList.find(r => r.id === id);
+    const at = (data && data.at) || new Date().toISOString();
+    if (it && String(it.last_contact_at || '') < at) {
+        it.last_contact_at = at;
+        if (document.getElementById('inqList')) inqRenderList();
+    }
     return data;
 }
 

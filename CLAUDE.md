@@ -156,6 +156,7 @@
 - **기록 수정**: 타임라인 연필 버튼 → `inqEditLog`(글·사진·고객/우리/메모·경로 수정, `inquiry_logs.edited_at` → '수정됨' 표시). 자동 기록(system)은 수정 불가
 - ⚠️ `inquiry_logs`를 배열로 한 번에 insert할 때는 모든 행의 키를 같게 — `images`가 NOT NULL이라 한 행에서 빠지면 전체가 거부됨
 - **목록 정렬**: 상태 칩 아래 `최근순 | 급한 일 먼저`(`_inqSort`, localStorage `inq_sort`, 기본 최근순). 최근순 = `last_contact_at` 내림차순, 급한 일 먼저 = 오늘·지난 '다음 할 일'(`inqIsOverdue`) 먼저 → 최근 연락 순. 버튼 옆 빨간 숫자 = 급한 상담 수
+- **최근 활동 시각 (migration 056)**: `inquiry_logs`에 기록이 생기면(상태 변경·국내 등록·할 일·발송 같은 자동 기록 포함) 트리거 `inquiry_logs_touch_inquiry`가 `inquiries.last_contact_at`을 그 시각으로 당김(앞으로만, 미래 시각은 now로). 앱은 `inqAddLog`에서 목록 항목 시간도 바로 바꿔 다시 정렬. 예전엔 대화 기록 일부만 바꿔서 상태를 바꿔도 '5일 전'으로 남았음
 - 주요 함수: `tpInitView`, `inqEnter`, `inqRenderList`, `inqRenderDetail`, `inqSubmit`, `inqPatch`, `inqAddLog`, `inqCreate`, `inqParseContact`, `inqAutofillNew`
 - `.btn-ghost`는 전역 스타일(styles.css 끝). 예전엔 `#tab-meetings` 안에서만 정의돼 다른 화면에서 기본 버튼으로 깨졌음
 
