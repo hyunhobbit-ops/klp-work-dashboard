@@ -66,6 +66,7 @@
   - `doc_number`에 UNIQUE 제약 (2026-05-19 Phase 3, migration 008). 동시 저장 race는 `saveConfirmationWithRetry`가 23505 catch → 재시도로 처리. WR 형식은 `YYMM_NNNN_K` (parent DC + suffix), retry 시 suffix만 증가.
 - RPC 함수
   - `delete_all_marketdb()` (Phase 3, migration 009): `SECURITY DEFINER`. 내부에서 `auth.uid → profiles.name` 조회 → 이현주/김현호/김관택만 실행. anon EXECUTE 차단. `app.js deleteAllMarketdb`가 호출.
+- ⚠️ **백업·임시 테이블도 public 스키마에 만들면 즉시** `enable row level security` + `revoke all … from anon, authenticated` (2026-10 `clients_category_backup_20260922`가 RLS 없이 노출돼 Supabase 보안 경고 → migration 057로 잠금)
 - RLS 정책: **단순 모델** — `authenticated` = 모든 내부 18개 테이블 풀 액세스. `proposals`/`products`는 anon SELECT 허용(거래처 공유 링크용). `profiles`는 anon SELECT 허용(handleLogin의 name→email 매핑용). 새 테이블 추가 시 동일 패턴 따를 것 (`migrations/` 폴더 참조).
 - 세션 관리: Supabase가 JWT를 자동 관리, `localStorage.klp_user`는 display name 캐시 + `doc-generator.html` 호환용 보조. 정식 인증은 `sb.auth.getSession()`
 - `doc-generator.html`은 SDK가 아닌 hand-rolled `sbFetch` 사용 — bootstrapAuthSession에서 access_token 추출 후 Bearer 자동 첨부 (RLS 잠금 대응). `sbFetch`는 `res.ok` 체크 + 에러 throw 패턴 (Phase 3 #11).
