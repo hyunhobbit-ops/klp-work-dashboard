@@ -22092,14 +22092,7 @@ function inqRenderQuotes(x) {
     const linked = tempProjects.filter(p => p.inquiryId === x.id);
     const rev = linked.reduce((s, p) => s + calcTempRevenueWithVat(p), 0);
     const sup = linked.reduce((s, p) => s + calcTempSupRevenueWithVat(p), 0);
-    // 같은 거래처의 아직 연결 안 된 견적 (날짜별 묶음)
-    const cands = [];
-    tempProjects.filter(p => !p.inquiryId && x.client && p.client === x.client).forEach(p => {
-        let g = cands.find(c => c.date === p.date);
-        if (!g) { g = { date: p.date, n: 0 }; cands.push(g); }
-        g.n++;
-    });
-    cands.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const cands = inqLinkCands(x);
 
     // 견적 묶음(날짜+매출처)별 — 견적 목록과 같은 기준
     const groups = [];
@@ -22160,14 +22153,13 @@ function inqRenderQuotes(x) {
             ${sup ? `<em>매입 <b class="sup">${won(sup)}</b></em><em>마진 <b class="${m >= 0 ? 'pos' : 'neg'}">${won(m)} (${pct}%)</b></em>` : ''}
           </span>` : '<span>아직 없음</span>'}
         <div class="inq-spacer"></div>
-        ${cands.length ? `<select id="inqQLink"><option value="">같은 거래처 견적 연결…</option>${cands.map(c =>
-            `<option value="${escHtml(c.date)}">${escHtml(String(c.date).replace(/-/g, '.'))} · ${c.n}품목</option>`).join('')}</select>` : ''}
+        ${cands.length ? `<button class="inq-mini" id="inqQLink">🔗 기존 견적 연결${cands.some(c => c.same) ? ` <b class="inq-qlink-n">${cands.filter(c => c.same).length}</b>` : ''}</button>` : ''}
         <button class="inq-mini primary" id="inqQStart">+ 이 상담으로 견적 작성</button>
       </div>
       ${linked.length && open ? `<div class="inq-q-body">${body}</div>` : ''}`;
     document.getElementById('inqQStart').addEventListener('click', () => inqStartQuote(x.id));
-    const sel = document.getElementById('inqQLink');
-    if (sel) sel.addEventListener('change', () => { if (sel.value) inqLinkGroup(x.id, sel.value); });
+    const lk = document.getElementById('inqQLink');
+    if (lk) lk.addEventListener('click', () => inqOpenQuoteLinkPicker(x));
     const tg = document.getElementById('inqQToggle');
     if (tg) tg.addEventListener('click', () => {
         try { localStorage.setItem('inq_q_open', open ? '0' : '1'); } catch (_) {}
@@ -22179,10 +22171,84 @@ function inqRenderQuotes(x) {
     inqRenderStage(x);
 }
 
-async function inqLinkGroup(id, date) {
+// 아직 상담에 연결 안 된 견적 묶음(날짜+매출처) — 같은 거래처((주)·공백 무시)가 먼저, 그다음 최근 순
+function inqLinkCands(x) {
+    const key = clientNameKey(x.client || '');
+    const out = [];
+    tempProjects.filter(p => !p.inquiryId).forEach(p => {
+        const k = (p.date || '') + '||' + (p.client || '');
+        let g = out.find(c => c.key === k);
+        if (!g) {
+            g = { key: k, date: p.date || '', client: p.client || '', contact: p.clientContact || '', items: [], rev: 0,
+                  same: !!key && clientNameKey(p.client || '') === key };
+            out.push(g);
+        }
+        g.items.push(p);
+        g.rev += calcTempRevenueWithVat(p);
+    });
+    return out.sort((a, b) => (b.same - a.same) || String(b.date).localeCompare(String(a.date)));
+}
+
+// '🔗 기존 견적 연결' — 견적 고르기 창 (같은 거래처 먼저, 검색으로 다른 견적도)
+function inqOpenQuoteLinkPicker(x) {
+    const cands = inqLinkCands(x);
+    if (!cands.length) { showToast('연결할 수 있는 견적이 없습니다 (모두 다른 상담에 연결됨)'); return; }
+    const old = document.getElementById('inqQLinkPick');
+    if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'inqQLinkPick';
+    ov.className = 'inq-qlp';
+    ov.innerHTML = `
+      <div class="inq-qlp-box" role="dialog" aria-label="기존 견적 연결">
+        <div class="inq-qlp-head"><b>기존 견적 연결</b><span>${escHtml(x.client || '')} 상담에 먼저 만들어 둔 견적을 붙여요</span>
+          <div class="inq-spacer"></div><button type="button" class="inq-qlp-x" data-qlp="close" aria-label="닫기">✕</button></div>
+        <input type="search" class="inq-qlp-q" placeholder="거래처·품목·담당자로 찾기" autocomplete="off">
+        <div class="inq-qlp-list"></div>
+      </div>`;
+    document.body.appendChild(ov);
+    const listEl = ov.querySelector('.inq-qlp-list');
+    const q = ov.querySelector('.inq-qlp-q');
+    const won = n => Number(n || 0).toLocaleString() + '원';
+    const row = c => `
+        <button type="button" class="inq-qlp-row" data-key="${escHtml(c.key)}">
+          <span class="inq-qlp-d">${escHtml(String(c.date).replace(/-/g, '.'))}</span>
+          <span class="inq-qlp-m"><b>${escHtml(c.client || '(거래처 없음)')}</b>${c.contact ? `<em>${escHtml(c.contact)}</em>` : ''}
+            <small>${escHtml(c.items.map(p => p.item + (p.qty ? ' ' + Number(p.qty).toLocaleString() + '개' : '')).slice(0, 3).join(' · '))}${c.items.length > 3 ? ` 외 ${c.items.length - 3}` : ''}</small></span>
+          <span class="inq-qlp-r">${won(c.rev)}<small>${c.items.length}품목</small></span>
+        </button>`;
+    const draw = () => {
+        const t = q.value.trim().toLowerCase();
+        const hit = c => !t || [c.client, c.contact, c.date, ...c.items.map(p => p.item)].some(v => String(v || '').toLowerCase().includes(t));
+        const same = cands.filter(c => c.same && hit(c));
+        const other = cands.filter(c => !c.same && hit(c)).slice(0, t ? 60 : 20);
+        listEl.innerHTML =
+            (same.length ? `<div class="inq-qlp-sec">같은 거래처</div>${same.map(row).join('')}` : '') +
+            (other.length ? `<div class="inq-qlp-sec">${t ? '찾은 견적' : '다른 거래처 · 최근 견적'}</div>${other.map(row).join('')}` : '') +
+            (!same.length && !other.length ? '<div class="inq-qlp-empty">찾는 견적이 없어요</div>' : '');
+    };
+    draw();
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey, true); };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    document.addEventListener('keydown', onKey, true);
+    q.addEventListener('input', draw);
+    setTimeout(() => q.focus(), 0);
+    ov.addEventListener('click', async e => {
+        if (e.target === ov || e.target.closest('[data-qlp="close"]')) { close(); return; }
+        const b = e.target.closest('.inq-qlp-row');
+        if (!b) return;
+        const c = cands.find(v => v.key === b.dataset.key);
+        if (!c) return;
+        if (!c.same && !confirm(`견적 거래처(${c.client || '없음'})가 이 상담(${x.client || '없음'})과 달라요.\n그래도 이 견적을 연결할까요?`)) return;
+        close();
+        await inqLinkGroup(x.id, c.date, c.client);
+    });
+}
+
+async function inqLinkGroup(id, date, client) {
     const x = inqFind(id);
     if (!x) return;
-    const rows = tempProjects.filter(p => !p.inquiryId && p.client === x.client && p.date === date);
+    const cl = client === undefined ? x.client : client;
+    const rows = tempProjects.filter(p => !p.inquiryId && (p.client || '') === (cl || '') && (p.date || '') === (date || ''));
     if (!rows.length) return;
     const { error } = await sb.from('projects_temp').update({ inquiry_id: id }).in('id', rows.map(p => p.id));
     if (error) { showToast('연결 실패: ' + error.message); return; }
@@ -23191,13 +23257,17 @@ function inqRenderStage(x) {
         } else {
             msg = '가격이 확정 전이면 가견적을, 확정됐으면 견적을 보내세요';
             btns.push(['pre-new', '가견적 안내']);
+            if (inqLinkCands(x).length) btns.push(['quote-link', '🔗 기존 견적 연결']);
             btns.push(['quote-new', '+ 이 상담으로 견적 작성', 1]);
         }
     }
     else if (cur.key === 'won') {
         msg = '견적이 확정되면 국내 프로젝트로 넘기세요 (수주)';
         if (quotes.length) { btns.push(['quote-doc', '견적서 보기']); btns.push(['transfer', '국내로 넘기기 · 수주', 1]); }
-        else btns.push(['quote-new', '+ 이 상담으로 견적 작성', 1]);
+        else {
+            if (inqLinkCands(x).length) btns.push(['quote-link', '🔗 기존 견적 연결']);
+            btns.push(['quote-new', '+ 이 상담으로 견적 작성', 1]);
+        }
     } else if (cur.key === 'design') {
         const p = firstLack('design');
         msg = `디자인확인서를 만들고 고객 컨펌을 받으세요${projs.length > 1 ? ` · ${p.product_name || ''}` : ''}`;
@@ -23243,6 +23313,7 @@ async function inqDealAction(x, act, btn) {
     const [kind, idStr, key] = act.split(':');
     const row = idStr ? _inqProjs.find(p => p.id === Number(idStr)) : null;
     if (kind === 'quote-new') { inqStartQuote(x.id); return; }
+    if (kind === 'quote-link') { inqOpenQuoteLinkPicker(x); return; }
     if (kind.startsWith('pre-')) { await inqPreAction(x, kind.slice(4)); return; }
     if (kind === 'quote-doc' || kind === 'transfer') {
         const q = tempProjects.filter(p => p.inquiryId === x.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
@@ -24481,7 +24552,7 @@ const TP_HELP = [
     ['#inqNow [data-act="pre-new"]', '디자인 확정 전 가격 범위로 안내 (매출·마진에는 안 들어가요)'],
     ['#inqNow [data-act="pre-quote"]', '가견적 품목·수량으로 확정 견적 작성 — 단가는 확정가로 입력'],
     ['#inqQStart, #inqNow [data-act="quote-new"]', '이 상담에 연결된 견적 작성 — 견적 화면으로 이동해요'],
-    ['#inqQLink', '같은 거래처로 먼저 만든 견적을 이 상담에 연결'],
+    ['#inqQLink, #inqNow [data-act="quote-link"]', '먼저 만들어 둔 견적을 이 상담에 연결 — 같은 거래처 견적이 위에, 검색으로 다른 견적도'],
     ['[data-qedit]', '견적 품목·단가·부대비용 편집'],
     ['[data-qdoc], #inqNow [data-act="quote-doc"]', '견적서 보기·인쇄'],
     ['#inqNow [data-act="transfer"]', '견적을 국내 프로젝트로 넘겨요 (수주) — 이후 국내에서 진행'],
