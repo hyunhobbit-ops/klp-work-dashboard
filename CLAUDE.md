@@ -135,7 +135,7 @@
 - **목적**: 문의 접수부터 수주/실패까지 상담 과정(고객 말·우리 답변·내부 메모)을 남김. 메뉴를 늘리지 않으려고 `tab-projects-temp` 상단 전환 `상담 관리 | 견적 목록`(`tpSetView`, 마지막 선택 localStorage `tp_view`)
 - **테이블**: `inquiries`(상담 건: client, status 신규/상담중/견적발송/수주/보류/실패, next_action+date, fail_reason 등), `inquiry_logs`(direction in/out/memo/system, channel, body, image base64), `projects_temp.inquiry_id`(견적 품목 → 상담 연결). 둘 다 회사 스코프 RLS + set_company_id 트리거
 - **자동 흐름**: 우리 첫 답변 → 신규→상담중 / 견적 품목 추가(`inqOnQuoteAdded`) → 견적발송 / `transferGroupToDomestic` 이관(`inqOnTransferred`) → 수주. 상태 변경은 모두 system 로그로 남음
-- **견적 연결**: 상담 상세의 '이 상담으로 견적 작성'(`inqStartQuote` → `_inqPendingLink`, 견적 목록 상단 배너) 또는 '같은 거래처 견적 연결'(`inqLinkGroup`). 묶음 안 품목 추가는 묶음의 inquiry_id를 따라감. 견적 목록 매출처 칸에 '상담 보기' 칩
+- **견적 연결**: 상담 상세의 '이 상담으로 견적 작성'(`inqStartQuote` → `_inqPendingLink`, 견적 목록 상단 배너) 또는 `🔗 기존 견적 연결`(2026-10-07: 지금 할 일·연결된 견적 카드 버튼 → `inqOpenQuoteLinkPicker` 고르기 창, 후보 `inqLinkCands` = 상담 미연결 견적 묶음(날짜+매출처), `clientNameKey`로 같은 거래처((주)·띄어쓰기 무시)가 위, 검색으로 다른 거래처 견적도 — 거래처가 다르면 확인 후 `inqLinkGroup(id, date, client)`). 예전 셀렉트는 이름이 글자까지 같아야 떠서 '더모아커머스'/'더모아 커머스' 같은 견적이 안 보였음. 묶음 안 품목 추가는 묶음의 inquiry_id를 따라감. 견적 목록 매출처 칸에 '상담 보기' 칩
 - **고객 연락처 칸 (migration 036)**: `contact_name / contact_title / contact_phone / contact_email`. 예전 `client_contact`는 읽기 호환용(값은 contact_name으로 옮김). 연락처는 `inqNormPhone`으로 하이픈 정리
 - **사진**: `inquiry_logs.images` jsonb 배열(업로드 시 `_shrinkDataUrl` 1200px 압축, 한 번에 최대 10장). Ctrl+V 붙여넣기·끌어놓기·파일 선택 모두 `inqBindImageInput`/`inqAddImageFiles`. 옛 `image` 한 칸도 표시는 함
 - **부서 칸**: `contact_dept` (036 파일 끝에 추가, 직함과 분리)
