@@ -262,6 +262,43 @@ body.quote-only-mode .mode-btns,body.quote-only-mode .sub-bar{display:none!impor
 body.quote-only-mode #btnSavePreview,body.quote-only-mode #paymentNoticeSection,body.quote-only-mode #docNumField{display:none!important}
 body.quote-only-mode #btnQuoteOnly{display:block!important}
 body.quote-only-mode .logo-area h1::after{content:' · 견적서 작성';color:#16A34A;font-weight:900}
+
+/* ===== 2026-10 대시보드와 같은 틀: 왼쪽 사이드바(문서 종류) + 위 제목줄(새로 입력·히스토리) + 왼쪽부터 이어지는 내용 ===== */
+.dg-back,.dg-label,.dg-title{display:none}
+@media (min-width:821px){
+body:not(.view-mode):not(.quote-only-mode){padding-left:230px}
+body:not(.view-mode):not(.quote-only-mode) .mode-bar{position:fixed;left:0;top:0;bottom:0;width:230px;padding:16px 10px;flex-direction:column;align-items:stretch;gap:0;border-bottom:0;border-right:1px solid var(--toss-gray-200);z-index:60;overflow-y:auto}
+body:not(.view-mode):not(.quote-only-mode) .mode-bar .logo-area{padding:4px 11px 14px}
+body:not(.view-mode):not(.quote-only-mode) .mode-bar .logo-area h1{font-size:17px}
+body:not(.view-mode):not(.quote-only-mode) .dg-back{display:block;margin:0 0 6px;padding:7px 11px;border-radius:7px;font-size:12.5px;font-weight:700;color:var(--toss-gray-500);text-decoration:none}
+body:not(.view-mode):not(.quote-only-mode) .dg-back:hover{background:var(--toss-gray-50);color:var(--toss-gray-900)}
+body:not(.view-mode):not(.quote-only-mode) .dg-label{display:block;font-size:10.5px;font-weight:800;color:var(--toss-gray-400);letter-spacing:.09em;padding:14px 11px 6px}
+body:not(.view-mode):not(.quote-only-mode) .mode-btns{flex-direction:column;margin-left:0;gap:2px}
+body:not(.view-mode):not(.quote-only-mode) .mode-btn{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:9px 11px;border:0;border-radius:7px;background:transparent;box-shadow:none;color:var(--toss-gray-600);font-size:14px;font-weight:700}
+body:not(.view-mode):not(.quote-only-mode) .mode-btn i{font-style:normal;font-size:17px;width:22px;text-align:center}
+body:not(.view-mode):not(.quote-only-mode) .mode-btn span{display:flex;flex-direction:column;line-height:1.25}
+body:not(.view-mode):not(.quote-only-mode) .mode-btn small{font-size:11px;font-weight:500;color:var(--toss-gray-400);margin-top:1px}
+body:not(.view-mode):not(.quote-only-mode) .mode-btn:hover{background:var(--toss-gray-50);color:var(--toss-gray-900)}
+body:not(.view-mode):not(.quote-only-mode) .mode-btn.active-dc{background:#EEF5FF;color:#1B64DA;box-shadow:inset 3px 0 0 #3182f6}
+body:not(.view-mode):not(.quote-only-mode) .mode-btn.active-wr{background:#FEF6E7;color:#B45309;box-shadow:inset 3px 0 0 #f59e0b}
+body:not(.view-mode):not(.quote-only-mode) .mode-btn.active-ps{background:#F5F3FF;color:#6D28D9;box-shadow:inset 3px 0 0 #7C3AED}
+body:not(.view-mode):not(.quote-only-mode) .mode-btn.active-po{background:#FFF1F1;color:#C81E1E;box-shadow:inset 3px 0 0 #E11D24}
+body:not(.view-mode):not(.quote-only-mode) .mode-btn[class*="active-"] small{color:inherit;opacity:.75}
+body:not(.view-mode):not(.quote-only-mode) .sub-bar{position:sticky;top:0;z-index:50;height:58px;padding:0 32px;align-items:center;gap:6px;flex-wrap:nowrap;background:rgba(255,255,255,.96);backdrop-filter:blur(6px)}
+body:not(.view-mode):not(.quote-only-mode) .sub-bar.hidden{display:none}
+body:not(.view-mode):not(.quote-only-mode) .dg-title{display:block;font-size:17px;font-weight:900;color:var(--toss-gray-900);margin-right:14px;white-space:nowrap}
+body:not(.view-mode):not(.quote-only-mode) .tab-btn{padding:7px 14px;font-size:13px}
+body:not(.view-mode):not(.quote-only-mode) .form-wrap,body:not(.view-mode):not(.quote-only-mode) .history-wrap{max-width:1100px;margin:0;padding:24px 32px 48px}
+body:not(.view-mode):not(.quote-only-mode) .preview-area{padding:24px 32px}
+body:not(.view-mode):not(.quote-only-mode) .preview-area .action-bar,body:not(.view-mode):not(.quote-only-mode) .preview-area .preview-wrap{margin-left:0}
+}
+@media (max-width:820px){
+.dg-title{display:none}
+.mode-btn small{display:none}
+.mode-btn i{font-style:normal;margin-right:4px}
+.mode-btns{overflow-x:auto;flex-wrap:nowrap;margin-left:0;width:100%}
+.mode-btn{white-space:nowrap;padding:8px 14px}
+}
 </style>
 </head>
 <body>
@@ -269,34 +306,40 @@ body.quote-only-mode .logo-area h1::after{content:' · 견적서 작성';color:#
 <!-- ===== MODE SWITCH BAR ===== -->
 <div class="mode-bar">
   <div class="logo-area"><div class="logo">KLP KOREA</div><h1>문서 생성기</h1></div>
+  <a class="dg-back" href="index.html" title="업무 대시보드로 돌아가기">← 대시보드로</a>
+  <div class="dg-label">문서 종류</div>
   <div class="mode-btns">
-    <button class="mode-btn active-dc" id="modeDC" onclick="switchMode('dc')">📄 디자인확인서</button>
-    <button class="mode-btn" id="modeWR" onclick="switchMode('wr')">🔧 작업요청서</button>
-    <button class="mode-btn" id="modePS" onclick="switchMode('ps')" title="시계 제작 주문 내부 문서 (외부 발송 안 함)">🕐 제작진행표</button>
-    <button class="mode-btn" id="modePO" onclick="switchMode('po')" title="해외 공장에 보내는 영문 발주서 (Purchase Order)">🌏 해외 PO</button>
+    <button class="mode-btn active-dc" id="modeDC" onclick="switchMode('dc')"><i>📄</i><span>디자인확인서<small>고객 컨펌용</small></span></button>
+    <button class="mode-btn" id="modeWR" onclick="switchMode('wr')"><i>🔧</i><span>작업요청서<small>국내 공장 발주</small></span></button>
+    <button class="mode-btn" id="modePS" onclick="switchMode('ps')" title="시계 제작 주문 내부 문서 (외부 발송 안 함)"><i>🕐</i><span>제작진행표<small>내부 제작 관리</small></span></button>
+    <button class="mode-btn" id="modePO" onclick="switchMode('po')" title="해외 공장에 보내는 영문 발주서 (Purchase Order)"><i>🌏</i><span>해외 PO<small>해외 공장 발주</small></span></button>
   </div>
 </div>
 
 <!-- ===== DC SUB TABS ===== -->
 <div class="sub-bar" id="dcSubBar">
+  <div class="dg-title">📄 디자인확인서</div>
   <button class="tab-btn active" id="dcTabForm" onclick="newDoc()">📝 새로 입력</button>
   <button class="tab-btn" id="dcTabHistory" onclick="showDcTab('history')">📋 히스토리</button>
 </div>
 
 <!-- ===== WR SUB TABS ===== -->
 <div class="sub-bar hidden" id="wrSubBar">
+  <div class="dg-title">🔧 작업요청서</div>
   <button class="tab-btn active" id="wrTabForm" onclick="newWrDoc()">📝 새로 입력</button>
   <button class="tab-btn" id="wrTabHistory" onclick="showWrTab('history')">📋 히스토리</button>
 </div>
 
 <!-- ===== PO SUB TABS (해외 작업요청서) ===== -->
 <div class="sub-bar hidden" id="poSubBar">
+  <div class="dg-title">🌏 해외 PO</div>
   <button class="tab-btn active" id="poTabForm" onclick="newPoDoc()">📝 새로 입력</button>
   <button class="tab-btn" id="poTabHistory" onclick="showPoTab('history')">📋 히스토리</button>
 </div>
 
 <!-- ===== PS SUB TABS (제작진행표) ===== -->
 <div class="sub-bar hidden" id="psSubBar">
+  <div class="dg-title">🕐 제작진행표</div>
   <button class="tab-btn active" id="psTabForm" onclick="newPsDoc()">📝 새로 입력</button>
   <button class="tab-btn" id="psTabHistory" onclick="showPsTab('history')">📋 히스토리</button>
 </div>
