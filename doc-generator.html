@@ -49,6 +49,25 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
 .ps-slot-hint{font-size:12px;font-weight:700;color:#7C3AED;text-align:center;line-height:1.5}
 .ps-slot-hint small{font-weight:500;color:#999;font-size:10.5px}
 .ps-slot-x{position:absolute;right:4px;top:4px;width:24px;height:24px;border:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:14px;cursor:pointer;z-index:1}
+.mode-btn.active-po{background:#E11D24;border-color:#E11D24;color:#fff;box-shadow:0 2px 8px rgba(225,29,36,.3)}
+.po-hint{font-size:12px;font-weight:500;color:#999;margin-left:8px;letter-spacing:0}
+.po-imgs{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}
+.po-imgcell{width:170px;display:flex;flex-direction:column;gap:5px}
+.po-imgcell .ps-slot{height:150px}
+.po-imgcell .ps-slot.po-empty{border-style:dashed;border-color:#C4B5FD;background:#FAF8FF}
+.po-cap{padding:6px 8px;border:1px solid #e3e3e3;border-radius:7px;font-size:12.5px;font-family:inherit}
+.po-addimg{width:120px;height:150px;border:1.5px dashed #ccc;border-radius:10px;background:#fafafa;color:#777;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.po-g{border:1px solid #eee;border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#fcfcfb}
+.po-g-head{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.po-g-head input:not([type]),.po-g-head input[type=text]{flex:1;padding:7px 9px;border:1px solid #ddd;border-radius:7px;font-weight:800;font-family:inherit;font-size:13px}
+.po-g-head b{font-size:13px;color:#E11D24;white-space:nowrap}
+.po-hl{font-size:12px;color:#E11D24;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:3px}
+.po-r{display:grid;grid-template-columns:200px 1fr 30px;gap:6px;margin-bottom:5px}
+.po-r input{padding:7px 9px;border:1px solid #e3e3e3;border-radius:7px;font-family:inherit;font-size:13px;min-width:0}
+.po-r input:first-child{font-weight:700;background:#fafafa}
+.po-page-ed{border:1.5px solid #FECACA;border-radius:12px;padding:12px;margin-bottom:12px;background:#FFFBFB}
+.po-stage{display:flex;gap:6px;flex-wrap:wrap}
+.po-hc:hover{border-color:#E11D24!important;background:#FFF5F5!important}
 .ps-hc:hover{border-color:#7C3AED!important;background:#F5F3FF!important}
 .mode-btn.active-wr{background:var(--klp-orange);border-color:var(--klp-orange);color:#fff;box-shadow:0 2px 8px rgba(245,158,11,.3)}
 
@@ -226,6 +245,7 @@ body.quote-only-mode .logo-area h1::after{content:' · 견적서 작성';color:#
     <button class="mode-btn active-dc" id="modeDC" onclick="switchMode('dc')">📄 디자인확인서</button>
     <button class="mode-btn" id="modeWR" onclick="switchMode('wr')">🔧 작업요청서</button>
     <button class="mode-btn" id="modePS" onclick="switchMode('ps')" title="시계 제작 주문 내부 문서 (외부 발송 안 함)">🕐 제작진행표</button>
+    <button class="mode-btn" id="modePO" onclick="switchMode('po')" title="해외 공장에 보내는 영문 작업요청서 (Order Sheet)">🌏 해외 작업요청서</button>
   </div>
 </div>
 
@@ -239,6 +259,12 @@ body.quote-only-mode .logo-area h1::after{content:' · 견적서 작성';color:#
 <div class="sub-bar hidden" id="wrSubBar">
   <button class="tab-btn active" id="wrTabForm" onclick="newWrDoc()">📝 새로 입력</button>
   <button class="tab-btn" id="wrTabHistory" onclick="showWrTab('history')">📋 히스토리</button>
+</div>
+
+<!-- ===== PO SUB TABS (해외 작업요청서) ===== -->
+<div class="sub-bar hidden" id="poSubBar">
+  <button class="tab-btn active" id="poTabForm" onclick="newPoDoc()">📝 새로 입력</button>
+  <button class="tab-btn" id="poTabHistory" onclick="showPoTab('history')">📋 히스토리</button>
 </div>
 
 <!-- ===== PS SUB TABS (제작진행표) ===== -->
@@ -452,6 +478,45 @@ body.quote-only-mode .logo-area h1::after{content:' · 견적서 작성';color:#
   <div id="psHistoryList"></div>
 </div>
 
+<!-- ================================================================ -->
+<!-- PO FORM (해외 작업요청서 — 영문) -->
+<!-- ================================================================ -->
+<div id="poForm" class="form-wrap hidden">
+  <div class="section" style="text-align:center">
+    <div style="font-size:13px;color:#666;margin-bottom:10px">해외 공장에 보내는 <b>영문 작업요청서</b>예요. 원본 AI 파일은 따로 보내고, 문서엔 파일 이름·링크(QR)를 적어 둬요.</div>
+    <button onclick="poOpenLink()" style="padding:12px 30px;border-radius:10px;border:none;background:#E11D24;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">📋 디자인확인서에서 불러오기</button>
+    <div id="poLinkedInfo" class="hidden" style="margin-top:12px;padding:10px 16px;background:#FFF5F5;border-radius:8px;font-size:12px;color:#B91C1C;font-weight:600"></div>
+    <div class="row" style="margin-top:12px;justify-content:center"><div class="field" style="max-width:260px"><label>문서번호 (자동)</label><input id="poDocNum" readonly style="background:#eee;color:#666;font-weight:700" placeholder="저장할 때 자동"></div></div>
+  </div>
+  <div id="poFormBody"></div>
+  <input type="file" id="poImgInput" accept="image/*" hidden onchange="poOnImgInput(this)">
+  <div class="warn hidden" id="poWarnBox"></div>
+  <button id="btnPoSave" class="btn-preview" style="background:linear-gradient(135deg,#E11D24,#991B1B)" onclick="poSaveAndPreview()">💾 저장 & 미리보기 →</button>
+</div>
+
+<!-- PO PREVIEW -->
+<div id="poPreview" class="preview-area hidden">
+  <div class="action-bar">
+    <button class="btn-back" onclick="showPoTab('form')">← 수정하기</button>
+    <button class="btn-dl" id="btnPoPdf" style="background:#E11D24;color:#fff" onclick="dlPo('pdf')">📄 PDF (전체)</button>
+    <button class="btn-dl" id="btnPoJpg" style="background:#991B1B;color:#fff" onclick="dlPo('jpg')">📷 JPG (쪽마다)</button>
+    <button class="btn-dl" style="background:#111827;color:#fff" onclick="poPrint()">🖨️ 인쇄</button>
+  </div>
+  <div class="preview-wrap"><div id="poDocEl"></div></div>
+</div>
+
+<!-- PO HISTORY -->
+<div id="poHistory" class="history-wrap hidden">
+  <div class="section" style="margin-bottom:0;padding-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:0;padding-bottom:0;border:none">📋 해외 작업요청서 히스토리</div>
+      <button onclick="poLoadHistory()" style="padding:6px 14px;border-radius:6px;border:1px solid var(--klp-border);background:#fff;cursor:pointer;font-size:12px;font-family:inherit">🔄 새로고침</button>
+    </div>
+    <input class="search-box" id="poHistorySearch" placeholder="🔍 PO 번호·모델·공장 검색..." oninput="poFilterHistory()">
+  </div>
+  <div id="poHistoryList"></div>
+</div>
+
 <!-- LINK MODAL -->
 <div id="linkModal" class="link-modal-bg hidden" style="display:none" onclick="closeLinkModal()">
   <div class="link-modal" onclick="event.stopPropagation()">
@@ -659,11 +724,15 @@ function switchMode(mode){
   document.getElementById('modeDC').className='mode-btn'+(mode==='dc'?' active-dc':'');
   document.getElementById('modeWR').className='mode-btn'+(mode==='wr'?' active-wr':'');
   document.getElementById('modePS').className='mode-btn'+(mode==='ps'?' active-ps':'');
+  document.getElementById('modePO').className='mode-btn'+(mode==='po'?' active-po':'');
+  document.getElementById('poSubBar').classList.toggle('hidden',mode!=='po');
+  ['poForm','poPreview','poHistory'].forEach(function(v){document.getElementById(v).classList.add('hidden')});
   document.getElementById('dcSubBar').classList.toggle('hidden',mode!=='dc');
   document.getElementById('wrSubBar').classList.toggle('hidden',mode!=='wr');
   document.getElementById('psSubBar').classList.toggle('hidden',mode!=='ps');
   ['dcForm','dcPreview','dcHistory','wrForm','wrPreview','wrHistory','psForm','psPreview','psHistory'].forEach(function(v){document.getElementById(v).classList.add('hidden')});
   if(mode==='dc') showDcTab('form');
+  else if(mode==='po'){ if(!po){po=poBlank();poRenderForm();} showPoTab('form'); }
   else if(mode==='ps'){ if(!psParts.length){psParts=psBlankParts();psRenderImgs();psRenderParts();psMarkShip();if(!val('psDate'))document.getElementById('psDate').value=psTodayStr();if(!val('psOrderDate'))document.getElementById('psOrderDate').value=psTodayStr();document.getElementById('psManager').value=getLoginManager()||'김현호 팀장';} showPsTab('form'); }
   else showWrTab('form');
 }
@@ -922,7 +991,7 @@ async function openLinkModal(){
   document.getElementById('linkModal').classList.remove('hidden');
   document.getElementById('linkModal').style.display='flex';
   document.getElementById('linkList').innerHTML='<div class="history-empty">불러오는 중...</div>';
-  try{var res=await sbFetch('confirmations?order=created_at.desc&limit=100','GET');linkData=(res||[]).filter(function(r){return r.status!=='작업요청서'&&r.status!=='제작진행표'});renderLinkList(linkData)}catch(e){document.getElementById('linkList').innerHTML='<div class="history-empty">불러오기 실패</div>'}
+  try{var res=await sbFetch('confirmations?order=created_at.desc&limit=100','GET');linkData=(res||[]).filter(function(r){return r.status!=='작업요청서'&&r.status!=='제작진행표'&&r.status!=='해외작업요청서'});renderLinkList(linkData)}catch(e){document.getElementById('linkList').innerHTML='<div class="history-empty">불러오기 실패</div>'}
 }
 function closeLinkModal(){document.getElementById('linkModal').classList.add('hidden');document.getElementById('linkModal').style.display='none';window._linkFor=null}
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeLinkModal()});
@@ -936,6 +1005,7 @@ function renderLinkList(data){
 /* FIX #4, #16: 이미지 연동 + WR 번호 자동 증가 */
 async function selectLinkedDC(id){
   if(window._linkFor==='ps'){closeLinkModal();await psApplyDcById(id);return}
+  if(window._linkFor==='po'){closeLinkModal();await poApplyDcById(id);return}
   try{var res=await sbFetch('confirmations?id=eq.'+id,'GET');if(!res||res.length===0)return;var r=res[0];
   linkedDC=r;closeLinkModal();
 
@@ -1650,7 +1720,7 @@ async function loadHistory(){
   list.innerHTML='<div class="history-empty">불러오는 중...</div>';
   try{
     var res=await sbFetch('confirmations?order=created_at.desc&limit=100','GET');
-    historyData=(res||[]).filter(function(r){return r.status!=='제작진행표'});
+    historyData=(res||[]).filter(function(r){return r.status!=='제작진행표'&&r.status!=='해외작업요청서'});
     buildMonthFilter();
     filterHistory();
   }catch(err){list.innerHTML='<div class="history-empty">불러오기 실패</div>'}
@@ -1821,6 +1891,7 @@ async function loadRecord(id){
     var r=res[0];
 
     if(r.status==='제작진행표'){psFill(r);return;}
+    if(r.status==='해외작업요청서'){poFill(r);return;}
     if(r.status==='작업요청서'){
       /* WR 데이터 복원 */
       switchMode('wr');
@@ -2803,6 +2874,430 @@ async function psOpenRecord(id){await loadRecord(id);showPsTab('preview')}
     if(res&&res[0]){await psApplyDc(res[0]);showMsg('✅ 디자인확인서 내용을 불러왔어요. 부품 표를 채우고 저장해주세요.')}
     else showMsg('❌ 디자인확인서를 찾을 수 없습니다: '+dcNum,true);
   }catch(e){showMsg('❌ 불러오기 실패: '+e.message,true)}
+})();
+</script>
+<script>
+/* ================================================================
+ * 해외 작업요청서 (영문 PO / Order Sheet) — 2026-10
+ * confirmations.status = '해외작업요청서', 문서번호 = 디확번호_E1 / 없으면 POYYMMDD-N
+ * 모든 값은 confirmations.extra, 사진은 images_data.po {key: dataURL}
+ * 문서는 여러 장: 1쪽 = 머리·진행 단계·기본 정보·SUMMARY·사양표(넘치면 다음 장), 원본 파일·REMARKS, 그 뒤 상세 페이지들
+ * ================================================================ */
+var PO_RED='#E11D24';
+var PO_STAGES=[['g3d','3D GRAPHIC'],['sample','SAMPLE'],['order','ORDER']];
+var PO_PAGE_TITLES=['CASE','CASE BACK','DIAL AND HANDS','STRAP / CHAIN','MOVEMENT','PACKAGING','LOGO','WARRANTY CARD'];
+var PO_PH={'SIZE':'예) 47mm','MATERIAL':'예) Alloy / Stainless steel 316L','PLATING(COLOR)':'예) Gold IP','LOGO':'예) Laser engraving','CASE BACK':'예) Laser engraving (see page 2)','CROWN':'예) Same as sample','CRYSTAL':'예) Mineral glass','INDEX':'예) Printed black numerals','BACKGROUND':'예) White','HANDS':'예) Black hands','TYPE / SHAPE':'예) No chain','MATERIAL / COLOR':'예) Genuine leather, black','MOVEMENT / BATTERY':'예) Miyota 2035 / SR626SW','BOX':'예) Black gift box with logo','WARRANTY / MANUAL':'예) Warranty card (English)','MARKING':'예) MADE IN CHINA silk print 6mm','ORDER':'예) 110pcs','SPARE WATCH 2%':'예) 2pcs','SPARE PARTS 3%':'예) 3 sets','SAMPLE':'예) 1pc / 15 USD','UNIT':'예) 4.15 USD','PAYMENT TERMS':'예) 30% deposit, 70% before shipment (T/T)','SHIPPING':'예) DHL Express / DDP','SHIP TO':'예) KLP KOREA, Seoul'};
+var po=null,poImgs={},poImgTarget=null,poCurrentId=null,poLinkedDcNum='';
+
+function poKey(){return 'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function poDefaultSpec(){
+  var g=function(name,hl,ks){return{g:name,hl:hl,rows:ks.map(function(k){return{k:k,v:''}})}};
+  return [g('CASE',0,['SIZE','MATERIAL','PLATING(COLOR)','LOGO','CASE BACK','CROWN','CRYSTAL']),g('DIAL',0,['INDEX','LOGO','BACKGROUND']),g('HANDS',0,['HANDS']),
+    g('STRAP / CHAIN',0,['TYPE / SHAPE','MATERIAL / COLOR']),g('MOVEMENT / BATTERY',0,['MOVEMENT / BATTERY']),g('PACKAGING',0,['BOX','WARRANTY / MANUAL','MARKING']),
+    g('QUANTITY',1,['ORDER','SPARE WATCH 2%','SPARE PARTS 3%']),g('PRICE',1,['SAMPLE','UNIT','PAYMENT TERMS']),g('DELIVERY',1,['SAMPLE','SHIPPING','SHIP TO'])];
+}
+function poBlank(){
+  var from='';try{from=localStorage.getItem('po_from')||''}catch(_){}
+  return {po_no:'',rev:'',date:psTodayStr(),to:'',attn:'',from:from,model:'',stage:'order',stage_dates:{g3d:'',sample:'',order:''},need_by:'',need_text:'',
+    summary:{imgs:[],notes:''},spec:poDefaultSpec(),files:[],link:'',remarks:'',pages:[]};
+}
+
+function showPoTab(tab){
+  if(tab==='preview'){if(!poValidate())return;buildPoDoc()}
+  if(tab==='history')poLoadHistory();
+  ['poForm','poPreview','poHistory'].forEach(function(v){document.getElementById(v).classList.add('hidden')});
+  ['poTabForm','poTabHistory'].forEach(function(t){document.getElementById(t).classList.remove('active')});
+  document.getElementById({form:'poForm',preview:'poPreview',history:'poHistory'}[tab]).classList.remove('hidden');
+  if(tab==='form')document.getElementById('poTabForm').classList.add('active');
+  if(tab==='history')document.getElementById('poTabHistory').classList.add('active');
+}
+function newPoDoc(){po=poBlank();poImgs={};poCurrentId=null;poLinkedDcNum='';document.getElementById('poDocNum').value='';document.getElementById('poLinkedInfo').classList.add('hidden');poRenderForm();showPoTab('form')}
+
+/* ---------- 폼 ---------- */
+function poF(path,el){ /* 'to' / 'summary.notes' / 'stage_dates.g3d' */
+  var p=path.split('.'),o=po;for(var i=0;i<p.length-1;i++)o=o[p[i]];o[p[p.length-1]]=el.value;
+  if(path==='from')try{localStorage.setItem('po_from',el.value)}catch(_){}
+}
+function poInput(path,label,ph,st,type){
+  var p=path.split('.'),v=po;p.forEach(function(k){v=v==null?'':v[k]});
+  return '<div class="field" style="'+(st||'')+'"><label>'+label+'</label><input '+(type?'type="'+type+'"':'')+' value="'+esc(v||'')+'" placeholder="'+esc(ph||'')+'" oninput="poF(\''+path+'\',this)"></div>';
+}
+function poImgTiles(list,where,max){
+  /* list: [{key,cap}] — 사진 칸 + 설명 */
+  return '<div class="po-imgs">'+list.map(function(it,i){
+    var im=poImgs[it.key];
+    return '<div class="po-imgcell"><div class="ps-slot has'+(im?'':' po-empty')+'" data-poimg="'+it.key+'" title="클릭·끌어놓기·Ctrl+V">'+
+      (im?'<img src="'+im+'" alt="">':'<span class="ps-slot-hint">＋ 사진<br><small>클릭 · 끌어놓기 · Ctrl+V</small></span>')+
+      '<button type="button" class="ps-slot-x" data-podel="'+where+'|'+i+'" title="이 칸 빼기">×</button></div>'+
+      '<input class="po-cap" value="'+esc(it.cap||'')+'" placeholder="설명 (예: <FRONT>)" data-pocap="'+where+'|'+i+'"></div>';
+  }).join('')+(list.length<max?'<button type="button" class="po-addimg" data-poadd="'+where+'">＋ 사진 칸</button>':'')+'</div>';
+}
+function poListOf(where){return where==='s'?po.summary.imgs:po.pages[+where].imgs}
+function poRenderForm(){
+  var h='';
+  /* 기본 정보 */
+  h+='<div class="section"><div class="section-title">📋 기본 정보 <span class="po-hint">문서에 영어로 나가요</span></div>'+
+    '<div class="row">'+poInput('po_no','PO No. / STYLE','#KLP2605','','')+poInput('rev','Revision','Rev.1 (수정 보낼 때)','max-width:180px','')+poInput('date','DATE','','max-width:200px','date')+'</div>'+
+    '<div class="row">'+poInput('to','TO (공장)','KODA-LEILA','','')+poInput('attn','ATTN (공장 담당자)','Ms. Leila','','')+'</div>'+
+    '<div class="row">'+poInput('model','MODEL','KIMGU POCKET WATCH','','')+poInput('from','FROM (우리 쪽)','Hyunho Kim / klpkorea@agift.kr','','')+'</div>'+
+    '<div class="row"><div class="field"><label>진행 단계</label><div class="po-stage">'+PO_STAGES.map(function(s){return '<button type="button" class="ps-chip'+(po.stage===s[0]?' on':'')+'" data-postage="'+s[0]+'">'+s[1]+'</button>'}).join('')+'</div></div>'+
+    PO_STAGES.map(function(s){return poInput('stage_dates.'+s[0],s[1]+' 날짜','-','max-width:170px','')}).join('')+'</div>'+
+    '<div class="row">'+poInput('need_by','받아야 하는 날 (Required by)','','max-width:220px','date')+poInput('need_text','강조 문구 (비우면 자동)','We need to receive by November 6th','','')+'</div></div>';
+  /* SUMMARY */
+  h+='<div class="section"><div class="section-title">🖼️ SUMMARY <span class="po-hint">1쪽 큰 사진 (최대 4장) + 빨간 요청 문구</span></div>'+poImgTiles(po.summary.imgs,'s',4)+
+    '<div class="field" style="margin-top:12px"><label>요청 문구 (한 줄에 하나, 빨간 글씨)</label><textarea rows="3" oninput="poF(\'summary.notes\',this)" placeholder="SAME AS BEFORE(LAST ORDER)&#10;SET KOREAN TIME / NO NEED CHAIN">'+esc(po.summary.notes||'')+'</textarea></div></div>';
+  /* 사양표 */
+  h+='<div class="section"><div class="section-title" style="display:flex;align-items:center;justify-content:space-between">🔩 SPECIFICATION <label class="po-hl" style="color:#555"><input type="checkbox" '+(po.hide_empty?'checked':'')+' data-pohide="1"> 빈 항목은 문서에서 빼기</label></div><div class="po-hint" style="margin:-6px 0 10px">빈 칸은 - 로 나와요 · 그룹 이름 옆 빨강 = 강조 · 넘치면 다음 쪽으로 이어져요</div><div id="poSpecBox">'+
+    po.spec.map(function(g,gi){
+      return '<div class="po-g"><div class="po-g-head"><input value="'+esc(g.g)+'" data-pogn="'+gi+'"><label class="po-hl"><input type="checkbox" '+(g.hl?'checked':'')+' data-pohl="'+gi+'"> 빨강</label>'+
+        '<button type="button" class="ps-del" data-pogdel="'+gi+'" title="그룹 빼기">×</button></div>'+
+        g.rows.map(function(r,ri){return '<div class="po-r"><input value="'+esc(r.k)+'" data-pork="'+gi+'|'+ri+'"><input value="'+esc(r.v)+'" placeholder="'+esc(PO_PH[r.k]||'')+'" data-porv="'+gi+'|'+ri+'"><button type="button" class="ps-del" data-pordel="'+gi+'|'+ri+'">×</button></div>'}).join('')+
+        '<button type="button" class="ps-add" data-poradd="'+gi+'">+ 항목</button></div>';
+    }).join('')+'</div><button type="button" class="ps-add" data-pogadd="1" style="margin-top:4px">+ 그룹 추가</button></div>';
+  /* 상세 페이지 */
+  h+='<div class="section"><div class="section-title">📄 상세 페이지 <span class="po-hint">2쪽부터 — CASE, DIAL AND HANDS 처럼 부위별 한 장씩</span></div>'+
+    po.pages.map(function(pg,pi){
+      return '<div class="po-page-ed"><div class="po-g-head"><b>'+(pi+2)+'쪽</b><input list="poPageTitles" value="'+esc(pg.title)+'" placeholder="CASE" data-popt="'+pi+'">'+
+        '<button type="button" class="ps-del" data-popmv="'+pi+'|-1" title="위로">↑</button><button type="button" class="ps-del" data-popmv="'+pi+'|1" title="아래로">↓</button><button type="button" class="ps-del" data-popdel="'+pi+'" title="페이지 빼기">×</button></div>'+
+        '<div class="row"><div class="field"><label>큰 강조 문구 (선택)</label><input value="'+esc(pg.headline||'')+'" placeholder="SAME AS SAMPLE" data-popf="'+pi+'|headline"></div><div class="field"><label>원본 파일 (이 페이지)</label><input value="'+esc(pg.file||'')+'" placeholder="KLP2605_CASE_v1.ai" data-popf="'+pi+'|file"></div></div>'+
+        poImgTiles(pg.imgs,String(pi),4)+
+        '<div class="field" style="margin-top:10px"><label>요청 문구 (한 줄에 하나, 빨간 글씨)</label><textarea rows="2" data-popf="'+pi+'|notes" placeholder="Please make it look clean.">'+esc(pg.notes||'')+'</textarea></div></div>';
+    }).join('')+
+    '<div class="ps-chips">'+PO_PAGE_TITLES.map(function(t){return '<button type="button" class="ps-chip" data-popadd="'+esc(t)+'">+ '+esc(t)+'</button>'}).join('')+'<button type="button" class="ps-chip ghost" data-popadd="">+ 빈 페이지</button></div>'+
+    '<datalist id="poPageTitles">'+PO_PAGE_TITLES.map(function(t){return '<option value="'+t+'">'}).join('')+'</datalist></div>';
+  /* 원본 파일 */
+  h+='<div class="section"><div class="section-title">📎 원본 디자인 파일 (ARTWORK FILES) <span class="po-hint">AI 파일은 따로 보내고, 문서엔 파일 이름·링크·QR이 찍혀요</span></div>'+
+    '<div id="poFilesBox">'+po.files.map(function(f,i){return '<div class="po-r"><input value="'+esc(f.name)+'" placeholder="KLP2605_DIAL_v1.ai" data-poff="'+i+'|name"><input value="'+esc(f.note||'')+'" placeholder="설명 (예: Dial logo, 1:1 scale)" data-poff="'+i+'|note"><button type="button" class="ps-del" data-pofdel="'+i+'">×</button></div>'}).join('')+'</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px"><button type="button" class="ps-add" data-pofadd="1">+ 파일</button><button type="button" class="ps-add" data-pofauto="1" title="PO 번호 + 상세 페이지 이름으로 파일 이름을 만들어요">✨ 파일 이름 자동으로 채우기</button></div>'+
+    '<div class="field"><label>다운로드 링크 (구글 드라이브·위트랜스퍼 등 — 넣으면 문서에 QR 코드)</label><input value="'+esc(po.link||'')+'" placeholder="https://drive.google.com/..." oninput="poF(\'link\',this)"></div></div>';
+  /* REMARKS */
+  h+='<div class="section"><div class="section-title">📝 REMARKS <span class="po-hint">검수·포장·운송 등 추가 요청</span></div><div class="field"><textarea rows="3" oninput="poF(\'remarks\',this)" placeholder="Please send photos of the first finished piece before mass production.">'+esc(po.remarks||'')+'</textarea></div></div>';
+
+  var box=document.getElementById('poFormBody');box.innerHTML=h;
+  poBindForm(box);
+}
+function poBindForm(box){
+  var rerender=function(){var y=window.scrollY;poRenderForm();window.scrollTo(0,y)};
+  box.querySelectorAll('[data-postage]').forEach(function(b){b.onclick=function(){po.stage=b.dataset.postage;rerender()}});
+  box.querySelectorAll('[data-poimg]').forEach(function(d){
+    var k=d.dataset.poimg;
+    d.addEventListener('click',function(e){if(e.target.closest('[data-podel]'))return;poImgTarget=k;document.getElementById('poImgInput').click()});
+    d.addEventListener('mouseenter',function(){poImgTarget=k});
+    d.addEventListener('dragover',function(e){e.preventDefault();d.classList.add('drag')});
+    d.addEventListener('dragleave',function(){d.classList.remove('drag')});
+    d.addEventListener('drop',function(e){e.preventDefault();d.classList.remove('drag');poSetImg(k,e.dataTransfer.files[0])});
+  });
+  box.querySelectorAll('[data-podel]').forEach(function(b){b.onclick=function(e){e.stopPropagation();var a=b.dataset.podel.split('|');var l=poListOf(a[0]);var it=l.splice(+a[1],1)[0];if(it)delete poImgs[it.key];rerender()}});
+  box.querySelectorAll('[data-pocap]').forEach(function(inp){inp.oninput=function(){var a=inp.dataset.pocap.split('|');poListOf(a[0])[+a[1]].cap=inp.value}});
+  box.querySelectorAll('[data-poadd]').forEach(function(b){b.onclick=function(){poListOf(b.dataset.poadd).push({key:poKey(),cap:''});rerender()}});
+  box.querySelectorAll('[data-pohide]').forEach(function(c){c.onchange=function(){po.hide_empty=c.checked?1:0}});
+  box.querySelectorAll('[data-pogn]').forEach(function(inp){inp.oninput=function(){po.spec[+inp.dataset.pogn].g=inp.value}});
+  box.querySelectorAll('[data-pohl]').forEach(function(c){c.onchange=function(){po.spec[+c.dataset.pohl].hl=c.checked?1:0}});
+  box.querySelectorAll('[data-pogdel]').forEach(function(b){b.onclick=function(){if(confirm('이 그룹을 뺄까요?')){po.spec.splice(+b.dataset.pogdel,1);rerender()}}});
+  box.querySelectorAll('[data-pork]').forEach(function(inp){inp.oninput=function(){var a=inp.dataset.pork.split('|');po.spec[+a[0]].rows[+a[1]].k=inp.value}});
+  box.querySelectorAll('[data-porv]').forEach(function(inp){inp.oninput=function(){var a=inp.dataset.porv.split('|');po.spec[+a[0]].rows[+a[1]].v=inp.value}});
+  box.querySelectorAll('[data-pordel]').forEach(function(b){b.onclick=function(){var a=b.dataset.pordel.split('|');po.spec[+a[0]].rows.splice(+a[1],1);rerender()}});
+  box.querySelectorAll('[data-poradd]').forEach(function(b){b.onclick=function(){po.spec[+b.dataset.poradd].rows.push({k:'',v:''});rerender()}});
+  box.querySelectorAll('[data-pogadd]').forEach(function(b){b.onclick=function(){po.spec.push({g:'',hl:0,rows:[{k:'',v:''}]});rerender()}});
+  box.querySelectorAll('[data-popt]').forEach(function(inp){inp.oninput=function(){po.pages[+inp.dataset.popt].title=inp.value}});
+  box.querySelectorAll('[data-popf]').forEach(function(inp){inp.oninput=function(){var a=inp.dataset.popf.split('|');po.pages[+a[0]][a[1]]=inp.value}});
+  box.querySelectorAll('[data-popdel]').forEach(function(b){b.onclick=function(){if(!confirm('이 페이지를 뺄까요?'))return;var pg=po.pages.splice(+b.dataset.popdel,1)[0];(pg.imgs||[]).forEach(function(it){delete poImgs[it.key]});rerender()}});
+  box.querySelectorAll('[data-popmv]').forEach(function(b){b.onclick=function(){var a=b.dataset.popmv.split('|'),i=+a[0],j=i+(+a[1]);if(j<0||j>=po.pages.length)return;var t=po.pages[i];po.pages[i]=po.pages[j];po.pages[j]=t;rerender()}});
+  box.querySelectorAll('[data-popadd]').forEach(function(b){b.onclick=function(){po.pages.push({title:b.dataset.popadd,headline:'',file:'',notes:'',imgs:[{key:poKey(),cap:''},{key:poKey(),cap:''}]});rerender()}});
+  box.querySelectorAll('[data-poff]').forEach(function(inp){inp.oninput=function(){var a=inp.dataset.poff.split('|');po.files[+a[0]][a[1]]=inp.value}});
+  box.querySelectorAll('[data-pofdel]').forEach(function(b){b.onclick=function(){po.files.splice(+b.dataset.pofdel,1);rerender()}});
+  box.querySelectorAll('[data-pofadd]').forEach(function(b){b.onclick=function(){po.files.push({name:'',note:''});rerender()}});
+  box.querySelectorAll('[data-pofauto]').forEach(function(b){b.onclick=function(){
+    var base=(po.po_no||'PO').replace(/[^A-Za-z0-9]/g,'')||'PO';var v=(po.rev||'').replace(/[^0-9]/g,'')||'1';
+    var have={};po.files.forEach(function(f){have[f.name]=1});
+    var parts=po.pages.length?po.pages.map(function(p){return p.title}):['SUMMARY'];
+    parts.forEach(function(t,i){var nm=base+'_'+(String(t||'PAGE'+(i+2)).toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,''))+'_v'+v+'.ai';
+      if(!have[nm])po.files.push({name:nm,note:(t||'')+' artwork — 1:1 scale, fonts outlined'});
+      if(po.pages[i]&&!po.pages[i].file)po.pages[i].file=nm;});
+    rerender();
+  }});
+}
+function poSetImg(key,f){if(!f||!/^image\//.test(f.type||''))return;var r=new FileReader();r.onload=function(ev){poImgs[key]=ev.target.result;var y=window.scrollY;poRenderForm();window.scrollTo(0,y)};r.readAsDataURL(f)}
+function poOnImgInput(inp){if(poImgTarget)poSetImg(poImgTarget,inp.files[0]);inp.value=''}
+document.addEventListener('paste',function(e){
+  var f=document.getElementById('poForm');if(!f||f.classList.contains('hidden')||!poImgTarget)return;
+  var it=[].slice.call((e.clipboardData&&e.clipboardData.items)||[]).find(function(x){return x.type&&x.type.indexOf('image')===0});
+  if(!it)return;e.preventDefault();poSetImg(poImgTarget,it.getAsFile());
+});
+
+/* ---------- 디자인확인서 + 국내 프로젝트(해외 매입)에서 불러오기 ---------- */
+function poOpenLink(){window._linkFor='po';openLinkModal()}
+async function poApplyDcById(id){try{var res=await sbFetch('confirmations?id=eq.'+id,'GET');if(res&&res[0])await poApplyDc(res[0])}catch(e){showMsg('❌ 불러오기 실패: '+e.message,true)}}
+function poSpecSet(g,k,v){if(!v)return;po.spec.forEach(function(x){if(x.g===g)x.rows.forEach(function(r){if(r.k===k&&!r.v)r.v=v})})}
+async function poApplyDc(r){
+  poLinkedDcNum=r.doc_number||'';
+  if(!po.model)po.model=String(r.product_name||'').toUpperCase();
+  if(r.quantity)poSpecSet('QUANTITY','ORDER',Number(r.quantity).toLocaleString()+'pcs');
+  if(r.delivery_date&&!po.need_by)po.need_by=r.delivery_date;
+  if(r.images_data){var imgs=unpackImages(r.images_data);if(imgs.main&&!po.summary.imgs.length){var k=poKey();poImgs[k]=imgs.main.url;po.summary.imgs.push({key:k,cap:'<DESIGN>'})}}
+  try{
+    var pj=await sbFetch('projects_domestic?source_doc_number=eq.'+encodeURIComponent(poLinkedDcNum)+'&select=supplier,supplier_contact,supplier_overseas,quantity&limit=1','GET');
+    if(pj&&pj[0]){
+      if(pj[0].supplier&&!po.to)po.to=pj[0].supplier;
+      if(pj[0].supplier_contact&&!po.attn)po.attn=pj[0].supplier_contact;
+      var o=pj[0].supplier_overseas;if(o&&o.unit)poSpecSet('PRICE','UNIT',o.unit+' USD');
+    }
+  }catch(_){}
+  if(!poCurrentId)document.getElementById('poDocNum').value=await poNextDocNum(poLinkedDcNum);
+  var info=document.getElementById('poLinkedInfo');info.textContent='📎 '+poLinkedDcNum+' · '+(r.company_name||'')+' · '+(r.product_name||'')+' 에서 불러왔어요 (공장·단가는 국내 프로젝트의 해외 매입 정보)';info.classList.remove('hidden');
+  poRenderForm();
+}
+async function poNextDocNum(dcNum){
+  try{
+    if(dcNum){var res=await sbFetch('confirmations?doc_number=like.'+encodeURIComponent(dcNum+'_E')+'*&select=doc_number','GET');var mx=0;(res||[]).forEach(function(w){var m=/_E(\d+)$/.exec(w.doc_number||'');if(m&&+m[1]>mx)mx=+m[1]});return dcNum+'_E'+(mx+1)}
+    var d=psTodayStr().replace(/-/g,'').substring(2);
+    var r2=await sbFetch('confirmations?doc_number=like.'+encodeURIComponent('PO'+d+'-')+'*&select=doc_number','GET');var mx2=0;(r2||[]).forEach(function(w){var m=/-(\d+)$/.exec(w.doc_number||'');if(m&&+m[1]>mx2)mx2=+m[1]});return 'PO'+d+'-'+(mx2+1);
+  }catch(e){return 'PO'+Date.now()}
+}
+
+/* ---------- 저장 ---------- */
+function poValidate(){
+  var miss=[];if(!po.to)miss.push('TO (공장)');if(!po.model)miss.push('MODEL');
+  var w=document.getElementById('poWarnBox');
+  if(miss.length){w.innerHTML='⚠️ 필수 항목: <b>'+miss.join(', ')+'</b>';w.classList.remove('hidden');return false}
+  w.classList.add('hidden');return true;
+}
+function poUsedKeys(){var ks=po.summary.imgs.map(function(i){return i.key});po.pages.forEach(function(p){(p.imgs||[]).forEach(function(i){ks.push(i.key)})});return ks}
+async function poSaveAndPreview(){
+  if(!poValidate())return;
+  var btn=document.getElementById('btnPoSave');btn.disabled=true;btn.textContent='저장 중...';
+  try{
+    var packed={main:null,subs:[],po:{}};var ks=poUsedKeys();
+    for(var i=0;i<ks.length;i++){if(!poImgs[ks[i]])continue;var b=await resizeImgToBase64(poImgs[ks[i]],1300,1300,0.85);if(b){packed.po[ks[i]]=b;poImgs[ks[i]]=b;if(!packed.main)packed.main=b}}
+    var docNum=val('poDocNum')||await poNextDocNum(poLinkedDcNum);
+    var qtyRow=(po.spec.find(function(g){return g.g==='QUANTITY'})||{rows:[]}).rows.find(function(r){return r.k==='ORDER'});
+    var data={doc_date:po.date||null,company_name:po.to,contact_person:po.attn,manager:po.from,title:po.po_no||'해외작업요청서',product_name:po.model,
+      quantity:qtyRow?toNum(qtyRow.v):0,unit:'pcs',delivery_date:po.need_by||null,status:'해외작업요청서',
+      images_data:JSON.stringify(packed),extra:Object.assign({},po,{dc:poLinkedDcNum})};
+    for(var a=0;a<3;a++){
+      var ex=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(docNum)+'&select=id,status','GET');
+      if(ex&&ex.length){if(ex[0].status!=='해외작업요청서'){docNum=await poNextDocNum(poLinkedDcNum);continue}await sbFetch('confirmations?id=eq.'+ex[0].id,'PATCH',Object.assign({},data,{doc_number:docNum}));poCurrentId=ex[0].id;break}
+      try{var ins=await sbFetch('confirmations','POST',Object.assign({},data,{doc_number:docNum}));if(ins&&ins[0])poCurrentId=ins[0].id;break}
+      catch(e){if(!(e.statusCode===409||e.code==='23505')||a===2)throw e;docNum=await poNextDocNum(poLinkedDcNum)}
+    }
+    document.getElementById('poDocNum').value=docNum;
+    showMsg('✅ 해외 작업요청서 저장 완료! ('+docNum+')');
+    showPoTab('preview');
+  }catch(err){console.error('해외 작업요청서 저장 실패',err);showMsg('❌ 저장 실패: '+err.message,true)}
+  btn.disabled=false;btn.textContent='💾 저장 & 미리보기 →';
+}
+function poFill(r){
+  switchMode('po');
+  poCurrentId=r.id;
+  var x=r.extra||{};
+  po=Object.assign(poBlank(),x);
+  if(!po.spec||!po.spec.length)po.spec=poDefaultSpec();
+  po.summary=Object.assign({imgs:[],notes:''},po.summary||{});
+  po.pages=(po.pages||[]).map(function(p){return Object.assign({title:'',headline:'',file:'',notes:'',imgs:[]},p)});
+  poLinkedDcNum=x.dc||'';
+  poImgs={};try{var d=typeof r.images_data==='string'?JSON.parse(r.images_data):r.images_data;if(d&&d.po)poImgs=d.po}catch(_){}
+  document.getElementById('poDocNum').value=r.doc_number||'';
+  var info=document.getElementById('poLinkedInfo');if(poLinkedDcNum){info.textContent='📎 연결된 디자인확인서 '+poLinkedDcNum;info.classList.remove('hidden')}else info.classList.add('hidden');
+  poRenderForm();showPoTab('form');
+}
+
+/* ---------- 문서 그리기 (A4 여러 장) ---------- */
+function poDateEn(d){if(!d)return '';var p=String(d).split('-');return p.length<3?d:p[0]+'.'+p[1]+'.'+p[2]}
+function poNeedText(){
+  if(po.need_text)return po.need_text;if(!po.need_by)return '';
+  var M=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var p=po.need_by.split('-'),d=+p[2],suf=(d%10===1&&d!==11)?'st':(d%10===2&&d!==12)?'nd':(d%10===3&&d!==13)?'rd':'th';
+  return 'We need to receive by '+M[+p[1]-1]+' '+d+suf;
+}
+function poLines(t){return String(t||'').split('\n').map(function(s){return s.trim()}).filter(Boolean)}
+var _poQrLib=null;
+function poLoadQr(){if(window.QRCode)return Promise.resolve();if(_poQrLib)return _poQrLib;_poQrLib=new Promise(function(ok,no){var s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';s.onload=ok;s.onerror=function(){no(new Error('QR 라이브러리 로드 실패'))};document.head.appendChild(s)});return _poQrLib}
+async function poQrData(text){
+  try{await poLoadQr();var d=document.createElement('div');d.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(d);
+    new QRCode(d,{text:text,width:240,height:240,correctLevel:QRCode.CorrectLevel.M});var c=d.querySelector('canvas');var u=c?c.toDataURL('image/png'):'';d.remove();return u}catch(e){console.warn(e);return ''}
+}
+var _poBuilt=null;
+function buildPoDoc(){_poBuilt=buildPoDocAsync();return _poBuilt}
+async function buildPoDocAsync(){
+  var W=794,H=1123,PX=26,PT=24,PB=20,INW=W-PX*2,FOOT=20;
+  var RED=PO_RED,no=esc(po.po_no||''),qr=po.link?await poQrData(po.link):'';
+  var font="font-family:'Noto Sans KR','Pretendard',Arial,sans-serif;";
+  var pages=[];
+  var head=function(big){
+    return '<div style="height:'+(big?54:40)+'px;display:flex;align-items:flex-end;justify-content:space-between;border-bottom:'+(big?3:2)+'px solid #111;padding-bottom:6px;flex-shrink:0">'+
+      '<img src="'+LOGO_DARK+'" style="height:'+(big?30:22)+'px">'+
+      '<div style="text-align:right">'+(po.rev?'<span style="font-size:11px;font-weight:800;color:#fff;background:#111;border-radius:3px;padding:2px 7px;margin-right:8px;vertical-align:middle">'+esc(po.rev)+'</span>':'')+
+      '<span style="font-size:'+(big?34:20)+'px;font-weight:900;color:'+RED+';letter-spacing:.5px;vertical-align:middle">'+no+'</span></div></div>';
+  };
+  var foot=function(){return '<div style="height:'+FOOT+'px;margin-top:auto;padding-top:6px;display:flex;justify-content:space-between;font-size:9px;color:#999;flex-shrink:0"><span>KLP KOREA inc · klpkorea@agift.kr · +82-2-2103-5757</span><span>'+no+' · PAGE {P} / {N}</span></div>'};
+  var wrap=function(inner){return '<div class="po-pg" style="width:'+W+'px;height:'+H+'px;overflow:hidden;background:#fff;'+font+'color:#111;box-sizing:border-box;padding:'+PT+'px '+PX+'px '+PB+'px;display:flex;flex-direction:column">'+inner+foot()+'</div>'};
+
+  /* --- 1쪽 위쪽 --- */
+  var stIdx=PO_STAGES.findIndex(function(s){return s[0]===po.stage});
+  var stepW=Math.floor((INW-24)/3);
+  var steps='<div style="display:flex;align-items:center;gap:12px;margin-top:2px">'+PO_STAGES.map(function(s,i){
+    var on=i===stIdx,done=i<stIdx,c=on?'#111':done?'#9a9a9a':'#cfcfcf';
+    return '<div style="width:'+stepW+'px;height:50px;box-sizing:border-box;border:2px solid '+c+';border-radius:6px;background:'+(on?'#111':'#fff')+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px">'+
+      '<div style="font-size:15px;font-weight:900;letter-spacing:.5px;color:'+(on?'#fff':c)+'">'+s[1]+(done?' ✓':'')+'</div><div style="font-size:10.5px;color:'+(on?'#ddd':c)+'">'+esc((po.stage_dates||{})[s[0]]||'-')+'</div></div>';
+  }).join('<div style="font-size:20px;color:#bbb;margin:0 -6px">›</div>')+'</div>';
+  var line=function(lb,v,red){return '<div style="flex:1;display:flex;align-items:flex-end;gap:10px;min-width:0"><b style="font-size:15px;font-weight:900;white-space:nowrap">'+lb+' :</b><div style="flex:1;border-bottom:1.5px solid #111;text-align:center;font-size:'+(red?17:15.5)+'px;font-weight:'+(red?900:500)+';color:'+(red?RED:'#111')+';padding-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(esc(v)||'&nbsp;')+'</div></div>'};
+  var info='<div style="display:flex;flex-direction:column;gap:9px;margin-top:12px">'+
+    '<div style="display:flex;gap:28px">'+line('DATE',poDateEn(po.date))+line('TO',po.to)+'</div>'+
+    '<div style="display:flex;gap:28px">'+line('STYLE',po.po_no,1)+line('MODEL',po.model,1)+'</div>'+
+    (po.attn||po.from?'<div style="display:flex;gap:28px">'+line('ATTN',po.attn)+line('FROM',po.from)+'</div>':'')+'</div>';
+  var topH=PT+54+8+20+50+12+(po.attn||po.from?3:2)*36;
+
+  /* SUMMARY */
+  var sImgs=po.summary.imgs.filter(function(i){return poImgs[i.key]});
+  var notes=poLines(po.summary.notes),need=poNeedText();
+  var imgsH=sImgs.length?(sImgs.length>2?330:350):0;
+  var sumH=sImgs.length||notes.length||need?(36+imgsH+notes.length*26+(need?58:0)+14):0;
+  var sumHtml='';
+  if(sumH){
+    var cw=Math.floor((INW-28-(sImgs.length-1)*14)/Math.max(1,sImgs.length));
+    sumHtml='<div style="height:'+sumH+'px;margin-top:14px;border:1.5px solid #111;box-sizing:border-box;position:relative;flex-shrink:0;padding:36px 14px 10px">'+
+      '<div style="position:absolute;left:-1.5px;top:-1.5px;border:1.5px solid #111;padding:3px 10px;font-size:17px;font-weight:900;background:#fff">SUMMARY</div>'+
+      (sImgs.length?'<div style="height:'+imgsH+'px;display:flex;gap:14px;justify-content:center">'+sImgs.map(function(it){
+        return '<div style="width:'+cw+'px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px"><img src="'+poImgs[it.key]+'" style="max-width:'+cw+'px;max-height:'+(imgsH-(it.cap?28:4))+'px;object-fit:contain">'+(it.cap?'<div style="font-size:14px;color:#111;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>':'')+
+      notes.map(function(n){return '<div style="font-size:17px;font-weight:800;color:'+RED+';line-height:26px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(n)+'</div>'}).join('')+
+      (need?'<div style="height:58px;display:flex;align-items:center;justify-content:center;font-size:31px;font-weight:900;color:'+RED+';letter-spacing:-.3px">'+esc(need)+'</div>':'')+'</div>';
+  }
+
+  /* 사양표 — 줄 단위로 페이지에 나눠 담기 */
+  var flat=[];po.spec.forEach(function(g){g.rows.filter(function(r){return !po.hide_empty||String(r.v||'').trim()}).forEach(function(r){flat.push({g:g.g,hl:g.hl,k:r.k,v:r.v,one:g.rows.length===1&&(!r.k||r.k===g.g)})})});
+  var RH=24,THH=36;
+  var specTable=function(rows,title){
+    if(!rows.length)return '';
+    var h='<table style="width:100%;border-collapse:collapse;table-layout:fixed;margin-top:12px;flex-shrink:0"><colgroup><col style="width:19%"><col style="width:20%"><col></colgroup>'+
+      '<tr style="height:'+THH+'px"><td colspan="3" style="border:1.2px solid #111;text-align:center;font-size:17px;font-weight:900;letter-spacing:.5px">'+title+'</td></tr>';
+    for(var i=0;i<rows.length;){
+      var j=i;while(j<rows.length&&rows[j].g===rows[i].g)j++;
+      var n=j-i,col=rows[i].hl?RED:'#111';
+      for(var t=i;t<j;t++){
+        var r=rows[t],v=r.v?esc(r.v):'-';
+        h+='<tr style="height:'+RH+'px">';
+        if(r.one){h+='<td colspan="2" style="border:1.2px solid #111;text-align:center;font-size:13.5px;font-weight:800;color:'+col+'">'+esc(r.g)+'</td>'}
+        else{if(t===i)h+='<td rowspan="'+n+'" style="border:1.2px solid #111;text-align:center;font-size:14px;font-weight:800;color:'+col+';padding:0 4px">'+esc(r.g)+'</td>';
+          h+='<td style="border:1.2px solid #111;text-align:center;font-size:12.5px;font-weight:800;color:'+col+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px">'+esc(r.k)+'</td>'}
+        h+='<td style="border:1.2px solid #111;text-align:center;font-size:13px;color:'+(r.hl&&r.v?RED:'#111')+';font-weight:'+(r.v?600:400)+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 8px">'+v+'</td></tr>';
+      }
+      i=j;
+    }
+    return h+'</table>';
+  };
+  /* 원본 파일 + REMARKS 블록 */
+  var files=(po.files||[]).filter(function(f){return f.name});
+  var rem=poLines(po.remarks);
+  var extraH=(files.length||qr?16+30+Math.max(files.length*22+(po.link?40:0),qr?130:0)+8:0)+(rem.length?16+30+rem.length*20+8:0);
+  var extraHtml=function(){
+    var h='';
+    if(files.length||qr){
+      h+='<div style="margin-top:16px;border:1.5px solid #111;box-sizing:border-box;flex-shrink:0"><div style="height:30px;display:flex;align-items:center;padding:0 12px;background:#111;color:#fff;font-size:13.5px;font-weight:900;letter-spacing:.5px">ARTWORK FILES <span style="font-weight:500;font-size:11px;margin-left:8px;color:#ddd">Original design files are sent separately — please use these files for production</span></div>'+
+        '<div style="display:flex;gap:14px;padding:8px 12px;align-items:flex-start"><div style="flex:1;min-width:0">'+
+        files.map(function(f){return '<div style="height:22px;display:flex;gap:10px;align-items:center;font-size:12.5px;white-space:nowrap;overflow:hidden"><b style="font-weight:800">📎 '+esc(f.name)+'</b><span style="color:#666;overflow:hidden;text-overflow:ellipsis">'+esc(f.note||'')+'</span></div>'}).join('')+
+        (po.link?'<div style="margin-top:6px;font-size:11px;color:#1F55C9;word-break:break-all;line-height:1.35">Download: '+esc(po.link)+'</div>':'')+'</div>'+
+        (qr?'<div style="text-align:center;flex-shrink:0"><img src="'+qr+'" style="width:110px;height:110px"><div style="font-size:9px;color:#666">Scan to download</div></div>':'')+'</div></div>';
+    }
+    if(rem.length)h+='<div style="margin-top:16px;border:1.5px solid #111;box-sizing:border-box;flex-shrink:0"><div style="height:30px;display:flex;align-items:center;padding:0 12px;background:#F4F3EA;font-size:13.5px;font-weight:900;letter-spacing:.5px;border-bottom:1.2px solid #111">REMARKS</div><div style="padding:6px 12px">'+rem.map(function(r){return '<div style="font-size:12.5px;line-height:20px">• '+esc(r)+'</div>'}).join('')+'</div></div>';
+    return h;
+  };
+
+  /* 1쪽 */
+  var avail1=H-topH-(sumH?sumH+14:0)-12-THH-FOOT-PB-10;
+  var cap1=Math.max(0,Math.floor(avail1/RH));
+  var first=flat.slice(0,cap1),rest=flat.slice(cap1);
+  var used1=topH+(sumH?sumH+14:0)+(first.length?12+THH+first.length*RH:0);
+  var p1=head(true)+'<div style="font-size:22px;font-weight:900;margin-top:8px;letter-spacing:.3px">ORDER PROCESS</div>'+steps+info+sumHtml+specTable(first,'WATCH SPECIFICATION');
+  var extraPlaced=false;
+  if(!rest.length&&extraH&&used1+extraH<=H-FOOT-PB-10){p1+=extraHtml();extraPlaced=true}
+  pages.push(wrap(p1));
+  /* 사양표 이어지는 쪽 */
+  var capN=Math.floor((H-PT-40-12-THH-FOOT-PB-10)/RH);
+  while(rest.length){
+    var chunk=rest.slice(0,capN);rest=rest.slice(capN);
+    var html=head(false)+specTable(chunk,'WATCH SPECIFICATION (CONT.)');
+    if(!rest.length&&extraH&&PT+40+12+THH+chunk.length*RH+extraH<=H-FOOT-PB-10){html+=extraHtml();extraPlaced=true}
+    pages.push(wrap(html));
+  }
+  if(extraH&&!extraPlaced)pages.push(wrap(head(false)+extraHtml()));
+
+  /* 상세 페이지 */
+  po.pages.forEach(function(pg){
+    var ims=(pg.imgs||[]).filter(function(i){return poImgs[i.key]});
+    var nts=poLines(pg.notes);
+    var boxH=H-PT-40-14-FOOT-PB-8;
+    var titleH=52,hlH=pg.headline?70:0,ntH=nts.length*30,flH=pg.file?26:0;
+    var areaH=boxH-titleH-hlH-ntH-flH-24;
+    var cols=ims.length<=1?1:2,rows=ims.length>2?2:1;
+    var cw=Math.floor((INW-28-(cols-1)*18)/cols),chh=Math.floor((areaH-(rows-1)*14)/rows);
+    var grid=ims.length?'<div style="height:'+areaH+'px;display:grid;grid-template-columns:repeat('+cols+','+cw+'px);grid-template-rows:repeat('+rows+','+chh+'px);gap:14px 18px;justify-content:center">'+ims.map(function(it){
+      return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;overflow:hidden"><img src="'+poImgs[it.key]+'" style="max-width:'+cw+'px;max-height:'+(chh-(it.cap?34:4))+'px;object-fit:contain">'+(it.cap?'<div style="font-size:17px;text-align:center;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>'
+      :'<div style="height:'+areaH+'px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:14px">No image</div>';
+    var inner=head(false)+'<div style="height:'+boxH+'px;margin-top:14px;border:1.2px solid #333;box-sizing:border-box;padding:12px 14px;display:flex;flex-direction:column;flex-shrink:0">'+
+      '<div style="height:'+titleH+'px;font-size:28px;font-weight:900;letter-spacing:.3px;flex-shrink:0">'+esc(pg.title||'')+'</div>'+
+      (hlH?'<div style="height:'+hlH+'px;display:flex;align-items:center;justify-content:center;font-size:46px;font-weight:900;color:'+RED+';letter-spacing:.5px;flex-shrink:0;white-space:nowrap;overflow:hidden">'+esc(pg.headline)+'</div>':'')+
+      grid+
+      nts.map(function(n){return '<div style="height:30px;display:flex;align-items:center;font-size:19px;font-weight:800;color:'+RED+';white-space:nowrap;overflow:hidden;flex-shrink:0">'+esc(n)+'</div>'}).join('')+
+      (flH?'<div style="height:'+flH+'px;display:flex;align-items:center;gap:6px;font-size:12px;color:#555;flex-shrink:0">📎 Artwork file: <b style="color:#111">'+esc(pg.file)+'</b></div>':'')+'</div>';
+    pages.push(wrap(inner));
+  });
+
+  var N=pages.length;
+  var el=document.getElementById('poDocEl');
+  el.innerHTML=pages.map(function(p,i){return p.replace('{P}',i+1).replace('{N}',N)}).join('<div style="height:18px;background:#e9e9e6"></div>');
+  return N;
+}
+async function poCanvases(){
+  await (_poBuilt||buildPoDoc());
+  var out=[],pgs=document.querySelectorAll('#poDocEl .po-pg');
+  for(var i=0;i<pgs.length;i++)out.push(await html2canvas(pgs[i],{scale:2.5,useCORS:true,backgroundColor:'#fff',logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123}));
+  return out;
+}
+function poFileBase(){return getYYMMDD(po.date)+'_KLP_'+((po.po_no||'PO').replace(/[^A-Za-z0-9]/g,''))+'_'+((po.model||'ORDER').replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_'))+'_OrderSheet'+(po.rev?'_'+po.rev.replace(/[^A-Za-z0-9.]/g,''):'')}
+async function dlPo(type){
+  var b=document.getElementById(type==='pdf'?'btnPoPdf':'btnPoJpg'),t=b.textContent;b.disabled=true;b.textContent='만드는 중...';
+  try{
+    var cs=await poCanvases();
+    if(type==='pdf'){var pdf=new jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});cs.forEach(function(c,i){if(i)pdf.addPage();pdf.addImage(c.toDataURL('image/jpeg',0.93),'JPEG',0,0,pdf.internal.pageSize.getWidth(),pdf.internal.pageSize.getHeight())});pdf.save(poFileBase()+'.pdf')}
+    else cs.forEach(function(c,i){var a=document.createElement('a');a.download=poFileBase()+(cs.length>1?'_p'+(i+1):'')+'.jpg';a.href=c.toDataURL('image/jpeg',0.92);setTimeout(function(){a.click()},i*400)});
+  }catch(e){alert('오류: '+e.message)}
+  b.disabled=false;b.textContent=t;
+}
+async function poPrint(){
+  var w=window.open('','_blank');if(!w){alert('팝업이 막혀 있어요. 팝업 허용 후 다시 눌러주세요');return}
+  w.document.write('<p style="font-family:sans-serif">준비 중…</p>');
+  var cs=await poCanvases();
+  w.document.open();w.document.write('<html><head><title>'+esc(poFileBase())+'</title><style>@page{size:A4;margin:0}body{margin:0}img{width:100%;display:block;page-break-after:always}</style></head><body>'+cs.map(function(c){return '<img src="'+c.toDataURL('image/jpeg',0.93)+'">'}).join('')+'<script>window.onload=function(){setTimeout(function(){print()},300)}<\/script></body></html>');w.document.close();
+}
+
+/* ---------- 히스토리 ---------- */
+var poHistoryData=[];
+async function poLoadHistory(){
+  var list=document.getElementById('poHistoryList');list.innerHTML='<div class="history-empty">불러오는 중...</div>';
+  try{poHistoryData=await sbFetch('confirmations?status=eq.'+encodeURIComponent('해외작업요청서')+'&select=id,doc_number,doc_date,company_name,product_name,title,quantity,delivery_date,created_at&order=created_at.desc&limit=300','GET')||[];poFilterHistory()}
+  catch(e){list.innerHTML='<div class="history-empty">불러오기 실패</div>'}
+}
+function poFilterHistory(){
+  var q=(document.getElementById('poHistorySearch').value||'').toLowerCase();
+  var data=poHistoryData.filter(function(r){return !q||[r.doc_number,r.company_name,r.product_name,r.title].some(function(s){return String(s||'').toLowerCase().indexOf(q)>=0})});
+  var list=document.getElementById('poHistoryList');
+  if(!data.length){list.innerHTML='<div class="history-empty">저장된 해외 작업요청서가 없습니다</div>';return}
+  list.innerHTML=data.map(function(r){return '<div class="link-hc po-hc" onclick="poOpenRecord('+r.id+')"><div class="lh-docno">'+esc(r.doc_number)+' · '+esc(r.doc_date||'')+'</div><div class="lh-title"><span style="color:'+PO_RED+'">'+esc(r.title||'')+'</span> '+esc(r.product_name)+' — '+esc(r.company_name)+'</div><div class="lh-sub">🌏 '+(r.quantity?Number(r.quantity).toLocaleString()+'pcs':'')+(r.delivery_date?' | Required by '+esc(r.delivery_date):'')+'</div></div>'}).join('');
+}
+async function poOpenRecord(id){await loadRecord(id);showPoTab('preview')}
+
+/* --- #po-new-디자인확인서번호 : 대시보드에서 '해외 작업요청서 만들기' --- */
+(async function applyPoNewHash(){
+  var hash=(location.hash||'').replace(/^#/,'');
+  if(hash!=='po-new'&&!hash.startsWith('po-new-'))return;
+  var dcNum=decodeURIComponent(hash.substring(7));
+  history.replaceState(null,'',location.pathname);
+  await new Promise(function(ok){setTimeout(ok,300)});
+  switchMode('po');newPoDoc();
+  if(!dcNum)return;
+  try{var res=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(dcNum),'GET');
+    if(res&&res[0]){await poApplyDc(res[0]);showMsg('✅ 디자인확인서·해외 매입 정보를 불러왔어요')}else showMsg('❌ 디자인확인서를 찾을 수 없습니다: '+dcNum,true)}
+  catch(e){showMsg('❌ 불러오기 실패: '+e.message,true)}
 })();
 </script>
 </body>

@@ -100,7 +100,12 @@
 - **해외 매입 (달러) — migration 059, 2026-10-08**: 매입처 카드 맨 위 `🌏 해외 매입` 체크(새로·편집 창 공통 `ovsBoxHtml(P)`, P = 'newProject'|'editProject', 상태 `_ovs[P]`). 켜면 국내용 단가·VAT·인쇄·포장·배송(`#{P}SupDom`)을 숨기고 달러 칸: 외화 단가·견적 환율(마지막 값 localStorage `ovs_rate`) / 부대비용 줄(국제 운송비·관세·통관·송금 수수료·국내 운송비·금형비·직접, 원 또는 $) / 수입 부가세(비우면 자동 10%) / 송금 기록 줄(선금·잔금·일괄·추가 × 달러·그날 환율·날짜 — 회차·비율은 그때그때, 잔금·일괄 버튼은 남은 금액 자동)
   - 저장: `projects_domestic.supplier_overseas` jsonb `{cur:'USD', unit, rate, extras:[{name,amt,cur}], ivat|null, pays:[{kind,usd,rate,date}]}` + `supplier_revenue` = `ovsCalc` 원화 합계(송금한 달러는 그날 환율, 남은 달러는 견적 환율 + 부대비용 + 수입 부가세 — 국내 매입액처럼 VAT 포함 기준이라 마진 비교 그대로), `supplier_unit_price` = 원화 환산 단가(작업요청서 만들기 조건 충족용), 국내 인쇄·포장·배송 매입 칸은 0/빈 값. 매입액 내역에 '환율 차이(견적 대비)' 표시
   - 매입처 이름이 해외 거래처 DB(`clients_overseas`, `clientNameKey` 비교)에 있으면 자동으로 켜짐(`ovsMaybeAuto`, 사람이 직접 끈 뒤엔 안 켬). 상담 국내 진행 카드에 `🌏 $단가` 표시
-  - 남은 일: 영문 작업요청서(PO)는 나중에
+  - **해외 작업요청서 (영문 Order Sheet, 2026-10-08)**: 문서 생성기 네 번째 모드 `🌏 해외 작업요청서`(`switchMode('po')`, 빨강 #E11D24). confirmations `status='해외작업요청서'`, 문서번호 `디확번호_E1…`/`POYYMMDD-N`, 값 전부 `extra`(= 전역 `po`: po_no·rev·date·to·attn·from(localStorage `po_from`)·model·stage(g3d/sample/order)+stage_dates·need_by/need_text·summary{imgs[{key,cap}],notes}·spec[{g,hl,rows[{k,v}]}]·hide_empty·files[{name,note}]·link·remarks·pages[{title,headline,file,notes,imgs}]), 사진은 `images_data.po {key:dataURL}`(1300px)
+    - 문서(여러 장, `buildPoDoc` async): 1쪽 = 로고·PO번호(빨강)·Rev / ORDER PROCESS 3단계(지난 단계 ✓, 지금 단계 검정) / DATE·TO·STYLE·MODEL·ATTN·FROM 밑줄 / SUMMARY 상자(사진 최대 4 + 빨간 요청 줄 + 'We need to receive by November 6th' 자동 영어 날짜) / WATCH SPECIFICATION 표(그룹 rowspan, 강조 그룹 빨강, 빈 칸 '-', 넘치면 'CONT.' 쪽으로) → ARTWORK FILES(파일 이름·설명·다운로드 링크 + QR — qrcodejs cdnjs 지연 로드) + REMARKS → 상세 페이지(제목·큰 강조 문구·사진 1~4 + 설명·빨간 요청·'Artwork file:' 줄). 쪽마다 바닥글 PAGE n/N
+    - 기본 사양 그룹(`poDefaultSpec`): CASE(SIZE·MATERIAL·PLATING·LOGO·CASE BACK·CROWN·CRYSTAL) / DIAL / HANDS / STRAP·CHAIN / MOVEMENT·BATTERY / PACKAGING(BOX·WARRANTY·MARKING) / QUANTITY·PRICE(PAYMENT TERMS)·DELIVERY(SHIPPING·SHIP TO) — 빨강. 칸마다 예시(`PO_PH`)
+    - 원본 AI 파일은 문서에 못 넣으니 **ARTWORK FILES**에 파일 이름 + 링크(QR)로 표시. `✨ 파일 이름 자동` = `PO번호_부위_v리비전.ai`(상세 페이지 file 칸도 채움). 수정본 보낼 땐 Revision
+    - 디자인확인서 불러오기(`poApplyDc`, 연동 창 `_linkFor='po'`) → MODEL·ORDER 수량·납기·대표 사진 + 연결된 국내 프로젝트의 매입처(TO)·담당(ATTN)·해외 매입 단가(UNIT USD). 대시보드 상담 국내 진행 카드에 해외 매입 건이면 `🌏 해외 작업요청서` 버튼(있으면 `#edit-`, 없으면 `#po-new-디확번호`)
+    - 출력: PDF(전체 쪽), JPG(쪽마다), 인쇄. 보내기(메일)는 아직 없음
 
 ## 제안서 시스템
 - 사이드바 "제안서" 그룹: 상품 DB / 제안서 관리
