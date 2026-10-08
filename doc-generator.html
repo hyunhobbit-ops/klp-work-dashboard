@@ -3447,7 +3447,7 @@ async function buildPoDocAsync(){
   var info='<div style="border:1.5px solid '+TX+';flex-shrink:0;margin-bottom:'+(hasOrder?14:16)+'px">'+
     row([{k:'TO',v:po.to,w:2,fs:15.5},{k:'ATTN',v:po.attn},{k:'FROM',v:po.from}])+
     row([{k:'ITEM NO.',v:po.po_no,red:1},{k:'MODEL NAME',v:po.model,w:3,fs:15.5}],1)+'</div>'+
-    (hasOrder?'<div style="height:26px;display:flex;align-items:center;gap:8px;flex-shrink:0"><span style="width:4px;height:15px;background:'+C+'"></span><span style="font-size:13px;font-weight:900;letter-spacing:1.5px;color:'+TX+'">ORDER TERMS</span></div>'+
+    (hasOrder?'<div style="height:26px;display:flex;align-items:flex-end;padding:0 0 5px 2px;box-sizing:border-box;flex-shrink:0;font-size:11.5px;font-weight:900;letter-spacing:2px;color:'+C+'">ORDER TERMS</div>'+   /* 표 이름표 — 쪽 제목(SUMMARY 막대)과 다르게 작은 빨간 글씨만 */
       '<div style="border:1.5px solid '+TX+';flex-shrink:0;margin-bottom:16px">'+(keyRow?row(keyRow,0,62):'')+oRows.map(function(r,i){return row(r,i>0||!!keyRow)}).join('')+'</div>':'');
   var used=2*RW+3+(hasOrder?14+26+(keyRow?62:0)+oRows.length*RW+3:0)+16;
   var orderHtml='';
