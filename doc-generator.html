@@ -2607,7 +2607,7 @@ function buildPsDoc(){
   var info='<table style="width:100%;border-collapse:collapse;table-layout:fixed;flex-shrink:0;margin-top:7px;border:1.6px solid #333">'+
     '<colgroup><col style="width:25%"><col style="width:25%"><col style="width:20%"><col style="width:30%"></colgroup>'+
     '<tr style="height:24px"><td rowspan="3" style="'+BD+LB+'font-size:28px;letter-spacing:16px;padding-left:16px;white-space:nowrap">발주처</td>'+
-      '<td rowspan="3" style="'+BD+'text-align:center;font-size:18px;color:#111;padding:0 8px;word-break:keep-all">'+esc(val('psCompany'))+'</td>'+lab('발 주 일')+v(psDateK(val('psOrderDate')))+'</tr>'+
+      '<td rowspan="3" style="'+BD+'text-align:center;font-size:'+(val('psCompany').length>14?13:val('psCompany').length>9?15:18)+'px;line-height:1.3;color:#111;padding:0 8px;word-break:break-all">'+esc(val('psCompany'))+'</td>'+lab('발 주 일')+v(psDateK(val('psOrderDate')))+'</tr>'+
     '<tr style="height:24px">'+lab('발주처 담당자','letter-spacing:3px')+v(val('psOrderContact'))+'</tr>'+
     '<tr style="height:24px">'+lab('발주처 연락처','letter-spacing:3px')+v(val('psOrderPhone'))+'</tr>'+
     '<tr style="height:24px">'+lab('제품명(품번)','letter-spacing:3px')+'<td colspan="3" style="'+BD+'text-align:center;font-size:14.5px;color:#111;padding:0 8px">'+esc(val('psProduct'))+'</td></tr>'+
