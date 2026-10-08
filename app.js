@@ -23331,6 +23331,14 @@ async function inqDealAction(x, act, btn) {
         if (inqEnsureProject(row)) createDocFromProject(row.id, kind);
         return;
     }
+    if (kind === 'ps') {
+        if (!row) return;
+        const num = await inqSavedDocNumber(row, 'ps');
+        if (num) { await viewSavedDoc(num, '제작진행표', null); return; }
+        if (!row.source_doc_number) { showToast('디자인확인서를 먼저 만들어주세요 (제작진행표는 디자인확인서 내용을 불러와요)'); return; }
+        if (confirm('아직 제작진행표가 없습니다. 디자인확인서 내용으로 새로 만들까요?\n(문서 생성기로 이동해요)')) location.href = 'doc-generator.html#ps-new-' + encodeURIComponent(row.source_doc_number);
+        return;
+    }
     if (kind === 'open') { if (inqEnsureProject(row)) showProjectDetail(row.id); return; }
     if (kind === 'chk') { if (btn) btn.disabled = true; await inqToggleProjCheck(x, row, key); }
 }
@@ -23397,6 +23405,7 @@ function inqRenderProjs(x) {
             <span class="inq-pj-amt">${won(p.revenue)}</span>
             <span class="inq-pj-prog">${done}/${CHECK_ITEMS.length}</span>
             <div class="inq-spacer"></div>
+            <button class="inq-mini" data-act="ps:${p.id}" title="시계 제작 주문 내부 문서 — 있으면 보기, 없으면 만들기">🕐 제작진행표</button>
             <button class="inq-mini" data-act="open:${p.id}">국내에서 보기</button>
           </div>
           <div class="inq-pj-docs">${['dc', 'wr'].map(k => inqDocTileHtml(p, k)).join('')}</div>
@@ -23800,10 +23809,11 @@ async function inqSavedDocNumber(row, kind) {
     if (!row || !row.source_doc_number) return null;
     if (kind === 'dc') return row.source_doc_number;
     const prefix = row.source_doc_number + '_';
+    const st = kind === 'ps' ? '제작진행표' : '작업요청서';
     const { data, error } = await sb.from('confirmations').select('doc_number, created_at, status')
         .like('doc_number', prefix + '%').order('created_at', { ascending: false });
-    if (error) { showToast('작업요청서 찾기 실패: ' + error.message); return null; }
-    const wr = (data || []).find(d => d.status === '작업요청서' && String(d.doc_number || '').startsWith(prefix));
+    if (error) { showToast(st + ' 찾기 실패: ' + error.message); return null; }
+    const wr = (data || []).find(d => d.status === st && String(d.doc_number || '').startsWith(prefix));
     return wr ? wr.doc_number : null;
 }
 async function inqSendSavedDoc(row, kind, x) {
@@ -23917,7 +23927,7 @@ async function viewSavedDoc(docNumber, label, x) {
             <b>${escHtml(label)} <em>${escHtml(docNumber)}</em></b>
             <span class="docview-t">${escHtml(opts.title || '')}</span>
             <div class="inq-spacer"></div>
-            <button data-v="send" class="primary">📤 보내기</button>
+            ${opts.docType === 'ps' ? '<span class="docview-t">내부 문서 · 외부 발송 금지</span>' : '<button data-v="send" class="primary">📤 보내기</button>'}
             <button data-v="pdf">PDF</button>
             <button data-v="jpg">JPG</button>
             <button data-v="edit">✏️ 편집</button>

@@ -23,6 +23,16 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
 .mode-btn{padding:10px 24px;border-radius:12px;border:1.5px solid var(--toss-gray-200);background:var(--klp-white);color:var(--toss-gray-600);cursor:pointer;font-size:14px;font-weight:700;font-family:inherit;transition:all .15s;letter-spacing:-.2px}
 .mode-btn:hover{background:var(--toss-gray-50);border-color:var(--toss-gray-300);color:var(--toss-gray-800)}
 .mode-btn.active-dc{background:var(--klp-blue);border-color:var(--klp-blue);color:#fff;box-shadow:0 2px 8px rgba(49,130,246,.3)}
+.mode-btn.active-ps{background:#7C3AED;border-color:#7C3AED;color:#fff;box-shadow:0 2px 8px rgba(124,58,237,.3)}
+.ps-parts{width:100%;border-collapse:collapse;font-size:13px}
+.ps-parts th{font-size:12px;font-weight:800;color:#555;padding:6px 4px;text-align:left;border-bottom:1.5px solid #ddd}
+.ps-parts td{padding:3px 3px;border-bottom:1px solid #f0f0f0}
+.ps-parts input{width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid #e3e3e3;border-radius:7px;font-family:inherit;font-size:13px}
+.ps-parts td:first-child input{font-weight:700;background:#fafafa}
+.ps-del{width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:#aaa;font-size:16px;cursor:pointer}
+.ps-del:hover{background:#fee2e2;color:#c41e3a}
+.ps-add{margin-top:10px;padding:8px 14px;border:1px dashed #bbb;border-radius:8px;background:transparent;color:#555;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.ps-hc:hover{border-color:#7C3AED!important;background:#F5F3FF!important}
 .mode-btn.active-wr{background:var(--klp-orange);border-color:var(--klp-orange);color:#fff;box-shadow:0 2px 8px rgba(245,158,11,.3)}
 
 /* === SUB TABS === */
@@ -198,6 +208,7 @@ body.quote-only-mode .logo-area h1::after{content:' · 견적서 작성';color:#
   <div class="mode-btns">
     <button class="mode-btn active-dc" id="modeDC" onclick="switchMode('dc')">📄 디자인확인서</button>
     <button class="mode-btn" id="modeWR" onclick="switchMode('wr')">🔧 작업요청서</button>
+    <button class="mode-btn" id="modePS" onclick="switchMode('ps')" title="시계 제작 주문 내부 문서 (외부 발송 안 함)">🕐 제작진행표</button>
   </div>
 </div>
 
@@ -211,6 +222,12 @@ body.quote-only-mode .logo-area h1::after{content:' · 견적서 작성';color:#
 <div class="sub-bar hidden" id="wrSubBar">
   <button class="tab-btn active" id="wrTabForm" onclick="newWrDoc()">📝 새로 입력</button>
   <button class="tab-btn" id="wrTabHistory" onclick="showWrTab('history')">📋 히스토리</button>
+</div>
+
+<!-- ===== PS SUB TABS (제작진행표) ===== -->
+<div class="sub-bar hidden" id="psSubBar">
+  <button class="tab-btn active" id="psTabForm" onclick="newPsDoc()">📝 새로 입력</button>
+  <button class="tab-btn" id="psTabHistory" onclick="showPsTab('history')">📋 히스토리</button>
 </div>
 
 <!-- ================================================================ -->
@@ -356,6 +373,65 @@ body.quote-only-mode .logo-area h1::after{content:' · 견적서 작성';color:#
     <input class="search-box" id="wrHistorySearch" placeholder="🔍 검색..." oninput="filterWrHistory()">
   </div>
   <div id="wrHistoryList"></div>
+</div>
+
+<!-- ================================================================ -->
+<!-- PS FORM (제작진행표 — 내부 문서) -->
+<!-- ================================================================ -->
+<div id="psForm" class="form-wrap hidden">
+  <div class="section" style="text-align:center">
+    <div style="font-size:13px;color:#666;margin-bottom:10px">시계 제작 주문이 들어오면 쓰는 <b>내부 문서</b>예요 (고객·공장에 보내지 않음)</div>
+    <button onclick="psOpenLink()" style="padding:12px 30px;border-radius:10px;border:none;background:#7C3AED;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">📋 디자인확인서에서 불러오기</button>
+    <div id="psLinkedInfo" class="hidden" style="margin-top:12px;padding:10px 16px;background:#F5F3FF;border-radius:8px;font-size:12px;color:#5B21B6;font-weight:600"></div>
+  </div>
+  <div class="section"><div class="section-title">📋 문서 정보</div>
+    <div class="row"><div class="field"><label>문서번호 (자동)</label><input id="psDocNum" readonly style="background:#eee;color:#666;font-weight:700" placeholder="저장할 때 자동"></div><div class="field"><label>일자</label><input type="date" id="psDate"></div></div>
+    <div class="row"><div class="field"><label>담당자</label><select id="psManager"><option>이현주 실장</option><option selected>김현호 팀장</option><option>유지은 대리</option><option>구정두</option><option>대표님</option></select></div></div>
+  </div>
+  <div class="section"><div class="section-title">🏢 발주처</div>
+    <div class="row"><div class="field"><label>발주처 <span class="req">*</span></label><input id="psCompany" list="clientsListDoc" autocomplete="off" placeholder="주문한 회사 (검색 가능)"></div><div class="field"><label>발주일</label><input type="date" id="psOrderDate"></div></div>
+    <div class="row"><div class="field"><label>발주처 담당자</label><input id="psOrderContact" placeholder="홍길동 과장"></div><div class="field"><label>발주처 연락처</label><input id="psOrderPhone" placeholder="010-0000-0000"></div></div>
+  </div>
+  <div class="section"><div class="section-title">⌚ 제품</div>
+    <div class="row"><div class="field" style="flex:1"><label>제품명 (품번) <span class="req">*</span></label><input id="psProduct" placeholder="KLPK22222 ○○○ 회중시계"></div></div>
+    <div class="price-row"><div class="field" style="flex:2;min-width:140px"><label>총수량</label><input id="psQty" placeholder="숫자만" oninput="fmtComma(this)"></div><div class="field" style="flex:1;min-width:100px"><label>단위</label><select id="psUnit"><option>개</option><option>세트</option><option>EA</option></select></div></div>
+    <div class="price-row"><div class="field" style="flex:2;min-width:140px"><label>단가</label><input id="psUnitPrice" placeholder="0" oninput="fmtComma(this)"></div><div class="field" style="flex:1;min-width:110px"><label>VAT</label><select id="psUnitPriceVat"><option>VAT 별도</option><option>VAT 포함</option></select></div></div>
+    <div class="row"><div class="field"><label>납품일</label><input type="date" id="psDeliveryDate"></div><div class="field"><label>납품 방식</label><input id="psShipNote" value="출고" placeholder="출고 / 택배 출고 / 직접 납품"></div></div>
+    <div class="row"><div class="field" style="flex:1"><label>납품처</label><input id="psPlace" placeholder="납품 주소"></div></div>
+  </div>
+  <div class="section"><div class="section-title">🖼️ 시안·제품 이미지</div>
+    <div style="margin-bottom:16px"><div class="sub-label">메인 이미지 <span>(1장)</span></div><div id="psMainImgArea"></div></div>
+    <div><div class="sub-label">추가 이미지 <span>(여러 장 가능)</span></div><label class="upload-area" for="psSubImgInput" style="padding:20px"><input type="file" id="psSubImgInput" accept="image/*" multiple onchange="psHandleSubs(event)"><span style="font-size:20px">+</span><span style="color:#888;font-size:13px">추가 이미지 선택</span></label><div class="thumb-list" id="psSubThumbList"></div></div>
+  </div>
+  <div class="section"><div class="section-title" style="display:flex;align-items:center;justify-content:space-between">🔩 부품별 진행 <button type="button" onclick="psFillQtyAll()" style="padding:5px 12px;border:1px solid #ccc;border-radius:7px;background:#fff;color:#555;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">빈 수량 = 총수량으로</button></div>
+    <div style="font-size:12px;color:#888;margin-bottom:8px">빈 칸은 문서에 '-'로 나와요. 항목 이름도 고칠 수 있어요.</div>
+    <div id="psPartsBox"></div>
+  </div>
+  <div class="warn hidden" id="psWarnBox"></div>
+  <button id="btnPsSave" class="btn-preview" style="background:linear-gradient(135deg,#7C3AED,#5B21B6)" onclick="psSaveAndPreview()">💾 저장 & 미리보기 →</button>
+</div>
+
+<!-- PS PREVIEW -->
+<div id="psPreview" class="preview-area hidden">
+  <div class="action-bar">
+    <button class="btn-back" onclick="showPsTab('form')">← 수정하기</button>
+    <button class="btn-dl" id="btnPsJpg" style="background:#7C3AED;color:#fff" onclick="dlPs('jpg')">📷 JPG</button>
+    <button class="btn-dl" id="btnPsPdf" style="background:#5B21B6;color:#fff" onclick="dlPs('pdf')">📄 PDF</button>
+    <button class="btn-dl" style="background:#111827;color:#fff" onclick="psPrint()">🖨️ 인쇄</button>
+  </div>
+  <div class="preview-wrap"><div id="psDocEl"></div></div>
+</div>
+
+<!-- PS HISTORY -->
+<div id="psHistory" class="history-wrap hidden">
+  <div class="section" style="margin-bottom:0;padding-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="section-title" style="margin-bottom:0;padding-bottom:0;border:none">📋 제작진행표 히스토리</div>
+      <button onclick="psLoadHistory()" style="padding:6px 14px;border-radius:6px;border:1px solid var(--klp-border);background:#fff;cursor:pointer;font-size:12px;font-family:inherit">🔄 새로고침</button>
+    </div>
+    <input class="search-box" id="psHistorySearch" placeholder="🔍 발주처·제품·문서번호 검색..." oninput="psFilterHistory()">
+  </div>
+  <div id="psHistoryList"></div>
 </div>
 
 <!-- LINK MODAL -->
@@ -564,10 +640,13 @@ function switchMode(mode){
   currentMode=mode;
   document.getElementById('modeDC').className='mode-btn'+(mode==='dc'?' active-dc':'');
   document.getElementById('modeWR').className='mode-btn'+(mode==='wr'?' active-wr':'');
+  document.getElementById('modePS').className='mode-btn'+(mode==='ps'?' active-ps':'');
   document.getElementById('dcSubBar').classList.toggle('hidden',mode!=='dc');
   document.getElementById('wrSubBar').classList.toggle('hidden',mode!=='wr');
-  ['dcForm','dcPreview','dcHistory','wrForm','wrPreview','wrHistory'].forEach(function(v){document.getElementById(v).classList.add('hidden')});
+  document.getElementById('psSubBar').classList.toggle('hidden',mode!=='ps');
+  ['dcForm','dcPreview','dcHistory','wrForm','wrPreview','wrHistory','psForm','psPreview','psHistory'].forEach(function(v){document.getElementById(v).classList.add('hidden')});
   if(mode==='dc') showDcTab('form');
+  else if(mode==='ps'){ if(!psParts.length){psParts=psBlankParts();psRenderImgs();psRenderParts();if(!val('psDate'))document.getElementById('psDate').value=psTodayStr();if(!val('psOrderDate'))document.getElementById('psOrderDate').value=psTodayStr();document.getElementById('psManager').value=getLoginManager()||'김현호 팀장';} showPsTab('form'); }
   else showWrTab('form');
 }
 
@@ -825,9 +904,9 @@ async function openLinkModal(){
   document.getElementById('linkModal').classList.remove('hidden');
   document.getElementById('linkModal').style.display='flex';
   document.getElementById('linkList').innerHTML='<div class="history-empty">불러오는 중...</div>';
-  try{var res=await sbFetch('confirmations?order=created_at.desc&limit=100','GET');linkData=(res||[]).filter(function(r){return r.status!=='작업요청서'});renderLinkList(linkData)}catch(e){document.getElementById('linkList').innerHTML='<div class="history-empty">불러오기 실패</div>'}
+  try{var res=await sbFetch('confirmations?order=created_at.desc&limit=100','GET');linkData=(res||[]).filter(function(r){return r.status!=='작업요청서'&&r.status!=='제작진행표'});renderLinkList(linkData)}catch(e){document.getElementById('linkList').innerHTML='<div class="history-empty">불러오기 실패</div>'}
 }
-function closeLinkModal(){document.getElementById('linkModal').classList.add('hidden');document.getElementById('linkModal').style.display='none'}
+function closeLinkModal(){document.getElementById('linkModal').classList.add('hidden');document.getElementById('linkModal').style.display='none';window._linkFor=null}
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeLinkModal()});
 function filterLinkList(){var q=document.getElementById('linkSearch').value.toLowerCase();if(!q){renderLinkList(linkData);return}renderLinkList(linkData.filter(function(r){return (r.company_name||'').toLowerCase().includes(q)||(r.product_name||'').toLowerCase().includes(q)||(r.doc_number||'').toLowerCase().includes(q)||(r.title||'').toLowerCase().includes(q)}))}
 function renderLinkList(data){
@@ -838,6 +917,7 @@ function renderLinkList(data){
 
 /* FIX #4, #16: 이미지 연동 + WR 번호 자동 증가 */
 async function selectLinkedDC(id){
+  if(window._linkFor==='ps'){closeLinkModal();await psApplyDcById(id);return}
   try{var res=await sbFetch('confirmations?id=eq.'+id,'GET');if(!res||res.length===0)return;var r=res[0];
   linkedDC=r;closeLinkModal();
 
@@ -1552,7 +1632,7 @@ async function loadHistory(){
   list.innerHTML='<div class="history-empty">불러오는 중...</div>';
   try{
     var res=await sbFetch('confirmations?order=created_at.desc&limit=100','GET');
-    historyData=res||[];
+    historyData=(res||[]).filter(function(r){return r.status!=='제작진행표'});
     buildMonthFilter();
     filterHistory();
   }catch(err){list.innerHTML='<div class="history-empty">불러오기 실패</div>'}
@@ -1722,6 +1802,7 @@ async function loadRecord(id){
     if(!res||res.length===0)return;
     var r=res[0];
 
+    if(r.status==='제작진행표'){psFill(r);return;}
     if(r.status==='작업요청서'){
       /* WR 데이터 복원 */
       switchMode('wr');
@@ -2046,6 +2127,7 @@ window.klpDocReady=null;
     var r=res[0];
     await loadRecord(r.id);
     await new Promise(function(ok){setTimeout(ok,400);});
+    if(r.status==='제작진행표'){showPsTab('preview');await new Promise(function(ok){setTimeout(ok,600);});return await psDocOptions();}
     var isWr=r.status==='작업요청서';
     if(isWr)showWrTab('preview');else showDcTab('preview');
     await new Promise(function(ok){setTimeout(ok,600);});
@@ -2323,6 +2405,300 @@ async function getNextSeqSafe(){
     return maxSeq+1;
   }catch(e){return 1}
 }
+</script>
+<script>
+/* ================================================================
+ * 제작진행표 (PS) — 시계 제작 주문 내부 문서 (작업요청서의 내부용, 2026-10)
+ * confirmations.status = '제작진행표', 문서번호 = 디자인확인서번호_P1 / 없으면 PSYYMMDD-N
+ * 표 전용 값은 confirmations.extra (migration 058)
+ * ================================================================ */
+var PS_PARTS_DEFAULT=['무브먼트','케이스','문자판','용두/용심','뒷백','바늘','밴드','보증서','패키지박스','선물포장'];
+var PS_MAX_ROWS=14;
+var psMainImg=null,psSubImgs=[],psParts=[],psLinkedDcNum='',psCurrentId=null;
+
+function psBlankParts(){return PS_PARTS_DEFAULT.map(function(n){return{name:n,qty:'',color:'',print:'',maker:'',note:''}})}
+function psTodayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+
+function showPsTab(tab){
+  if(tab==='preview'){if(!psValidate())return;buildPsDoc()}
+  if(tab==='history')psLoadHistory();
+  ['psForm','psPreview','psHistory'].forEach(function(v){document.getElementById(v).classList.add('hidden')});
+  ['psTabForm','psTabHistory'].forEach(function(t){document.getElementById(t).classList.remove('active')});
+  document.getElementById({form:'psForm',preview:'psPreview',history:'psHistory'}[tab]).classList.remove('hidden');
+  if(tab==='form')document.getElementById('psTabForm').classList.add('active');
+  if(tab==='history')document.getElementById('psTabHistory').classList.add('active');
+}
+
+function newPsDoc(){
+  psCurrentId=null;psLinkedDcNum='';psMainImg=null;psSubImgs=[];psParts=psBlankParts();
+  ['psDocNum','psCompany','psOrderContact','psOrderPhone','psProduct','psQty','psUnitPrice','psDeliveryDate','psPlace'].forEach(function(id){document.getElementById(id).value=''});
+  document.getElementById('psDate').value=psTodayStr();
+  document.getElementById('psOrderDate').value=psTodayStr();
+  document.getElementById('psManager').value=getLoginManager()||'김현호 팀장';
+  document.getElementById('psUnit').value='개';
+  document.getElementById('psUnitPriceVat').value='VAT 별도';
+  document.getElementById('psShipNote').value='출고';
+  document.getElementById('psLinkedInfo').classList.add('hidden');
+  psRenderImgs();psRenderParts();
+  showPsTab('form');
+}
+
+/* --- 이미지 --- */
+function psHandleMain(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){psMainImg={url:ev.target.result};psRenderImgs()};r.readAsDataURL(f);e.target.value=''}
+function psHandleSubs(e){Array.from(e.target.files).forEach(function(f){var r=new FileReader();r.onload=function(ev){psSubImgs.push({url:ev.target.result});psRenderImgs()};r.readAsDataURL(f)});e.target.value=''}
+function psRemoveMain(){psMainImg=null;psRenderImgs()}
+function psRemoveSub(i){psSubImgs.splice(i,1);psRenderImgs()}
+function psRenderImgs(){
+  var el=document.getElementById('psMainImgArea');
+  el.innerHTML=psMainImg?'<div class="thumb" style="display:inline-block"><img src="'+psMainImg.url+'" style="width:200px;height:200px"><button class="del" onclick="psRemoveMain()">×</button></div>'
+    :'<label class="upload-area" for="psMainImgInput"><input type="file" id="psMainImgInput" accept="image/*" onchange="psHandleMain(event)"><span style="font-size:24px">📷</span><span style="color:#888;font-size:14px">시안·제품 이미지 1장 선택</span></label>';
+  document.getElementById('psSubThumbList').innerHTML=psSubImgs.map(function(img,i){return '<div class="thumb"><img src="'+img.url+'" style="width:100px;height:100px"><button class="del" onclick="psRemoveSub('+i+')">×</button></div>'}).join('');
+}
+
+/* --- 부품 표 --- */
+function psRenderParts(){
+  var cols=[['qty','수량'],['color','색상'],['print','인쇄'],['maker','제작처'],['note','비고']];
+  var h='<table class="ps-parts"><thead><tr><th style="width:120px">항목</th>'+cols.map(function(c){return '<th>'+c[1]+'</th>'}).join('')+'<th style="width:34px"></th></tr></thead><tbody>';
+  psParts.forEach(function(p,i){
+    h+='<tr><td><input data-pi="'+i+'" data-pk="name" value="'+esc(p.name)+'"></td>'+cols.map(function(c){return '<td><input data-pi="'+i+'" data-pk="'+c[0]+'" value="'+esc(p[c[0]])+'" placeholder="-"></td>'}).join('')+
+       '<td><button type="button" class="ps-del" onclick="psDelPart('+i+')" title="이 줄 빼기">×</button></td></tr>';
+  });
+  h+='</tbody></table>';
+  if(psParts.length<PS_MAX_ROWS)h+='<button type="button" class="ps-add" onclick="psAddPart()">+ 항목 추가</button>';
+  var box=document.getElementById('psPartsBox');
+  box.innerHTML=h;
+  box.querySelectorAll('input[data-pi]').forEach(function(inp){inp.addEventListener('input',function(){psParts[+inp.dataset.pi][inp.dataset.pk]=inp.value})});
+}
+function psAddPart(){if(psParts.length>=PS_MAX_ROWS)return;psParts.push({name:'',qty:'',color:'',print:'',maker:'',note:''});psRenderParts()}
+function psDelPart(i){psParts.splice(i,1);psRenderParts()}
+function psFillQtyAll(){var q=val('psQty');if(!q){alert('총수량을 먼저 입력해주세요');return}psParts.forEach(function(p){if(!p.qty)p.qty=q});psRenderParts()}
+
+/* --- 디자인확인서 불러오기 (기존 연동 창 재사용) --- */
+function psOpenLink(){window._linkFor='ps';openLinkModal()}
+async function psApplyDcById(id){
+  try{var res=await sbFetch('confirmations?id=eq.'+id,'GET');if(res&&res[0])await psApplyDc(res[0])}
+  catch(e){showMsg('❌ 불러오기 실패: '+e.message,true)}
+}
+async function psApplyDc(r){
+  psLinkedDcNum=r.doc_number||'';
+  document.getElementById('psCompany').value=r.company_name||'';
+  document.getElementById('psOrderContact').value=r.contact_person||'';
+  document.getElementById('psProduct').value=r.product_name||'';
+  document.getElementById('psQty').value=r.quantity?Number(r.quantity).toLocaleString():'';
+  document.getElementById('psUnit').value=r.unit||'개';
+  document.getElementById('psUnitPrice').value=r.unit_price?Number(r.unit_price).toLocaleString():'';
+  document.getElementById('psUnitPriceVat').value=r.unit_price_vat||'VAT 별도';
+  document.getElementById('psDeliveryDate').value=r.delivery_date||'';
+  document.getElementById('psShipNote').value=r.shipping_type?r.shipping_type+' 출고':'출고';
+  var sp=unpackShip(r.delivery_address);document.getElementById('psPlace').value=sp[2]||'';
+  if(r.images_data){var imgs=unpackImages(r.images_data);psMainImg=imgs.main;psSubImgs=imgs.subs}
+  psRenderImgs();
+  /* 발주처 연락처: 거래처 DB 담당자 휴대폰 */
+  try{
+    var cl=await sbFetch('clients?company_name=eq.'+encodeURIComponent(r.company_name||'')+'&select=staff_mobile,staff_name&limit=1','GET');
+    if(cl&&cl[0]&&cl[0].staff_mobile&&!val('psOrderPhone'))document.getElementById('psOrderPhone').value=cl[0].staff_mobile;
+  }catch(_){}
+  /* 문서번호: 디확번호_P1, _P2 … (새 문서일 때만) */
+  if(!psCurrentId)document.getElementById('psDocNum').value=await psNextDocNum(psLinkedDcNum);
+  var info=document.getElementById('psLinkedInfo');
+  info.textContent='📎 '+psLinkedDcNum+' · '+(r.company_name||'')+' · '+(r.product_name||'')+' 디자인확인서에서 불러왔어요';
+  info.classList.remove('hidden');
+}
+async function psNextDocNum(dcNum){
+  try{
+    if(dcNum){
+      var res=await sbFetch('confirmations?doc_number=like.'+encodeURIComponent(dcNum+'_P')+'*&select=doc_number','GET');
+      var mx=0;(res||[]).forEach(function(w){var m=/_P(\d+)$/.exec(w.doc_number||'');if(m&&+m[1]>mx)mx=+m[1]});
+      return dcNum+'_P'+(mx+1);
+    }
+    var d=psTodayStr().replace(/-/g,'').substring(2);
+    var r2=await sbFetch('confirmations?doc_number=like.'+encodeURIComponent('PS'+d+'-')+'*&select=doc_number','GET');
+    var mx2=0;(r2||[]).forEach(function(w){var m=/-(\d+)$/.exec(w.doc_number||'');if(m&&+m[1]>mx2)mx2=+m[1]});
+    return 'PS'+d+'-'+(mx2+1);
+  }catch(e){return 'PS'+Date.now()}
+}
+
+/* --- 검사·저장 --- */
+function psValidate(){
+  var miss=[];if(!val('psCompany'))miss.push('발주처');if(!val('psProduct'))miss.push('제품명');
+  var w=document.getElementById('psWarnBox');
+  if(miss.length){w.innerHTML='⚠️ 필수 항목: <b>'+miss.join(', ')+'</b>';w.classList.remove('hidden');return false}
+  w.classList.add('hidden');return true;
+}
+async function psSaveAndPreview(){
+  if(!psValidate())return;
+  var btn=document.getElementById('btnPsSave');btn.disabled=true;btn.textContent='저장 중...';
+  try{
+    var docNum=val('psDocNum')||await psNextDocNum(psLinkedDcNum);
+    var data={
+      doc_date:val('psDate')||null,company_name:val('psCompany'),contact_person:val('psOrderContact'),manager:val('psManager'),
+      title:'제작진행표',product_name:val('psProduct'),quantity:toNum(val('psQty')),unit:val('psUnit'),
+      unit_price:toNum(val('psUnitPrice')),unit_price_vat:val('psUnitPriceVat'),
+      delivery_date:val('psDeliveryDate')||null,delivery_address:packShip('','',val('psPlace')),
+      total_amount:toNum(val('psQty'))*toNum(val('psUnitPrice')),status:'제작진행표',
+      images_data:await packImages(psMainImg,psSubImgs,900,900),
+      extra:{order_date:val('psOrderDate')||'',order_phone:val('psOrderPhone'),ship_note:val('psShipNote'),place:val('psPlace'),dc:psLinkedDcNum,
+             parts:psParts.map(function(p){return{name:p.name||'',qty:p.qty||'',color:p.color||'',print:p.print||'',maker:p.maker||'',note:p.note||''}})}
+    };
+    for(var attempt=0;attempt<3;attempt++){
+      var ex=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(docNum)+'&select=id,status','GET');
+      if(ex&&ex.length){
+        if(ex[0].status!=='제작진행표'){docNum=await psNextDocNum(psLinkedDcNum);continue}
+        await sbFetch('confirmations?id=eq.'+ex[0].id,'PATCH',Object.assign({},data,{doc_number:docNum}));psCurrentId=ex[0].id;break;
+      }
+      try{var ins=await sbFetch('confirmations','POST',Object.assign({},data,{doc_number:docNum}));if(ins&&ins[0])psCurrentId=ins[0].id;break}
+      catch(e){var dup=e.statusCode===409||e.code==='23505';if(!dup||attempt===2)throw e;docNum=await psNextDocNum(psLinkedDcNum)}
+    }
+    document.getElementById('psDocNum').value=docNum;
+    showMsg('✅ 제작진행표 저장 완료! ('+docNum+')');
+    showPsTab('preview');
+  }catch(err){console.error('제작진행표 저장 실패',err);showMsg('❌ 저장 실패: '+err.message,true)}
+  btn.disabled=false;btn.textContent='💾 저장 & 미리보기 →';
+}
+
+/* --- 기록 불러오기 (loadRecord에서 호출) --- */
+function psFill(r){
+  switchMode('ps');
+  psCurrentId=r.id;
+  var x=r.extra||{};
+  psLinkedDcNum=x.dc||'';
+  document.getElementById('psDocNum').value=r.doc_number||'';
+  document.getElementById('psDate').value=r.doc_date||'';
+  document.getElementById('psManager').value=r.manager||'김현호 팀장';
+  document.getElementById('psCompany').value=r.company_name||'';
+  document.getElementById('psOrderDate').value=x.order_date||'';
+  document.getElementById('psOrderContact').value=r.contact_person||'';
+  document.getElementById('psOrderPhone').value=x.order_phone||'';
+  document.getElementById('psProduct').value=r.product_name||'';
+  document.getElementById('psQty').value=r.quantity?Number(r.quantity).toLocaleString():'';
+  document.getElementById('psUnit').value=r.unit||'개';
+  document.getElementById('psUnitPrice').value=r.unit_price?Number(r.unit_price).toLocaleString():'';
+  document.getElementById('psUnitPriceVat').value=r.unit_price_vat||'VAT 별도';
+  document.getElementById('psDeliveryDate').value=r.delivery_date||'';
+  document.getElementById('psShipNote').value=x.ship_note||'출고';
+  document.getElementById('psPlace').value=x.place||unpackShip(r.delivery_address)[2]||'';
+  if(r.images_data){var imgs=unpackImages(r.images_data);psMainImg=imgs.main;psSubImgs=imgs.subs}else{psMainImg=null;psSubImgs=[]}
+  psParts=(x.parts&&x.parts.length)?x.parts.map(function(p){return Object.assign({name:'',qty:'',color:'',print:'',maker:'',note:''},p)}):psBlankParts();
+  var info=document.getElementById('psLinkedInfo');
+  if(psLinkedDcNum){info.textContent='📎 연결된 디자인확인서 '+psLinkedDcNum;info.classList.remove('hidden')}else info.classList.add('hidden');
+  psRenderImgs();psRenderParts();
+  showPsTab('form');
+}
+
+/* --- 문서 그리기 (A4 794×1123) --- */
+function psDateK(d){if(!d)return '';var p=String(d).split('-');return p.length<3?d:p[0]+'년 '+(+p[1])+'월 '+(+p[2])+'일'}
+function buildPsDoc(){
+  var LB='font-weight:900;color:#111;text-align:center;';
+  var BD='border:1.2px solid #444;';
+  var td=function(html,st){return '<td style="'+BD+'padding:0 8px;'+(st||'')+'">'+html+'</td>'};
+  var lab=function(t,st){return td(t,LB+'font-size:13px;letter-spacing:5px;'+(st||''))};
+  var v=function(t,st){return td(esc(t)||'',"text-align:center;font-size:14px;color:#111;"+(st||''))};
+  var unitP=val('psUnitPrice')?val('psUnitPrice')+'원('+(val('psUnitPriceVat')==='VAT 포함'?'vat포함':'vat별도')+')':'';
+  var qtyS=val('psQty')?'총 '+val('psQty')+val('psUnit'):'';
+  var dlv=val('psDeliveryDate')?psDateK(val('psDeliveryDate'))+' '+(val('psShipNote')||''):'';
+  var place=val('psPlace');
+  var placeFs=place.length>34?'10.5px':place.length>24?'12px':'13px';
+
+  var top='<table style="width:100%;border-collapse:collapse;table-layout:fixed;flex-shrink:0;border:1.6px solid #333">'+
+    '<colgroup><col style="width:50%"><col style="width:20%"><col style="width:30%"></colgroup>'+
+    '<tr style="height:30px"><td rowspan="2" style="'+BD+LB+'font-size:36px;letter-spacing:26px;padding-left:26px;white-space:nowrap">제작진행표</td>'+lab('담 당 자')+v(val('psManager'))+'</tr>'+
+    '<tr style="height:30px">'+lab('일 자')+v(psDateK(val('psDate')))+'</tr></table>';
+
+  var info='<table style="width:100%;border-collapse:collapse;table-layout:fixed;flex-shrink:0;margin-top:7px;border:1.6px solid #333">'+
+    '<colgroup><col style="width:25%"><col style="width:25%"><col style="width:20%"><col style="width:30%"></colgroup>'+
+    '<tr style="height:24px"><td rowspan="3" style="'+BD+LB+'font-size:28px;letter-spacing:16px;padding-left:16px;white-space:nowrap">발주처</td>'+
+      '<td rowspan="3" style="'+BD+'text-align:center;font-size:18px;color:#111;padding:0 8px;word-break:keep-all">'+esc(val('psCompany'))+'</td>'+lab('발 주 일')+v(psDateK(val('psOrderDate')))+'</tr>'+
+    '<tr style="height:24px">'+lab('발주처 담당자','letter-spacing:3px')+v(val('psOrderContact'))+'</tr>'+
+    '<tr style="height:24px">'+lab('발주처 연락처','letter-spacing:3px')+v(val('psOrderPhone'))+'</tr>'+
+    '<tr style="height:24px">'+lab('제품명(품번)','letter-spacing:3px')+'<td colspan="3" style="'+BD+'text-align:center;font-size:14.5px;color:#111;padding:0 8px">'+esc(val('psProduct'))+'</td></tr>'+
+    '<tr style="height:24px">'+lab('총 수 량')+v(qtyS)+lab('단 가')+v(unitP)+'</tr>'+
+    '<tr style="height:24px">'+lab('납 품 일')+v(dlv)+lab('납 품 처')+v(place,'font-size:'+placeFs+';word-break:break-all;line-height:1.25')+'</tr></table>';
+
+  var rows=psParts.length;
+  var rowH=rows>12?22:25;
+  var partsH=(rows+1)*rowH;
+  var fixed=32+60+7+144+9+9+partsH+30+16; /* 마지막 16 = 테두리 여유 */
+  var imgH=Math.max(160,1123-fixed);
+  var img='';
+  if(psMainImg||psSubImgs.length){
+    var mainH=psSubImgs.length?imgH-96:imgH-24;
+    img='<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px">'+
+      (psMainImg?'<img src="'+psMainImg.url+'" style="max-width:92%;max-height:'+mainH+'px;object-fit:contain">':'')+
+      (psSubImgs.length?'<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">'+psSubImgs.map(function(s){return '<img src="'+s.url+'" style="width:70px;height:70px;object-fit:contain">'}).join('')+'</div>':'')+'</div>';
+  }
+  var imgBox='<div style="flex-shrink:0;height:'+imgH+'px;margin-top:9px;border:2px dashed #888;box-sizing:border-box;overflow:hidden">'+img+'</div>';
+
+  var cols=['qty','color','print','maker','note'];
+  var parts='<table style="width:100%;border-collapse:collapse;table-layout:fixed;flex-shrink:0;margin-top:9px;border:1.6px solid #333">'+
+    '<tr style="height:'+rowH+'px">'+td('','')+['수 량','색 상','인 쇄','제 작 처','비 고'].map(function(t){return lab(t,'font-size:13.5px')}).join('')+'</tr>'+
+    psParts.map(function(p){
+      return '<tr style="height:'+rowH+'px">'+lab(esc(p.name||''),'font-size:13px;letter-spacing:4px')+cols.map(function(k){return v(p[k]||'-','font-size:13px')}).join('')+'</tr>';
+    }).join('')+'</table>';
+
+  var foot='<div style="flex-shrink:0;height:30px;display:flex;align-items:flex-end;justify-content:flex-end;color:#e11d24;font-size:19px;font-weight:700;letter-spacing:-.3px">해당 문서는 회사 내부 대외비 문서로 외부유출을 엄격히 금합니다.</div>';
+
+  document.getElementById('psDocEl').innerHTML='<div style="width:794px;height:1123px;overflow:hidden;background:#fff;font-family:\'Noto Sans KR\',\'Pretendard\',sans-serif;color:#111;box-sizing:border-box;padding:16px 18px;display:flex;flex-direction:column">'+
+    top+info+imgBox+parts+foot+'</div>';
+  setTimeout(function(){fitToA4('psDocEl')},100);
+}
+
+function psFileBase(){return getYYMMDD(val('psDate'))+'_케이엘피코리아_'+(val('psCompany')||'발주처')+'_'+(val('psProduct')||'제품')+'_제작진행표'}
+async function dlPs(type){
+  var b1=document.getElementById('btnPsJpg'),b2=document.getElementById('btnPsPdf');b1.disabled=b2.disabled=true;
+  try{
+    var canvas=await sendCanvasOf('psDocEl');
+    if(type==='jpg'){var a=document.createElement('a');a.download=psFileBase()+'.jpg';a.href=canvas.toDataURL('image/jpeg',0.92);a.click()}
+    else{var pdf=new jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',0,0,pdf.internal.pageSize.getWidth(),pdf.internal.pageSize.getHeight());pdf.save(psFileBase()+'.pdf')}
+  }catch(err){alert('오류: '+err.message)}
+  b1.disabled=b2.disabled=false;
+}
+function psPrint(){
+  sendCanvasOf('psDocEl').then(function(c){
+    var w=window.open('','_blank');if(!w){alert('팝업이 막혀 있어요. 팝업 허용 후 다시 눌러주세요');return}
+    w.document.write('<html><head><title>'+esc(psFileBase())+'</title><style>@page{size:A4;margin:0}body{margin:0}img{width:100%;display:block}</style></head><body><img src="'+c.toDataURL('image/jpeg',0.95)+'" onload="setTimeout(function(){print()},200)"></body></html>');
+    w.document.close();
+  });
+}
+/* 대시보드 '크게 보기'용 (보내기 없음 — 내부 문서) */
+async function psDocOptions(){
+  return {docType:'ps',title:(val('psCompany')||'')+' · '+(val('psProduct')||'제작진행표'),fileBase:psFileBase(),makeCanvas:function(){return sendCanvasOf('psDocEl')}};
+}
+
+/* --- 히스토리 --- */
+var psHistoryData=[];
+async function psLoadHistory(){
+  var list=document.getElementById('psHistoryList');list.innerHTML='<div class="history-empty">불러오는 중...</div>';
+  try{psHistoryData=await sbFetch('confirmations?status=eq.'+encodeURIComponent('제작진행표')+'&select=id,doc_number,doc_date,company_name,product_name,quantity,unit,delivery_date,manager,created_at&order=created_at.desc&limit=300','GET')||[];psFilterHistory()}
+  catch(e){list.innerHTML='<div class="history-empty">불러오기 실패</div>'}
+}
+function psFilterHistory(){
+  var q=(document.getElementById('psHistorySearch').value||'').toLowerCase();
+  var data=psHistoryData.filter(function(r){return !q||[r.doc_number,r.company_name,r.product_name,r.manager].some(function(s){return String(s||'').toLowerCase().indexOf(q)>=0})});
+  var list=document.getElementById('psHistoryList');
+  if(!data.length){list.innerHTML='<div class="history-empty">저장된 제작진행표가 없습니다</div>';return}
+  list.innerHTML=data.map(function(r){
+    return '<div class="link-hc ps-hc" onclick="psOpenRecord('+r.id+')"><div class="lh-docno">'+esc(r.doc_number)+' · '+esc(fmtDate(r.doc_date))+(r.manager?' · '+esc(r.manager):'')+'</div>'+
+      '<div class="lh-title">'+esc(r.company_name)+' — '+esc(r.product_name)+'</div>'+
+      '<div class="lh-sub">🕐 '+(r.quantity?Number(r.quantity).toLocaleString()+(r.unit||'개'):'')+(r.delivery_date?' | 납품 '+esc(fmtDate(r.delivery_date)):'')+'</div></div>';
+  }).join('');
+}
+async function psOpenRecord(id){await loadRecord(id);showPsTab('preview')}
+
+/* --- #ps-new-디자인확인서번호 : 대시보드에서 '제작진행표 만들기' --- */
+(async function applyPsNewHash(){
+  var hash=(location.hash||'').replace(/^#/,'');
+  if(hash!=='ps-new'&&!hash.startsWith('ps-new-'))return;
+  var dcNum=decodeURIComponent(hash.substring(7));
+  history.replaceState(null,'',location.pathname);
+  await new Promise(function(ok){setTimeout(ok,300)});
+  switchMode('ps');newPsDoc();
+  if(!dcNum){document.getElementById('psDocNum').value=await psNextDocNum('');return}
+  try{
+    var res=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(dcNum),'GET');
+    if(res&&res[0]){await psApplyDc(res[0]);showMsg('✅ 디자인확인서 내용을 불러왔어요. 부품 표를 채우고 저장해주세요.')}
+    else showMsg('❌ 디자인확인서를 찾을 수 없습니다: '+dcNum,true);
+  }catch(e){showMsg('❌ 불러오기 실패: '+e.message,true)}
+})();
 </script>
 </body>
 </html>
