@@ -241,6 +241,11 @@
 - **DB 분리**: doc-generator는 `confirmations` 테이블에만 쓰고, `projects_domestic`에는 쓰지 않음
 - **자동 연결**: DC 저장 성공 시 `projects_domestic.source_doc_number`를 새 문서번호로 PATCH (프로젝트 상세에서 DC 이미지 미리보기 연동)
 - **WR 전제 조건**: WR 만들기는 프로젝트에 `source_doc_number`(연결된 DC) + `supplier_unit_price`(매입 단가)가 있어야 동작
+- **제작진행표 (2026-10-08, migration 058)**: 시계 제작 주문 **내부 문서**(작업요청서의 내부용, 외부 발송 없음). 문서 생성기 세 번째 모드 `🕐 제작진행표`(`switchMode('ps')`, 보라 #7C3AED). confirmations에 `status='제작진행표'`, 문서번호 `디확번호_P1·_P2…`(디확 없이 만들면 `PSYYMMDD-N`), 표 전용 값은 `confirmations.extra` jsonb `{order_date, order_phone, ship_note, place, dc, parts:[{name,qty,color,print,maker,note}]}`
+  - 칸: 담당자·일자 / 발주처·발주일·발주처 담당자·연락처 / 제품명(품번)·총수량·단가 / 납품일+납품 방식·납품처 / 이미지(점선 칸) / 부품표(기본 10줄 `PS_PARTS_DEFAULT` 무브먼트~선물포장, 이름 수정·추가 최대 14줄) / 빨간 '대외비' 문구. A4 그리기 `buildPsDoc`(줄 높이 자동, 이미지 칸이 남는 높이 차지), JPG·PDF·🖨️ 인쇄(`psPrint`), 히스토리(`psLoadHistory`)
+  - `📋 디자인확인서에서 불러오기` = 기존 연동 창 재사용(`window._linkFor='ps'` → `selectLinkedDC`가 `psApplyDcById`로 넘김) → 발주처·담당자·제품·수량·단가·납기·배송(납품 방식)·주소·이미지 + 거래처 DB 담당자 휴대폰(`staff_mobile`)
+  - 저장 `psSaveAndPreview`(같은 번호면 수정, 충돌 시 다음 번호). `loadRecord`가 제작진행표면 `psFill`. 디확·작지 히스토리·연동 창·`#render-`에서는 제작진행표를 따로 처리(디확으로 섞이지 않게)
+  - 대시보드: 상담 국내 진행 카드 `🕐 제작진행표` 버튼(`inqDealAction` 'ps') — 있으면 `viewSavedDoc` 크게 보기(보내기 버튼 대신 '내부 문서' 표시), 없으면 `doc-generator.html#ps-new-디확번호`로 이동해 디확 내용 불러옴. `inqSavedDocNumber(row,'ps')`
 
 ## 코드 스타일
 - 에러 발생 시 디버깅용 상세 메시지 유지 (console.error + 화면 표시)
