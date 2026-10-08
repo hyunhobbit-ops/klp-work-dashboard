@@ -3442,12 +3442,14 @@ async function buildPoDocAsync(){
   if(cur.length)oRows.push(cur);
   /* 마지막 줄이 덜 차면 마지막 칸을 늘려서 빈칸 없게 */
   oRows.forEach(function(r){var u=r.reduce(function(a,c){return a+c.w},0);if(u<4)r[r.length-1].w+=4-u});
-  var info='<div style="border:1.5px solid '+TX+';flex-shrink:0;margin-bottom:16px">'+
+  /* 받는 곳·품번 표 / ORDER TERMS 표를 따로 (붙어 있으면 ORDER TERMS가 입력칸처럼 보여서) */
+  var hasOrder=!!(keyRow||oRows.length);
+  var info='<div style="border:1.5px solid '+TX+';flex-shrink:0;margin-bottom:'+(hasOrder?14:16)+'px">'+
     row([{k:'TO',v:po.to,w:2,fs:15.5},{k:'ATTN',v:po.attn},{k:'FROM',v:po.from}])+
-    row([{k:'ITEM NO.',v:po.po_no,red:1},{k:'MODEL NAME',v:po.model,w:3,fs:15.5}],1)+
-    (keyRow||oRows.length?'<div style="height:22px;display:flex;align-items:center;padding:0 12px;border-top:1.5px solid '+TX+';font-size:10.5px;font-weight:900;letter-spacing:1.5px;color:'+C+'">ORDER TERMS</div>'+
-      (keyRow?row(keyRow,1,62):'')+oRows.map(function(r,i){return row(r,1)}).join(''):'')+'</div>';
-  var used=2*RW+(keyRow||oRows.length?22:0)+(keyRow?62:0)+oRows.length*RW+3+16;
+    row([{k:'ITEM NO.',v:po.po_no,red:1},{k:'MODEL NAME',v:po.model,w:3,fs:15.5}],1)+'</div>'+
+    (hasOrder?'<div style="height:26px;display:flex;align-items:center;gap:8px;flex-shrink:0"><span style="width:4px;height:15px;background:'+C+'"></span><span style="font-size:13px;font-weight:900;letter-spacing:1.5px;color:'+TX+'">ORDER TERMS</span></div>'+
+      '<div style="border:1.5px solid '+TX+';flex-shrink:0;margin-bottom:16px">'+(keyRow?row(keyRow,0,62):'')+oRows.map(function(r,i){return row(r,i>0||!!keyRow)}).join('')+'</div>':'');
+  var used=2*RW+3+(hasOrder?14+26+(keyRow?62:0)+oRows.length*RW+3:0)+16;
   var orderHtml='';
 
   /* SUMMARY 사진 + 번호 붙은 문구 */
