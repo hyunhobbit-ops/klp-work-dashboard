@@ -92,6 +92,15 @@
 - **범위 밖(다음 단계)**: 셀프 회원가입+자동 결제, 업종별 모듈팩(택배·문서생성 등), 랜딩. 설계·계획: `docs/superpowers/{specs,plans}/2026-07-20-multitenant-saas-*`.
 - **새 테넌트 테이블 추가 시**: `company_id bigint references companies(id) not null` + `set_company_id` 트리거 + 회사 스코프 RLS 필수.
 
+## 🖥️ 맥미니 서버 이전 (2026-10 진행 중) — Supabase를 맥미니 자체 운영으로
+- **왜**: Supabase Pro($25/월)를 쓰는 이유가 **Egress(전송량) 초과**(무료 5.5GB 넘어 2026-08에 요청 차단됨). 데이터 자체는 작음(DB 62MB · Storage 233MB · 사용자 8명). 현호님은 사진을 작게 압축해 깨져 보이는 걸 원치 않음 → 자체 운영으로 전송량 제한을 없애고 사진 화질 올리기
+  - 전송량 주범(2026-10 로그): `planning_posts select=*`(글 안 base64 사진, 하루 50회), 문서 미리보기 `confirmations` 단건 조회(images_data), `products select=id,image`, `inquiry_logs select=*`(사진)
+- **장비**: Mac mini **M6**(2026, 12코어) · 24GB · 256GB SSD + 외장 1TB(백업용) · Wi-Fi 7 내장이지만 **유선 랜** 권장 · Docker 설치 중. 맥미니 작업 폴더: **`~/hyunho-server`**
+- **현호님 결정**: 맥미니/사무실 인터넷이 꺼지면 대시보드가 멈추는 건 괜찮음. 걱정은 백업·보안·장애 대응 → 전부 자동화로 해결하기로
+- **구성**: Supabase self-host(docker compose: Postgres·GoTrue·PostgREST·Realtime·Storage·Kong·Studio) + **Cloudflare Tunnel**(포트 안 엶) + 서버 주소용 **별도 도메인**(권장, klpkorea.kr은 아임웹 홈페이지라 네임서버 이전 위험 — 결정 대기). Vercel(프론트·api)은 그대로
+- **단계**: ① 맥 설정(잠자기 끔·정전 후 자동 시동·자동 로그인·보안 업데이트 자동·Docker 로그인 시 시작·메모리 8GB) ② Supabase 설치(비밀 키는 맥미니에서 새로 생성 — **채팅에 붙여넣지 않기**) ③ Cloudflare Tunnel `https://api.<도메인>` ④ 리허설: pg_dump(public+auth+storage 스키마) 복원 + storage 파일 복사 → Vercel 미리보기 배포로 로그인·상담·문서생성기·사진·realtime·푸시 확인 ⑤ 실제 이전(퇴근 후): 쓰기 중지 → 최종 덤프 → `app.js`·`doc-generator.html`·`proposal-view.html` 등의 SUPABASE URL/anon key + Vercel env(SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY 등) 교체 → 배포 → 직원 재로그인 ⑥ 자동화: 매일 백업(맥미니+외장+클라우드, 30일 보관, 월 1회 복구 점검) · UptimeRobot 5분 감시→폰 알림 · Docker restart always · 월 1회 업데이트 스크립트 ⑦ 1~2주 Supabase 유지(롤백용) 후 해지 ⑧ 사진 업로드 축소 기준 올리고 목록은 썸네일
+- **옮길 것 체크**: 확장 pg_cron(job `daily-summary` 0,3,6,9,12시 → vercel `/api/daily-summary` net.http_post) · pg_net · pg_trgm · pgcrypto · uuid-ossp · supabase_vault, Storage 버킷·파일 148개, auth.users 8명(비번 해시 그대로), RLS·트리거·함수(migrations 001~059), realtime publication, 웹푸시 구독(push_subscriptions)
+
 ## 프로젝트 진행사항 (국내)
 - **매출/매입 통합 단일 행**: 매출처 정보 + 매입처 상세(작업요청서용)를 한 프로젝트 행에 함께 저장
 - 신규/편집 모달에서 매입처명 입력 시 주황색 🏭 매입처 상세 카드가 펼쳐짐 (매입 단가·VAT·인쇄비·포장비)
