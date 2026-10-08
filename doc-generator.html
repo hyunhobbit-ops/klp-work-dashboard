@@ -3398,27 +3398,27 @@ async function buildPoDocAsync(){
   var font="font-family:'Noto Sans KR',sans-serif;";
   var V=function(t){return t?esc(t):'<span style="color:#bbb">-</span>'};
   var pages=[];
-  var HEAD=82,FOOTH=30;
+  var HEAD=70,FOOTH=30;
   var head=function(section){
     return '<div style="height:62px;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:10px;border-bottom:2px solid '+TX+';flex-shrink:0;box-sizing:border-box">'+
       '<div><div style="font-size:12px;color:'+C+';letter-spacing:2.5px;font-weight:800;margin-bottom:3px">'+esc(section)+'</div>'+
       '<div style="font-size:28px;font-weight:900;color:'+TX+';letter-spacing:1px;line-height:1.1">PURCHASE ORDER</div></div>'+
       '<div style="text-align:right"><img src="'+LOGO_DARK+'" style="height:26px;display:block;margin-left:auto;margin-bottom:4px"><div style="font-size:12px;color:'+SUB+'">ITEM NO. <b style="color:'+C+';font-size:14px">'+(no||'-')+'</b>'+(po.rev?' · '+esc(po.rev):'')+' | '+esc(poDateEn(po.date))+'</div></div></div>'+
-      '<div style="height:20px;flex-shrink:0"></div>';
+      '<div style="height:8px;flex-shrink:0"></div>';
   };
   var foot=function(){return '<div style="height:24px;margin-top:6px;border-top:1px solid '+LN+';display:flex;align-items:flex-end;justify-content:space-between;font-size:10px;color:'+SUB+';flex-shrink:0">'+
     '<span>KLP KOREA inc · 30, Digital-ro 32-gil, Guro-gu, Seoul, Korea · T. +82-2-2103-5757 · klpkorea@agift.kr</span><b style="color:'+TX+'">'+(no||'')+' · PAGE {P} / {N}</b></div>'};
   var wrap=function(inner){return '<div class="po-pg" style="width:'+W+'px;height:'+H+'px;overflow:hidden;background:#fff;'+font+'color:'+TX+';box-sizing:border-box;padding:'+PT+'px '+PX+'px '+PB+'px;display:flex;flex-direction:column">'+inner+'<div style="flex:1"></div>'+foot()+'</div>'};
   var usable=H-PT-PB-HEAD-FOOTH;
-  var secTitle=function(t,sub,num){return '<div style="height:34px;display:flex;align-items:center;gap:10px;flex-shrink:0;margin-bottom:10px">'+(num?'<span style="font-size:19px;font-weight:900;color:'+C+';letter-spacing:.5px">'+num+'.</span>':'<span style="width:5px;height:22px;background:'+C+'"></span>')+'<span style="font-size:19px;font-weight:900;letter-spacing:1.5px">'+t+'</span>'+(sub?'<span style="font-size:12.5px;color:'+SUB+';font-weight:600">'+sub+'</span>':'')+'</div>'};
+  var secTitle=function(t,sub,num){return '<div style="height:46px;display:flex;align-items:center;gap:12px;flex-shrink:0;margin-bottom:6px">'+(num?'<span style="font-size:30px;font-weight:900;color:'+C+';letter-spacing:.5px">'+num+'.</span>':'<span style="width:6px;height:28px;background:'+C+'"></span>')+'<span style="font-size:30px;font-weight:900;letter-spacing:1px;white-space:nowrap">'+t+'</span>'+(sub?'<span style="margin-left:auto;font-size:13.5px;color:'+SUB+';font-weight:700;text-align:right;line-height:1.25">'+sub+'</span>':'')+'</div>'};
 
   /* ================= 1쪽: SUMMARY ================= */
   /* 받는 곳·품번 + 주문 조건을 한 표로 (빈칸 없이 이어짐) — 2026-10 피드백 */
-  var RW=44;
+  var RW=54;
   var cell=function(c){
-    return '<div style="flex:'+(c.w||1)+' 1 0;min-width:0;padding:'+(c.fs>16?'7px':'6px')+' 12px 0;box-sizing:border-box;'+(c.first?'':'border-left:1px solid '+LN2+';')+(c.box?'border:2px solid '+C+';':'')+'">'+
-      '<div style="font-size:'+(c.fs>16?11.5:10)+'px;color:'+(c.red?C:SUB)+';font-weight:'+(c.fs>16?900:700)+';letter-spacing:.8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.k)+'</div>'+
-      '<div style="font-size:'+(c.fs||14.5)+'px;font-weight:'+(c.fs>16?900:800)+';color:'+(c.red?C:TX)+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:'+(c.fs>16?1.35:1.45)+'">'+V(c.v)+'</div></div>';
+    return '<div style="flex:'+(c.w||1)+' 1 0;min-width:0;padding:'+(c.fs>20?'7px':'6px')+' 12px 0;box-sizing:border-box;'+(c.first?'':'border-left:1px solid '+LN2+';')+(c.box?'border:2px solid '+C+';':'')+'">'+
+      '<div style="font-size:'+(c.fs>20?13.5:12)+'px;color:'+(c.red?C:SUB)+';font-weight:'+(c.fs>16?900:700)+';letter-spacing:.8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.k)+'</div>'+
+      '<div style="font-size:'+(c.fs||17)+'px;font-weight:'+(c.fs>20?900:800)+';color:'+(c.red?C:TX)+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:'+(c.fs>20?1.3:1.45)+'">'+V(c.v)+'</div></div>';
   };
   var row=function(cells,top,h){cells[0].first=1;return '<div style="display:flex;height:'+(h||RW)+'px;'+(top?'border-top:1px solid '+LN2+';':'')+'">'+cells.map(cell).join('')+'</div>'};
   /* 주문 조건 칸: 각 그룹 첫 줄(주문 수량·단가·출고일 등)을 먼저, 나머지는 뒤에 — 한 줄 4칸, 긴 값은 2칸 */
@@ -3429,11 +3429,11 @@ async function buildPoDocAsync(){
     rows.forEach(function(r,i){
       if(/^SHIP DATE/i.test(r.k)){shipDate=r.v;return}
       var c={k:r.k,v:r.v,red:r.hl,w:String(r.v).length>20?2:1};
-      if(i===0&&!isDel){c.red=1;c.fs=18;key.push(c)}else rest.push(c);
+      if(i===0&&!isDel){c.red=1;c.fs=23;key.push(c)}else rest.push(c);
     });
   });
   var delV=po.need_by?poDateEn(po.need_by):shipDate;
-  if(delV)key.push({k:'DELIVERY DATE',v:delV,red:1,fs:24,w:2,box:1});
+  if(delV)key.push({k:'DELIVERY DATE',v:delV,red:1,fs:31,w:2,box:1});
   var keyRow=key.length?key:null;
   if(keyRow){var ku=keyRow.reduce(function(a,c){return a+c.w},0);if(ku<4)keyRow[keyRow.length-1].w+=4-ku}
   var oc=rest;
@@ -3445,11 +3445,11 @@ async function buildPoDocAsync(){
   /* 받는 곳·품번 표 / ORDER TERMS 표를 따로 (붙어 있으면 ORDER TERMS가 입력칸처럼 보여서) */
   var hasOrder=!!(keyRow||oRows.length);
   var info='<div style="border:1.5px solid '+TX+';flex-shrink:0;margin-bottom:'+(hasOrder?14:16)+'px">'+
-    row([{k:'TO',v:po.to,w:2,fs:15.5},{k:'ATTN',v:po.attn},{k:'FROM',v:po.from}])+
-    row([{k:'ITEM NO.',v:po.po_no,red:1},{k:'MODEL NAME',v:po.model,w:3,fs:15.5}],1)+'</div>'+
-    (hasOrder?'<div style="height:26px;display:flex;align-items:flex-end;padding:0 0 5px 2px;box-sizing:border-box;flex-shrink:0;font-size:11.5px;font-weight:900;letter-spacing:2px;color:'+C+'">ORDER TERMS</div>'+   /* 표 이름표 — 쪽 제목(SUMMARY 막대)과 다르게 작은 빨간 글씨만 */
-      '<div style="border:1.5px solid '+TX+';flex-shrink:0;margin-bottom:16px">'+(keyRow?row(keyRow,0,62):'')+oRows.map(function(r,i){return row(r,i>0||!!keyRow)}).join('')+'</div>':'');
-  var used=2*RW+3+(hasOrder?14+26+(keyRow?62:0)+oRows.length*RW+3:0)+16;
+    row([{k:'TO',v:po.to,w:2,fs:19},{k:'ATTN',v:po.attn},{k:'FROM',v:po.from}])+
+    row([{k:'ITEM NO.',v:po.po_no,red:1},{k:'MODEL NAME',v:po.model,w:3,fs:19}],1)+'</div>'+
+    (hasOrder?'<div style="height:26px;display:flex;align-items:flex-end;padding:0 0 5px 2px;box-sizing:border-box;flex-shrink:0;font-size:13px;font-weight:900;letter-spacing:2px;color:'+C+'">ORDER TERMS</div>'+   /* 표 이름표 — 쪽 제목(SUMMARY 막대)과 다르게 작은 빨간 글씨만 */
+      '<div style="border:1.5px solid '+TX+';flex-shrink:0;margin-bottom:16px">'+(keyRow?row(keyRow,0,78):'')+oRows.map(function(r,i){return row(r,i>0||!!keyRow)}).join('')+'</div>':'');
+  var used=2*RW+3+(hasOrder?14+26+(keyRow?78:0)+oRows.length*RW+3:0)+16;
   var orderHtml='';
 
   /* SUMMARY 사진 + 번호 붙은 문구 */
@@ -3459,7 +3459,7 @@ async function buildPoDocAsync(){
   var LH=30;
   var linesH=lines.length*LH;
   var needH=need?60:0;
-  var restH=usable-used-44-linesH-(lines.length?12+30:0)-needH;
+  var restH=usable-used-52-linesH-(lines.length?12+30:0)-needH;
   var imgsH=sImgs.length?Math.max(200,Math.min(600,restH)):0;   /* 남는 높이를 사진이 채움 */
   var cw=Math.floor((INW-(sImgs.length-1)*14)/Math.max(1,sImgs.length));
   var sumHtml=secTitle('SUMMARY','KEY POINTS — PLEASE CHECK BEFORE PRODUCTION','I')+
@@ -3473,19 +3473,19 @@ async function buildPoDocAsync(){
 
   /* ================= SPECIFICATION (+ 원본 파일 · REMARKS) ================= */
   var groups=po.spec.filter(function(g){return !poIsOrderGroup(g)}).map(function(g){return{g:g.g,hl:g.hl,rows:g.rows.filter(function(r){return !po.hide_empty||String(r.v||'').trim()})}}).filter(function(g){return g.rows.length});
-  var RH=27,GH=32,GAP=12;
+  var RH=34,GH=40,GAP=12;
   var colW2=Math.floor((INW-16)/2);
-  var RH2=46,rowH=function(r){return String(r.v||'').length>24?RH2:RH};   /* 긴 값은 두 줄 */
+  var RH2=58,rowH=function(r){return String(r.v||'').length>20?RH2:RH};   /* 긴 값은 두 줄 */
   var gH=function(g){return GH+g.rows.reduce(function(a,r){return a+rowH(r)},0)+3+GAP};
   var gHtml=function(g){
     var col=g.hl?C:TX;
     return '<div style="margin-bottom:'+GAP+'px;border:1px solid '+(g.hl?C:LN)+'">'+
-      '<div style="height:'+GH+'px;display:flex;align-items:center;padding:0 12px;border-bottom:1.5px solid '+col+';font-size:13.5px;font-weight:900;letter-spacing:1.5px;color:'+col+'">'+esc(g.g)+'</div>'+
+      '<div style="height:'+GH+'px;display:flex;align-items:center;padding:0 12px;border-bottom:1.5px solid '+col+';font-size:17px;font-weight:900;letter-spacing:1.5px;color:'+col+'">'+esc(g.g)+'</div>'+
       g.rows.map(function(r,i){var hl=r.hl||(g.hl&&r.v);
         var rh=rowH(r);
         return '<div style="height:'+rh+'px;display:flex;align-items:center;'+(i?'border-top:1px solid '+LN2+';':'')+'">'+
-          '<div style="width:42%;padding:0 10px 0 12px;box-sizing:border-box;font-size:11px;font-weight:700;color:'+(hl?C:SUB)+';line-height:1.2;overflow:hidden">'+esc(r.k)+'</div>'+
-          '<div style="flex:1;padding:0 10px 0 0;font-size:13.5px;font-weight:'+(r.v?(hl?900:700):400)+';color:'+(hl?C:TX)+';line-height:1.3;max-height:'+(rh-6)+'px;overflow:hidden;word-break:break-word">'+V(r.v)+'</div></div>'}).join('')+'</div>';
+          '<div style="width:44%;padding:0 10px 0 12px;box-sizing:border-box;font-size:13px;font-weight:700;color:'+(hl?C:SUB)+';line-height:1.2;overflow:hidden">'+esc(r.k)+'</div>'+
+          '<div style="flex:1;padding:0 10px 0 0;font-size:16.5px;font-weight:'+(r.v?(hl?900:700):400)+';color:'+(hl?C:TX)+';line-height:1.3;max-height:'+(rh-6)+'px;overflow:hidden;word-break:break-word">'+V(r.v)+'</div></div>'}).join('')+'</div>';
   };
   var pack=function(avail,strict){
     var hs=[0,0],ci=0,n=0;
@@ -3499,9 +3499,9 @@ async function buildPoDocAsync(){
   };
   var files=(po.files||[]).filter(function(f){return f.name});
   var rem=poLines(po.remarks);
-  var boxHead=function(t,sub){return '<div style="height:34px;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1.5px solid '+TX+'"><span style="font-size:14px;font-weight:900;letter-spacing:1.5px">'+t+'</span>'+(sub?'<span style="font-size:11px;color:'+SUB+'">'+sub+'</span>':'')+'</div>'};
-  var filesH=(files.length||qr)?34+Math.max(20+files.length*26+(po.link?36:0),qr?132:0)+3+14:0;
-  var remH=rem.length?34+16+rem.length*24+3+14:0;
+  var boxHead=function(t,sub){return '<div style="height:30px;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1.5px solid '+TX+'"><span style="font-size:14px;font-weight:900;letter-spacing:1.5px">'+t+'</span>'+(sub?'<span style="font-size:11px;color:'+SUB+'">'+sub+'</span>':'')+'</div>'};
+  var filesH=(files.length||qr)?30+Math.max(20+files.length*26+(po.link?36:0),qr?112:0)+3+12:0;
+  var remH=rem.length?30+12+rem.length*24+3+12:0;
   var extraH=filesH+remH;
   var extraHtml=function(){
     var h='';
@@ -3509,12 +3509,12 @@ async function buildPoDocAsync(){
       '<div style="display:flex;gap:16px;padding:10px 14px;align-items:center"><div style="flex:1;min-width:0">'+
       files.map(function(f){return '<div style="height:26px;display:flex;gap:12px;align-items:center;font-size:13px;white-space:nowrap;overflow:hidden"><b style="font-weight:800">📎 '+esc(f.name)+'</b><span style="color:'+SUB+';overflow:hidden;text-overflow:ellipsis">'+esc(f.note||'')+'</span></div>'}).join('')+
       (po.link?'<div style="margin-top:8px;font-size:11.5px;color:#1F55C9;word-break:break-all;line-height:1.35"><b style="color:'+SUB+'">DOWNLOAD </b>'+esc(po.link)+'</div>':'')+'</div>'+
-      (qr?'<div style="text-align:center;flex-shrink:0"><img src="'+qr+'" style="width:104px;height:104px;display:block"><div style="font-size:9.5px;color:'+SUB+';margin-top:2px">Scan to download</div></div>':'')+'</div></div>';
+      (qr?'<div style="text-align:center;flex-shrink:0"><img src="'+qr+'" style="width:88px;height:88px;display:block"><div style="font-size:9.5px;color:'+SUB+';margin-top:2px">Scan to download</div></div>':'')+'</div></div>';
     if(remH)h+='<div style="margin-bottom:14px;border:1.5px solid '+TX+';flex-shrink:0">'+boxHead('REMARKS','')+'<div style="padding:8px 14px">'+rem.map(function(r,i){return '<div style="font-size:14px;line-height:24px;font-weight:600">'+(i+1)+'. '+esc(r)+'</div>'}).join('')+'</div></div>';
     return h;
   };
   var wtName=po.watch_type==='pocket'?'POCKET WATCH':'WRIST WATCH';
-  var SECT=44,specStarted=false,placed=false;
+  var SECT=52,specStarted=false,placed=false;
   while(groups.length){
     var pk=pack(usable-SECT,false);
     var html=head('SPECIFICATION')+secTitle('WATCH SPECIFICATION'+(specStarted?' (CONT.)':''),wtName,'II')+pk.html;
@@ -3528,7 +3528,7 @@ async function buildPoDocAsync(){
   po.pages.forEach(function(pg,pgi){
     var ims=(pg.imgs||[]).filter(function(i){return poImgs[i.key]});
     var nts=poLines(pg.notes);
-    var titleH=44,hlH=pg.headline?62:0,ntH=nts.length?12+nts.length*30:0,flH=pg.file?34:0;
+    var titleH=50,hlH=pg.headline?62:0,ntH=nts.length?12+nts.length*30:0,flH=pg.file?34:0;
     var areaH=usable-titleH-hlH-ntH-flH-6;
     var cols=ims.length<=1?1:2,rows=ims.length>2?2:1;
     var cw2=Math.floor((INW-(cols-1)*14)/cols),chh=Math.floor((areaH-(rows-1)*14)/rows);
@@ -3536,7 +3536,7 @@ async function buildPoDocAsync(){
         return '<div style="border:1px solid '+LN+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px;box-sizing:border-box;overflow:hidden"><img src="'+poImgs[it.key]+'" style="'+poFitStyle(dims[it.key]||{w:1,h:1},cw2-22,chh-(it.cap?46:22))+'">'+(it.cap?'<div style="font-size:15px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>'
       :'<div style="height:'+areaH+'px;border:1px dashed '+LN+';display:flex;align-items:center;justify-content:center;color:#bbb;font-size:14px;flex-shrink:0">No image</div>';
     var inner=head('DESIGN DETAIL')+
-      '<div style="height:'+titleH+'px;display:flex;align-items:center;gap:10px;flex-shrink:0"><span style="font-size:22px;font-weight:900;color:'+C+';letter-spacing:.5px">III-'+(pgi+1)+'</span><span style="font-size:22px;font-weight:900;letter-spacing:1.5px">DETAIL : '+esc(pg.title||'')+'</span></div>'+
+      '<div style="height:'+titleH+'px;display:flex;align-items:center;gap:10px;flex-shrink:0"><span style="font-size:30px;font-weight:900;color:'+C+';letter-spacing:.5px">III-'+(pgi+1)+'</span><span style="font-size:30px;font-weight:900;letter-spacing:1px;white-space:nowrap">DETAIL : '+esc(pg.title||'')+'</span></div>'+
       (hlH?'<div style="height:52px;margin-bottom:10px;box-sizing:border-box;border:2px solid '+C+';display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:'+C+';letter-spacing:1px;flex-shrink:0;white-space:nowrap;overflow:hidden">'+esc(poHeadText(pg))+'</div>':'')+
       grid+
       (nts.length?'<div style="margin-top:12px;flex-shrink:0">'+nts.map(function(n,i){return '<div style="height:30px;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;color:'+C+';white-space:nowrap;overflow:hidden"><b style="min-width:22px">'+(i+1)+'.</b>'+esc(n)+'</div>'}).join('')+'</div>':'')+

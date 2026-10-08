@@ -108,6 +108,7 @@
     - DESIGN DETAIL 큰 강조 문구도 선택(`PO_HEAD_OPT`): 없음 / SAME AS SAMPLE / SAME AS LAST ORDER(+ 지난 주문 달 `pg.hl_date` → 'SAME AS LAST ORDER (SEPTEMBER 2026)', `poHeadText`) / 기타 직접 입력(`pg._hother`)
     - 1쪽 위: 받는 곳·품번 표와 ORDER TERMS 표를 **따로**(사이 간격 + 'ORDER TERMS'는 막대 없는 작은 빨간 글씨 이름표 — 쪽 제목 SUMMARY의 빨간 막대와 구분. 붙어 있으면 입력칸처럼 보였음)
     - 단락 번호: 빨간 막대 대신 로마 숫자 — `I. SUMMARY`, `II. WATCH SPECIFICATION`, 상세 페이지 `III-1 DETAIL : CASE`, `III-2 DETAIL : …` (`secTitle(t,sub,num)`)
+    - 글씨 키움 2차(인쇄 피드백): 단락 제목 30px(설명은 오른쪽 끝), 머리 아래 여백 20→8, 1쪽 표 줄 54px·값 17~19px·라벨 12px, ORDER TERMS 첫 줄 78px(수량·단가 23px, DELIVERY DATE 31px), 사양표 줄 34px(긴 값 58px, 20자 넘으면 두 줄)·값 16.5px·라벨 13px·그룹 17px. 원본 파일·REMARKS 상자를 압축(QR 88px)해 사양표 쪽에 같이 들어가게
     - SUMMARY 줄 순서: ↑↓ 버튼으로 바꾸기, ★ 강조를 켜고 끌 때마다 강조한 줄이 위로 모임(묶음 안 순서 유지)
   - **해외 매입 건 = 작업요청서 대신 해외 PO (2026-10-08)**: `isOvsProject(p)` = 해외 매입 정보(supplier_overseas) 있음 또는 매입처가 해외 거래처 DB(`ovsClientKeys()` 캐시, `clientNameKey`)에 있음. 그러면 — 상담 국내 진행 카드 둘째 칸 = **해외 PO** 미리보기(`inqDocTileHtml(p,'po')`, 캐시 키 'po:프로젝트id'), 지금 할 일 작업요청 단계 = '해외 공장에 PO를 보내세요' + `po:` 버튼, `wr:` 동작도 po로, 보내기 메뉴 공장 줄 = 🌏 해외 PO, 국내 상세 = 작업요청서 칸 → '해외 PO' 칸(`renderProjectPoArea`, #view- iframe + 열기·PDF) · '작업요청서 만들기' 버튼 → '🌏 해외 PO 만들기·열기'(`createDocFromProject(id,'wr')`가 `openProjectPo`로 넘김)
     - 찾기 `findProjectPoNumber(p)`: status '해외작업요청서' 중 `디확번호_E%` 또는 `extra.project_id = 프로젝트 id`. 없으면 `doc-generator.html#po-new-pj-프로젝트id` → `poApplyProject`(디확 있으면 `poApplyDc`, 없으면 매입처=TO·담당=ATTN(비면 해외 거래처 DB contact_name, `poFillAttn`)·품목·수량·USD 단가·납기) + `po.project_id` 저장
