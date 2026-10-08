@@ -2922,6 +2922,7 @@ var PO_OPT={
   'PLATING / COLOR':PLATING_OPT,
   'CASE TYPE':[['Open face','오픈페이스 (뚜껑 없음)'],['Hunter (full cover)','헌터 (전체 뚜껑)'],['Half hunter (window cover)','하프헌터 (창 있는 뚜껑)'],['Skeleton','스켈레톤']],
   'CASE BACK':[['Laser engraving','레이저 각인'],['Silk printing','실크 인쇄'],['Stamped (embossed)','프레스 각인 (양각)'],['Plain (no marking)','무지 (표시 없음)'],['Screw-down back','스크류 뒷판'],['Snap-on back','스냅 뒷판 (눌러 닫기)'],['Same as sample','샘플과 동일']],
+  'CASE BACK MATERIAL':[['Same as case','케이스와 같은 소재'],['Stainless steel 316L','스테인리스 316L'],['Stainless steel 304','스테인리스 304'],['Alloy (zinc alloy)','합금 (아연 합금)'],['Brass','황동'],['Titanium','티타늄'],['Transparent glass (exhibition back)','투명 유리 (속이 보이는 뒷판)']],
   'CROWN':[['Same as sample','샘플과 동일'],['Plain','무지'],['With logo','로고 각인'],['Screw-down','스크류 용두']],
   'CRYSTAL':[['Mineral glass','미네랄 유리'],['Sapphire crystal','사파이어 유리'],['Domed mineral glass','돔형 미네랄 유리'],['Hardlex','하드렉스'],['Acrylic','아크릴']],
   'WATER RESISTANCE':[['Not water resistant','방수 없음'],['3ATM (splash resistant)','3ATM 생활방수'],['5ATM','5ATM'],['10ATM','10ATM']],
@@ -2957,7 +2958,7 @@ function poKey(){return 'i'+Date.now().toString(36)+Math.random().toString(36).s
 function poGrp(name,hl,ks){return{g:name,hl:hl,rows:ks.map(function(k){return{k:k,v:'',hl:0}})}}
 function poBand(t){return t==='pocket'?poGrp('CHAIN',0,['TYPE','LENGTH','PLATING / COLOR','CLIP']):poGrp('STRAP',0,['TYPE / MATERIAL','COLOR','SIZE (W × L)','BUCKLE'])}
 function poDefaultSpec(t){
-  return [poGrp('CASE',0,t==='pocket'?['SIZE (Ø × T)','CASE TYPE','MATERIAL','PLATING / COLOR','CASE BACK','CROWN','CRYSTAL']:['SIZE (Ø × T)','MATERIAL','PLATING / COLOR','CASE BACK','CROWN','CRYSTAL','WATER RESISTANCE']),
+  return [poGrp('CASE',0,t==='pocket'?['SIZE (Ø × T)','CASE TYPE','MATERIAL','PLATING / COLOR','CASE BACK','CASE BACK MATERIAL','CROWN','CRYSTAL']:['SIZE (Ø × T)','MATERIAL','PLATING / COLOR','CASE BACK','CASE BACK MATERIAL','CROWN','CRYSTAL','WATER RESISTANCE']),
     poGrp('DIAL',0,['COLOR / BACKGROUND','INDEX / NUMERALS','LOGO','OTHER PRINTING']),
     poGrp('HANDS',0,['HOUR / MINUTE','SECOND']),
     poGrp('MOVEMENT',0,['MODEL','BATTERY','TIME SETTING']),
@@ -3221,6 +3222,7 @@ function poFill(r){
   if(!po.summary.lines){po.summary.lines=poLines(po.summary.notes).map(function(t){return{t:t,hl:1}})}
   if(!po.summary.lines.length)po.summary.lines=[{t:'',hl:0}];
   delete po.summary.notes;
+  (po.spec||[]).forEach(function(g){if(g.g!=='CASE')return;var i=g.rows.findIndex(function(r){return r.k==='CASE BACK'});if(i>=0&&!g.rows.some(function(r){return r.k==='CASE BACK MATERIAL'}))g.rows.splice(i+1,0,{k:'CASE BACK MATERIAL',v:'',hl:0})});
   po.pages=(po.pages||[]).map(function(p){return Object.assign({title:'',headline:'',file:'',notes:'',imgs:[]},p)});
   poLinkedDcNum=x.dc||'';
   poImgs={};try{var d=typeof r.images_data==='string'?JSON.parse(r.images_data):r.images_data;if(d&&d.po)poImgs=d.po}catch(_){}
