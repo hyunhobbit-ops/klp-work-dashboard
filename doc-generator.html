@@ -3410,7 +3410,7 @@ async function buildPoDocAsync(){
     '<span>KLP KOREA inc · 30, Digital-ro 32-gil, Guro-gu, Seoul, Korea · T. +82-2-2103-5757 · klpkorea@agift.kr</span><b style="color:'+TX+'">'+(no||'')+' · PAGE {P} / {N}</b></div>'};
   var wrap=function(inner){return '<div class="po-pg" style="width:'+W+'px;height:'+H+'px;overflow:hidden;background:#fff;'+font+'color:'+TX+';box-sizing:border-box;padding:'+PT+'px '+PX+'px '+PB+'px;display:flex;flex-direction:column">'+inner+'<div style="flex:1"></div>'+foot()+'</div>'};
   var usable=H-PT-PB-HEAD-FOOTH;
-  var secTitle=function(t,sub){return '<div style="height:34px;display:flex;align-items:center;gap:10px;flex-shrink:0;margin-bottom:10px"><span style="width:5px;height:22px;background:'+C+'"></span><span style="font-size:19px;font-weight:900;letter-spacing:1.5px">'+t+'</span>'+(sub?'<span style="font-size:12.5px;color:'+SUB+';font-weight:600">'+sub+'</span>':'')+'</div>'};
+  var secTitle=function(t,sub,num){return '<div style="height:34px;display:flex;align-items:center;gap:10px;flex-shrink:0;margin-bottom:10px">'+(num?'<span style="font-size:19px;font-weight:900;color:'+C+';letter-spacing:.5px">'+num+'.</span>':'<span style="width:5px;height:22px;background:'+C+'"></span>')+'<span style="font-size:19px;font-weight:900;letter-spacing:1.5px">'+t+'</span>'+(sub?'<span style="font-size:12.5px;color:'+SUB+';font-weight:600">'+sub+'</span>':'')+'</div>'};
 
   /* ================= 1쪽: SUMMARY ================= */
   /* 받는 곳·품번 + 주문 조건을 한 표로 (빈칸 없이 이어짐) — 2026-10 피드백 */
@@ -3462,7 +3462,7 @@ async function buildPoDocAsync(){
   var restH=usable-used-44-linesH-(lines.length?12+30:0)-needH;
   var imgsH=sImgs.length?Math.max(200,Math.min(600,restH)):0;   /* 남는 높이를 사진이 채움 */
   var cw=Math.floor((INW-(sImgs.length-1)*14)/Math.max(1,sImgs.length));
-  var sumHtml=secTitle('SUMMARY','KEY POINTS — PLEASE CHECK BEFORE PRODUCTION')+
+  var sumHtml=secTitle('SUMMARY','KEY POINTS — PLEASE CHECK BEFORE PRODUCTION','I')+
     (sImgs.length?'<div style="height:'+imgsH+'px;display:flex;gap:14px;justify-content:center;flex-shrink:0">'+sImgs.map(function(it){
       return '<div style="width:'+cw+'px;border:1px solid '+LN+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;box-sizing:border-box"><img src="'+poImgs[it.key]+'" style="'+poFitStyle(dims[it.key]||{w:1,h:1},cw-18,imgsH-(it.cap?40:18))+'">'+(it.cap?'<div style="font-size:13px;font-weight:700;color:'+TX+';text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>':'')+
     (lines.length?'<div style="height:30px;margin-top:12px;display:flex;align-items:center;gap:10px;border-bottom:1.5px solid '+TX+';flex-shrink:0"><span style="font-size:14px;font-weight:900;letter-spacing:1.5px;color:'+C+'">IMPORTANT NOTES</span><span style="font-size:11.5px;font-weight:700;color:'+SUB+';letter-spacing:.5px">MUST BE FOLLOWED</span></div>'+
@@ -3517,7 +3517,7 @@ async function buildPoDocAsync(){
   var SECT=44,specStarted=false,placed=false;
   while(groups.length){
     var pk=pack(usable-SECT,false);
-    var html=head('SPECIFICATION')+secTitle('WATCH SPECIFICATION'+(specStarted?' (CONT.)':''),wtName)+pk.html;
+    var html=head('SPECIFICATION')+secTitle('WATCH SPECIFICATION'+(specStarted?' (CONT.)':''),wtName,'II')+pk.html;
     specStarted=true;
     if(!groups.length&&extraH&&SECT+pk.h+extraH<=usable){html+=extraHtml();placed=true}
     pages.push(wrap(html));
@@ -3525,7 +3525,7 @@ async function buildPoDocAsync(){
   if(extraH&&!placed)pages.push(wrap(head(specStarted?'SPECIFICATION':'FILES')+extraHtml()));
 
   /* ================= DESIGN DETAIL ================= */
-  po.pages.forEach(function(pg){
+  po.pages.forEach(function(pg,pgi){
     var ims=(pg.imgs||[]).filter(function(i){return poImgs[i.key]});
     var nts=poLines(pg.notes);
     var titleH=44,hlH=pg.headline?62:0,ntH=nts.length?12+nts.length*30:0,flH=pg.file?34:0;
@@ -3536,7 +3536,7 @@ async function buildPoDocAsync(){
         return '<div style="border:1px solid '+LN+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px;box-sizing:border-box;overflow:hidden"><img src="'+poImgs[it.key]+'" style="'+poFitStyle(dims[it.key]||{w:1,h:1},cw2-22,chh-(it.cap?46:22))+'">'+(it.cap?'<div style="font-size:15px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>'
       :'<div style="height:'+areaH+'px;border:1px dashed '+LN+';display:flex;align-items:center;justify-content:center;color:#bbb;font-size:14px;flex-shrink:0">No image</div>';
     var inner=head('DESIGN DETAIL')+
-      '<div style="height:'+titleH+'px;display:flex;align-items:center;gap:10px;flex-shrink:0"><span style="width:5px;height:24px;background:'+C+'"></span><span style="font-size:22px;font-weight:900;letter-spacing:1.5px">'+esc(pg.title||'')+'</span></div>'+
+      '<div style="height:'+titleH+'px;display:flex;align-items:center;gap:10px;flex-shrink:0"><span style="font-size:22px;font-weight:900;color:'+C+';letter-spacing:.5px">III-'+(pgi+1)+'</span><span style="font-size:22px;font-weight:900;letter-spacing:1.5px">DETAIL : '+esc(pg.title||'')+'</span></div>'+
       (hlH?'<div style="height:52px;margin-bottom:10px;box-sizing:border-box;border:2px solid '+C+';display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:'+C+';letter-spacing:1px;flex-shrink:0;white-space:nowrap;overflow:hidden">'+esc(poHeadText(pg))+'</div>':'')+
       grid+
       (nts.length?'<div style="margin-top:12px;flex-shrink:0">'+nts.map(function(n,i){return '<div style="height:30px;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;color:'+C+';white-space:nowrap;overflow:hidden"><b style="min-width:22px">'+(i+1)+'.</b>'+esc(n)+'</div>'}).join('')+'</div>':'')+
