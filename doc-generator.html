@@ -76,7 +76,8 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
 .po-star{height:32px;min-width:32px;padding:0 9px;border:1px solid #ddd;border-radius:7px;background:#fff;color:#c8c8c8;font-weight:800;cursor:pointer;font-family:inherit;font-size:12px;white-space:nowrap}
 .po-star.on{background:#FFF1F1;border-color:#E11D24;color:#E11D24}
 .po-lines{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
-.po-line{display:grid;grid-template-columns:1fr auto 30px;gap:6px}
+.po-line{display:grid;grid-template-columns:26px 1fr auto 30px;gap:6px;align-items:center}
+.po-num{font-size:14px;font-weight:900;color:#E11D24;text-align:right}
 .po-line input{padding:9px 11px;border:1px solid #e3e3e3;border-radius:8px;font-family:inherit;font-size:13.5px}
 .po-line.hl input{border-color:#FCA5A5;background:#FFF5F5;font-weight:800;color:#B91C1C}
 .po-steps-ed{display:flex;align-items:stretch;gap:8px}
@@ -3050,9 +3051,9 @@ function poRenderForm(){
   h+='<div class="section"><div class="section-title">📋 기본 정보 <span class="po-hint">문서에는 영어 제목으로 나가요</span></div>'+
     '<div class="row">'+poInput('to','받는 회사 (TO)','KODA-LEILA','','')+poInput('attn','받는 사람 (ATTN)','Ms. Leila','','')+poInput('from','보내는 사람 (FROM) — 이름만','Hyunho Kim','','')+'</div>'+
     '<div class="row">'+poInput('po_no','품번 (ITEM NO.)','#KLP2605','','')+poInput('model','모델명 (MODEL NAME)','KIMGU POCKET WATCH','','')+poInput('need_by','납기일 (DELIVERY DATE)','','max-width:200px','date')+'</div>'+
-    '<div class="row">'+poInput('date','작성일 (DATE)','','max-width:200px','date')+poInput('rev','수정 차수 (Revision)','Rev.1 — 수정본 보낼 때','max-width:240px','')+poInput('need_text','마감 강조 문구 (비우면 납기일로 자동)','We need to receive by November 6th','','')+'</div></div>';
+    '<div class="row">'+poInput('date','작성일 (DATE)','','max-width:200px','date')+poInput('rev','수정 차수 (Revision)','Rev.1 — 수정본 보낼 때','max-width:240px','')+poInput('need_text','마감 강조 문구 (선택 — 적으면 SUMMARY에 빨간 상자로)','예) We need to receive by November 6th','','')+'</div></div>';
   /* 진행 단계 */
-  h+='<div class="section"><div class="section-title">📈 진행 단계 <span class="po-hint">3D 그래픽 컨펌 → 샘플 컨펌 → 본 주문 — 앞 단계가 컨펌돼야 다음으로</span></div>'+
+  h+='<div class="section"><div class="section-title">📈 진행 단계 <span class="po-hint">내부 확인용 — 문서에는 안 나와요 · 3D 그래픽 컨펌 → 샘플 컨펌 → 본 주문</span></div>'+
     '<div class="po-steps-ed">'+PO_STAGES.map(function(s,i){
       var cur=PO_STAGES.findIndex(function(x){return x[0]===po.stage});
       var st=i<cur?'done':i===cur?'on':'';
@@ -3064,25 +3065,29 @@ function poRenderForm(){
   h+='<div class="section"><div class="section-title">🖼️ SUMMARY <span class="po-hint">꼭 잊지 말아야 할 내용 — 사진 + 한 줄씩</span></div>'+poImgTiles(po.summary.imgs,'s',4)+
     '<div class="po-lines" style="margin-top:12px">'+lines.map(function(l,i){
       var inList=PO_SUM_OPT.some(function(o){return o[0]===l.t}),other=!!l._other||(l.t&&!inList);
-      return '<div class="po-line'+(l.hl?' hl':'')+'"><div class="po-vsel"><select data-polsel="'+i+'"><option value="">— 자주 쓰는 문구 선택 —</option>'+
+      return '<div class="po-line'+(l.hl?' hl':'')+'"><b class="po-num">'+(i+1)+'.</b><div class="po-vsel"><select data-polsel="'+i+'"><option value="">— 자주 쓰는 문구 선택 —</option>'+
         PO_SUM_OPT.map(function(o){return '<option value="'+esc(o[0])+'"'+(!other&&o[0]===l.t?' selected':'')+'>'+esc(o[1])+'  ·  '+esc(o[0])+'</option>'}).join('')+
         '<option value="__other"'+(other?' selected':'')+'>기타 (직접 입력)</option></select>'+
         (other?'<input value="'+esc(l.t||'')+'" placeholder="직접 입력 — 영어로" data-pol="'+i+'">':'')+'</div>'+
         '<button type="button" class="po-star'+(l.hl?' on':'')+'" data-polhl="'+i+'" title="강조 (빨간 굵은 글씨)">★ 강조</button><button type="button" class="ps-del" data-poldel="'+i+'" title="줄 빼기">×</button></div>';
     }).join('')+'</div><button type="button" class="ps-add" data-poladd="1">+ 한 줄 추가</button> <span class="po-hint">고르면 문서엔 영어로 · 목록에 없으면 “기타” → 직접 입력 (Enter = 다음 줄)</span></div>';
+  /* 주문 조건 (수량·단가·납기) — 문서 1쪽 SUMMARY에 크게 */
+  var grpEd=function(g,gi){
+    return '<div class="po-g"><div class="po-g-head"><input value="'+esc(g.g)+'" data-pogn="'+gi+'"><label class="po-hl"><input type="checkbox" '+(g.hl?'checked':'')+' data-pohl="'+gi+'"> 빨강</label>'+
+      '<button type="button" class="ps-del" data-pogdel="'+gi+'" title="그룹 빼기">×</button></div>'+
+      g.rows.map(function(r,ri){return '<div class="po-r'+(r.hl?' hl':'')+'"><input value="'+esc(r.k)+'" data-pork="'+gi+'|'+ri+'">'+poValCell(gi,ri,r)+'<button type="button" class="po-star'+(r.hl?' on':'')+'" data-porhl="'+gi+'|'+ri+'" title="이 줄 강조">★</button><button type="button" class="ps-del" data-pordel="'+gi+'|'+ri+'">×</button></div>'}).join('')+
+      '<button type="button" class="ps-add" data-poradd="'+gi+'">+ 항목</button></div>';
+  };
+  h+='<div class="section"><div class="section-title">📦 주문 조건 <span class="po-hint">수량 · 단가 · 납기 — 문서 1쪽 SUMMARY에 크게 나가요 (적은 칸만)</span></div>'+
+    po.spec.map(function(g,gi){return poIsOrderGroup(g)?grpEd(g,gi):''}).join('')+'</div>';
   /* 사양표 */
   var wt=po.watch_type||'wrist';
   h+='<div class="section"><div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">🔩 WATCH SPECIFICATION <label class="po-hl" style="color:#555"><input type="checkbox" '+(po.hide_empty?'checked':'')+' data-pohide="1"> 빈 항목은 문서에서 빼기</label></div>'+
     '<div class="po-wt"><button type="button" class="'+(wt==='wrist'?'on':'')+'" data-powt="wrist">⌚ 손목시계 <small>STRAP</small></button><button type="button" class="'+(wt==='pocket'?'on':'')+'" data-powt="pocket">🕰️ 회중시계 <small>CHAIN · CASE TYPE</small></button></div>'+
-    '<div class="po-hint" style="margin:8px 0 10px">고르면 문서엔 영어로 나가요 · 목록에 없으면 \'기타\' → 직접 입력 · ★ = 그 줄 강조 · 그룹 \'빨강\' = 그룹 전체 강조</div><div id="poSpecBox">'+
-    po.spec.map(function(g,gi){
-      return '<div class="po-g"><div class="po-g-head"><input value="'+esc(g.g)+'" data-pogn="'+gi+'"><label class="po-hl"><input type="checkbox" '+(g.hl?'checked':'')+' data-pohl="'+gi+'"> 빨강</label>'+
-        '<button type="button" class="ps-del" data-pogdel="'+gi+'" title="그룹 빼기">×</button></div>'+
-        g.rows.map(function(r,ri){return '<div class="po-r'+(r.hl?' hl':'')+'"><input value="'+esc(r.k)+'" data-pork="'+gi+'|'+ri+'">'+poValCell(gi,ri,r)+'<button type="button" class="po-star'+(r.hl?' on':'')+'" data-porhl="'+gi+'|'+ri+'" title="이 줄 강조">★</button><button type="button" class="ps-del" data-pordel="'+gi+'|'+ri+'">×</button></div>'}).join('')+
-        '<button type="button" class="ps-add" data-poradd="'+gi+'">+ 항목</button></div>';
-    }).join('')+'</div><button type="button" class="ps-add" data-pogadd="1" style="margin-top:4px">+ 그룹 추가</button></div>';
+    '<div class="po-hint" style="margin:8px 0 10px">문서 2쪽(SPECIFICATION)에 나가요 · 고르면 영어로 · 목록에 없으면 “기타” → 직접 입력 · ★ = 그 줄 강조</div><div id="poSpecBox">'+
+    po.spec.map(function(g,gi){return poIsOrderGroup(g)?'':grpEd(g,gi)}).join('')+'</div><button type="button" class="ps-add" data-pogadd="1" style="margin-top:4px">+ 그룹 추가</button></div>';
   /* 상세 페이지 */
-  h+='<div class="section"><div class="section-title">📄 상세 페이지 <span class="po-hint">2쪽부터 — CASE, DIAL AND HANDS 처럼 부위별 한 장씩</span></div>'+
+  h+='<div class="section"><div class="section-title">📄 DESIGN DETAIL <span class="po-hint">SPECIFICATION 다음 쪽부터 — CASE, DIAL AND HANDS 처럼 부위별 한 장씩</span></div>'+
     po.pages.map(function(pg,pi){
       return '<div class="po-page-ed"><div class="po-g-head"><b>'+(pi+2)+'쪽</b><input list="poPageTitles" value="'+esc(pg.title)+'" placeholder="CASE" data-popt="'+pi+'">'+
         '<button type="button" class="ps-del" data-popmv="'+pi+'|-1" title="위로">↑</button><button type="button" class="ps-del" data-popmv="'+pi+'|1" title="아래로">↓</button><button type="button" class="ps-del" data-popdel="'+pi+'" title="페이지 빼기">×</button></div>'+
@@ -3280,7 +3285,10 @@ function poFill(r){
 /* ---------- 문서 그리기 (A4 여러 장) ---------- */
 function poDateEn(d){if(!d)return '';var p=String(d).split('-');return p.length<3?d:p[0]+'.'+p[1]+'.'+p[2]}
 function poNeedText(){
-  if(po.need_text)return po.need_text;if(!po.need_by)return '';
+  return String(po.need_text||'').trim();
+}
+function poNeedTextAuto(){
+  if(!po.need_by)return '';
   var M=['January','February','March','April','May','June','July','August','September','October','November','December'];
   var p=po.need_by.split('-'),d=+p[2],suf=(d%10===1&&d!==11)?'st':(d%10===2&&d!==12)?'nd':(d%10===3&&d!==13)?'rd':'th';
   return 'We need to receive by '+M[+p[1]-1]+' '+d+suf;
@@ -3294,159 +3302,143 @@ async function poQrData(text){
 }
 var _poBuilt=null;
 function buildPoDoc(){_poBuilt=buildPoDocAsync();return _poBuilt}
+function poIsOrderGroup(g){return /^(QUANTITY|PRICE|DELIVERY)$/i.test(String(g.g||'').trim())}
 async function buildPoDocAsync(){
-  /* 디자인확인서·작업요청서와 같은 결 (빨강 #E11D24). A4 794×1123 여러 장 */
-  var W=794,H=1123,PX=28,PT=20,PB=18,INW=W-PX*2;
-  var C=PO_RED,C2='#FFF1F1',BG='#F4F3EA',LN='#e8e8e5';
+  /* 2026-10 피드백: 바탕색 없음(잉크 절약) · 글자 크게(A4 인쇄) · 쪽 나눔 SUMMARY / SPECIFICATION / DESIGN DETAIL · 진행 단계는 문서에서 뺌 */
+  var W=794,H=1123,PX=34,PT=26,PB=22,INW=W-PX*2;
+  var C=PO_RED,LN='#cfcfcb',LN2='#e4e4e0',TX='#1a1a1a',SUB='#6b6b6b';
   var no=esc(po.po_no||''),qr=po.link?await poQrData(po.link):'';
   var font="font-family:'Noto Sans KR',sans-serif;";
-  var V=function(t){return t?esc(t):'<span style="color:#ccc">-</span>'};
+  var V=function(t){return t?esc(t):'<span style="color:#bbb">-</span>'};
   var pages=[];
-  var HEAD=71,FOOTH=40;
-  var head=function(sub){
-    return '<div style="height:52px;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0">'+
-      '<div><div style="font-size:10px;color:'+C+';letter-spacing:3px;font-weight:700;margin-bottom:2px">P/O · OVERSEAS ORDER'+(sub?' <span style="color:#bbb;letter-spacing:1px">· '+esc(sub)+'</span>':'')+'</div>'+
-      '<div style="font-size:24px;font-weight:900;color:#222327;letter-spacing:1px">PURCHASE ORDER</div></div>'+
-      '<div style="text-align:right"><img src="'+LOGO_DARK+'" style="height:22px;margin-bottom:2px"><div style="font-size:9px;color:#aaa;margin-top:1px">ITEM NO. <b style="color:'+C+';font-size:10px">'+(no||'-')+'</b>'+(po.rev?' · '+esc(po.rev):'')+' | '+esc(poDateEn(po.date))+'</div></div></div>'+
-      '<div style="height:3px;margin:6px 0 10px;background:linear-gradient(90deg,'+C+','+C2+');border-radius:2px;flex-shrink:0"></div>';
+  var HEAD=82,FOOTH=30;
+  var head=function(section){
+    return '<div style="height:62px;display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:10px;border-bottom:2px solid '+TX+';flex-shrink:0;box-sizing:border-box">'+
+      '<div><div style="font-size:12px;color:'+C+';letter-spacing:2.5px;font-weight:800;margin-bottom:3px">'+esc(section)+'</div>'+
+      '<div style="font-size:28px;font-weight:900;color:'+TX+';letter-spacing:1px;line-height:1.1">PURCHASE ORDER</div></div>'+
+      '<div style="text-align:right"><img src="'+LOGO_DARK+'" style="height:26px;display:block;margin-left:auto;margin-bottom:4px"><div style="font-size:12px;color:'+SUB+'">ITEM NO. <b style="color:'+C+';font-size:14px">'+(no||'-')+'</b>'+(po.rev?' · '+esc(po.rev):'')+' | '+esc(poDateEn(po.date))+'</div></div></div>'+
+      '<div style="height:20px;flex-shrink:0"></div>';
   };
-  var foot=function(){return '<div style="height:34px;margin-top:6px;box-sizing:border-box;padding:0 14px;background:#222327;border-radius:5px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0"><img src="'+LOGO_WHITE+'" style="height:14px"><div style="color:rgba(255,255,255,.55);font-size:7px;line-height:1.5;text-align:right">KLP KOREA inc · 30, Digital-ro 32-gil, Guro-gu, Seoul, Korea | T. +82-2-2103-5757 | klpkorea@agift.kr<br><b style="color:rgba(255,255,255,.85)">'+(no||'')+' · PAGE {P} / {N}</b></div></div>'};
-  var wrap=function(inner){return '<div class="po-pg" style="width:'+W+'px;height:'+H+'px;overflow:hidden;background:#fff;'+font+'color:#222327;box-sizing:border-box;padding:'+PT+'px '+PX+'px '+PB+'px;display:flex;flex-direction:column">'+inner+'<div style="flex:1"></div>'+foot()+'</div>'};
+  var foot=function(){return '<div style="height:24px;margin-top:6px;border-top:1px solid '+LN+';display:flex;align-items:flex-end;justify-content:space-between;font-size:10px;color:'+SUB+';flex-shrink:0">'+
+    '<span>KLP KOREA inc · 30, Digital-ro 32-gil, Guro-gu, Seoul, Korea · T. +82-2-2103-5757 · klpkorea@agift.kr</span><b style="color:'+TX+'">'+(no||'')+' · PAGE {P} / {N}</b></div>'};
+  var wrap=function(inner){return '<div class="po-pg" style="width:'+W+'px;height:'+H+'px;overflow:hidden;background:#fff;'+font+'color:'+TX+';box-sizing:border-box;padding:'+PT+'px '+PX+'px '+PB+'px;display:flex;flex-direction:column">'+inner+'<div style="flex:1"></div>'+foot()+'</div>'};
   var usable=H-PT-PB-HEAD-FOOTH;
+  var secTitle=function(t,sub){return '<div style="height:34px;display:flex;align-items:center;gap:10px;flex-shrink:0;margin-bottom:10px"><span style="width:5px;height:22px;background:'+C+'"></span><span style="font-size:19px;font-weight:900;letter-spacing:1.5px">'+t+'</span>'+(sub?'<span style="font-size:12.5px;color:'+SUB+';font-weight:600">'+sub+'</span>':'')+'</div>'};
 
-  /* --- 진행 단계 그래프 (3D GRAPHIC → SAMPLE → ORDER) --- */
-  var stIdx=Math.max(0,PO_STAGES.findIndex(function(s){return s[0]===po.stage}));
-  var colW=INW/3,trackL=colW/2,trackW=INW-colW,fillW=trackW*stIdx/(PO_STAGES.length-1);
-  var steps='<div style="position:relative;height:66px;margin-bottom:8px;flex-shrink:0;background:#fafafa;border:1px solid #eee;border-radius:6px;box-sizing:border-box">'+
-    '<div style="position:absolute;left:'+trackL+'px;top:21px;width:'+trackW+'px;height:4px;background:#e6e6e3;border-radius:2px"></div>'+
-    '<div style="position:absolute;left:'+trackL+'px;top:21px;width:'+fillW+'px;height:4px;background:'+C+';border-radius:2px"></div>'+
-    PO_STAGES.map(function(s,i){
-      var on=i===stIdx,done=i<stIdx,d=(po.stage_dates||{})[s[0]]||'';
-      return '<div style="position:absolute;left:'+(colW*i)+'px;top:0;width:'+colW+'px;height:66px;display:flex;flex-direction:column;align-items:center">'+
-        '<div style="margin-top:9px;width:28px;height:28px;box-sizing:border-box;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;'+
-          (done?'background:'+C+';color:#fff':on?'background:#fff;border:3px solid '+C+';color:'+C:'background:#fff;border:2px solid #d8d8d4;color:#bbb')+'">'+(done?'✓':(i+1))+'</div>'+
-        '<div style="margin-top:3px;font-size:11.5px;font-weight:900;letter-spacing:1px;color:'+(on?C:done?'#222327':'#bbb')+'">'+s[1]+'</div>'+
-        '<div style="font-size:8.5px;font-weight:700;letter-spacing:.5px;color:'+(on?C:done?'#888':'#ccc')+'">'+(done?'CONFIRMED'+(d?' · '+esc(poDateEn(d)):''):on?'IN PROGRESS':'NEXT')+'</div></div>';
+  /* ================= 1쪽: SUMMARY ================= */
+  var cell=function(lb,v,st,fs,col){return '<div style="'+st+';padding:9px 14px;min-width:0;box-sizing:border-box"><div style="font-size:11px;color:'+SUB+';font-weight:700;letter-spacing:1px;margin-bottom:3px">'+lb+'</div><div style="font-size:'+fs+'px;font-weight:800;color:'+(col||TX)+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+V(v)+'</div></div>'};
+  var vl='<div style="width:1px;background:'+LN2+'"></div>';
+  var info='<div style="border:1.5px solid '+TX+';flex-shrink:0;margin-bottom:16px">'+
+    '<div style="display:flex;height:62px">'+cell('TO',po.to,'flex:1',18)+vl+cell('ATTN',po.attn,'flex:0 0 200px',16)+vl+cell('FROM',po.from,'flex:0 0 180px',16)+'</div>'+
+    '<div style="height:1px;background:'+LN2+'"></div>'+
+    '<div style="display:flex;height:62px">'+cell('ITEM NO.',po.po_no,'flex:0 0 180px',18,C)+vl+cell('MODEL NAME',po.model,'flex:1',18)+vl+cell('DELIVERY DATE',po.need_by?poDateEn(po.need_by):'','flex:0 0 200px',18,C)+'</div></div>';
+  var used=128+16;
+
+  /* 주문 조건 (수량·단가·납기) — 사양표에서 빼서 SUMMARY에 크게 */
+  var ogs=po.spec.filter(poIsOrderGroup).map(function(g){return{g:g.g,rows:g.rows.filter(function(r){return String(r.v||'').trim()})}}).filter(function(g){return g.rows.length});
+  var orderH=0,orderHtml='';
+  if(ogs.length){
+    var maxRows=Math.max.apply(null,ogs.map(function(g){return g.rows.length}));
+    orderH=36+maxRows*50+6;
+    var ow=Math.floor((INW-(ogs.length-1)*12)/ogs.length);
+    orderHtml='<div style="display:flex;gap:12px;flex-shrink:0;margin-bottom:16px;height:'+orderH+'px">'+ogs.map(function(g){
+      return '<div style="width:'+ow+'px;border:1.5px solid '+C+';box-sizing:border-box">'+
+        '<div style="height:34px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid '+C+';font-size:13px;font-weight:900;letter-spacing:1.5px;color:'+C+'">'+esc(g.g)+'</div>'+
+        g.rows.map(function(r,i){var big=i===0;
+          return '<div style="height:50px;padding:5px 12px 0;box-sizing:border-box;'+(i?'border-top:1px solid '+LN2+';':'')+'"><div style="font-size:10.5px;color:'+SUB+';font-weight:700;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(r.k)+'</div>'+
+            '<div style="font-size:'+(big?17:13.5)+'px;font-weight:'+(big?900:700)+';color:'+(big||r.hl?C:TX)+';line-height:'+(big?1.4:1.2)+';max-height:32px;overflow:hidden;word-break:break-word">'+esc(r.v)+'</div></div>'}).join('')+'</div>';
     }).join('')+'</div>';
-
-  /* --- 정보 카드 --- */
-  var card=function(lb,v,st,fs,col){return '<div style="'+st+';padding:7px 14px;background:'+BG+';min-width:0"><div style="font-size:9px;color:#999;font-weight:600;letter-spacing:1px;margin-bottom:2px">'+lb+'</div><div style="font-size:'+fs+'px;font-weight:700;color:'+(col||'#222327')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+V(v)+'</div></div>'};
-  var sep='<div style="width:1px;background:'+LN+'"></div>';
-  var cards=function(arr){return '<div style="height:46px;margin-bottom:8px;display:flex;border:1px solid '+LN+';border-radius:6px;overflow:hidden;flex-shrink:0;box-sizing:border-box">'+arr.join(sep)+'</div>'};
-  var need=poNeedText();
-  var info=cards([card('TO',po.to,'flex:1',14),card('ATTN',po.attn,'flex:0 0 190px',12.5),card('FROM',po.from,'flex:0 0 170px',12.5)])+
-    cards([card('ITEM NO.',po.po_no,'flex:0 0 170px',14,C),card('MODEL NAME',po.model,'flex:1',14),card('DELIVERY DATE',po.need_by?poDateEn(po.need_by):'','flex:0 0 150px',13,C)]);
-  var used=66+8+54*2;
-
-  /* --- SUMMARY (사진 + 한 줄씩, ★ 강조) --- */
-  var sImgs=po.summary.imgs.filter(function(i){return poImgs[i.key]});
-  var lines=(po.summary.lines||[]).filter(function(l){return String(l.t||'').trim()});
-  var imgsH=sImgs.length?(sImgs.length>2?290:310):0;
-  var linesH=lines.reduce(function(s,l){return s+(l.hl?28:22)},0);
-  var sumH=(sImgs.length||lines.length||need)?(30+imgsH+(lines.length?8+linesH:0)+(need?50:0)+12):0;
-  var sumHtml='';
-  if(sumH){
-    var cw=Math.floor((INW-24-(sImgs.length-1)*12)/Math.max(1,sImgs.length));
-    sumHtml='<div style="height:'+sumH+'px;margin-bottom:8px;box-sizing:border-box;background:#fafafa;border:1px solid #eee;border-radius:6px;position:relative;padding:28px 12px 10px;flex-shrink:0;overflow:hidden">'+
-      '<span style="position:absolute;left:0;top:0;background:'+C+';color:#fff;font-size:10px;font-weight:800;padding:3px 10px;border-bottom-right-radius:5px;letter-spacing:1px">SUMMARY</span>'+
-      '<span style="position:absolute;left:84px;top:4px;font-size:9px;color:#aaa;letter-spacing:.5px">KEY POINTS — PLEASE CHECK BEFORE PRODUCTION</span>'+
-      (sImgs.length?'<div style="height:'+imgsH+'px;display:flex;gap:12px;justify-content:center">'+sImgs.map(function(it){
-        return '<div style="width:'+cw+'px;background:#fff;border:1px solid #ececec;border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px;box-sizing:border-box"><img src="'+poImgs[it.key]+'" style="max-width:'+(cw-14)+'px;max-height:'+(imgsH-(it.cap?32:14))+'px;object-fit:contain">'+(it.cap?'<div style="font-size:10.5px;font-weight:700;color:#555;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>':'')+
-      (lines.length?'<div style="margin-top:8px">'+lines.map(function(l){
-        return l.hl?'<div style="height:24px;margin-bottom:4px;box-sizing:border-box;display:flex;align-items:center;padding:0 10px;background:'+C2+';border-left:4px solid '+C+';border-radius:3px;font-size:13px;font-weight:900;color:'+C+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(l.t)+'</div>'
-          :'<div style="height:22px;display:flex;align-items:center;padding:0 4px;font-size:12px;font-weight:600;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">•&nbsp; '+esc(l.t)+'</div>';
-      }).join('')+'</div>':'')+
-      (need?'<div style="height:40px;margin-top:10px;box-sizing:border-box;background:'+C+';border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;color:#fff;letter-spacing:.3px">'+esc(need)+'</div>':'')+'</div>';
-    used+=sumH+8;
+    used+=orderH+16;
   }
 
-  /* --- 사양: 그룹 카드 2단 --- */
-  var groups=po.spec.map(function(g){return{g:g.g,hl:g.hl,rows:g.rows.filter(function(r){return !po.hide_empty||String(r.v||'').trim()})}}).filter(function(g){return g.rows.length});
-  var RH=19,GH=22,GAP=8,SECT=26+8;
-  var colW2=Math.floor((INW-10)/2);
-  var gH=function(g){return GH+g.rows.length*RH+2+GAP};
+  /* SUMMARY 사진 + 번호 붙은 문구 */
+  var sImgs=po.summary.imgs.filter(function(i){return poImgs[i.key]});
+  var lines=(po.summary.lines||[]).filter(function(l){return String(l.t||'').trim()});
+  var need=poNeedText();
+  var LH=30;
+  var linesH=lines.length*LH;
+  var needH=need?60:0;
+  var restH=usable-used-44-linesH-(lines.length?14:0)-needH;
+  var imgsH=sImgs.length?Math.max(200,Math.min(430,restH)):0;
+  var cw=Math.floor((INW-(sImgs.length-1)*14)/Math.max(1,sImgs.length));
+  var sumHtml=secTitle('SUMMARY','KEY POINTS — PLEASE CHECK BEFORE PRODUCTION')+
+    (sImgs.length?'<div style="height:'+imgsH+'px;display:flex;gap:14px;justify-content:center;flex-shrink:0">'+sImgs.map(function(it){
+      return '<div style="width:'+cw+'px;border:1px solid '+LN+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;box-sizing:border-box"><img src="'+poImgs[it.key]+'" style="max-width:'+(cw-18)+'px;max-height:'+(imgsH-(it.cap?42:18))+'px;object-fit:contain">'+(it.cap?'<div style="font-size:13px;font-weight:700;color:'+TX+';text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>':'')+
+    (lines.length?'<div style="margin-top:14px;flex-shrink:0">'+lines.map(function(l,i){
+      return '<div style="height:'+LH+'px;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:'+(l.hl?900:700)+';color:'+(l.hl?C:TX)+';white-space:nowrap;overflow:hidden;'+(l.hl?'text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px':'')+'"><b style="min-width:24px;font-weight:900">'+(i+1)+'.</b><span style="overflow:hidden;text-overflow:ellipsis">'+esc(l.t)+'</span></div>'}).join('')+'</div>':'')+
+    (need?'<div style="height:48px;margin-top:12px;box-sizing:border-box;border:2px solid '+C+';display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:'+C+';flex-shrink:0">'+esc(need)+'</div>':'');
+  pages.push(wrap(head('SUMMARY')+info+orderHtml+sumHtml));
+
+  /* ================= SPECIFICATION (+ 원본 파일 · REMARKS) ================= */
+  var groups=po.spec.filter(function(g){return !poIsOrderGroup(g)}).map(function(g){return{g:g.g,hl:g.hl,rows:g.rows.filter(function(r){return !po.hide_empty||String(r.v||'').trim()})}}).filter(function(g){return g.rows.length});
+  var RH=27,GH=32,GAP=12;
+  var colW2=Math.floor((INW-16)/2);
+  var RH2=46,rowH=function(r){return String(r.v||'').length>24?RH2:RH};   /* 긴 값은 두 줄 */
+  var gH=function(g){return GH+g.rows.reduce(function(a,r){return a+rowH(r)},0)+3+GAP};
   var gHtml=function(g){
-    return '<div style="margin-bottom:'+GAP+'px;border:1px solid '+(g.hl?'#FBCACA':LN)+';border-radius:6px;overflow:hidden">'+
-      '<div style="height:'+GH+'px;display:flex;align-items:center;padding:0 10px;background:'+(g.hl?C2:BG)+';font-size:10px;font-weight:900;letter-spacing:1.5px;color:'+(g.hl?C:'#555')+'">'+esc(g.g)+'</div>'+
+    var col=g.hl?C:TX;
+    return '<div style="margin-bottom:'+GAP+'px;border:1px solid '+(g.hl?C:LN)+'">'+
+      '<div style="height:'+GH+'px;display:flex;align-items:center;padding:0 12px;border-bottom:1.5px solid '+col+';font-size:13.5px;font-weight:900;letter-spacing:1.5px;color:'+col+'">'+esc(g.g)+'</div>'+
       g.rows.map(function(r,i){var hl=r.hl||(g.hl&&r.v);
-        return '<div style="height:'+RH+'px;display:flex;align-items:center;'+(i?'border-top:1px solid #f3f3f1;':'')+(r.hl?'background:'+C2+';':'')+'">'+
-          '<div style="width:37%;padding:0 10px;box-sizing:border-box;font-size:9px;font-weight:600;color:'+(hl?C:'#999')+';letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(r.k)+'</div>'+
-          '<div style="flex:1;padding:0 8px 0 0;font-size:10.5px;font-weight:'+(r.v?(hl?800:600):400)+';color:'+(hl?C:'#222')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+V(r.v)+'</div></div>'}).join('')+'</div>';
+        var rh=rowH(r);
+        return '<div style="height:'+rh+'px;display:flex;align-items:center;'+(i?'border-top:1px solid '+LN2+';':'')+'">'+
+          '<div style="width:42%;padding:0 10px 0 12px;box-sizing:border-box;font-size:11px;font-weight:700;color:'+(hl?C:SUB)+';line-height:1.2;overflow:hidden">'+esc(r.k)+'</div>'+
+          '<div style="flex:1;padding:0 10px 0 0;font-size:13.5px;font-weight:'+(r.v?(hl?900:700):400)+';color:'+(hl?C:TX)+';line-height:1.3;max-height:'+(rh-6)+'px;overflow:hidden;word-break:break-word">'+V(r.v)+'</div></div>'}).join('')+'</div>';
   };
-  var specTitle=function(t){return '<div style="height:26px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-shrink:0"><span style="width:4px;height:16px;background:'+C+';border-radius:2px"></span><span style="font-size:12px;font-weight:900;letter-spacing:1.5px;color:#222327">'+t+'</span></div>'};
-  /* 한 쪽에 들어갈 만큼: 왼쪽 단 채우고 → 오른쪽 단 → 남으면 다음 쪽 */
   var pack=function(avail,strict){
-    /* 1) 이 쪽에 들어갈 그룹 수 정하기 (왼쪽 단 → 오른쪽 단 순서로 채워 봄) */
     var hs=[0,0],ci=0,n=0;
-    while(n<groups.length){
-      var h=gH(groups[n]);
-      if(hs[ci]+h<=avail||(!strict&&hs[ci]===0)){hs[ci]+=h;n++}
-      else if(ci===0)ci=1;
-      else break;
-    }
-    /* 2) 그 그룹들을 두 단에 고르게 나누기 (순서 유지: 앞쪽 = 왼쪽, 뒤쪽 = 오른쪽) — 한쪽만 길고 반이 비지 않게 */
+    while(n<groups.length){var h=gH(groups[n]);if(hs[ci]+h<=avail||(!strict&&hs[ci]===0)){hs[ci]+=h;n++}else if(ci===0)ci=1;else break}
     var take=groups.splice(0,n),best=0,bestMax=Infinity,tot=take.reduce(function(a,g){return a+gH(g)},0),left=0;
-    for(var k=0;k<=take.length;k++){
-      if(k>0)left+=gH(take[k-1]);
-      var mx=Math.max(left,tot-left);
-      if((left<=avail||(!strict&&k===1))&&(tot-left<=avail||(!strict&&k===take.length-1))&&mx<bestMax){bestMax=mx;best=k}
-    }
+    for(var k=0;k<=take.length;k++){if(k>0)left+=gH(take[k-1]);var mx=Math.max(left,tot-left);if((left<=avail||(!strict&&k===1))&&(tot-left<=avail||(!strict&&k===take.length-1))&&mx<bestMax){bestMax=mx;best=k}}
     if(bestMax===Infinity)best=Math.ceil(take.length/2);
     var cols=[take.slice(0,best),take.slice(best)];
     hs=[cols[0].reduce(function(a,g){return a+gH(g)},0),cols[1].reduce(function(a,g){return a+gH(g)},0)];
-    return {html:'<div style="display:flex;gap:10px;flex-shrink:0"><div style="width:'+colW2+'px">'+cols[0].map(gHtml).join('')+'</div><div style="width:'+colW2+'px">'+cols[1].map(gHtml).join('')+'</div></div>',h:Math.max(hs[0],hs[1])};
+    return {html:'<div style="display:flex;gap:16px;flex-shrink:0"><div style="width:'+colW2+'px">'+cols[0].map(gHtml).join('')+'</div><div style="width:'+colW2+'px">'+cols[1].map(gHtml).join('')+'</div></div>',h:Math.max(hs[0],hs[1])};
   };
-
-  /* --- 원본 파일 + REMARKS --- */
   var files=(po.files||[]).filter(function(f){return f.name});
   var rem=poLines(po.remarks);
-  var filesH=(files.length||qr)?26+Math.max(16+files.length*20+(po.link?30:0),qr?118:0)+2+8:0;
-  var remH=rem.length?26+12+rem.length*18+2+8:0;
+  var boxHead=function(t,sub){return '<div style="height:34px;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1.5px solid '+TX+'"><span style="font-size:14px;font-weight:900;letter-spacing:1.5px">'+t+'</span>'+(sub?'<span style="font-size:11px;color:'+SUB+'">'+sub+'</span>':'')+'</div>'};
+  var filesH=(files.length||qr)?34+Math.max(20+files.length*26+(po.link?36:0),qr?132:0)+3+14:0;
+  var remH=rem.length?34+16+rem.length*24+3+14:0;
   var extraH=filesH+remH;
   var extraHtml=function(){
     var h='';
-    if(filesH)h+='<div style="margin-bottom:8px;border:1px solid '+LN+';border-radius:6px;overflow:hidden;flex-shrink:0">'+
-      '<div style="height:26px;display:flex;align-items:center;gap:8px;padding:0 12px;background:#222327"><span style="font-size:10px;font-weight:800;color:#fff;letter-spacing:1.5px">ARTWORK FILES</span><span style="font-size:9px;color:rgba(255,255,255,.6)">Original design files (AI) are sent separately — please use these files for production</span></div>'+
-      '<div style="display:flex;gap:14px;padding:8px 12px;align-items:center"><div style="flex:1;min-width:0">'+
-      files.map(function(f){return '<div style="height:20px;display:flex;gap:10px;align-items:center;font-size:11px;white-space:nowrap;overflow:hidden"><b style="font-weight:700;color:#222">📎 '+esc(f.name)+'</b><span style="color:#888;overflow:hidden;text-overflow:ellipsis">'+esc(f.note||'')+'</span></div>'}).join('')+
-      (po.link?'<div style="margin-top:6px;font-size:9.5px;color:#1F55C9;word-break:break-all;line-height:1.35"><b style="color:#888;font-weight:600">DOWNLOAD </b>'+esc(po.link)+'</div>':'')+'</div>'+
-      (qr?'<div style="text-align:center;flex-shrink:0"><img src="'+qr+'" style="width:96px;height:96px;display:block"><div style="font-size:8px;color:#999;margin-top:2px">Scan to download</div></div>':'')+'</div></div>';
-    if(remH)h+='<div style="margin-bottom:8px;border:1px solid '+LN+';border-radius:6px;overflow:hidden;flex-shrink:0"><div style="height:26px;display:flex;align-items:center;padding:0 12px;background:'+BG+';font-size:10px;font-weight:700;color:#666;letter-spacing:1.5px;border-bottom:1px solid '+LN+'">REMARKS</div><div style="padding:6px 12px">'+rem.map(function(r){return '<div style="font-size:11px;line-height:18px;color:#333">• '+esc(r)+'</div>'}).join('')+'</div></div>';
+    if(filesH)h+='<div style="margin-top:2px;margin-bottom:14px;border:1.5px solid '+TX+';flex-shrink:0">'+boxHead('ARTWORK FILES','Original design files (AI) are sent separately — please use these files for production')+
+      '<div style="display:flex;gap:16px;padding:10px 14px;align-items:center"><div style="flex:1;min-width:0">'+
+      files.map(function(f){return '<div style="height:26px;display:flex;gap:12px;align-items:center;font-size:13px;white-space:nowrap;overflow:hidden"><b style="font-weight:800">📎 '+esc(f.name)+'</b><span style="color:'+SUB+';overflow:hidden;text-overflow:ellipsis">'+esc(f.note||'')+'</span></div>'}).join('')+
+      (po.link?'<div style="margin-top:8px;font-size:11.5px;color:#1F55C9;word-break:break-all;line-height:1.35"><b style="color:'+SUB+'">DOWNLOAD </b>'+esc(po.link)+'</div>':'')+'</div>'+
+      (qr?'<div style="text-align:center;flex-shrink:0"><img src="'+qr+'" style="width:104px;height:104px;display:block"><div style="font-size:9.5px;color:'+SUB+';margin-top:2px">Scan to download</div></div>':'')+'</div></div>';
+    if(remH)h+='<div style="margin-bottom:14px;border:1.5px solid '+TX+';flex-shrink:0">'+boxHead('REMARKS','')+'<div style="padding:8px 14px">'+rem.map(function(r,i){return '<div style="font-size:14px;line-height:24px;font-weight:600">'+(i+1)+'. '+esc(r)+'</div>'}).join('')+'</div></div>';
     return h;
   };
-
-  /* --- 1쪽 + 이어지는 쪽 --- */
   var wtName=po.watch_type==='pocket'?'POCKET WATCH':'WRIST WATCH';
-  var p1=head('')+steps+info+sumHtml,placed=false,specStarted=false;
-  if(groups.length&&usable-used-SECT>=GH+RH*2+GAP){var pk=pack(usable-used-SECT,true);if(pk.h){p1+=specTitle(wtName+' SPECIFICATION')+pk.html;used+=SECT+pk.h;specStarted=true}}
-  if(!groups.length&&extraH&&used+extraH<=usable){p1+=extraHtml();placed=true}
-  pages.push(wrap(p1));
+  var SECT=44,specStarted=false,placed=false;
   while(groups.length){
-    var pk2=pack(usable-SECT,false),html=head('SPECIFICATION')+specTitle(wtName+' SPECIFICATION'+(specStarted?' (CONT.)':''))+pk2.html;
+    var pk=pack(usable-SECT,false);
+    var html=head('SPECIFICATION')+secTitle('WATCH SPECIFICATION'+(specStarted?' (CONT.)':''),wtName)+pk.html;
     specStarted=true;
-    if(!groups.length&&extraH&&SECT+pk2.h+extraH<=usable){html+=extraHtml();placed=true}
+    if(!groups.length&&extraH&&SECT+pk.h+extraH<=usable){html+=extraHtml();placed=true}
     pages.push(wrap(html));
   }
-  if(extraH&&!placed)pages.push(wrap(head('FILES')+extraHtml()));
+  if(extraH&&!placed)pages.push(wrap(head(specStarted?'SPECIFICATION':'FILES')+extraHtml()));
 
-  /* --- 상세 페이지 --- */
+  /* ================= DESIGN DETAIL ================= */
   po.pages.forEach(function(pg){
     var ims=(pg.imgs||[]).filter(function(i){return poImgs[i.key]});
     var nts=poLines(pg.notes);
-    var titleH=34,hlH=pg.headline?52:0,ntH=nts.length?10+nts.length*24:0,flH=pg.file?30:0;
-    var areaH=usable-titleH-hlH-ntH-flH-8;
+    var titleH=44,hlH=pg.headline?62:0,ntH=nts.length?12+nts.length*30:0,flH=pg.file?34:0;
+    var areaH=usable-titleH-hlH-ntH-flH-6;
     var cols=ims.length<=1?1:2,rows=ims.length>2?2:1;
-    var gw=INW-2-24,cw=Math.floor((gw-(cols-1)*12)/cols),chh=Math.floor((areaH-2-24-(rows-1)*12)/rows);
-    var grid='<div style="height:'+areaH+'px;box-sizing:border-box;padding:12px;background:#fafafa;border:1px solid #eee;border-radius:6px;flex-shrink:0;overflow:hidden">'+
-      (ims.length?'<div style="display:grid;grid-template-columns:repeat('+cols+','+cw+'px);grid-template-rows:repeat('+rows+','+chh+'px);gap:12px;justify-content:center">'+ims.map(function(it){
-        return '<div style="background:#fff;border:1px solid #ececec;border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;box-sizing:border-box;overflow:hidden"><img src="'+poImgs[it.key]+'" style="max-width:'+(cw-18)+'px;max-height:'+(chh-(it.cap?40:18))+'px;object-fit:contain">'+(it.cap?'<div style="font-size:12px;font-weight:700;color:#555;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>'
-       :'<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:12px">No image</div>')+'</div>';
-    var inner=head(pg.title||'DETAIL')+
-      '<div style="height:'+titleH+'px;display:flex;align-items:center;gap:10px;flex-shrink:0"><span style="width:4px;height:20px;background:'+C+';border-radius:2px"></span><span style="font-size:19px;font-weight:900;color:#222327;letter-spacing:1px">'+esc(pg.title||'')+'</span></div>'+
-      (hlH?'<div style="height:44px;margin-bottom:8px;box-sizing:border-box;background:'+C2+';border:1.5px solid '+C+';border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:'+C+';letter-spacing:1px;flex-shrink:0;white-space:nowrap;overflow:hidden">'+esc(pg.headline)+'</div>':'')+
+    var cw2=Math.floor((INW-(cols-1)*14)/cols),chh=Math.floor((areaH-(rows-1)*14)/rows);
+    var grid=ims.length?'<div style="height:'+areaH+'px;display:grid;grid-template-columns:repeat('+cols+','+cw2+'px);grid-template-rows:repeat('+rows+','+chh+'px);gap:14px;justify-content:center;flex-shrink:0">'+ims.map(function(it){
+        return '<div style="border:1px solid '+LN+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px;box-sizing:border-box;overflow:hidden"><img src="'+poImgs[it.key]+'" style="max-width:'+(cw2-22)+'px;max-height:'+(chh-(it.cap?48:22))+'px;object-fit:contain">'+(it.cap?'<div style="font-size:15px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>'
+      :'<div style="height:'+areaH+'px;border:1px dashed '+LN+';display:flex;align-items:center;justify-content:center;color:#bbb;font-size:14px;flex-shrink:0">No image</div>';
+    var inner=head('DESIGN DETAIL')+
+      '<div style="height:'+titleH+'px;display:flex;align-items:center;gap:10px;flex-shrink:0"><span style="width:5px;height:24px;background:'+C+'"></span><span style="font-size:22px;font-weight:900;letter-spacing:1.5px">'+esc(pg.title||'')+'</span></div>'+
+      (hlH?'<div style="height:52px;margin-bottom:10px;box-sizing:border-box;border:2px solid '+C+';display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:'+C+';letter-spacing:1px;flex-shrink:0;white-space:nowrap;overflow:hidden">'+esc(pg.headline)+'</div>':'')+
       grid+
-      (nts.length?'<div style="margin-top:10px;flex-shrink:0">'+nts.map(function(n){return '<div style="height:24px;display:flex;align-items:center;font-size:13.5px;font-weight:800;color:'+C+';white-space:nowrap;overflow:hidden">▸ '+esc(n)+'</div>'}).join('')+'</div>':'')+
-      (flH?'<div style="height:24px;margin-top:6px;padding:0 12px;box-sizing:border-box;background:'+BG+';border-radius:5px;display:flex;align-items:center;gap:6px;font-size:10.5px;color:#666;flex-shrink:0">📎 Artwork file: <b style="color:#222">'+esc(pg.file)+'</b></div>':'');
+      (nts.length?'<div style="margin-top:12px;flex-shrink:0">'+nts.map(function(n,i){return '<div style="height:30px;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;color:'+C+';white-space:nowrap;overflow:hidden"><b style="min-width:22px">'+(i+1)+'.</b>'+esc(n)+'</div>'}).join('')+'</div>':'')+
+      (flH?'<div style="height:28px;margin-top:6px;display:flex;align-items:center;gap:6px;font-size:12.5px;color:'+SUB+';border-top:1px solid '+LN2+';flex-shrink:0">📎 Artwork file: <b style="color:'+TX+'">'+esc(pg.file)+'</b></div>':'');
     pages.push(wrap(inner));
   });
 
