@@ -77,6 +77,8 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
 .po-star.on{background:#FFF1F1;border-color:#E11D24;color:#E11D24}
 .po-lines{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
 .po-line{display:grid;grid-template-columns:26px 1fr auto 30px;gap:6px;align-items:center}
+.po-month{display:flex;align-items:center;gap:6px;flex-shrink:0;font-size:12px;font-weight:800;color:#B91C1C;white-space:nowrap}
+.po-month input{padding:6px 8px;border:1.5px solid #FCA5A5;border-radius:7px;font-family:inherit;font-size:13px;background:#FFF5F5;color:#222}
 .po-num{font-size:14px;font-weight:900;color:#E11D24;text-align:right}
 .po-line input{padding:9px 11px;border:1px solid #e3e3e3;border-radius:8px;font-family:inherit;font-size:13.5px}
 .po-line.hl input{border-color:#FCA5A5;background:#FFF5F5;font-weight:800;color:#B91C1C}
@@ -3006,6 +3008,13 @@ var PO_OPT={
 };
 /* SUMMARY 자주 쓰는 문구 — [문서에 나가는 영어, 화면 한글] */
 var PO_SUM_OPT=[['SAME AS SAMPLE','샘플과 동일하게 제작'],['SAME AS BEFORE (LAST ORDER)','지난번 주문과 동일하게 제작'],['SET TO KOREAN TIME (GMT+9)','한국 시간으로 세팅'],["SILK PRINT 'MADE IN CHINA' ON THE CASE (6mm WIDE)",'케이스에 MADE IN CHINA 실크 인쇄 (6mm 너비)']];
+var PO_LAST_ORDER='SAME AS BEFORE (LAST ORDER)';
+/* '지난번 주문과 동일' + 달 → SAME AS BEFORE (LAST ORDER: SEPTEMBER 2026) */
+function poLineText(l){
+  var t=String(l.t||'').trim();
+  if(t===PO_LAST_ORDER&&l.date){var p=String(l.date).split('-');var M=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];if(p.length>=2&&+p[1]>=1)return 'SAME AS BEFORE (LAST ORDER: '+M[+p[1]-1]+' '+p[0]+')'}
+  return t;
+}
 var PO_PH={'SIZE (Ø × T)':'예) Ø47mm × 12mm','SIZE (W × L)':'예) 20mm × 120/75mm','LENGTH':'예) 37cm','ORDER':'예) 110pcs','SPARE WATCH (2%)':'예) 2pcs','SPARE PARTS (3%)':'예) 3 sets','UNIT PRICE':'예) 4.15 USD','SAMPLE COST':'예) 15 USD','MOLD / SETUP COST':'예) 120 USD','SAMPLE DATE':'예) 2026.10.20','SHIP DATE (ETD)':'예) 2026.11.01'};
 var po=null,poImgs={},poImgTarget=null,poCurrentId=null,poLinkedDcNum='';
 
@@ -3111,7 +3120,8 @@ function poRenderForm(){
       return '<div class="po-line'+(l.hl?' hl':'')+'"><b class="po-num">'+(i+1)+'.</b><div class="po-vsel"><select data-polsel="'+i+'"><option value="">— 자주 쓰는 문구 선택 —</option>'+
         PO_SUM_OPT.map(function(o){return '<option value="'+esc(o[0])+'"'+(!other&&o[0]===l.t?' selected':'')+'>'+esc(o[1])+'  ·  '+esc(o[0])+'</option>'}).join('')+
         '<option value="__other"'+(other?' selected':'')+'>기타 (직접 입력)</option></select>'+
-        (other?'<input value="'+esc(l.t||'')+'" placeholder="직접 입력 — 영어로" data-pol="'+i+'">':'')+'</div>'+
+        (other?'<input value="'+esc(l.t||'')+'" placeholder="직접 입력 — 영어로" data-pol="'+i+'">':'')+
+        (!other&&l.t===PO_LAST_ORDER?'<label class="po-month" title="지난 주문이 몇 월이었는지 — 문서에 LAST ORDER: 월 연도로 나가요">지난 주문<input type="month" value="'+esc(l.date||'')+'" data-polm="'+i+'"></label>':'')+'</div>'+
         '<button type="button" class="po-star'+(l.hl?' on':'')+'" data-polhl="'+i+'" title="강조 (빨간 굵은 글씨)">★ 강조</button><button type="button" class="ps-del" data-poldel="'+i+'" title="줄 빼기">×</button></div>';
     }).join('')+'</div><button type="button" class="ps-add" data-poladd="1">+ 한 줄 추가</button> <span class="po-hint">고르면 문서엔 영어로 · 목록에 없으면 “기타” → 직접 입력 (Enter = 다음 줄)</span></div>';
   /* 주문 조건 (수량·단가·납기) — 문서 1쪽 SUMMARY에 크게 */
@@ -3158,10 +3168,11 @@ function poBindForm(box){
     inp.oninput=function(){po.summary.lines[+inp.dataset.pol].t=inp.value};
     inp.onkeydown=function(e){if(e.key!=='Enter'||e.isComposing)return;e.preventDefault();var i=+inp.dataset.pol;po.summary.lines.splice(i+1,0,{t:'',hl:0});rerender();var n=document.querySelector('[data-polsel="'+(i+1)+'"]');if(n)n.focus()};
   });
+  box.querySelectorAll('[data-polm]').forEach(function(inp){inp.onchange=inp.oninput=function(){po.summary.lines[+inp.dataset.polm].date=inp.value}});
   box.querySelectorAll('[data-polsel]').forEach(function(sel){sel.onchange=function(){
     var i=+sel.dataset.polsel,l=po.summary.lines[i];
     if(sel.value==='__other'){l._other=1;if(PO_SUM_OPT.some(function(o){return o[0]===l.t}))l.t='';rerender();var n=document.querySelector('[data-pol="'+i+'"]');if(n)n.focus()}
-    else{l._other=0;l.t=sel.value;rerender()}
+    else{l._other=0;l.t=sel.value;rerender();if(l.t===PO_LAST_ORDER){var m=document.querySelector('[data-polm="'+i+'"]');if(m)m.focus()}}
   }});
   box.querySelectorAll('[data-polhl]').forEach(function(b){b.onclick=function(){var l=po.summary.lines[+b.dataset.polhl];l.hl=l.hl?0:1;rerender()}});
   box.querySelectorAll('[data-poldel]').forEach(function(b){b.onclick=function(){po.summary.lines.splice(+b.dataset.poldel,1);if(!po.summary.lines.length)po.summary.lines.push({t:'',hl:0});rerender()}});
@@ -3430,7 +3441,7 @@ async function buildPoDocAsync(){
       return '<div style="width:'+cw+'px;border:1px solid '+LN+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;box-sizing:border-box"><img src="'+poImgs[it.key]+'" style="'+poFitStyle(dims[it.key]||{w:1,h:1},cw-18,imgsH-(it.cap?40:18))+'">'+(it.cap?'<div style="font-size:13px;font-weight:700;color:'+TX+';text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>':'')+
     (lines.length?'<div style="height:30px;margin-top:12px;display:flex;align-items:center;gap:10px;border-bottom:1.5px solid '+TX+';flex-shrink:0"><span style="font-size:14px;font-weight:900;letter-spacing:1.5px;color:'+C+'">IMPORTANT NOTES</span><span style="font-size:11.5px;font-weight:700;color:'+SUB+';letter-spacing:.5px">MUST BE FOLLOWED</span></div>'+
       '<div style="margin-top:2px;flex-shrink:0">'+lines.map(function(l,i){
-      return '<div style="height:'+LH+'px;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:'+(l.hl?900:700)+';color:'+(l.hl?C:TX)+';white-space:nowrap;overflow:hidden"><b style="min-width:24px;font-weight:900">'+(i+1)+'.</b><span style="overflow:hidden;text-overflow:ellipsis;'+(l.hl?'text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px':'')+'">'+esc(l.t)+'</span></div>'}).join('')+'</div>':'')+
+      return '<div style="height:'+LH+'px;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:'+(l.hl?900:700)+';color:'+(l.hl?C:TX)+';white-space:nowrap;overflow:hidden"><b style="min-width:24px;font-weight:900">'+(i+1)+'.</b><span style="overflow:hidden;text-overflow:ellipsis;'+(l.hl?'text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px':'')+'">'+esc(poLineText(l))+'</span></div>'}).join('')+'</div>':'')+
     (need?'<div style="height:48px;margin-top:12px;box-sizing:border-box;border:2px solid '+C+';display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:'+C+';flex-shrink:0">'+esc(need)+'</div>':'');
   pages.push(wrap(head('SUMMARY')+info+orderHtml+sumHtml));
 
