@@ -5902,3 +5902,28 @@ body.m-on .theme-toggle{display:none}
 .inq-qlp-r{flex:none; display:flex; flex-direction:column; align-items:flex-end; font-size:13.5px; font-weight:800; color:#1B64DA; font-variant-numeric:tabular-nums}
 .inq-qlp-r small{font-size:11.5px; font-weight:600; color:var(--gray-500)}
 .inq-qlp-empty{padding:28px; text-align:center; color:var(--gray-500); font-size:13px}
+
+/* ---- 매입처 카드: 해외 매입 (달러) ---- */
+.ovs-toggle{display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:9px 12px;border:1.5px solid #FFD4A6;border-radius:9px;background:var(--white);font-size:13.5px;font-weight:800;color:#B56500;cursor:pointer}
+.ovs-toggle input{width:17px;height:17px;accent-color:#E67E22}
+.ovs-toggle span{font-size:12px;font-weight:500;color:var(--gray-500)}
+.ovs-box{margin-bottom:6px}
+.ovs-box small{font-weight:500;color:var(--gray-500);font-size:11.5px}
+.ovs-in{position:relative}
+.ovs-in b{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--gray-500);font-weight:700;pointer-events:none}
+.ovs-in .form-input{padding-left:26px!important}
+.ovs-goods{background:var(--white);font-weight:800;color:#B56500}
+.ovs-goods small{font-weight:600;color:var(--gray-500);margin-left:4px}
+.ovs-sub{margin:12px 0 6px;padding-top:10px;border-top:1px dashed #FFE0CC;font-size:12.5px;font-weight:800;color:#B56500}
+.ovs-sub small{margin-left:6px}
+.ovs-row{display:grid;grid-template-columns:1.3fr 1fr 64px 1fr 30px;gap:6px;align-items:center;margin-bottom:6px}
+.ovs-row.pay{grid-template-columns:84px 1fr 1fr 1.1fr 1fr 30px}
+.ovs-row .form-input,.ovs-row .form-select{height:36px;padding-top:0;padding-bottom:0;font-size:13px}
+.ovs-krw{font-size:12px;font-weight:700;color:var(--gray-600);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ovs-x{width:30px;height:30px;border:0;border-radius:7px;background:transparent;color:var(--gray-400);font-size:16px;cursor:pointer}
+.ovs-x:hover{background:var(--red-light,#fee2e2);color:var(--red)}
+.ovs-quick{display:flex;flex-wrap:wrap;gap:6px}
+.ovs-quick button{padding:5px 10px;border:1px dashed #FFD4A6;border-radius:999px;background:transparent;color:#B56500;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.ovs-quick button:hover{background:var(--white);border-style:solid}
+.ovs-note{font-size:11.5px;color:var(--gray-500);line-height:1.5;align-self:end;padding-bottom:10px}
+.inq-ovs{font-weight:800;color:#B56500}

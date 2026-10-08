@@ -4559,6 +4559,8 @@ function openEditProject(id) {
 
         <div id="editSupplierDetailCard" style="background:var(--orange-light);border:1.5px solid var(--gray-200);border-left:4px solid var(--orange);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900);display:${p.supplier ? 'block' : 'none'}">
             <div class="form-section-title" style="color:var(--klp-orange,#E67E22)">🏭 매입처 상세 (작업요청서용)</div>
+            ${ovsBoxHtml('editProject', p.supplierOverseas)}
+            <div class="sup-dom" id="editProjectSupDom" style="display:${p.supplierOverseas ? 'none' : ''}">
             <div class="form-row" style="grid-template-columns:2fr 1fr">
                 <div class="form-group"><label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">매입 단가</label><input type="text" inputmode="numeric" class="form-input" id="editProjectSupUnitPrice" value="${p.supplierUnitPrice ? Number(p.supplierUnitPrice).toLocaleString() : ''}" placeholder="0" oninput="fmtProjectNumberInput(this);calcEditSupplierTotal()"></div>
                 <div class="form-group"><label class="form-label">매입 VAT</label>
@@ -4648,6 +4650,7 @@ function openEditProject(id) {
                     </div>
                 </div>
             </div>
+            </div>
             <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid #FFE0CC">
                 <label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">💰 매입액 (자동계산)</label>
                 <div id="editProjectSupBreakdown" style="background:var(--white);border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--gray-600)"></div>
@@ -4688,7 +4691,7 @@ function openEditProject(id) {
     const overlay = document.getElementById('modalOverlay');
     overlay.classList.add('show'); openModalHistory();
     overlay.classList.add('modal-wide');
-    setTimeout(() => { calcEditProjectRevenue(); calcEditSupplierTotal(); }, 0);
+    setTimeout(() => { if (ovsIsOn('editProject')) ovsRenderRows('editProject'); calcEditProjectRevenue(); calcEditSupplierTotal(); }, 0);
 }
 
 function calcEditProjectRevenue() {
@@ -4711,6 +4714,7 @@ function calcEditProjectRevenue() {
 }
 
 function toggleEditSupplierSection() {
+    ovsMaybeAuto('editProject', 'editProjectSupplier');
     const supEl = document.getElementById('editProjectSupplier');
     const card = document.getElementById('editSupplierDetailCard');
     if (!supEl || !card) return;
@@ -4725,6 +4729,7 @@ function toggleEditSupplierSection() {
 function calcEditSupplierTotal() {
     const displayEl = document.getElementById('editProjectSupTotalDisplay');
     if (!displayEl) return;
+    if (ovsIsOn('editProject')) { ovsShowTotal('editProject', readProjectNumber('editProjectQty'), 'editProjectRevenueDisplay', 'editProjectMarginDisplay'); return; }
     const price = readProjectNumber('editProjectSupUnitPrice');
     const qty = readProjectNumber('editProjectQty');
     const vatEl = document.getElementById('editProjectSupVat');
@@ -4787,6 +4792,16 @@ async function updateProject(id) {
         const supShipTotal = _shippingComponent('editProjectSupShippingType','editProjectSupShippingVat','editProjectSupShippingCost','editProjectSupShipPerBox','editProjectSupShipBoxes');
         supplierRevenue = supProductTotal + supPrintTotal + supPackTotal + supShipTotal;
     }
+    // 해외 매입(달러): 원화 환산 매입액으로 덮어씀 — 국내용 인쇄·포장·배송 매입 칸은 비움
+    let supplierOverseas = null;
+    if (supplierName && ovsIsOn('editProject')) {
+        const o = ovsCalc(_ovs.editProject, qty);
+        supplierOverseas = ovsClean(_ovs.editProject);
+        supplierRevenue = o.total;
+        supplierUnitPrice = o.unitKrw; supplierUnitPriceVat = 'VAT 별도'; supplierVat = 'exclude';
+        supplierPrintFee = 0; supplierPackagingFee = 0;
+        ovsRememberRate(supplierOverseas.rate);
+    }
 
     const newChecks = {};
     Object.keys(p.checks || {}).forEach(k => {
@@ -4834,7 +4849,8 @@ async function updateProject(id) {
         supplierPackagingFeeVat,
         supplierPackagingFeeApply,
         supplierRevenue,
-        supplierShippingType: getVal('editProjectSupShippingType'),
+        supplierOverseas,
+        supplierShippingType: supplierOverseas ? '' : getVal('editProjectSupShippingType'),
         supplierShippingVat: getVal('editProjectSupShippingVat') || 'VAT 별도',
         supplierShippingCostPerBox: readProjectNumber('editProjectSupShipPerBox'),
         supplierShippingBoxes: readProjectNumber('editProjectSupShipBoxes'),
@@ -4912,6 +4928,7 @@ async function updateProject(id) {
                 supplier_packaging_fee_vat: p.supplierPackagingFeeVat || 'VAT 별도',
                 supplier_packaging_fee_apply: p.supplierPackagingFeeApply || '1개당',
                 supplier_revenue: p.supplierRevenue || 0,
+                supplier_overseas: p.supplierOverseas || null,
                 supplier_shipping_type: p.supplierShippingType || '',
                 supplier_shipping_vat: p.supplierShippingVat || 'VAT 별도',
                 supplier_shipping_cost_per_box: p.supplierShippingCostPerBox || 0,
@@ -5173,6 +5190,8 @@ function openModal(type) {
                 <div id="supplierDetailCard" style="background:var(--orange-light);border:1.5px solid var(--gray-200);border-left:4px solid var(--orange);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900);display:none">
                     <div class="form-section-title" style="color:var(--klp-orange,#E67E22)">🏭 매입처 상세 (작업요청서용)</div>
                     <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:14px">매입 단가를 입력하면 저장 시 매입처 자식 프로젝트가 함께 생성됩니다. (수량·단위·품명은 위 제품 정보를 공유합니다)</div>
+                    ${ovsBoxHtml('newProject', null)}
+                    <div class="sup-dom" id="newProjectSupDom">
                     <div class="form-row" style="grid-template-columns:2fr 1fr">
                         <div class="form-group"><label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">매입 단가</label><input type="text" inputmode="numeric" class="form-input" id="newProjectSupUnitPrice" placeholder="0" oninput="fmtProjectNumberInput(this);calcSupplierTotal()"></div>
                         <div class="form-group"><label class="form-label">매입 VAT</label>
@@ -5215,6 +5234,7 @@ function openModal(type) {
                     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:8px;border-top:1px solid #FFE0CC">
                         <button type="button" id="newSupPrintAdd" onclick="toggleProjSection('newSupPrintSec','newSupPrintAdd',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed #FFD4A6;background:transparent;color:#B56500;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ 매입 인쇄 추가</button>
                         <button type="button" id="newSupPackAdd" onclick="toggleProjSection('newSupPackSec','newSupPackAdd',true)" style="flex:1;min-width:120px;padding:8px 12px;border:1px dashed #FFD4A6;background:transparent;color:#B56500;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">+ 매입 포장 추가</button>
+                    </div>
                     </div>
                     <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid #FFE0CC">
                         <label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">💰 매입액 (자동계산)</label>
@@ -5427,6 +5447,184 @@ function _shippingComponent(typeId, vatId, costId, perBoxId, boxesId) {
     return cost;
 }
 
+// ===== 해외 매입 (달러) — 매입처 카드 '🌏 해외 매입' (migration 059: projects_domestic.supplier_overseas jsonb) =====
+// { cur:'USD', unit: 외화 단가, rate: 견적 환율, extras:[{name, amt, cur:'KRW'|'USD'}], ivat: 수입 부가세(빈 값=자동 10%), pays:[{kind, usd, rate, date}] }
+// 매입액(supplier_revenue) = 물품 대금(송금한 건 그때 환율, 남은 건 견적 환율) + 부대비용 + 수입 부가세 — 국내 매입액(VAT 포함)과 같은 기준
+const OVS_EXTRA_NAMES = ['국제 운송비', '관세', '통관 수수료', '송금 수수료', '국내 운송비', '금형비'];
+const OVS_PAY_KINDS = ['선금', '잔금', '일괄', '추가'];
+const _ovs = {};
+let _ovsClientKeys = null;
+function ovsNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
+function ovsUsd(n) { return '$' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
+function ovsDefault() {
+    let rate = 0;
+    try { rate = ovsNum(localStorage.getItem('ovs_rate')); } catch (_) {}
+    return { cur: 'USD', unit: 0, rate: rate || 0, extras: [], ivat: null, pays: [] };
+}
+function ovsRememberRate(r) { if (r > 0) try { localStorage.setItem('ovs_rate', String(r)); } catch (_) {} }
+function ovsClean(d) {
+    return {
+        cur: 'USD', unit: ovsNum(d.unit), rate: ovsNum(d.rate),
+        extras: (d.extras || []).filter(e => e.name || ovsNum(e.amt)).map(e => ({ name: e.name || '', amt: ovsNum(e.amt), cur: e.cur === 'USD' ? 'USD' : 'KRW' })),
+        ivat: d.ivat === null || d.ivat === '' || d.ivat === undefined ? null : ovsNum(d.ivat),
+        pays: (d.pays || []).filter(x => ovsNum(x.usd)).map(x => ({ kind: x.kind || '선금', usd: ovsNum(x.usd), rate: ovsNum(x.rate), date: x.date || '' }))
+    };
+}
+function ovsCalc(d, qty) {
+    d = d || ovsDefault();
+    const rate = ovsNum(d.rate), q = Number(qty) || 0;
+    const goodsUsd = Math.round(ovsNum(d.unit) * q * 100) / 100;
+    const pays = (d.pays || []).filter(x => ovsNum(x.usd));
+    const paidUsd = pays.reduce((s, x) => s + ovsNum(x.usd), 0);
+    const paidKrw = pays.reduce((s, x) => s + Math.round(ovsNum(x.usd) * (ovsNum(x.rate) || rate)), 0);
+    const remainUsd = Math.max(0, goodsUsd - paidUsd);
+    const goodsKrw = paidKrw + Math.round(remainUsd * rate);
+    const goodsKrwQuote = Math.round(goodsUsd * rate);
+    const fxDiff = paidKrw - Math.round(paidUsd * rate);           // 송금 때 환율 − 견적 환율 (+면 더 냄)
+    const extrasKrw = (d.extras || []).reduce((s, e) => s + (e.cur === 'USD' ? Math.round(ovsNum(e.amt) * rate) : Math.round(ovsNum(e.amt))), 0);
+    const ivatAuto = Math.round((goodsKrw + extrasKrw) * 0.1);
+    const ivatManual = !(d.ivat === null || d.ivat === '' || d.ivat === undefined);
+    const ivat = ivatManual ? Math.round(ovsNum(d.ivat)) : ivatAuto;
+    const total = goodsKrw + extrasKrw + ivat;
+    return { goodsUsd, paidUsd, paidKrw, remainUsd, goodsKrw, goodsKrwQuote, fxDiff, extrasKrw, ivat, ivatAuto, ivatManual, total, unitKrw: q ? Math.round(goodsKrw / q) : 0, rate };
+}
+function ovsIsOn(P) { const el = document.getElementById(P + 'Ovs'); return !!(el && el.checked); }
+function ovsCalcFn(P) { return P === 'editProject' ? calcEditSupplierTotal : calcSupplierTotal; }
+function ovsBoxHtml(P, data) {
+    _ovs[P] = data ? JSON.parse(JSON.stringify(data)) : ovsDefault();
+    if (!_ovs[P].extras) _ovs[P].extras = [];
+    if (!_ovs[P].pays) _ovs[P].pays = [];
+    const d = _ovs[P], on = !!data;
+    const nv = v => (v ? Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '');
+    return `
+      <label class="ovs-toggle"><input type="checkbox" id="${P}Ovs" ${on ? 'checked' : ''} onchange="this.dataset.touched='1';ovsToggle('${P}')"> 🌏 해외 매입 <span>달러로 결제하는 해외 공장</span></label>
+      <div class="ovs-box" id="${P}OvsBox" style="display:${on ? '' : 'none'}">
+        <div class="form-row" style="grid-template-columns:1fr 1fr 1.2fr">
+          <div class="form-group"><label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">외화 단가 (USD)</label>
+            <div class="ovs-in"><b>$</b><input type="text" inputmode="decimal" class="form-input" id="${P}OvsUnit" value="${nv(d.unit)}" placeholder="0.00" oninput="ovsSet('${P}','unit',this)"></div></div>
+          <div class="form-group"><label class="form-label">견적 환율 <small>(원 / $1)</small></label>
+            <input type="text" inputmode="decimal" class="form-input" id="${P}OvsRate" value="${nv(d.rate)}" placeholder="예) 1,390" oninput="ovsSet('${P}','rate',this)"></div>
+          <div class="form-group"><label class="form-label">물품 대금</label><div class="form-input ovs-goods" id="${P}OvsGoods">-</div></div>
+        </div>
+        <div class="ovs-sub">부대비용 <small>운송비·관세·통관·송금 수수료 등 — 원화 또는 달러</small></div>
+        <div id="${P}OvsExtras"></div>
+        <div class="ovs-quick">${OVS_EXTRA_NAMES.map(n => `<button type="button" onclick="ovsAddExtra('${P}','${n}')">+ ${n}</button>`).join('')}<button type="button" onclick="ovsAddExtra('${P}','')">+ 직접 입력</button></div>
+        <div class="form-row" style="grid-template-columns:1fr 1.4fr;margin-top:10px">
+          <div class="form-group"><label class="form-label">수입 부가세 <small>(통관 때 냄 · 나중에 돌려받음)</small></label>
+            <input type="text" inputmode="numeric" class="form-input" id="${P}OvsIvat" value="${d.ivat === null || d.ivat === undefined ? '' : Number(d.ivat).toLocaleString()}" placeholder="비우면 자동 10%" oninput="ovsSet('${P}','ivat',this)"></div>
+          <div class="ovs-note">국내 매입처의 VAT처럼 매입액에 넣어 마진을 같은 기준으로 비교해요. 실제 금액은 통관 서류를 보고 고쳐 주세요.</div>
+        </div>
+        <div class="ovs-sub">송금 기록 <small>보낼 때마다 그날 환율로 — 선금·잔금으로 나누거나 한 번에(일괄)</small></div>
+        <div id="${P}OvsPays"></div>
+        <div class="ovs-quick">${OVS_PAY_KINDS.map(k => `<button type="button" onclick="ovsAddPay('${P}','${k}')">+ ${k} 송금</button>`).join('')}</div>
+      </div>`;
+}
+function ovsToggle(P) {
+    const on = ovsIsOn(P);
+    const box = document.getElementById(P + 'OvsBox'), dom = document.getElementById(P + 'SupDom');
+    if (box) box.style.display = on ? '' : 'none';
+    if (dom) dom.style.display = on ? 'none' : '';
+    if (on) { ovsRenderRows(P); }
+    ovsCalcFn(P)();
+}
+async function ovsMaybeAuto(P, inputId) {
+    const el = document.getElementById(inputId), cb = document.getElementById(P + 'Ovs');
+    if (!el || !cb || cb.checked || cb.dataset.touched) return;
+    const name = (el.value || '').trim();
+    if (!name) return;
+    if (!_ovsClientKeys) {
+        try {
+            const { data } = await sb.from('clients_overseas').select('company_name');
+            _ovsClientKeys = new Set((data || []).map(r => clientNameKey(r.company_name || '')).filter(Boolean));
+        } catch (_) { _ovsClientKeys = new Set(); }
+    }
+    if (_ovsClientKeys.has(clientNameKey(name)) && !cb.checked) {
+        cb.checked = true; ovsToggle(P);
+        showToast('해외 거래처라서 🌏 해외 매입으로 바꿨어요 (끄려면 체크 해제)');
+    }
+}
+function ovsSet(P, key, el) {
+    if (key === 'unit' || key === 'rate') { _ovs[P][key] = ovsNum(el.value); fmtOvsInput(el); }
+    else if (key === 'ivat') { _ovs[P].ivat = el.value.trim() === '' ? null : ovsNum(el.value); fmtOvsInput(el, true); }
+    ovsCalcFn(P)();
+}
+function fmtOvsInput(el, intOnly) {
+    const raw = String(el.value), pos = raw.length - el.selectionStart;
+    let v = raw.replace(intOnly ? /[^0-9]/g : /[^0-9.]/g, '');
+    if (!intOnly) { const i = v.indexOf('.'); if (i >= 0) v = v.slice(0, i + 1) + v.slice(i + 1).replace(/\./g, '').slice(0, 2); }
+    const [a, b] = v.split('.');
+    const out = (a ? Number(a).toLocaleString() : (b !== undefined ? '0' : '')) + (b !== undefined ? '.' + b : '');
+    if (out !== raw) { el.value = out; try { const p = Math.max(0, out.length - pos); el.setSelectionRange(p, p); } catch (_) {} }
+}
+function ovsRenderRows(P) {
+    const d = _ovs[P];
+    const ex = document.getElementById(P + 'OvsExtras'), py = document.getElementById(P + 'OvsPays');
+    const nv = v => (v ? Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '');
+    if (ex) ex.innerHTML = d.extras.map((e, i) => `
+        <div class="ovs-row">
+          <input type="text" class="form-input" list="ovsExtraNames" value="${escHtml(e.name || '')}" placeholder="항목" oninput="ovsSetRow('${P}','extras',${i},'name',this)">
+          <input type="text" inputmode="decimal" class="form-input" value="${nv(e.amt)}" placeholder="금액" oninput="ovsSetRow('${P}','extras',${i},'amt',this)">
+          <select class="form-select" onchange="ovsSetRow('${P}','extras',${i},'cur',this)"><option value="KRW" ${e.cur !== 'USD' ? 'selected' : ''}>원</option><option value="USD" ${e.cur === 'USD' ? 'selected' : ''}>$</option></select>
+          <span class="ovs-krw" id="${P}OvsEx${i}"></span>
+          <button type="button" class="ovs-x" onclick="ovsDelRow('${P}','extras',${i})" title="빼기">×</button>
+        </div>`).join('') + `<datalist id="ovsExtraNames">${OVS_EXTRA_NAMES.map(n => `<option value="${n}">`).join('')}</datalist>`;
+    if (py) py.innerHTML = d.pays.map((x, i) => `
+        <div class="ovs-row pay">
+          <select class="form-select" onchange="ovsSetRow('${P}','pays',${i},'kind',this)">${OVS_PAY_KINDS.map(k => `<option ${x.kind === k ? 'selected' : ''}>${k}</option>`).join('')}</select>
+          <div class="ovs-in"><b>$</b><input type="text" inputmode="decimal" class="form-input" value="${nv(x.usd)}" placeholder="송금액" oninput="ovsSetRow('${P}','pays',${i},'usd',this)"></div>
+          <input type="text" inputmode="decimal" class="form-input" value="${nv(x.rate)}" placeholder="그날 환율" oninput="ovsSetRow('${P}','pays',${i},'rate',this)">
+          <input type="date" class="form-input" value="${escHtml(x.date || '')}" onchange="ovsSetRow('${P}','pays',${i},'date',this)">
+          <span class="ovs-krw" id="${P}OvsPay${i}"></span>
+          <button type="button" class="ovs-x" onclick="ovsDelRow('${P}','pays',${i})" title="빼기">×</button>
+        </div>`).join('');
+}
+function ovsSetRow(P, list, i, key, el) {
+    const row = _ovs[P][list][i];
+    if (!row) return;
+    if (key === 'amt' || key === 'usd' || key === 'rate') { fmtOvsInput(el); row[key] = ovsNum(el.value); }
+    else row[key] = el.value;
+    ovsCalcFn(P)();
+}
+function ovsDelRow(P, list, i) { _ovs[P][list].splice(i, 1); ovsRenderRows(P); ovsCalcFn(P)(); }
+function ovsAddExtra(P, name) {
+    _ovs[P].extras.push({ name, amt: 0, cur: name === '송금 수수료' ? 'USD' : 'KRW' });
+    ovsRenderRows(P); ovsCalcFn(P)();
+    const rows = document.querySelectorAll(`#${P}OvsExtras .ovs-row`);
+    const last = rows[rows.length - 1];
+    if (last) last.querySelector(name ? 'input[inputmode]' : 'input').focus();
+}
+function ovsAddPay(P, kind) {
+    const d = _ovs[P], qty = readProjectNumber(P + 'Qty');
+    const c = ovsCalc(d, qty);
+    // 금액 기본값: 일괄 = 전체, 잔금 = 남은 금액, 선금 = 절반
+    const usd = kind === '일괄' || kind === '잔금' ? c.remainUsd : kind === '선금' ? Math.round(c.goodsUsd * 50) / 100 : 0;
+    d.pays.push({ kind, usd, rate: d.rate || 0, date: getTodayStr() });
+    ovsRenderRows(P); ovsCalcFn(P)();
+}
+function ovsShowTotal(P, qty, revId, marginId) {
+    const d = _ovs[P], c = ovsCalc(d, qty);
+    const won = n => Math.round(n).toLocaleString() + '원';
+    const g = document.getElementById(P + 'OvsGoods');
+    if (g) g.innerHTML = c.goodsUsd ? `${ovsUsd(c.goodsUsd)} <small>≈ ${won(c.goodsKrwQuote)}</small>` : '-';
+    d.extras.forEach((e, i) => { const el = document.getElementById(P + 'OvsEx' + i); if (el) el.textContent = e.cur === 'USD' && ovsNum(e.amt) ? '≈ ' + won(ovsNum(e.amt) * c.rate) : ''; });
+    d.pays.forEach((x, i) => { const el = document.getElementById(P + 'OvsPay' + i); if (el) el.textContent = ovsNum(x.usd) ? '= ' + won(ovsNum(x.usd) * (ovsNum(x.rate) || c.rate)) : ''; });
+    const iv = document.getElementById(P + 'OvsIvat');
+    if (iv) iv.placeholder = '비우면 자동 10% · ' + won(c.ivatAuto);
+    const disp = document.getElementById(P + 'SupTotalDisplay');
+    if (disp) disp.textContent = c.total.toLocaleString() + ' 원';
+    const bd = document.getElementById(P + 'SupBreakdown');
+    if (bd) {
+        const line = (k, v, st) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;${st || ''}"><span>${k}</span><b style="font-weight:700;color:var(--gray-800)">${v}</b></div>`;
+        const paidLine = c.paidUsd ? `송금 ${ovsUsd(c.paidUsd)} → ${won(c.paidKrw)}${c.remainUsd ? ` · 남은 ${ovsUsd(c.remainUsd)} × ${Number(c.rate).toLocaleString()}` : ' · 송금 완료'}` : `${ovsUsd(c.goodsUsd)} × 견적 환율 ${c.rate ? Number(c.rate).toLocaleString() : '?'}`;
+        bd.innerHTML = line('🌏 물품 대금', won(c.goodsKrw)) + `<div style="font-size:11.5px;color:var(--gray-500);margin:-1px 0 3px">${paidLine}</div>` +
+            (c.extrasKrw ? line('부대비용', won(c.extrasKrw)) : '') +
+            line('수입 부가세' + (c.ivatManual ? '' : ' (자동 10%)'), won(c.ivat)) +
+            (c.paidUsd && c.fxDiff ? line('환율 차이 (견적 대비)', (c.fxDiff > 0 ? '+' : '') + won(c.fxDiff), `color:${c.fxDiff > 0 ? 'var(--red)' : 'var(--green,#16a34a)'}`) : '') +
+            (!c.rate ? '<div style="color:var(--red);font-size:12px;margin-top:4px">⚠️ 견적 환율을 넣어야 원화로 계산돼요</div>' : '');
+    }
+    _renderMargin(marginId, _parseKRW(revId), c.total);
+}
+
 function _breakdownHtml(productTotal, printTotal, packTotal, shippingTotal) {
     const r = (label, val) => `<div style="display:flex;justify-content:space-between;padding:3px 0"><span>${label}</span><strong style="color:var(--text-primary)">${val.toLocaleString()}원</strong></div>`;
     let html = r('제품 (단가 × 수량)', productTotal) + r('＋ 인쇄비', printTotal) + r('＋ 포장비', packTotal);
@@ -5474,6 +5672,7 @@ function calcProjectRevenue() {
 }
 
 function toggleSupplierSection() {
+    ovsMaybeAuto('newProject', 'newProjectSupplier');
     const supEl = document.getElementById('newProjectSupplier');
     const card = document.getElementById('supplierDetailCard');
     if (!supEl || !card) return;
@@ -5488,6 +5687,7 @@ function toggleSupplierSection() {
 function calcSupplierTotal() {
     const displayEl = document.getElementById('newProjectSupTotalDisplay');
     if (!displayEl) return;
+    if (ovsIsOn('newProject')) { ovsShowTotal('newProject', readProjectNumber('newProjectQty'), 'newProjectRevenueDisplay', 'newProjectMarginDisplay'); return; }
     const price = readProjectNumber('newProjectSupUnitPrice');
     const qty = readProjectNumber('newProjectQty');
     const vatEl = document.getElementById('newProjectSupVat');
@@ -5782,6 +5982,15 @@ async function addProject(type) {
                 supplierRevenue: supProductTotal + supPrintTotal + supPackTotal + supShipTotal
             });
         }
+        if (ovsIsOn('newProject')) {
+            const o = ovsCalc(_ovs.newProject, newProject.qty);
+            Object.assign(newProject, {
+                supplierOverseas: ovsClean(_ovs.newProject),
+                supplierRevenue: o.total, supplierUnitPrice: o.unitKrw, supplierUnitPriceVat: 'VAT 별도', supplierVat: 'exclude',
+                supplierPrintFee: 0, supplierPackagingFee: 0, supplierShippingType: '', supplierShippingCost: 0
+            });
+            ovsRememberRate(_ovs.newProject.rate);
+        }
     }
 
     if (type === 'domestic') {
@@ -5829,6 +6038,7 @@ async function addProject(type) {
                 supplier_packaging_fee_vat: newProject.supplierPackagingFeeVat || 'VAT 별도',
                 supplier_packaging_fee_apply: newProject.supplierPackagingFeeApply || '1개당',
                 supplier_revenue: newProject.supplierRevenue || 0,
+                supplier_overseas: newProject.supplierOverseas || null,
                 supplier_shipping_type: newProject.supplierShippingType || '',
                 supplier_shipping_vat: newProject.supplierShippingVat || 'VAT 별도',
                 supplier_shipping_cost_per_box: newProject.supplierShippingCostPerBox || 0,
@@ -5900,6 +6110,7 @@ function _projectsDomesticRowToObj(r) {
         supplierPackagingFeeVat: r.supplier_packaging_fee_vat || 'VAT 별도',
         supplierPackagingFeeApply: r.supplier_packaging_fee_apply || '1개당',
         supplierRevenue: r.supplier_revenue || 0,
+        supplierOverseas: r.supplier_overseas || null,
         supplierShippingType: r.supplier_shipping_type || '',
         supplierShippingVat: r.supplier_shipping_vat || 'VAT 별도',
         supplierShippingCostPerBox: r.supplier_shipping_cost_per_box || 0,
@@ -23401,7 +23612,7 @@ function inqRenderProjs(x) {
         <div class="inq-pj">
           <div class="inq-pj-top">
             <b>${escHtml(p.product_name || '(품목 없음)')}</b>
-            <span>${p.quantity ? Number(p.quantity).toLocaleString() + (p.unit || '개') : ''}${p.supplier ? ' · ' + escHtml(p.supplier) : ''}</span>
+            <span>${p.quantity ? Number(p.quantity).toLocaleString() + (p.unit || '개') : ''}${p.supplier ? ' · ' + escHtml(p.supplier) : ''}${p.supplier_overseas ? ` · <b class="inq-ovs" title="해외 매입 (달러)">🌏 $${Number(p.supplier_overseas.unit || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</b>` : ''}</span>
             <span class="inq-pj-amt">${won(p.revenue)}</span>
             <span class="inq-pj-prog">${done}/${CHECK_ITEMS.length}</span>
             <div class="inq-spacer"></div>

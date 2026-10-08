@@ -97,6 +97,10 @@
 - 신규/편집 모달에서 매입처명 입력 시 주황색 🏭 매입처 상세 카드가 펼쳐짐 (매입 단가·VAT·인쇄비·포장비)
 - 매출액/매입액은 `단가 × 수량 + 인쇄비 환산 + 포장비 환산` 합산 (VAT, 1개당/일괄 적용)
 - 마진 = `revenue - supplier_revenue`
+- **해외 매입 (달러) — migration 059, 2026-10-08**: 매입처 카드 맨 위 `🌏 해외 매입` 체크(새로·편집 창 공통 `ovsBoxHtml(P)`, P = 'newProject'|'editProject', 상태 `_ovs[P]`). 켜면 국내용 단가·VAT·인쇄·포장·배송(`#{P}SupDom`)을 숨기고 달러 칸: 외화 단가·견적 환율(마지막 값 localStorage `ovs_rate`) / 부대비용 줄(국제 운송비·관세·통관·송금 수수료·국내 운송비·금형비·직접, 원 또는 $) / 수입 부가세(비우면 자동 10%) / 송금 기록 줄(선금·잔금·일괄·추가 × 달러·그날 환율·날짜 — 회차·비율은 그때그때, 잔금·일괄 버튼은 남은 금액 자동)
+  - 저장: `projects_domestic.supplier_overseas` jsonb `{cur:'USD', unit, rate, extras:[{name,amt,cur}], ivat|null, pays:[{kind,usd,rate,date}]}` + `supplier_revenue` = `ovsCalc` 원화 합계(송금한 달러는 그날 환율, 남은 달러는 견적 환율 + 부대비용 + 수입 부가세 — 국내 매입액처럼 VAT 포함 기준이라 마진 비교 그대로), `supplier_unit_price` = 원화 환산 단가(작업요청서 만들기 조건 충족용), 국내 인쇄·포장·배송 매입 칸은 0/빈 값. 매입액 내역에 '환율 차이(견적 대비)' 표시
+  - 매입처 이름이 해외 거래처 DB(`clients_overseas`, `clientNameKey` 비교)에 있으면 자동으로 켜짐(`ovsMaybeAuto`, 사람이 직접 끈 뒤엔 안 켬). 상담 국내 진행 카드에 `🌏 $단가` 표시
+  - 남은 일: 영문 작업요청서(PO)는 나중에
 
 ## 제안서 시스템
 - 사이드바 "제안서" 그룹: 상품 DB / 제안서 관리
