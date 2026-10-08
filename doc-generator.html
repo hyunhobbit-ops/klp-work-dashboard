@@ -64,6 +64,15 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
 .po-hl{font-size:12px;color:#E11D24;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:3px}
 .po-r{display:grid;grid-template-columns:200px 1fr 34px 30px;gap:6px;margin-bottom:5px}
 .po-r.hl input:nth-child(2){border-color:#FCA5A5;background:#FFF5F5;color:#B91C1C;font-weight:700}
+.po-vsel{display:flex;gap:6px;min-width:0}
+.po-vsel select{flex:1;min-width:0;padding:7px 8px;border:1px solid #e3e3e3;border-radius:7px;font-family:inherit;font-size:13px;background:#fff;color:#222}
+.po-vsel input{flex:1;min-width:0}
+.po-r.hl select{border-color:#FCA5A5;background:#FFF5F5;color:#B91C1C;font-weight:700}
+.po-wt{display:flex;gap:8px}
+.po-wt button{flex:1;padding:12px;border:1.5px solid #e5e5e5;border-radius:10px;background:#fff;font-family:inherit;font-size:14px;font-weight:800;color:#777;cursor:pointer}
+.po-wt button small{display:block;font-size:11px;font-weight:600;color:#aaa;margin-top:2px}
+.po-wt button.on{border-color:#E11D24;background:#FFF5F5;color:#E11D24}
+.po-wt button.on small{color:#E11D24}
 .po-star{height:32px;min-width:32px;padding:0 9px;border:1px solid #ddd;border-radius:7px;background:#fff;color:#c8c8c8;font-weight:800;cursor:pointer;font-family:inherit;font-size:12px;white-space:nowrap}
 .po-star.on{background:#FFF1F1;border-color:#E11D24;color:#E11D24}
 .po-lines{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
@@ -2904,37 +2913,92 @@ async function psOpenRecord(id){await loadRecord(id);showPsTab('preview')}
 var PO_RED='#E11D24';
 var PO_STAGES=[['g3d','3D GRAPHIC'],['sample','SAMPLE'],['order','ORDER']];
 var PO_PAGE_TITLES=['CASE','CASE BACK','DIAL AND HANDS','STRAP / CHAIN','MOVEMENT','PACKAGING','LOGO','WARRANTY CARD'];
-var PO_PH={'SIZE (Ø × T)':'예) Ø47mm × 12mm','MATERIAL':'예) Alloy / SUS316L','PLATING / COLOR':'예) Gold IP','CASE BACK':'예) Laser engraving (see CASE page)','CROWN':'예) Same as sample','CRYSTAL':'예) Mineral glass','WATER RESISTANCE':'예) 3ATM',
-  'COLOR / BACKGROUND':'예) White','INDEX / NUMERALS':'예) Black printed Arabic','LOGO':'예) Applied metal logo 5mm','OTHER PRINTING':'예) None',
-  'HOUR / MINUTE':'예) Gold, same as design','SECOND':'예) Red',
-  'MODEL':'예) Miyota 2035','BATTERY':'예) SR626SW','TIME SETTING':'예) Korean time (GMT+9)',
-  'TYPE / MATERIAL':'예) Genuine leather / No chain','COLOR':'예) Black','SIZE (W × L)':'예) 20mm × 120/75mm','BUCKLE':'예) Gold pin buckle',
-  'GIFT BOX':'예) Black box with logo','WARRANTY / MANUAL':'예) Warranty card (English)','INNER PACKING':'예) Polybag + bubble wrap','MARKING / LABEL':'예) MADE IN CHINA silk print 6mm on case back',
-  'ORDER':'예) 110pcs','SPARE WATCH (2%)':'예) 2pcs','SPARE PARTS (3%)':'예) 3 sets',
-  'UNIT PRICE':'예) 4.15 USD','SAMPLE COST':'예) 15 USD','MOLD / SETUP COST':'예) 120 USD','PAYMENT TERMS':'예) 30% deposit / 70% before shipment (T/T)',
-  'SAMPLE DATE':'예) 2026.10.20','SHIP DATE (ETD)':'예) 2026.11.01','SHIPPING':'예) DHL Express / DDP','SHIP TO':'예) KLP KOREA, Seoul',
-  'INSPECTION':'예) Photos & video of finished goods before shipment','TEST':'예) 24h time accuracy check'};
+/* 시계 제작 사양 — 공장이 실제로 묻는 순서 (케이스 → 다이얼 → 바늘 → 무브먼트 → 줄/체인 → 포장 → 수량·가격·납기 → 검수)
+ * 손목시계(wrist) = STRAP 그룹, 회중시계(pocket) = CHAIN 그룹 + CASE TYPE */
+var PLATING_OPT=[['Gold IP','골드 IP 도금'],['Rose gold IP','로즈골드 IP 도금'],['Silver (polished)','실버 유광'],['Silver (brushed)','실버 무광(헤어라인)'],['Black IP','블랙 IP 도금'],['Gunmetal','건메탈'],['Two-tone (silver & gold)','투톤 (실버+골드)'],['Antique bronze','앤틱 브론즈'],['No plating (natural steel)','도금 없음']];
+/* 선택지: [문서에 나가는 영어, 화면에 보이는 한글] — 목록에 없으면 '기타'로 직접 입력 */
+var PO_OPT={
+  'MATERIAL':[['Alloy (zinc alloy)','합금 (아연 합금)'],['Brass','황동'],['Stainless steel 316L','스테인리스 316L'],['Stainless steel 304','스테인리스 304'],['Titanium','티타늄'],['Sterling silver 925','은 925'],['Aluminum','알루미늄']],
+  'PLATING / COLOR':PLATING_OPT,
+  'CASE TYPE':[['Open face','오픈페이스 (뚜껑 없음)'],['Hunter (full cover)','헌터 (전체 뚜껑)'],['Half hunter (window cover)','하프헌터 (창 있는 뚜껑)'],['Skeleton','스켈레톤']],
+  'CASE BACK':[['Laser engraving','레이저 각인'],['Silk printing','실크 인쇄'],['Stamped (embossed)','프레스 각인 (양각)'],['Plain (no marking)','무지 (표시 없음)'],['Screw-down back','스크류 뒷판'],['Snap-on back','스냅 뒷판 (눌러 닫기)'],['Same as sample','샘플과 동일']],
+  'CROWN':[['Same as sample','샘플과 동일'],['Plain','무지'],['With logo','로고 각인'],['Screw-down','스크류 용두']],
+  'CRYSTAL':[['Mineral glass','미네랄 유리'],['Sapphire crystal','사파이어 유리'],['Domed mineral glass','돔형 미네랄 유리'],['Hardlex','하드렉스'],['Acrylic','아크릴']],
+  'WATER RESISTANCE':[['Not water resistant','방수 없음'],['3ATM (splash resistant)','3ATM 생활방수'],['5ATM','5ATM'],['10ATM','10ATM']],
+  'COLOR / BACKGROUND':[['White','화이트'],['Black','블랙'],['Silver','실버'],['Ivory','아이보리'],['Navy','네이비'],['Mother of pearl','자개'],['Custom print (see artwork)','디자인대로 인쇄']],
+  'INDEX / NUMERALS':[['Printed Arabic numerals','아라비아 숫자 인쇄'],['Printed Roman numerals','로마 숫자 인쇄'],['Applied indexes','아플리케 (부착) 인덱스'],['Applied Roman numerals','아플리케 로마 숫자'],['Stick indexes','바 인덱스'],['No index','인덱스 없음'],['Same as design','디자인대로']],
+  'LOGO':[['Printed logo','로고 인쇄'],['Applied metal logo','금속 로고 부착'],['Embossed logo','양각 로고'],['Laser engraved logo','레이저 로고'],['No logo','로고 없음']],
+  'OTHER PRINTING':[['None','없음'],['Same as design','디자인대로']],
+  'HOUR / MINUTE':[['Gold','골드'],['Silver','실버'],['Black','블랙'],['Rose gold','로즈골드'],['Blue (heat blued)','블루'],['Same as design','디자인대로']],
+  'SECOND':[['Red','레드'],['Gold','골드'],['Silver','실버'],['Black','블랙'],['Same as hour / minute hands','시·분침과 같게'],['No second hand','초침 없음']],
+  'MODEL':[['Miyota 2035','미요타 2035'],['Miyota 2115','미요타 2115 (날짜)'],['Seiko PC21','세이코 PC21'],['Seiko VJ21','세이코 VJ21'],['Ronda 515','론다 515'],['Mechanical (hand-wind)','기계식 (수동)'],['Automatic','오토매틱']],
+  'BATTERY':[['SR626SW (377)','SR626SW (377)'],['SR621SW (364)','SR621SW (364)'],['SR920SW (371)','SR920SW (371)'],['CR2025','CR2025'],['None (mechanical)','없음 (기계식)']],
+  'TIME SETTING':[['Set to Korean time (GMT+9)','한국 시간으로 맞춤'],['Not set','시간 안 맞춤'],['Battery insulated (stopped)','배터리 절연 (멈춤 상태)']],
+  'TYPE / MATERIAL':[['Genuine leather','소가죽'],['PU leather','인조가죽 (PU)'],['Stainless mesh','스테인리스 메쉬'],['Metal bracelet','메탈 브레이슬릿'],['Silicone','실리콘'],['NATO / Nylon','나토 (나일론)']],
+  'COLOR':[['Black','블랙'],['Brown','브라운'],['Dark brown','다크 브라운'],['Navy','네이비'],['Silver','실버'],['Gold','골드']],
+  'BUCKLE':[['Pin buckle','핀 버클'],['Deployment clasp','디버클'],['Butterfly clasp','버터플라이 클래스프'],['Folding clasp','폴딩 클래스프']],
+  'TYPE':[['Curb chain','커브 체인'],['Box chain','박스 체인'],['Rope chain','로프 체인'],['Albert chain (with T-bar)','알버트 체인 (T바)'],['Leather fob','가죽 줄'],['No chain','체인 없음']],
+  'CLIP':[['T-bar','T바'],['Spring ring','스프링 링'],['Lobster clasp','랍스터 고리'],['Belt clip','벨트 클립'],['Carabiner','카라비너']],
+  'GIFT BOX':[['Black gift box with logo','로고 블랙 선물 상자'],['Wooden box','원목 상자'],['Leatherette box','레자 상자'],['Paper box','종이 상자'],['Customer supplied','고객사 제공'],['None','없음']],
+  'WARRANTY / MANUAL':[['Warranty card (English)','영문 보증서'],['Warranty card (Korean)','한글 보증서'],['Manual only','설명서만'],['Customer supplied','고객사 제공'],['None','없음']],
+  'INNER PACKING':[['Polybag + bubble wrap','비닐 + 에어캡'],['Polybag','비닐'],['Individual pouch','개별 파우치'],['Foam insert','스펀지']],
+  'MARKING / LABEL':[['MADE IN CHINA on case back','케이스 뒷면 MADE IN CHINA'],['MADE IN CHINA sticker','MADE IN CHINA 스티커'],['No marking','표기 없음']],
+  'PAYMENT TERMS':[['30% deposit / 70% before shipment (T/T)','선금 30% · 잔금 70% (출고 전)'],['50% deposit / 50% before shipment (T/T)','선금 50% · 잔금 50% (출고 전)'],['100% before shipment (T/T)','출고 전 100%'],['100% in advance (T/T)','전액 선결제']],
+  'SHIPPING':[['DHL Express','DHL 특송'],['FedEx','페덱스'],['UPS','UPS'],['EMS','EMS'],['Air freight','항공 화물'],['Sea freight','해운']],
+  'INCOTERMS':[['DDP (duties paid by supplier)','DDP — 관세까지 공장 부담'],['DAP (duties paid by buyer)','DAP — 관세는 우리가'],['EXW','EXW — 공장 출고'],['FOB','FOB — 선적항 인도']],
+  'SHIP TO':[['KLP KOREA, Seoul','케이엘피코리아 본사'],['Customer address (see remarks)','고객사 직배송']],
+  'INSPECTION':[['Photos & video before shipment','출고 전 사진·영상'],['Sample approval before mass production','양산 전 샘플 승인'],['Third-party inspection','제3자 검수']],
+  'TEST':[['24h time accuracy check','24시간 시간 정확도'],['Water resistance test','방수 테스트'],['Drop test','낙하 테스트']]
+};
+var PO_PH={'SIZE (Ø × T)':'예) Ø47mm × 12mm','SIZE (W × L)':'예) 20mm × 120/75mm','LENGTH':'예) 37cm','ORDER':'예) 110pcs','SPARE WATCH (2%)':'예) 2pcs','SPARE PARTS (3%)':'예) 3 sets','UNIT PRICE':'예) 4.15 USD','SAMPLE COST':'예) 15 USD','MOLD / SETUP COST':'예) 120 USD','SAMPLE DATE':'예) 2026.10.20','SHIP DATE (ETD)':'예) 2026.11.01'};
 var po=null,poImgs={},poImgTarget=null,poCurrentId=null,poLinkedDcNum='';
 
 function poKey(){return 'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
-/* 시계 제작 사양 — 공장이 실제로 묻는 순서 (케이스 → 다이얼 → 바늘 → 무브먼트 → 줄 → 포장 → 수량·가격·납기 → 검수) */
-function poDefaultSpec(){
-  var g=function(name,hl,ks){return{g:name,hl:hl,rows:ks.map(function(k){return{k:k,v:'',hl:0}})}};
-  return [g('CASE',0,['SIZE (Ø × T)','MATERIAL','PLATING / COLOR','CASE BACK','CROWN','CRYSTAL','WATER RESISTANCE']),
-    g('DIAL',0,['COLOR / BACKGROUND','INDEX / NUMERALS','LOGO','OTHER PRINTING']),
-    g('HANDS',0,['HOUR / MINUTE','SECOND']),
-    g('MOVEMENT',0,['MODEL','BATTERY','TIME SETTING']),
-    g('STRAP / CHAIN',0,['TYPE / MATERIAL','COLOR','SIZE (W × L)','BUCKLE']),
-    g('PACKAGING',0,['GIFT BOX','WARRANTY / MANUAL','INNER PACKING','MARKING / LABEL']),
-    g('QUANTITY',1,['ORDER','SPARE WATCH (2%)','SPARE PARTS (3%)']),
-    g('PRICE',1,['UNIT PRICE','SAMPLE COST','MOLD / SETUP COST','PAYMENT TERMS']),
-    g('DELIVERY',1,['SAMPLE DATE','SHIP DATE (ETD)','SHIPPING','SHIP TO']),
-    g('QC',0,['INSPECTION','TEST'])];
+function poGrp(name,hl,ks){return{g:name,hl:hl,rows:ks.map(function(k){return{k:k,v:'',hl:0}})}}
+function poBand(t){return t==='pocket'?poGrp('CHAIN',0,['TYPE','LENGTH','PLATING / COLOR','CLIP']):poGrp('STRAP',0,['TYPE / MATERIAL','COLOR','SIZE (W × L)','BUCKLE'])}
+function poDefaultSpec(t){
+  return [poGrp('CASE',0,t==='pocket'?['SIZE (Ø × T)','CASE TYPE','MATERIAL','PLATING / COLOR','CASE BACK','CROWN','CRYSTAL']:['SIZE (Ø × T)','MATERIAL','PLATING / COLOR','CASE BACK','CROWN','CRYSTAL','WATER RESISTANCE']),
+    poGrp('DIAL',0,['COLOR / BACKGROUND','INDEX / NUMERALS','LOGO','OTHER PRINTING']),
+    poGrp('HANDS',0,['HOUR / MINUTE','SECOND']),
+    poGrp('MOVEMENT',0,['MODEL','BATTERY','TIME SETTING']),
+    poBand(t),
+    poGrp('PACKAGING',0,['GIFT BOX','WARRANTY / MANUAL','INNER PACKING','MARKING / LABEL']),
+    poGrp('QUANTITY',1,['ORDER','SPARE WATCH (2%)','SPARE PARTS (3%)']),
+    poGrp('PRICE',1,['UNIT PRICE','SAMPLE COST','MOLD / SETUP COST','PAYMENT TERMS']),
+    poGrp('DELIVERY',1,['SAMPLE DATE','SHIP DATE (ETD)','SHIPPING','INCOTERMS','SHIP TO']),
+    poGrp('QC',0,['INSPECTION','TEST'])];
+}
+/* 손목 ↔ 회중 바꾸기: 줄(STRAP) ↔ 체인(CHAIN) 그룹을 바꿔 끼우고(적어 둔 값은 기억), 회중이면 CASE TYPE 줄 추가 */
+function poSetWatchType(t){
+  var cur=po.watch_type||'wrist';if(cur===t)return;
+  po._alt=po._alt||{};
+  var idx=po.spec.findIndex(function(g){return /STRAP|CHAIN/i.test(g.g)});
+  if(idx>=0)po._alt[cur]=po.spec[idx];
+  var next=po._alt[t]||poBand(t);
+  if(idx>=0)po.spec[idx]=next;
+  else{var mi=po.spec.findIndex(function(g){return g.g==='MOVEMENT'});po.spec.splice(mi>=0?mi+1:po.spec.length,0,next)}
+  var cs=po.spec.find(function(g){return g.g==='CASE'});
+  if(cs){
+    if(t==='pocket'){if(!cs.rows.some(function(r){return r.k==='CASE TYPE'}))cs.rows.splice(1,0,{k:'CASE TYPE',v:'',hl:0});cs.rows=cs.rows.filter(function(r){return !(r.k==='WATER RESISTANCE'&&!r.v)})}
+    else{cs.rows=cs.rows.filter(function(r){return !(r.k==='CASE TYPE'&&!r.v)});if(!cs.rows.some(function(r){return r.k==='WATER RESISTANCE'}))cs.rows.push({k:'WATER RESISTANCE',v:'',hl:0})}
+  }
+  po.watch_type=t;
 }
 function poBlank(){
   var from='';try{from=localStorage.getItem('po_from')||''}catch(_){}
   return {po_no:'',rev:'',date:psTodayStr(),to:'',attn:'',from:from,model:'',stage:'g3d',stage_dates:{g3d:'',sample:'',order:''},need_by:'',need_text:'',
-    summary:{imgs:[],lines:[{t:'',hl:0}]},spec:poDefaultSpec(),hide_empty:1,files:[],link:'',remarks:'',pages:[]};
+    summary:{imgs:[],lines:[{t:'',hl:0}]},watch_type:'wrist',spec:poDefaultSpec('wrist'),hide_empty:1,files:[],link:'',remarks:'',pages:[]};
+}
+/* 값 칸: 선택지가 있으면 '한글 · English' 고르기 + 기타(직접 입력) */
+function poValCell(gi,ri,r){
+  var opts=PO_OPT[r.k],id=gi+'|'+ri;
+  if(!opts)return '<input value="'+esc(r.v)+'" placeholder="'+esc(PO_PH[r.k]||'')+'" data-porv="'+id+'">';
+  var inList=opts.some(function(o){return o[0]===r.v});
+  var other=!!r._other||(r.v&&!inList);
+  return '<div class="po-vsel"><select data-porsel="'+id+'"><option value="">— 선택 —</option>'+
+    opts.map(function(o){return '<option value="'+esc(o[0])+'"'+(!other&&o[0]===r.v?' selected':'')+'>'+esc(o[1])+'  ·  '+esc(o[0])+'</option>'}).join('')+
+    '<option value="__other"'+(other?' selected':'')+'>기타 (직접 입력)</option></select>'+
+    (other?'<input value="'+esc(r.v)+'" placeholder="직접 입력 — 영어로" data-porv="'+id+'">':'')+'</div>';
 }
 
 function showPoTab(tab){
@@ -2991,11 +3055,14 @@ function poRenderForm(){
         '<button type="button" class="po-star'+(l.hl?' on':'')+'" data-polhl="'+i+'" title="강조 (빨간 굵은 글씨)">★ 강조</button><button type="button" class="ps-del" data-poldel="'+i+'" title="줄 빼기">×</button></div>';
     }).join('')+'</div><button type="button" class="ps-add" data-poladd="1">+ 한 줄 추가</button> <span class="po-hint">Enter = 다음 줄</span></div>';
   /* 사양표 */
-  h+='<div class="section"><div class="section-title" style="display:flex;align-items:center;justify-content:space-between">🔩 WATCH SPECIFICATION <label class="po-hl" style="color:#555"><input type="checkbox" '+(po.hide_empty?'checked':'')+' data-pohide="1"> 빈 항목은 문서에서 빼기</label></div><div class="po-hint" style="margin:-6px 0 10px">공장이 묻는 순서대로 · ★ = 그 줄 강조 · 그룹 \'빨강\' = 그룹 전체 강조 · 문서엔 2단 카드로 나와요</div><div id="poSpecBox">'+
+  var wt=po.watch_type||'wrist';
+  h+='<div class="section"><div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">🔩 WATCH SPECIFICATION <label class="po-hl" style="color:#555"><input type="checkbox" '+(po.hide_empty?'checked':'')+' data-pohide="1"> 빈 항목은 문서에서 빼기</label></div>'+
+    '<div class="po-wt"><button type="button" class="'+(wt==='wrist'?'on':'')+'" data-powt="wrist">⌚ 손목시계 <small>STRAP</small></button><button type="button" class="'+(wt==='pocket'?'on':'')+'" data-powt="pocket">🕰️ 회중시계 <small>CHAIN · CASE TYPE</small></button></div>'+
+    '<div class="po-hint" style="margin:8px 0 10px">고르면 문서엔 영어로 나가요 · 목록에 없으면 \'기타\' → 직접 입력 · ★ = 그 줄 강조 · 그룹 \'빨강\' = 그룹 전체 강조</div><div id="poSpecBox">'+
     po.spec.map(function(g,gi){
       return '<div class="po-g"><div class="po-g-head"><input value="'+esc(g.g)+'" data-pogn="'+gi+'"><label class="po-hl"><input type="checkbox" '+(g.hl?'checked':'')+' data-pohl="'+gi+'"> 빨강</label>'+
         '<button type="button" class="ps-del" data-pogdel="'+gi+'" title="그룹 빼기">×</button></div>'+
-        g.rows.map(function(r,ri){return '<div class="po-r'+(r.hl?' hl':'')+'"><input value="'+esc(r.k)+'" data-pork="'+gi+'|'+ri+'"><input value="'+esc(r.v)+'" placeholder="'+esc(PO_PH[r.k]||'')+'" data-porv="'+gi+'|'+ri+'"><button type="button" class="po-star'+(r.hl?' on':'')+'" data-porhl="'+gi+'|'+ri+'" title="이 줄 강조">★</button><button type="button" class="ps-del" data-pordel="'+gi+'|'+ri+'">×</button></div>'}).join('')+
+        g.rows.map(function(r,ri){return '<div class="po-r'+(r.hl?' hl':'')+'"><input value="'+esc(r.k)+'" data-pork="'+gi+'|'+ri+'">'+poValCell(gi,ri,r)+'<button type="button" class="po-star'+(r.hl?' on':'')+'" data-porhl="'+gi+'|'+ri+'" title="이 줄 강조">★</button><button type="button" class="ps-del" data-pordel="'+gi+'|'+ri+'">×</button></div>'}).join('')+
         '<button type="button" class="ps-add" data-poradd="'+gi+'">+ 항목</button></div>';
     }).join('')+'</div><button type="button" class="ps-add" data-pogadd="1" style="margin-top:4px">+ 그룹 추가</button></div>';
   /* 상세 페이지 */
@@ -3030,6 +3097,12 @@ function poBindForm(box){
   box.querySelectorAll('[data-polhl]').forEach(function(b){b.onclick=function(){var l=po.summary.lines[+b.dataset.polhl];l.hl=l.hl?0:1;rerender()}});
   box.querySelectorAll('[data-poldel]').forEach(function(b){b.onclick=function(){po.summary.lines.splice(+b.dataset.poldel,1);if(!po.summary.lines.length)po.summary.lines.push({t:'',hl:0});rerender()}});
   box.querySelectorAll('[data-poladd]').forEach(function(b){b.onclick=function(){po.summary.lines.push({t:'',hl:0});rerender();var l=document.querySelectorAll('[data-pol]');if(l.length)l[l.length-1].focus()}});
+  box.querySelectorAll('[data-powt]').forEach(function(b){b.onclick=function(){poSetWatchType(b.dataset.powt);rerender()}});
+  box.querySelectorAll('[data-porsel]').forEach(function(sel){sel.onchange=function(){
+    var a=sel.dataset.porsel.split('|'),r=po.spec[+a[0]].rows[+a[1]];
+    if(sel.value==='__other'){r._other=1;if(PO_OPT[r.k]&&PO_OPT[r.k].some(function(o){return o[0]===r.v}))r.v='';rerender();var i=document.querySelector('[data-porv="'+sel.dataset.porsel+'"]');if(i)i.focus()}
+    else{r._other=0;r.v=sel.value;rerender()}
+  }});
   box.querySelectorAll('[data-porhl]').forEach(function(b){b.onclick=function(){var a=b.dataset.porhl.split('|');var r=po.spec[+a[0]].rows[+a[1]];r.hl=r.hl?0:1;rerender()}});
   box.querySelectorAll('[data-poimg]').forEach(function(d){
     var k=d.dataset.poimg;
@@ -3284,12 +3357,13 @@ async function buildPoDocAsync(){
   };
 
   /* --- 1쪽 + 이어지는 쪽 --- */
+  var wtName=po.watch_type==='pocket'?'POCKET WATCH':'WRIST WATCH';
   var p1=head('')+steps+info+sumHtml,placed=false,specStarted=false;
-  if(groups.length&&usable-used-SECT>=GH+RH*2+GAP){var pk=pack(usable-used-SECT,true);if(pk.h){p1+=specTitle('WATCH SPECIFICATION')+pk.html;used+=SECT+pk.h;specStarted=true}}
+  if(groups.length&&usable-used-SECT>=GH+RH*2+GAP){var pk=pack(usable-used-SECT,true);if(pk.h){p1+=specTitle(wtName+' SPECIFICATION')+pk.html;used+=SECT+pk.h;specStarted=true}}
   if(!groups.length&&extraH&&used+extraH<=usable){p1+=extraHtml();placed=true}
   pages.push(wrap(p1));
   while(groups.length){
-    var pk2=pack(usable-SECT,false),html=head('SPECIFICATION')+specTitle(specStarted?'WATCH SPECIFICATION (CONT.)':'WATCH SPECIFICATION')+pk2.html;
+    var pk2=pack(usable-SECT,false),html=head('SPECIFICATION')+specTitle(wtName+' SPECIFICATION'+(specStarted?' (CONT.)':''))+pk2.html;
     specStarted=true;
     if(!groups.length&&extraH&&SECT+pk2.h+extraH<=usable){html+=extraHtml();placed=true}
     pages.push(wrap(html));
