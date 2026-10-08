@@ -3346,10 +3346,19 @@ async function poQrData(text){
 var _poBuilt=null;
 function buildPoDoc(){_poBuilt=buildPoDocAsync();return _poBuilt}
 function poIsOrderGroup(g){return /^(QUANTITY|PRICE|DELIVERY)$/i.test(String(g.g||'').trim())}
+var _poDims={};
+function poImgDim(u){
+  if(!_poDims[u])_poDims[u]=new Promise(function(ok){var im=new Image();im.onload=function(){ok({w:im.naturalWidth||1,h:im.naturalHeight||1})};im.onerror=function(){ok({w:1,h:1})};im.src=u});
+  return _poDims[u];
+}
+function poFitStyle(d,mw,mh){var k=Math.min(mw/d.w,mh/d.h);return 'width:'+Math.max(1,Math.floor(d.w*k))+'px;height:'+Math.max(1,Math.floor(d.h*k))+'px'}
 async function buildPoDocAsync(){
   /* 2026-10 피드백: 바탕색 없음(잉크 절약) · 글자 크게(A4 인쇄) · 쪽 나눔 SUMMARY / SPECIFICATION / DESIGN DETAIL · 진행 단계는 문서에서 뺌 */
   var W=794,H=1123,PX=34,PT=26,PB=22,INW=W-PX*2;
-  var C=PO_RED,LN='#cfcfcb',LN2='#e4e4e0',TX='#1a1a1a',SUB='#6b6b6b';
+  var dims={};
+  var usedKeys=po.summary.imgs.map(function(i){return i.key});po.pages.forEach(function(pg){(pg.imgs||[]).forEach(function(i){usedKeys.push(i.key)})});
+  for(var di=0;di<usedKeys.length;di++){var u=poImgs[usedKeys[di]];if(u)dims[usedKeys[di]]=await poImgDim(u)}
+  var C=PO_RED,LN='#7a7a7a',LN2='#9e9e9e',TX='#1a1a1a',SUB='#555555';   /* 선은 인쇄에서도 보이게 진하게 (2026-10) */
   var no=esc(po.po_no||''),qr=po.link?await poQrData(po.link):'';
   var font="font-family:'Noto Sans KR',sans-serif;";
   var V=function(t){return t?esc(t):'<span style="color:#bbb">-</span>'};
@@ -3413,13 +3422,14 @@ async function buildPoDocAsync(){
   var LH=30;
   var linesH=lines.length*LH;
   var needH=need?60:0;
-  var restH=usable-used-44-linesH-(lines.length?14:0)-needH;
+  var restH=usable-used-44-linesH-(lines.length?12+30:0)-needH;
   var imgsH=sImgs.length?Math.max(200,Math.min(600,restH)):0;   /* 남는 높이를 사진이 채움 */
   var cw=Math.floor((INW-(sImgs.length-1)*14)/Math.max(1,sImgs.length));
   var sumHtml=secTitle('SUMMARY','KEY POINTS — PLEASE CHECK BEFORE PRODUCTION')+
     (sImgs.length?'<div style="height:'+imgsH+'px;display:flex;gap:14px;justify-content:center;flex-shrink:0">'+sImgs.map(function(it){
-      return '<div style="width:'+cw+'px;border:1px solid '+LN+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;box-sizing:border-box"><img src="'+poImgs[it.key]+'" style="max-width:'+(cw-18)+'px;max-height:'+(imgsH-(it.cap?42:18))+'px;object-fit:contain">'+(it.cap?'<div style="font-size:13px;font-weight:700;color:'+TX+';text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>':'')+
-    (lines.length?'<div style="margin-top:14px;flex-shrink:0">'+lines.map(function(l,i){
+      return '<div style="width:'+cw+'px;border:1px solid '+LN+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;box-sizing:border-box"><img src="'+poImgs[it.key]+'" style="'+poFitStyle(dims[it.key]||{w:1,h:1},cw-18,imgsH-(it.cap?40:18))+'">'+(it.cap?'<div style="font-size:13px;font-weight:700;color:'+TX+';text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>':'')+
+    (lines.length?'<div style="height:30px;margin-top:12px;display:flex;align-items:center;gap:10px;border-bottom:1.5px solid '+TX+';flex-shrink:0"><span style="font-size:14px;font-weight:900;letter-spacing:1.5px;color:'+C+'">KEY REQUIREMENTS</span><span style="font-size:11.5px;font-weight:700;color:'+SUB+';letter-spacing:.5px">MUST BE FOLLOWED</span></div>'+
+      '<div style="margin-top:2px;flex-shrink:0">'+lines.map(function(l,i){
       return '<div style="height:'+LH+'px;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:'+(l.hl?900:700)+';color:'+(l.hl?C:TX)+';white-space:nowrap;overflow:hidden"><b style="min-width:24px;font-weight:900">'+(i+1)+'.</b><span style="overflow:hidden;text-overflow:ellipsis;'+(l.hl?'text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px':'')+'">'+esc(l.t)+'</span></div>'}).join('')+'</div>':'')+
     (need?'<div style="height:48px;margin-top:12px;box-sizing:border-box;border:2px solid '+C+';display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:'+C+';flex-shrink:0">'+esc(need)+'</div>':'');
   pages.push(wrap(head('SUMMARY')+info+orderHtml+sumHtml));
@@ -3486,7 +3496,7 @@ async function buildPoDocAsync(){
     var cols=ims.length<=1?1:2,rows=ims.length>2?2:1;
     var cw2=Math.floor((INW-(cols-1)*14)/cols),chh=Math.floor((areaH-(rows-1)*14)/rows);
     var grid=ims.length?'<div style="height:'+areaH+'px;display:grid;grid-template-columns:repeat('+cols+','+cw2+'px);grid-template-rows:repeat('+rows+','+chh+'px);gap:14px;justify-content:center;flex-shrink:0">'+ims.map(function(it){
-        return '<div style="border:1px solid '+LN+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px;box-sizing:border-box;overflow:hidden"><img src="'+poImgs[it.key]+'" style="max-width:'+(cw2-22)+'px;max-height:'+(chh-(it.cap?48:22))+'px;object-fit:contain">'+(it.cap?'<div style="font-size:15px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>'
+        return '<div style="border:1px solid '+LN+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px;box-sizing:border-box;overflow:hidden"><img src="'+poImgs[it.key]+'" style="'+poFitStyle(dims[it.key]||{w:1,h:1},cw2-22,chh-(it.cap?46:22))+'">'+(it.cap?'<div style="font-size:15px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>'
       :'<div style="height:'+areaH+'px;border:1px dashed '+LN+';display:flex;align-items:center;justify-content:center;color:#bbb;font-size:14px;flex-shrink:0">No image</div>';
     var inner=head('DESIGN DETAIL')+
       '<div style="height:'+titleH+'px;display:flex;align-items:center;gap:10px;flex-shrink:0"><span style="width:5px;height:24px;background:'+C+'"></span><span style="font-size:22px;font-weight:900;letter-spacing:1.5px">'+esc(pg.title||'')+'</span></div>'+
