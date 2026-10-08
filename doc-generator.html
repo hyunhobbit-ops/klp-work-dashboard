@@ -2244,6 +2244,7 @@ window.klpDocReady=null;
     await loadRecord(r.id);
     await new Promise(function(ok){setTimeout(ok,400);});
     if(r.status==='제작진행표'){showPsTab('preview');await new Promise(function(ok){setTimeout(ok,600);});return await psDocOptions();}
+    if(r.status==='해외작업요청서'){showPoTab('preview');await (_poBuilt||Promise.resolve());await new Promise(function(ok){setTimeout(ok,500);});return await poDocOptions();}
     var isWr=r.status==='작업요청서';
     if(isWr)showWrTab('preview');else showDcTab('preview');
     await new Promise(function(ok){setTimeout(ok,600);});
@@ -2372,7 +2373,8 @@ window.klpEmbedDownload=async function(fmt){
     var r=res[0];
     await loadRecord(r.id);
     await new Promise(function(resolve){setTimeout(resolve,300);});
-    if(r.status==='작업요청서'){showWrTab('preview');}
+    if(r.status==='해외작업요청서'){showPoTab('preview');}
+    else if(r.status==='작업요청서'){showWrTab('preview');}
     else{showDcTab('preview');}
     /* 임베드 폭에 맞춰 A4 원본을 축소 */
     setTimeout(fitEmbedToViewport,200);
@@ -3173,15 +3175,39 @@ async function poApplyDc(r){
   if(r.delivery_date&&!po.need_by)po.need_by=r.delivery_date;
   if(r.images_data){var imgs=unpackImages(r.images_data);if(imgs.main&&!po.summary.imgs.length){var k=poKey();poImgs[k]=imgs.main.url;po.summary.imgs.push({key:k,cap:'<DESIGN>'})}}
   try{
-    var pj=await sbFetch('projects_domestic?source_doc_number=eq.'+encodeURIComponent(poLinkedDcNum)+'&select=supplier,supplier_contact,supplier_overseas,quantity&limit=1','GET');
+    var pj=await sbFetch('projects_domestic?source_doc_number=eq.'+encodeURIComponent(poLinkedDcNum)+'&select=id,supplier,supplier_contact,supplier_overseas,quantity&limit=1','GET');
     if(pj&&pj[0]){
+      po.project_id=pj[0].id;
       if(pj[0].supplier&&!po.to)po.to=pj[0].supplier;
       if(pj[0].supplier_contact&&!po.attn)po.attn=pj[0].supplier_contact;
       var o=pj[0].supplier_overseas;if(o&&o.unit)poSpecSet('PRICE','UNIT PRICE',o.unit+' USD');
     }
   }catch(_){}
+  await poFillAttn();
   if(!poCurrentId)document.getElementById('poDocNum').value=await poNextDocNum(poLinkedDcNum);
   var info=document.getElementById('poLinkedInfo');info.textContent='📎 '+poLinkedDcNum+' · '+(r.company_name||'')+' · '+(r.product_name||'')+' 에서 불러왔어요 (공장·단가는 국내 프로젝트의 해외 매입 정보)';info.classList.remove('hidden');
+  poRenderForm();
+}
+/* 받는 사람(ATTN)이 비면 해외 거래처 DB 담당자 */
+async function poFillAttn(){
+  if(po.attn||!po.to)return;
+  try{var c=await sbFetch('clients_overseas?company_name=eq.'+encodeURIComponent(po.to)+'&select=contact_name&limit=1','GET');if(c&&c[0]&&c[0].contact_name)po.attn=c[0].contact_name}catch(_){}
+}
+/* 국내 프로젝트(해외 매입 건)에서 바로 만들기 — 대시보드 #po-new-pj-프로젝트id */
+async function poApplyProject(pj){
+  po.project_id=pj.id;
+  if(pj.source_doc_number){
+    try{var r=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(pj.source_doc_number),'GET');if(r&&r[0]){await poApplyDc(r[0]);return}}catch(_){}
+  }
+  if(!po.to)po.to=pj.supplier||'';
+  if(!po.attn)po.attn=pj.supplier_contact||'';
+  if(!po.model)po.model=String(pj.product_name||'').toUpperCase();
+  if(pj.quantity)poSpecSet('QUANTITY','ORDER',Number(pj.quantity).toLocaleString()+'pcs');
+  var o=pj.supplier_overseas;if(o&&o.unit)poSpecSet('PRICE','UNIT PRICE',o.unit+' USD');
+  if(pj.delivery_date&&!po.need_by)po.need_by=pj.delivery_date;
+  await poFillAttn();
+  if(!poCurrentId)document.getElementById('poDocNum').value=await poNextDocNum('');
+  var info=document.getElementById('poLinkedInfo');info.textContent='📎 국내 프로젝트 · '+(pj.client||'')+' · '+(pj.product_name||'')+' → '+(pj.supplier||'')+' 에서 불러왔어요';info.classList.remove('hidden');
   poRenderForm();
 }
 async function poNextDocNum(dcNum){
@@ -3421,11 +3447,19 @@ async function buildPoDocAsync(){
   document.getElementById('poDocEl').innerHTML=pages.map(function(p,i){return p.replace('{P}',i+1).replace('{N}',N)}).join('<div style="height:18px;background:#e9e9e6"></div>');
   return N;
 }
-async function poCanvases(){
+async function poCanvases(scale){
   await (_poBuilt||buildPoDoc());
   var out=[],pgs=document.querySelectorAll('#poDocEl .po-pg');
-  for(var i=0;i<pgs.length;i++)out.push(await html2canvas(pgs[i],{scale:2.5,useCORS:true,backgroundColor:'#fff',logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123}));
+  for(var i=0;i<pgs.length;i++)out.push(await html2canvas(pgs[i],{scale:scale||2.5,useCORS:true,backgroundColor:'#fff',logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123}));
   return out;
+}
+/* 대시보드 '크게 보기'용 — 모든 쪽을 세로로 이어 붙인 한 장 (보내기·PDF는 문서 생성기에서) */
+async function poDocOptions(){
+  return {docType:'po',title:(po.model||'')+' → '+(po.to||''),fileBase:poFileBase(),makeCanvas:async function(){
+    var cs=await poCanvases(1.6),w=cs[0].width,gap=Math.round(w*0.02),h=cs.reduce(function(a,c){return a+c.height},0)+gap*(cs.length-1);
+    var out=document.createElement('canvas');out.width=w;out.height=h;var g=out.getContext('2d');g.fillStyle='#e9e9e6';g.fillRect(0,0,w,h);
+    var y=0;cs.forEach(function(c){g.drawImage(c,0,y);y+=c.height+gap});return out;
+  }};
 }
 function poFileBase(){return getYYMMDD(po.date)+'_KLP_'+((po.po_no||'PO').replace(/[^A-Za-z0-9]/g,''))+'_'+((po.model||'ORDER').replace(/[\\\/:*?"<>|]/g,'').replace(/\s+/g,'_'))+'_OrderSheet'+(po.rev?'_'+po.rev.replace(/[^A-Za-z0-9.]/g,''):'')}
 async function dlPo(type){
@@ -3469,6 +3503,12 @@ async function poOpenRecord(id){await loadRecord(id);showPoTab('preview')}
   await new Promise(function(ok){setTimeout(ok,300)});
   switchMode('po');newPoDoc();
   if(!dcNum)return;
+  if(dcNum.indexOf('pj-')===0){
+    try{var pj=await sbFetch('projects_domestic?id=eq.'+encodeURIComponent(dcNum.substring(3))+'&select=*','GET');
+      if(pj&&pj[0]){await poApplyProject(pj[0]);showMsg('✅ 해외 매입 정보를 불러왔어요 — 확인 후 저장해주세요')}else showMsg('❌ 프로젝트를 찾을 수 없습니다',true)}
+    catch(e){showMsg('❌ 불러오기 실패: '+e.message,true)}
+    return;
+  }
   try{var res=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(dcNum),'GET');
     if(res&&res[0]){await poApplyDc(res[0]);showMsg('✅ 디자인확인서·해외 매입 정보를 불러왔어요')}else showMsg('❌ 디자인확인서를 찾을 수 없습니다: '+dcNum,true)}
   catch(e){showMsg('❌ 불러오기 실패: '+e.message,true)}

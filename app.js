@@ -3886,6 +3886,7 @@ async function updateDeliveryRating(id, value) {
 // DETAIL PANELS
 // =====================================
 async function showProjectDetail(id) {
+    if (!_ovsClientKeys) await ovsClientKeys();
     const p = projects.find(x => x.id === id);
     if (!p) return;
     const title = document.getElementById('modalTitle');
@@ -4094,8 +4095,8 @@ async function showProjectDetail(id) {
                 <div id="dcDocArea">${p.sourceDocNumber ? `<div style="color:var(--gray-500);font-size:13px">디자인확인서 로딩 중...</div>` : `<div style="color:var(--gray-500);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">연결된 디자인확인서가 없습니다. 상단의 "디자인확인서 만들기" 버튼으로 생성하세요.</div>`}</div>
             </div>
             <div style="background:var(--white);border:1px solid var(--gray-200);border-radius:10px;padding:14px 16px;color:var(--gray-900);min-width:0">
-                ${secTitle('📋', '작업요청서')}
-                <div id="wrDocArea">${p.sourceDocNumber ? `<div style="color:var(--gray-500);font-size:13px">작업요청서 로딩 중...</div>` : `<div style="color:var(--gray-500);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">디자인확인서가 먼저 연결되어야 작업요청서를 조회할 수 있습니다</div>`}</div>
+                ${isOvsProject(p) ? secTitle('🌏', '해외 PO (해외 매입처 발주서)') : secTitle('📋', '작업요청서')}
+                <div id="wrDocArea">${isOvsProject(p) ? `<div style="color:var(--gray-500);font-size:13px">해외 PO 불러오는 중...</div>` : p.sourceDocNumber ? `<div style="color:var(--gray-500);font-size:13px">작업요청서 로딩 중...</div>` : `<div style="color:var(--gray-500);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">디자인확인서가 먼저 연결되어야 작업요청서를 조회할 수 있습니다</div>`}</div>
             </div>
         </div>
 
@@ -4108,7 +4109,7 @@ async function showProjectDetail(id) {
         <!-- 액션 버튼 -->
         <div class="m-detail-actions" style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
             <button class="form-submit" style="flex:1 1 180px;background:var(--blue)" onclick="createDocFromProject(${id},'dc')">📄 디자인확인서 만들기</button>
-            <button class="form-submit" style="flex:1 1 180px;background:var(--klp-orange,#E67E22)" onclick="createDocFromProject(${id},'wr')">📋 작업요청서 만들기</button>
+            <button class="form-submit" style="flex:1 1 180px;background:${isOvsProject(p) ? '#E11D24' : 'var(--klp-orange,#E67E22)'}" onclick="createDocFromProject(${id},'wr')">${isOvsProject(p) ? '🌏 해외 PO 만들기·열기' : '📋 작업요청서 만들기'}</button>
             <button class="form-submit" style="flex:1 1 160px;background:#16A34A" onclick="createQuoteFromProject(${id})">💰 견적서 만들기</button>
             <button class="form-submit" style="flex:1 1 120px" onclick="openEditProject(${id})">✏️ 편집</button>
             <button class="form-submit" style="flex:1 1 100px;background:var(--gray-200);color:var(--gray-800)" onclick="closeModal()">닫기</button>
@@ -4118,6 +4119,7 @@ async function showProjectDetail(id) {
     overlay.classList.add('modal-wide');
 
     // DC / WR 비동기 로드
+    if (isOvsProject(p)) renderProjectPoArea(p);
     if (p.sourceDocNumber) {
         const renderDocCard = (r, kind) => {
             const titleColor = kind === 'DC' ? 'var(--blue)' : 'var(--orange)';
@@ -4160,8 +4162,8 @@ async function showProjectDetail(id) {
             if (dcEl) dcEl.innerHTML = `<div style="color:var(--red);font-size:13px">DC 로드 실패: ${err.message}</div>`;
         }
 
-        // WR 로드 (doc_number 가 `DC번호_` 로 시작하는 것들)
-        try {
+        // WR 로드 (doc_number 가 `DC번호_` 로 시작하는 것들) — 해외 매입 건은 아래 해외 PO 칸이 대신
+        if (!isOvsProject(p)) try {
             const prefix = p.sourceDocNumber + '_';
             const { data: wrData, error: wrErr } = await sb.from('confirmations')
                 .select('*')
@@ -4232,6 +4234,11 @@ function downloadDoc(docNum, fmt) {
 // 프로젝트 → 문서생성기 (DC/WR) prefill 이동
 // =====================================
 async function createDocFromProject(id, type) {
+    if (type === 'wr') {   // 해외 매입 건은 작업요청서 대신 해외 PO
+        if (!_ovsClientKeys) await ovsClientKeys();
+        const p0 = projects.find(x => x.id === id);
+        if (p0 && isOvsProject(p0)) { await openProjectPo(p0); return; }
+    }
     const p = projects.find(x => x.id === id);
     if (!p) return;
     // 납기·배송은 다른 서류(디자인확인서·작업요청서·상담)에서 채워졌을 수 있어 DB에서 최신으로 (migration 053 트리거)
@@ -4681,7 +4688,7 @@ function openEditProject(id) {
 
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
             <button class="form-submit" style="flex:1 1 180px;background:var(--blue)" onclick="createDocFromProject(${p.id},'dc')">📄 디자인확인서 만들기</button>
-            <button class="form-submit" style="flex:1 1 180px;background:var(--klp-orange,#E67E22)" onclick="createDocFromProject(${p.id},'wr')">📋 작업요청서 만들기</button>
+            <button class="form-submit" style="flex:1 1 180px;background:${isOvsProject(p) ? '#E11D24' : 'var(--klp-orange,#E67E22)'}" onclick="createDocFromProject(${p.id},'wr')">${isOvsProject(p) ? '🌏 해외 PO 만들기·열기' : '📋 작업요청서 만들기'}</button>
             <button class="form-submit" style="flex:1 1 160px;background:#16A34A" onclick="createQuoteFromProject(${p.id})">💰 견적서 만들기</button>
         </div>
         <div style="display:flex;gap:8px;margin-top:8px">
@@ -5454,6 +5461,61 @@ const OVS_EXTRA_NAMES = ['국제 운송비', '관세', '통관 수수료', '송�
 const OVS_PAY_KINDS = ['선금', '잔금', '일괄', '추가'];
 const _ovs = {};
 let _ovsClientKeys = null;
+async function ovsClientKeys() {
+    if (_ovsClientKeys) return _ovsClientKeys;
+    try {
+        const { data } = await sb.from('clients_overseas').select('company_name');
+        _ovsClientKeys = new Set((data || []).map(r => clientNameKey(r.company_name || '')).filter(Boolean));
+    } catch (_) { _ovsClientKeys = new Set(); }
+    return _ovsClientKeys;
+}
+// 해외 매입 건인지 — 해외 매입(달러) 정보가 있거나 매입처가 해외 거래처 DB에 있으면 → 작업요청서 대신 해외 PO
+function isOvsProject(p) {
+    if (!p) return false;
+    if (p.supplier_overseas || p.supplierOverseas) return true;
+    return !!(_ovsClientKeys && p.supplier && _ovsClientKeys.has(clientNameKey(p.supplier)));
+}
+// 이 국내 프로젝트의 해외 PO 문서번호 (디확번호_E… 또는 extra.project_id로 연결) — 없으면 null
+async function findProjectPoNumber(p) {
+    if (!p) return null;
+    const dc = p.source_doc_number || p.sourceDocNumber || '';
+    try {
+        let q = sb.from('confirmations').select('doc_number, created_at').eq('status', '해외작업요청서');
+        q = dc ? q.or(`doc_number.like.${dc}_E%,extra->>project_id.eq.${p.id}`) : q.eq('extra->>project_id', String(p.id));
+        const { data } = await q.order('created_at', { ascending: false }).limit(1);
+        return data && data[0] ? data[0].doc_number : null;
+    } catch (_) { return null; }
+}
+// 해외 PO 열기·만들기 (문서 생성기로 이동) — 없으면 #po-new-pj-프로젝트id 로 해외 매입처·수량·단가·납기를 불러와 새로 만듦
+async function openProjectPo(p) {
+    const num = await findProjectPoNumber(p);
+    if (num) { if (confirm(`해외 PO(${num})를 문서 생성기에서 열까요?`)) location.href = 'doc-generator.html#edit-' + encodeURIComponent(num); return; }
+    if (confirm(`아직 해외 PO가 없습니다. 이 건으로 새로 만들까요?\n(해외 매입처 ${p.supplier || ''}·수량·단가·납기·디자인확인서를 불러와요 — 문서 생성기로 이동)`)) location.href = 'doc-generator.html#po-new-pj-' + p.id;
+}
+// 국내 프로젝트 상세의 '해외 PO' 칸
+async function renderProjectPoArea(p) {
+    const el = document.getElementById('wrDocArea');
+    if (!el) return;
+    const dc = p.sourceDocNumber || '';
+    let q = sb.from('confirmations').select('doc_number, doc_date, title, product_name, company_name').eq('status', '해외작업요청서');
+    q = dc ? q.or(`doc_number.like.${dc}_E%,extra->>project_id.eq.${p.id}`) : q.eq('extra->>project_id', String(p.id));
+    const { data, error } = await q.order('created_at', { ascending: false });
+    if (!document.getElementById('wrDocArea')) return;
+    if (error) { el.innerHTML = `<div style="color:var(--red);font-size:13px">해외 PO 불러오기 실패: ${escHtml(error.message)}</div>`; return; }
+    if (!data || !data.length) {
+        el.innerHTML = `<div style="color:var(--gray-500);font-size:13px;padding:12px;background:var(--gray-50);border-radius:8px">아직 해외 PO가 없습니다.<br>아래 <b>🌏 해외 PO 만들기·열기</b>로 만들면 해외 매입처(${escHtml(p.supplier || '')})·수량·단가·납기가 채워져요.</div>`;
+        return;
+    }
+    el.innerHTML = data.map(r => {
+        const v = `doc-generator.html#view-${encodeURIComponent(r.doc_number)}`, e = `doc-generator.html#edit-${encodeURIComponent(r.doc_number)}`;
+        return `<div style="background:#FFF5F5;border:1px solid var(--gray-200);border-radius:10px;padding:12px 14px;margin-bottom:10px;color:var(--gray-900)">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><div style="min-width:0">
+            <div style="font-size:11px;color:#E11D24;font-weight:800">${escHtml(r.doc_number)}${r.title ? ' · ' + escHtml(r.title) : ''}</div>
+            <div style="font-size:13px;font-weight:700;margin-top:2px">${escHtml(r.product_name || '')} → ${escHtml(r.company_name || '')}</div></div>
+            <a href="${e}" style="flex-shrink:0;padding:6px 12px;border:1.5px solid #E11D24;border-radius:6px;background:var(--white);color:#E11D24;font-size:12px;font-weight:700;text-decoration:none">✏️ 열기·PDF</a></div>
+          <div style="border-radius:8px;overflow:hidden;border:1px solid var(--gray-200);background:#fff"><iframe src="${v}" style="width:100%;aspect-ratio:794/1123;height:auto;border:0;display:block;background:#fff" loading="lazy" title="${escHtml(r.doc_number)}"></iframe></div></div>`;
+    }).join('');
+}
 function ovsNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
 function ovsUsd(n) { return '$' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
 function ovsDefault() {
@@ -23486,8 +23548,13 @@ function inqRenderStage(x) {
         btns.push([`chk:${p.id}:design`, '컨펌 완료 체크']);
     } else if (cur.key === 'wo') {
         const p = firstLack('workOrder');
-        msg = `공장에 작업요청서를 보내세요${projs.length > 1 ? ` · ${p.product_name || ''}` : ''}`;
-        btns.push([`wr:${p.id}`, '작업요청서 열기·만들기', 1]);
+        if (isOvsProject(p)) {
+            msg = `해외 공장(${p.supplier || ''})에 PO(발주서)를 보내세요${projs.length > 1 ? ` · ${p.product_name || ''}` : ''}`;
+            btns.push([`po:${p.id}`, '🌏 해외 PO 열기·만들기', 1]);
+        } else {
+            msg = `공장에 작업요청서를 보내세요${projs.length > 1 ? ` · ${p.product_name || ''}` : ''}`;
+            btns.push([`wr:${p.id}`, '작업요청서 열기·만들기', 1]);
+        }
         btns.push([`chk:${p.id}:workOrder`, '발송 완료 체크']);
     } else {
         const ps = INQ_PAY_STAGES.find(v => v[0] === cur.key);
@@ -23535,6 +23602,7 @@ async function inqDealAction(x, act, btn) {
         else { await transferGroupToDomestic(gi); }
         return;
     }
+    if (kind === 'wr' && isOvsProject(row)) return inqDealAction(x, 'po:' + idStr, btn);
     if (kind === 'dc' || kind === 'wr') {
         // 이미 만든 문서는 보기 화면으로 (편집·덮어쓰기 확인 없이), 없을 때만 만들기
         const num = row ? await inqSavedDocNumber(row, kind) : null;
@@ -23545,8 +23613,8 @@ async function inqDealAction(x, act, btn) {
     if (kind === 'po') {
         if (!row) return;
         const num = await inqSavedDocNumber(row, 'po');
-        if (num) { if (confirm(`해외 PO(${num})를 문서 생성기에서 열까요?`)) location.href = 'doc-generator.html#edit-' + encodeURIComponent(num); return; }
-        if (confirm('아직 해외 PO가 없습니다. 새로 만들까요?\n(디자인확인서·해외 매입 정보를 불러와요 — 문서 생성기로 이동)')) location.href = 'doc-generator.html#po-new' + (row.source_doc_number ? '-' + encodeURIComponent(row.source_doc_number) : '');
+        if (num) { await viewSavedDoc(num, '해외 PO', null); return; }
+        await openProjectPo(row);
         return;
     }
     if (kind === 'ps') {
@@ -23608,6 +23676,7 @@ function inqRenderProjs(x) {
     if (!el || _inqSel !== x.id) return;
     const projs = _inqProjsFor === x.id ? _inqProjs : [];
     if (!projs.length) { el.innerHTML = ''; return; }
+    if (!_ovsClientKeys) ovsClientKeys().then(() => { if (_inqSel === x.id) inqRenderProjs(x); });
     const won = n => Number(n || 0).toLocaleString() + '원';
     const open = inqCardOpen('pj');
     el.innerHTML = `
@@ -23623,11 +23692,10 @@ function inqRenderProjs(x) {
             <span class="inq-pj-amt">${won(p.revenue)}</span>
             <span class="inq-pj-prog">${done}/${CHECK_ITEMS.length}</span>
             <div class="inq-spacer"></div>
-            ${p.supplier_overseas ? `<button class="inq-mini" data-act="po:${p.id}" title="해외 공장에 보내는 영문 발주서(PO) — 있으면 열기, 없으면 만들기">🌏 해외 PO</button>` : ''}
             <button class="inq-mini" data-act="ps:${p.id}" title="시계 제작 주문 내부 문서 — 있으면 보기, 없으면 만들기">🕐 제작진행표</button>
             <button class="inq-mini" data-act="open:${p.id}">국내에서 보기</button>
           </div>
-          <div class="inq-pj-docs">${['dc', 'wr'].map(k => inqDocTileHtml(p, k)).join('')}</div>
+          <div class="inq-pj-docs">${['dc', isOvsProject(p) ? 'po' : 'wr'].map(k => inqDocTileHtml(p, k)).join('')}</div>
           <div class="inq-pj-checks">${CHECK_ITEMS.map(it => {
               const on = !!(p.checks && p.checks[it.key]);
               const ciK = CHECK_INFO[it.key];
@@ -23646,9 +23714,11 @@ function inqRenderProjs(x) {
 
 // ---------- 국내 진행 카드의 디자인확인서·작업요청서 미리보기 (누르면 크게 = viewSavedDoc) ----------
 const _inqDocNum = new Map();   // 'dc:DC번호' / 'wr:DC번호' → 저장된 문서번호(없으면 null)
+const INQ_DOC_LABEL = { dc: '디자인확인서', wr: '작업요청서', po: '해외 PO' };
+function inqDocCacheKey(p, kind) { return kind === 'po' ? 'po:' + p.id : kind + ':' + p.source_doc_number; }
 function inqDocTileState(p, kind) {
-    if (!p.source_doc_number) return { st: kind === 'wr' ? 'needdc' : 'empty' };
-    const ck = kind + ':' + p.source_doc_number;
+    if (kind !== 'po' && !p.source_doc_number) return { st: kind === 'wr' ? 'needdc' : 'empty' };
+    const ck = inqDocCacheKey(p, kind);
     if (!_inqDocNum.has(ck)) return { st: 'loading' };
     const num = _inqDocNum.get(ck);
     if (!num) return { st: 'empty' };
@@ -23658,7 +23728,7 @@ function inqDocTileState(p, kind) {
     return { st: 'loading', num };
 }
 function inqDocTileInner(kind, t) {
-    const label = kind === 'dc' ? '디자인확인서' : '작업요청서';
+    const label = INQ_DOC_LABEL[kind] || kind;
     if (t.st === 'img') return `<img src="${t.src}" alt="${label} 미리보기"><span class="inq-doc-lb">${label}</span>`;
     if (t.st === 'empty') return `<div class="inq-doc-ph"><b>＋</b>${label} 만들기</div>`;
     if (t.st === 'needdc') return `<div class="inq-doc-ph"><b>＋</b>${label}<em>디자인확인서를 먼저 만들어주세요</em></div>`;
@@ -23669,7 +23739,7 @@ function inqDocTileHtml(p, kind) {
     const t = inqDocTileState(p, kind);
     const empty = t.st === 'empty' || t.st === 'needdc';
     return `<button type="button" class="inq-doc-th ${empty ? 'empty' : ''}" data-act="${kind}:${p.id}" data-doctile="${kind}:${p.id}"
-        title="${kind === 'dc' ? '디자인확인서' : '작업요청서'}${empty ? ' 만들기' : ' — 누르면 크게 보기'}">${inqDocTileInner(kind, t)}</button>`;
+        title="${INQ_DOC_LABEL[kind]}${empty ? ' 만들기' : ' — 누르면 크게 보기'}">${inqDocTileInner(kind, t)}</button>`;
 }
 function inqSetDocTile(p, kind) {
     const b = document.querySelector(`#inqProjs [data-doctile="${kind}:${p.id}"]`);
@@ -23680,17 +23750,17 @@ function inqSetDocTile(p, kind) {
 }
 async function inqFillDocTiles(x) {
     const projs = _inqProjsFor === x.id ? _inqProjs.slice() : [];
-    for (const p of projs) for (const kind of ['dc', 'wr']) {
+    for (const p of projs) for (const kind of ['dc', isOvsProject(p) ? 'po' : 'wr']) {
         if (_inqSel !== x.id) return;
-        if (!p.source_doc_number) continue;
-        const ck = kind + ':' + p.source_doc_number;
+        if (kind !== 'po' && !p.source_doc_number) continue;
+        const ck = inqDocCacheKey(p, kind);
         if (!_inqDocNum.has(ck)) {
             try { _inqDocNum.set(ck, await inqSavedDocNumber(p, kind)); } catch (_) { continue; }
             inqSetDocTile(p, kind);
         }
         const num = _inqDocNum.get(ck);
         if (!num || _savedDocThumb.has(num) || _savedDocFail.has(num)) continue;
-        try { await getSavedDoc(num, kind === 'dc' ? '디자인확인서' : '작업요청서'); }
+        try { await getSavedDoc(num, INQ_DOC_LABEL[kind]); }
         catch (e) { console.warn('문서 미리보기 실패', num, e); _savedDocFail.add(num); }
         inqSetDocTile(p, kind);
     }
@@ -23965,7 +24035,7 @@ function inqSendMenu(x, btn) {
     projs.forEach(p => rows.push(`<button data-s="dc:${p.id}">🎨 디자인확인서 <em>${escHtml(p.product_name || '')} · ${p.source_doc_number ? escHtml(p.source_doc_number) + ' 저장된 문서 그대로' : '아직 없음 — 만들기'}</em></button>`));
     if (projs.length) {
         rows.push('<div class="inq-send-cap">공장·공급처에게</div>');
-        projs.forEach(p => rows.push(`<button data-s="wr:${p.id}">📋 작업요청서 <em>${escHtml(p.product_name || '')}${p.supplier ? ' → ' + escHtml(p.supplier) : ''} · ${p.source_doc_number ? '저장된 문서 그대로' : '디자인확인서 먼저'}</em></button>`));
+        projs.forEach(p => rows.push(isOvsProject(p) ? `<button data-s="po:${p.id}">🌏 해외 PO <em>${escHtml(p.product_name || '')}${p.supplier ? ' → ' + escHtml(p.supplier) : ''} · 문서 생성기에서 PDF로</em></button>` : `<button data-s="wr:${p.id}">📋 작업요청서 <em>${escHtml(p.product_name || '')}${p.supplier ? ' → ' + escHtml(p.supplier) : ''} · ${p.source_doc_number ? '저장된 문서 그대로' : '디자인확인서 먼저'}</em></button>`));
     }
     const m = document.createElement('div');
     m.id = 'inqSendMenu';
@@ -23986,6 +24056,7 @@ function inqSendMenu(x, btn) {
     });
 }
 async function inqSendGo(x, what) {
+    if (what.startsWith('po:')) { await inqDealAction(x, what); return; }
     if (!window.SendKit) { showToast('보내기 기능을 불러오지 못했습니다. 새로고침 해주세요'); return; }
     sendKitSetup();
     if (what.startsWith('quote:')) {
@@ -24025,6 +24096,7 @@ async function inqSendGo(x, what) {
 // — '만들기'(createDocFromProject)는 프로젝트 데이터로 덮어쓸지 묻기 때문에 보내기에서는 쓰지 않음
 // 상담에 연결된 국내 품목의 저장된 디자인확인서·작업요청서 문서번호 (없으면 null)
 async function inqSavedDocNumber(row, kind) {
+    if (kind === 'po') return await findProjectPoNumber(row);
     if (!row || !row.source_doc_number) return null;
     if (kind === 'dc') return row.source_doc_number;
     const prefix = row.source_doc_number + '_';
@@ -24146,10 +24218,10 @@ async function viewSavedDoc(docNumber, label, x) {
             <b>${escHtml(label)} <em>${escHtml(docNumber)}</em></b>
             <span class="docview-t">${escHtml(opts.title || '')}</span>
             <div class="inq-spacer"></div>
-            ${opts.docType === 'ps' ? '<span class="docview-t">내부 문서 · 외부 발송 금지</span>' : '<button data-v="send" class="primary">📤 보내기</button>'}
-            <button data-v="pdf">PDF</button>
+            ${opts.docType === 'ps' ? '<span class="docview-t">내부 문서 · 외부 발송 금지</span>' : opts.docType === 'po' ? '' : '<button data-v="send" class="primary">📤 보내기</button>'}
+            ${opts.docType === 'po' ? '<span class="docview-t">여러 장 문서 — PDF·인쇄는 문서 생성기에서</span><button data-v="edit">✏️ 문서 생성기에서 열기</button>' : `<button data-v="pdf">PDF</button>
             <button data-v="jpg">JPG</button>
-            <button data-v="edit">✏️ 편집</button>
+            <button data-v="edit">✏️ 편집</button>`}
             <button data-v="close" aria-label="닫기">✕</button>
           </div>
           <div class="docview-body"><img src="${jpg}" alt="${escHtml(label)}"></div>`;
