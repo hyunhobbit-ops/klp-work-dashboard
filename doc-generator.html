@@ -3019,6 +3019,10 @@ function poLineText(l){
   if(t===PO_LAST_ORDER&&l.date){var p=String(l.date).split('-');var M=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];if(p.length>=2&&+p[1]>=1)return 'SAME AS BEFORE (LAST ORDER: '+M[+p[1]-1]+' '+p[0]+')'}
   return t;
 }
+/* DESIGN DETAIL 큰 강조 문구 선택지 — [문서 영어, 화면 한글] */
+var PO_HEAD_OPT=[['SAME AS SAMPLE','샘플과 동일'],['SAME AS LAST ORDER','지난 주문과 동일 (달 선택)']];
+function poMonthEn(ym){var p=String(ym||'').split('-');var M=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];return p.length>=2&&+p[1]>=1?M[+p[1]-1]+' '+p[0]:''}
+function poHeadText(pg){var t=String(pg.headline||'').trim();if(t==='SAME AS LAST ORDER'&&pg.hl_date)return 'SAME AS LAST ORDER ('+poMonthEn(pg.hl_date)+')';return t}
 var PO_PH={'SIZE (Ø × T)':'예) Ø47mm × 12mm','SIZE (W × L)':'예) 20mm × 120/75mm','LENGTH':'예) 37cm','ORDER':'예) 110pcs','SPARE WATCH (2%)':'예) 2pcs','SPARE PARTS (3%)':'예) 3 sets','UNIT PRICE':'예) 4.15 USD','SAMPLE COST':'예) 15 USD','MOLD / SETUP COST':'예) 120 USD','SAMPLE DATE':'예) 2026.10.20','SHIP DATE (ETD)':'예) 2026.11.01'};
 var po=null,poImgs={},poImgTarget=null,poCurrentId=null,poLinkedDcNum='';
 
@@ -3150,7 +3154,13 @@ function poRenderForm(){
     po.pages.map(function(pg,pi){
       return '<div class="po-page-ed"><div class="po-g-head"><b>'+(pi+2)+'쪽</b><input list="poPageTitles" value="'+esc(pg.title)+'" placeholder="CASE" data-popt="'+pi+'">'+
         '<button type="button" class="ps-del" data-popmv="'+pi+'|-1" title="위로">↑</button><button type="button" class="ps-del" data-popmv="'+pi+'|1" title="아래로">↓</button><button type="button" class="ps-del" data-popdel="'+pi+'" title="페이지 빼기">×</button></div>'+
-        '<div class="row"><div class="field"><label>큰 강조 문구 (선택)</label><input value="'+esc(pg.headline||'')+'" placeholder="SAME AS SAMPLE" data-popf="'+pi+'|headline"></div><div class="field"><label>원본 파일 (이 페이지)</label><input value="'+esc(pg.file||'')+'" placeholder="KLP2605_CASE_v1.ai" data-popf="'+pi+'|file"></div></div>'+
+        '<div class="row"><div class="field"><label>큰 강조 문구 (선택)</label>'+(function(){
+          var inList=PO_HEAD_OPT.some(function(o){return o[0]===pg.headline}),other=!!pg._hother||(pg.headline&&!inList);
+          return '<div class="po-vsel"><select data-pophsel="'+pi+'"><option value="">— 없음 —</option>'+PO_HEAD_OPT.map(function(o){return '<option value="'+o[0]+'"'+(!other&&o[0]===pg.headline?' selected':'')+'>'+o[1]+'  ·  '+o[0]+'</option>'}).join('')+
+            '<option value="__other"'+(other?' selected':'')+'>기타 (직접 입력)</option></select>'+
+            (other?'<input value="'+esc(pg.headline||'')+'" placeholder="직접 입력 — 영어로" data-popf="'+pi+'|headline">':'')+
+            (!other&&pg.headline==='SAME AS LAST ORDER'?'<label class="po-month">지난 주문<input type="month" value="'+esc(pg.hl_date||'')+'" data-pophm="'+pi+'"></label>':'')+'</div>';
+        })()+'</div><div class="field"><label>원본 파일 (이 페이지)</label><input value="'+esc(pg.file||'')+'" placeholder="KLP2605_CASE_v1.ai" data-popf="'+pi+'|file"></div></div>'+
         poImgTiles(pg.imgs,String(pi),4)+
         '<div class="field" style="margin-top:10px"><label>요청 문구 (한 줄에 하나, 빨간 글씨)</label><textarea rows="2" data-popf="'+pi+'|notes" placeholder="Please make it look clean.">'+esc(pg.notes||'')+'</textarea></div></div>';
     }).join('')+
@@ -3214,6 +3224,12 @@ function poBindForm(box){
   box.querySelectorAll('[data-pogadd]').forEach(function(b){b.onclick=function(){po.spec.push({g:'',hl:0,rows:[{k:'',v:''}]});rerender()}});
   box.querySelectorAll('[data-popt]').forEach(function(inp){inp.oninput=function(){po.pages[+inp.dataset.popt].title=inp.value}});
   box.querySelectorAll('[data-popf]').forEach(function(inp){inp.oninput=function(){var a=inp.dataset.popf.split('|');po.pages[+a[0]][a[1]]=inp.value}});
+  box.querySelectorAll('[data-pophsel]').forEach(function(sel){sel.onchange=function(){
+    var pg=po.pages[+sel.dataset.pophsel];
+    if(sel.value==='__other'){pg._hother=1;if(PO_HEAD_OPT.some(function(o){return o[0]===pg.headline}))pg.headline='';rerender();var n=document.querySelector('[data-popf="'+sel.dataset.pophsel+'|headline"]');if(n)n.focus()}
+    else{pg._hother=0;pg.headline=sel.value;rerender();if(sel.value==='SAME AS LAST ORDER'){var m=document.querySelector('[data-pophm="'+sel.dataset.pophsel+'"]');if(m)m.focus()}}
+  }});
+  box.querySelectorAll('[data-pophm]').forEach(function(inp){inp.onchange=inp.oninput=function(){po.pages[+inp.dataset.pophm].hl_date=inp.value}});
   box.querySelectorAll('[data-popdel]').forEach(function(b){b.onclick=function(){if(!confirm('이 페이지를 뺄까요?'))return;var pg=po.pages.splice(+b.dataset.popdel,1)[0];(pg.imgs||[]).forEach(function(it){delete poImgs[it.key]});rerender()}});
   box.querySelectorAll('[data-popmv]').forEach(function(b){b.onclick=function(){var a=b.dataset.popmv.split('|'),i=+a[0],j=i+(+a[1]);if(j<0||j>=po.pages.length)return;var t=po.pages[i];po.pages[i]=po.pages[j];po.pages[j]=t;rerender()}});
   box.querySelectorAll('[data-popadd]').forEach(function(b){b.onclick=function(){po.pages.push({title:b.dataset.popadd,headline:'',file:'',notes:'',imgs:[{key:poKey(),cap:''},{key:poKey(),cap:''}]});rerender()}});
@@ -3519,7 +3535,7 @@ async function buildPoDocAsync(){
       :'<div style="height:'+areaH+'px;border:1px dashed '+LN+';display:flex;align-items:center;justify-content:center;color:#bbb;font-size:14px;flex-shrink:0">No image</div>';
     var inner=head('DESIGN DETAIL')+
       '<div style="height:'+titleH+'px;display:flex;align-items:center;gap:10px;flex-shrink:0"><span style="width:5px;height:24px;background:'+C+'"></span><span style="font-size:22px;font-weight:900;letter-spacing:1.5px">'+esc(pg.title||'')+'</span></div>'+
-      (hlH?'<div style="height:52px;margin-bottom:10px;box-sizing:border-box;border:2px solid '+C+';display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:'+C+';letter-spacing:1px;flex-shrink:0;white-space:nowrap;overflow:hidden">'+esc(pg.headline)+'</div>':'')+
+      (hlH?'<div style="height:52px;margin-bottom:10px;box-sizing:border-box;border:2px solid '+C+';display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:'+C+';letter-spacing:1px;flex-shrink:0;white-space:nowrap;overflow:hidden">'+esc(poHeadText(pg))+'</div>':'')+
       grid+
       (nts.length?'<div style="margin-top:12px;flex-shrink:0">'+nts.map(function(n,i){return '<div style="height:30px;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;color:'+C+';white-space:nowrap;overflow:hidden"><b style="min-width:22px">'+(i+1)+'.</b>'+esc(n)+'</div>'}).join('')+'</div>':'')+
       (flH?'<div style="height:28px;margin-top:6px;display:flex;align-items:center;gap:6px;font-size:12.5px;color:'+SUB+';border-top:1px solid '+LN2+';flex-shrink:0">📎 Artwork file: <b style="color:'+TX+'">'+esc(pg.file)+'</b></div>':'');
