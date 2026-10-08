@@ -254,6 +254,7 @@
 - 카톡: PC = ①문서 이미지 복사(ClipboardItem png, Promise로 넘겨 버튼 권한 유지) ②문구 복사 → 채팅방 Ctrl+V / 폰 = `navigator.share({files, text})` 공유 시트(문구는 미리 클립보드에도). 문서 이미지는 창을 열 때 미리 만들어 둠(공유·복사는 클릭 직후에만 허용)
 
 ## 문서 생성기 (DC/WR) 연동
+- **화면 틀 (2026-10-08)**: 대시보드와 같은 구조 — 왼쪽 고정 사이드바 230px(`.mode-bar`를 CSS로 세로 배치: 로고 · ← 대시보드로 · '문서 종류' · 4개 문서 버튼(아이콘+이름+작은 설명, 선택 = 문서 색 옅은 바탕 + 왼쪽 막대)) / 위 고정 제목줄(`.sub-bar` 안 `.dg-title` 문서 이름 + 새로 입력·히스토리 탭) / 입력칸은 왼쪽부터(최대 1100px). `body:not(.view-mode):not(.quote-only-mode)` + 821px 이상에서만 — 임베드(#view-)·단독 견적서·폰은 예전 모양
 - **생성 흐름**: 프로젝트 진행사항 → 상세/편집 모달의 `📄 디자인확인서 만들기` / `📋 작업요청서 만들기` 버튼 → `doc-generator.html`로 이동하여 pre-fill
   - 프로젝트 데이터는 `localStorage.klp_doc_prefill`로 전달 (doc-generator가 로드 시 읽고 즉시 삭제)
   - DC는 매출 필드로, WR은 매입(`supplier_*`) 필드로 pre-fill
