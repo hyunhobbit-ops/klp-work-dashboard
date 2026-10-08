@@ -23545,8 +23545,8 @@ async function inqDealAction(x, act, btn) {
     if (kind === 'po') {
         if (!row) return;
         const num = await inqSavedDocNumber(row, 'po');
-        if (num) { if (confirm(`해외 작업요청서(${num})를 문서 생성기에서 열까요?`)) location.href = 'doc-generator.html#edit-' + encodeURIComponent(num); return; }
-        if (confirm('아직 해외 작업요청서가 없습니다. 새로 만들까요?\n(디자인확인서·해외 매입 정보를 불러와요 — 문서 생성기로 이동)')) location.href = 'doc-generator.html#po-new' + (row.source_doc_number ? '-' + encodeURIComponent(row.source_doc_number) : '');
+        if (num) { if (confirm(`해외 PO(${num})를 문서 생성기에서 열까요?`)) location.href = 'doc-generator.html#edit-' + encodeURIComponent(num); return; }
+        if (confirm('아직 해외 PO가 없습니다. 새로 만들까요?\n(디자인확인서·해외 매입 정보를 불러와요 — 문서 생성기로 이동)')) location.href = 'doc-generator.html#po-new' + (row.source_doc_number ? '-' + encodeURIComponent(row.source_doc_number) : '');
         return;
     }
     if (kind === 'ps') {
@@ -23623,7 +23623,7 @@ function inqRenderProjs(x) {
             <span class="inq-pj-amt">${won(p.revenue)}</span>
             <span class="inq-pj-prog">${done}/${CHECK_ITEMS.length}</span>
             <div class="inq-spacer"></div>
-            ${p.supplier_overseas ? `<button class="inq-mini" data-act="po:${p.id}" title="해외 공장 영문 작업요청서 — 있으면 열기, 없으면 만들기">🌏 해외 작업요청서</button>` : ''}
+            ${p.supplier_overseas ? `<button class="inq-mini" data-act="po:${p.id}" title="해외 공장에 보내는 영문 발주서(PO) — 있으면 열기, 없으면 만들기">🌏 해외 PO</button>` : ''}
             <button class="inq-mini" data-act="ps:${p.id}" title="시계 제작 주문 내부 문서 — 있으면 보기, 없으면 만들기">🕐 제작진행표</button>
             <button class="inq-mini" data-act="open:${p.id}">국내에서 보기</button>
           </div>
