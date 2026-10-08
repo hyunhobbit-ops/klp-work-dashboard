@@ -2978,7 +2978,7 @@ function poDefaultSpec(t){
     poGrp('PACKAGING',0,['GIFT BOX','WARRANTY / MANUAL','INNER PACKING','MARKING / LABEL']),
     poGrp('QUANTITY',1,['ORDER','SPARE WATCH (2%)','SPARE PARTS (3%)']),
     poGrp('PRICE',1,['UNIT PRICE','SAMPLE COST','MOLD / SETUP COST','PAYMENT TERMS']),
-    poGrp('DELIVERY',1,['SAMPLE DATE','SHIP DATE (ETD)','SHIPPING','INCOTERMS','SHIP TO']),
+    poGrp('DELIVERY',1,['SAMPLE DATE','SHIPPING','INCOTERMS','SHIP TO']),
     poGrp('QC',0,['INSPECTION','TEST'])];
 }
 /* 손목 ↔ 회중 바꾸기: 줄(STRAP) ↔ 체인(CHAIN) 그룹을 바꿔 끼우고(적어 둔 값은 기억), 회중이면 CASE TYPE 줄 추가 */
@@ -3078,7 +3078,7 @@ function poRenderForm(){
       g.rows.map(function(r,ri){return '<div class="po-r'+(r.hl?' hl':'')+'"><input value="'+esc(r.k)+'" data-pork="'+gi+'|'+ri+'">'+poValCell(gi,ri,r)+'<button type="button" class="po-star'+(r.hl?' on':'')+'" data-porhl="'+gi+'|'+ri+'" title="이 줄 강조">★</button><button type="button" class="ps-del" data-pordel="'+gi+'|'+ri+'">×</button></div>'}).join('')+
       '<button type="button" class="ps-add" data-poradd="'+gi+'">+ 항목</button></div>';
   };
-  h+='<div class="section"><div class="section-title">📦 주문 조건 <span class="po-hint">수량 · 단가 · 납기 — 문서 1쪽 SUMMARY에 크게 나가요 (적은 칸만)</span></div>'+
+  h+='<div class="section"><div class="section-title">📦 주문 조건 <span class="po-hint">수량 · 단가 · 납기 — 문서 1쪽에 크게 (적은 칸만) · 납기일(DELIVERY DATE)은 위 기본 정보의 “납기일”이 가장 크게 나가요</span></div>'+
     po.spec.map(function(g,gi){return poIsOrderGroup(g)?grpEd(g,gi):''}).join('')+'</div>';
   /* 사양표 */
   var wt=po.watch_type||'wrist';
@@ -3329,18 +3329,27 @@ async function buildPoDocAsync(){
   /* 받는 곳·품번 + 주문 조건을 한 표로 (빈칸 없이 이어짐) — 2026-10 피드백 */
   var RW=44;
   var cell=function(c){
-    return '<div style="flex:'+(c.w||1)+' 1 0;min-width:0;padding:6px 12px 0;box-sizing:border-box;'+(c.first?'':'border-left:1px solid '+LN2+';')+'">'+
-      '<div style="font-size:10px;color:'+(c.red?C:SUB)+';font-weight:700;letter-spacing:.8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.k)+'</div>'+
-      '<div style="font-size:'+(c.fs||14.5)+'px;font-weight:800;color:'+(c.red?C:TX)+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.45">'+V(c.v)+'</div></div>';
+    return '<div style="flex:'+(c.w||1)+' 1 0;min-width:0;padding:'+(c.fs>16?'7px':'6px')+' 12px 0;box-sizing:border-box;'+(c.first?'':'border-left:1px solid '+LN2+';')+(c.box?'border:2px solid '+C+';':'')+'">'+
+      '<div style="font-size:'+(c.fs>16?11.5:10)+'px;color:'+(c.red?C:SUB)+';font-weight:'+(c.fs>16?900:700)+';letter-spacing:.8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.k)+'</div>'+
+      '<div style="font-size:'+(c.fs||14.5)+'px;font-weight:'+(c.fs>16?900:800)+';color:'+(c.red?C:TX)+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:'+(c.fs>16?1.35:1.45)+'">'+V(c.v)+'</div></div>';
   };
-  var row=function(cells,top){cells[0].first=1;return '<div style="display:flex;height:'+RW+'px;'+(top?'border-top:1px solid '+LN2+';':'')+'">'+cells.map(cell).join('')+'</div>'};
+  var row=function(cells,top,h){cells[0].first=1;return '<div style="display:flex;height:'+(h||RW)+'px;'+(top?'border-top:1px solid '+LN2+';':'')+'">'+cells.map(cell).join('')+'</div>'};
   /* 주문 조건 칸: 각 그룹 첫 줄(주문 수량·단가·출고일 등)을 먼저, 나머지는 뒤에 — 한 줄 4칸, 긴 값은 2칸 */
-  var oc=[],rest=[];
+  var key=[],rest=[],shipDate='';
   po.spec.filter(poIsOrderGroup).forEach(function(g){
+    var isDel=/^DELIVERY$/i.test(String(g.g).trim());
     var rows=g.rows.filter(function(r){return String(r.v||'').trim()});
-    rows.forEach(function(r,i){var c={k:r.k,v:r.v,red:i===0||r.hl,w:String(r.v).length>20?2:1};(i===0?oc:rest).push(c)});
+    rows.forEach(function(r,i){
+      if(/^SHIP DATE/i.test(r.k)){shipDate=r.v;return}
+      var c={k:r.k,v:r.v,red:r.hl,w:String(r.v).length>20?2:1};
+      if(i===0&&!isDel){c.red=1;c.fs=18;key.push(c)}else rest.push(c);
+    });
   });
-  oc=oc.concat(rest);
+  var delV=po.need_by?poDateEn(po.need_by):shipDate;
+  if(delV)key.push({k:'DELIVERY DATE',v:delV,red:1,fs:24,w:2,box:1});
+  var keyRow=key.length?key:null;
+  if(keyRow){var ku=keyRow.reduce(function(a,c){return a+c.w},0);if(ku<4)keyRow[keyRow.length-1].w+=4-ku}
+  var oc=rest;
   var oRows=[],cur=[],units=0;
   oc.forEach(function(c){if(units+c.w>4){oRows.push(cur);cur=[];units=0}cur.push(c);units+=c.w});
   if(cur.length)oRows.push(cur);
@@ -3348,10 +3357,10 @@ async function buildPoDocAsync(){
   oRows.forEach(function(r){var u=r.reduce(function(a,c){return a+c.w},0);if(u<4)r[r.length-1].w+=4-u});
   var info='<div style="border:1.5px solid '+TX+';flex-shrink:0;margin-bottom:16px">'+
     row([{k:'TO',v:po.to,w:2,fs:15.5},{k:'ATTN',v:po.attn},{k:'FROM',v:po.from}])+
-    row([{k:'ITEM NO.',v:po.po_no,red:1},{k:'MODEL NAME',v:po.model,w:2,fs:15.5},{k:'DELIVERY DATE',v:po.need_by?poDateEn(po.need_by):'',red:1}],1)+
-    (oRows.length?'<div style="height:22px;display:flex;align-items:center;padding:0 12px;border-top:1.5px solid '+TX+';font-size:10.5px;font-weight:900;letter-spacing:1.5px;color:'+C+'">ORDER TERMS</div>'+
-      oRows.map(function(r,i){return row(r,1)}).join(''):'')+'</div>';
-  var used=2*RW+(oRows.length?22+oRows.length*RW:0)+3+16;
+    row([{k:'ITEM NO.',v:po.po_no,red:1},{k:'MODEL NAME',v:po.model,w:3,fs:15.5}],1)+
+    (keyRow||oRows.length?'<div style="height:22px;display:flex;align-items:center;padding:0 12px;border-top:1.5px solid '+TX+';font-size:10.5px;font-weight:900;letter-spacing:1.5px;color:'+C+'">ORDER TERMS</div>'+
+      (keyRow?row(keyRow,1,62):'')+oRows.map(function(r,i){return row(r,1)}).join(''):'')+'</div>';
+  var used=2*RW+(keyRow||oRows.length?22:0)+(keyRow?62:0)+oRows.length*RW+3+16;
   var orderHtml='';
 
   /* SUMMARY 사진 + 번호 붙은 문구 */
