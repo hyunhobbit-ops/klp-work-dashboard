@@ -32,6 +32,11 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
 .ps-del{width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:#aaa;font-size:16px;cursor:pointer}
 .ps-del:hover{background:#fee2e2;color:#c41e3a}
 .ps-add{margin-top:10px;padding:8px 14px;border:1px dashed #bbb;border-radius:8px;background:transparent;color:#555;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.ps-chip{padding:5px 11px;border:1.5px solid #C4B5FD;border-radius:999px;background:#F5F3FF;color:#5B21B6;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:0}
+.ps-chip:hover{background:#EDE9FE}
+.ps-chip.on{background:#7C3AED;border-color:#7C3AED;color:#fff}
+.ps-chip.ghost{border-color:#ddd;background:#fff;color:#777}
+.ps-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .ps-hc:hover{border-color:#7C3AED!important;background:#F5F3FF!important}
 .mode-btn.active-wr{background:var(--klp-orange);border-color:var(--klp-orange);color:#fff;box-shadow:0 2px 8px rgba(245,158,11,.3)}
 
@@ -388,15 +393,15 @@ body.quote-only-mode .logo-area h1::after{content:' · 견적서 작성';color:#
     <div class="row"><div class="field"><label>문서번호 (자동)</label><input id="psDocNum" readonly style="background:#eee;color:#666;font-weight:700" placeholder="저장할 때 자동"></div><div class="field"><label>일자</label><input type="date" id="psDate"></div></div>
     <div class="row"><div class="field"><label>담당자</label><select id="psManager"><option>이현주 실장</option><option selected>김현호 팀장</option><option>유지은 대리</option><option>구정두</option><option>대표님</option></select></div></div>
   </div>
-  <div class="section"><div class="section-title">🏢 발주처</div>
-    <div class="row"><div class="field"><label>발주처 <span class="req">*</span></label><input id="psCompany" list="clientsListDoc" autocomplete="off" placeholder="주문한 회사 (검색 가능)"></div><div class="field"><label>발주일</label><input type="date" id="psOrderDate"></div></div>
+  <div class="section"><div class="section-title" style="display:flex;align-items:center;justify-content:space-between">🏢 발주처 <span style="display:flex;gap:6px"><button type="button" class="ps-chip" id="psHqBtn" onclick="psUseHq()" title="고객 주문 없이 자사에서 직접 제작해 판매·사용할 때">🏠 자사 제작 (본사)</button><button type="button" class="ps-chip ghost" onclick="psClearOrderer()">비우기</button></span></div>
+    <div class="row"><div class="field"><label>발주처 <span class="req">*</span></label><input id="psCompany" list="clientsListDoc" autocomplete="off" placeholder="주문한 회사 (검색 가능) — 자사 제작이면 위 버튼" oninput="psMarkHq()"></div><div class="field"><label>발주일</label><input type="date" id="psOrderDate"></div></div>
     <div class="row"><div class="field"><label>발주처 담당자</label><input id="psOrderContact" placeholder="홍길동 과장"></div><div class="field"><label>발주처 연락처</label><input id="psOrderPhone" placeholder="010-0000-0000"></div></div>
   </div>
   <div class="section"><div class="section-title">⌚ 제품</div>
     <div class="row"><div class="field" style="flex:1"><label>제품명 (품번) <span class="req">*</span></label><input id="psProduct" placeholder="KLPK22222 ○○○ 회중시계"></div></div>
     <div class="price-row"><div class="field" style="flex:2;min-width:140px"><label>총수량</label><input id="psQty" placeholder="숫자만" oninput="fmtComma(this)"></div><div class="field" style="flex:1;min-width:100px"><label>단위</label><select id="psUnit"><option>개</option><option>세트</option><option>EA</option></select></div></div>
     <div class="price-row"><div class="field" style="flex:2;min-width:140px"><label>단가</label><input id="psUnitPrice" placeholder="0" oninput="fmtComma(this)"></div><div class="field" style="flex:1;min-width:110px"><label>VAT</label><select id="psUnitPriceVat"><option>VAT 별도</option><option>VAT 포함</option></select></div></div>
-    <div class="row"><div class="field"><label>납품일</label><input type="date" id="psDeliveryDate"></div><div class="field"><label>납품 방식</label><input id="psShipNote" value="출고" placeholder="출고 / 택배 출고 / 직접 납품"></div></div>
+    <div class="row"><div class="field"><label>납품일</label><input type="date" id="psDeliveryDate"></div><div class="field"><label>납품 방식</label><input id="psShipNote" value="일괄 출고" placeholder="직접 입력도 돼요" oninput="psMarkShip()"><div class="ps-chips" id="psShipChips"></div></div></div>
     <div class="row"><div class="field" style="flex:1"><label>납품처</label><input id="psPlace" placeholder="납품 주소"></div></div>
   </div>
   <div class="section"><div class="section-title">🖼️ 시안·제품 이미지</div>
@@ -646,7 +651,7 @@ function switchMode(mode){
   document.getElementById('psSubBar').classList.toggle('hidden',mode!=='ps');
   ['dcForm','dcPreview','dcHistory','wrForm','wrPreview','wrHistory','psForm','psPreview','psHistory'].forEach(function(v){document.getElementById(v).classList.add('hidden')});
   if(mode==='dc') showDcTab('form');
-  else if(mode==='ps'){ if(!psParts.length){psParts=psBlankParts();psRenderImgs();psRenderParts();if(!val('psDate'))document.getElementById('psDate').value=psTodayStr();if(!val('psOrderDate'))document.getElementById('psOrderDate').value=psTodayStr();document.getElementById('psManager').value=getLoginManager()||'김현호 팀장';} showPsTab('form'); }
+  else if(mode==='ps'){ if(!psParts.length){psParts=psBlankParts();psRenderImgs();psRenderParts();psMarkShip();if(!val('psDate'))document.getElementById('psDate').value=psTodayStr();if(!val('psOrderDate'))document.getElementById('psOrderDate').value=psTodayStr();document.getElementById('psManager').value=getLoginManager()||'김현호 팀장';} showPsTab('form'); }
   else showWrTab('form');
 }
 
@@ -2419,6 +2424,28 @@ var psMainImg=null,psSubImgs=[],psParts=[],psLinkedDcNum='',psCurrentId=null;
 function psBlankParts(){return PS_PARTS_DEFAULT.map(function(n){return{name:n,qty:'',color:'',print:'',maker:'',note:''}})}
 function psTodayStr(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 
+/* 자사(본사) 정보 — 작업요청서 푸터와 같은 주소·전화 */
+var PS_HQ={name:'케이엘피코리아 (본사)',phone:'02-2103-5757',addr:'서울 구로구 디지털로32길 30, 코오롱빌란트 1차 901호'};
+var PS_SHIP_OPTS=['일괄 출고','택배 출고','분할 출고','직접 납품','본사 보관·사용'];
+function psUseHq(){
+  var me=getLoginManager()||val('psManager')||'김현호 팀장';
+  document.getElementById('psCompany').value=PS_HQ.name;
+  document.getElementById('psOrderContact').value=me;
+  document.getElementById('psOrderPhone').value=PS_HQ.phone;
+  if(!val('psPlace')||confirm('납품처를 본사 주소로 바꿀까요?'))document.getElementById('psPlace').value=PS_HQ.addr;
+  var sn=val('psShipNote');if(!sn||sn==='출고'||sn==='일괄 출고')psSetShip('본사 보관·사용');
+  psMarkHq();
+}
+function psClearOrderer(){['psCompany','psOrderContact','psOrderPhone'].forEach(function(id){document.getElementById(id).value=''});psMarkHq()}
+function psMarkHq(){var b=document.getElementById('psHqBtn');if(b)b.classList.toggle('on',val('psCompany')===PS_HQ.name)}
+function psSetShip(v){document.getElementById('psShipNote').value=v;if(v==='본사 보관·사용'&&!val('psPlace'))document.getElementById('psPlace').value=PS_HQ.addr;psMarkShip()}
+function psMarkShip(){
+  var box=document.getElementById('psShipChips');if(!box)return;
+  var cur=val('psShipNote');
+  box.innerHTML=PS_SHIP_OPTS.map(function(o){return '<button type="button" class="ps-chip'+(o===cur?' on':'')+'" data-ship="'+esc(o)+'">'+esc(o)+'</button>'}).join('');
+  box.querySelectorAll('[data-ship]').forEach(function(b){b.onclick=function(){psSetShip(b.dataset.ship)}});
+}
+
 function showPsTab(tab){
   if(tab==='preview'){if(!psValidate())return;buildPsDoc()}
   if(tab==='history')psLoadHistory();
@@ -2437,9 +2464,9 @@ function newPsDoc(){
   document.getElementById('psManager').value=getLoginManager()||'김현호 팀장';
   document.getElementById('psUnit').value='개';
   document.getElementById('psUnitPriceVat').value='VAT 별도';
-  document.getElementById('psShipNote').value='출고';
+  document.getElementById('psShipNote').value='일괄 출고';
   document.getElementById('psLinkedInfo').classList.add('hidden');
-  psRenderImgs();psRenderParts();
+  psRenderImgs();psRenderParts();psMarkShip();psMarkHq();
   showPsTab('form');
 }
 
@@ -2489,7 +2516,7 @@ async function psApplyDc(r){
   document.getElementById('psUnitPrice').value=r.unit_price?Number(r.unit_price).toLocaleString():'';
   document.getElementById('psUnitPriceVat').value=r.unit_price_vat||'VAT 별도';
   document.getElementById('psDeliveryDate').value=r.delivery_date||'';
-  document.getElementById('psShipNote').value=r.shipping_type?r.shipping_type+' 출고':'출고';
+  document.getElementById('psShipNote').value=r.shipping_type==='택배'?'택배 출고':'일괄 출고';psMarkShip();psMarkHq();
   var sp=unpackShip(r.delivery_address);document.getElementById('psPlace').value=sp[2]||'';
   if(r.images_data){var imgs=unpackImages(r.images_data);psMainImg=imgs.main;psSubImgs=imgs.subs}
   psRenderImgs();
@@ -2575,7 +2602,7 @@ function psFill(r){
   document.getElementById('psUnitPrice').value=r.unit_price?Number(r.unit_price).toLocaleString():'';
   document.getElementById('psUnitPriceVat').value=r.unit_price_vat||'VAT 별도';
   document.getElementById('psDeliveryDate').value=r.delivery_date||'';
-  document.getElementById('psShipNote').value=x.ship_note||'출고';
+  document.getElementById('psShipNote').value=x.ship_note||'일괄 출고';psMarkShip();psMarkHq();
   document.getElementById('psPlace').value=x.place||unpackShip(r.delivery_address)[2]||'';
   if(r.images_data){var imgs=unpackImages(r.images_data);psMainImg=imgs.main;psSubImgs=imgs.subs}else{psMainImg=null;psSubImgs=[]}
   psParts=(x.parts&&x.parts.length)?x.parts.map(function(p){return Object.assign({name:'',qty:'',color:'',print:'',maker:'',note:''},p)}):psBlankParts();
@@ -2595,7 +2622,7 @@ function buildPsDoc(){
   var v=function(t,st){return td(esc(t)||'',"text-align:center;font-size:14px;color:#111;"+(st||''))};
   var unitP=val('psUnitPrice')?val('psUnitPrice')+'원('+(val('psUnitPriceVat')==='VAT 포함'?'vat포함':'vat별도')+')':'';
   var qtyS=val('psQty')?'총 '+val('psQty')+val('psUnit'):'';
-  var dlv=val('psDeliveryDate')?psDateK(val('psDeliveryDate'))+' '+(val('psShipNote')||''):'';
+  var dlv=[val('psDeliveryDate')?psDateK(val('psDeliveryDate')):'',val('psShipNote')].filter(Boolean).join(' ');
   var place=val('psPlace');
   var placeFs=place.length>34?'10.5px':place.length>24?'12px':'13px';
 
