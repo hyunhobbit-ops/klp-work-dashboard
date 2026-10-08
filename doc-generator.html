@@ -2673,64 +2673,77 @@ function psFill(r){
 /* --- 문서 그리기 (A4 794×1123) --- */
 function psDateK(d){if(!d)return '';var p=String(d).split('-');return p.length<3?d:p[0]+'년 '+(+p[1])+'월 '+(+p[2])+'일'}
 function buildPsDoc(){
-  var LB='font-weight:900;color:#111;text-align:center;';
-  var BD='border:1.2px solid #444;';
-  var td=function(html,st){return '<td style="'+BD+'padding:0 8px;'+(st||'')+'">'+html+'</td>'};
-  var lab=function(t,st){return td(t,LB+'font-size:13px;letter-spacing:5px;'+(st||''))};
-  var v=function(t,st){return td(esc(t)||'',"text-align:center;font-size:14px;color:#111;"+(st||''))};
-  var unitP=val('psUnitPrice')?val('psUnitPrice')+'원('+(val('psUnitPriceVat')==='VAT 포함'?'vat포함':'vat별도')+')':'';
-  var qtyS=val('psQty')?'총 '+val('psQty')+val('psUnit'):'';
-  var dlv=[val('psDeliveryDate')?psDateK(val('psDeliveryDate')):'',val('psShipNote')].filter(Boolean).join(' ');
+  /* 디자인확인서·작업요청서와 같은 결 (WR 스타일 + 보라 #7C3AED). A4 794×1123 — 모든 칸 높이를 고정해 남는 높이를 사진 칸이 씀 */
+  var C='#7C3AED',C2='#F5F3FF';
+  var unitP=val('psUnitPrice')?val('psUnitPrice')+'원 ('+val('psUnitPriceVat')+')':'';
+  var qtyS=val('psQty')?val('psQty')+' '+val('psUnit'):'';
   var place=val('psPlace');
-  var placeFs=place.length>34?'10.5px':place.length>24?'12px':'13px';
+  var hq=val('psCompany')==='케이엘피코리아 (본사)';
+  var dash='<span style="color:#ccc">-</span>';
+  var V=function(t){return t?esc(t):dash};
 
-  var top='<table style="width:100%;border-collapse:collapse;table-layout:fixed;flex-shrink:0;border:1.6px solid #333">'+
-    '<colgroup><col style="width:50%"><col style="width:20%"><col style="width:30%"></colgroup>'+
-    '<tr style="height:30px"><td rowspan="2" style="'+BD+LB+'font-size:36px;letter-spacing:26px;padding-left:26px;white-space:nowrap">제작진행표</td>'+lab('담 당 자')+v(val('psManager'))+'</tr>'+
-    '<tr style="height:30px">'+lab('일 자')+v(psDateK(val('psDate')))+'</tr></table>';
+  /* 높이 배분 */
+  var PT=20,PB=18,PX=28,INW=794-PX*2;
+  var rows=psParts.length,rowH=rows>12?19:22;
+  var partsH=24+rows*rowH+2;
+  var fixed=PT+PB+71+58+106+8+partsH+38+40+6;
+  var imgH=Math.max(220,1123-fixed);
+  var GAP=8,BP=8;
+  var cellW=Math.floor((INW-2-BP*2-GAP*3)/4);
+  var cellH=Math.floor((imgH-2-BP*2-GAP*2)/3);
 
-  var info='<table style="width:100%;border-collapse:collapse;table-layout:fixed;flex-shrink:0;margin-top:7px;border:1.6px solid #333">'+
-    '<colgroup><col style="width:25%"><col style="width:25%"><col style="width:20%"><col style="width:30%"></colgroup>'+
-    '<tr style="height:24px"><td rowspan="3" style="'+BD+LB+'font-size:28px;letter-spacing:16px;padding-left:16px;white-space:nowrap">발주처</td>'+
-      '<td rowspan="3" style="'+BD+'text-align:center;font-size:'+(val('psCompany').length>14?13:val('psCompany').length>9?15:18)+'px;line-height:1.3;color:#111;padding:0 8px;word-break:break-all">'+esc(val('psCompany'))+'</td>'+lab('발 주 일')+v(psDateK(val('psOrderDate')))+'</tr>'+
-    '<tr style="height:24px">'+lab('발주처 담당자','letter-spacing:3px')+v(val('psOrderContact'))+'</tr>'+
-    '<tr style="height:24px">'+lab('발주처 연락처','letter-spacing:3px')+v(val('psOrderPhone'))+'</tr>'+
-    '<tr style="height:24px">'+lab('제품명(품번)','letter-spacing:3px')+'<td colspan="3" style="'+BD+'text-align:center;font-size:14.5px;color:#111;padding:0 8px">'+esc(val('psProduct'))+'</td></tr>'+
-    '<tr style="height:24px">'+lab('총 수 량')+v(qtyS)+lab('단 가')+v(unitP)+'</tr>'+
-    '<tr style="height:24px">'+lab('납 품 일')+v(dlv)+lab('납 품 처')+v(place,'font-size:'+placeFs+';word-break:break-all;line-height:1.25')+'</tr></table>';
+  /* 머리 */
+  var head='<div style="height:52px;display:flex;justify-content:space-between;align-items:flex-start;flex-shrink:0">'+
+    '<div><div style="font-size:10px;color:'+C+';letter-spacing:3px;font-weight:700;margin-bottom:2px">PRODUCTION SHEET <span style="margin-left:6px;padding:1px 6px;border:1px solid '+C+';border-radius:3px;font-size:8.5px;letter-spacing:1px">INTERNAL</span></div>'+
+    '<div style="font-size:24px;font-weight:900;color:#222327;letter-spacing:2px">제작진행표</div></div>'+
+    '<div style="text-align:right"><img src="'+LOGO_DARK+'" style="height:22px;margin-bottom:2px"><div style="font-size:9px;color:#aaa;margin-top:1px">NO. '+esc(val('psDocNum')||'-')+' | '+esc(fmtDate(val('psDate')))+'</div></div></div>'+
+    '<div style="height:3px;margin:6px 0 10px;background:linear-gradient(90deg,'+C+','+C2+');border-radius:2px;flex-shrink:0"></div>';
 
-  /* A4 794×1123 안에서 높이 배분: 위 표(60) + 발주처 표(6줄×24) + 부품표 + 경고문 → 남는 높이가 사진 칸 */
-  var rows=psParts.length;
-  var rowH=rows>12?22:25;
-  var partsH=(rows+1)*rowH;
-  var fixed=32+60+7+144+9+9+partsH+30+16; /* 패딩·간격 + 마지막 16 = 테두리 여유 */
-  var imgH=Math.max(240,1123-fixed);
-  var GAP=6,PAD=6;
-  var boxW=794-36-4;                                 /* 좌우 패딩 18씩 · 점선 2px씩 */
-  var cellW=Math.floor((boxW-PAD*2-GAP*3)/4);
-  var cellH=Math.floor((imgH-4-PAD*2-GAP*2)/3);
+  /* 발주처 카드 */
+  var card=function(lb,v,st,fs,col){return '<div style="'+st+';padding:8px 14px;background:#F4F3EA;min-width:0"><div style="font-size:9px;color:#999;font-weight:600;letter-spacing:1px;margin-bottom:2px">'+lb+'</div><div style="font-size:'+fs+'px;font-weight:700;color:'+(col||'#222327')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+V(v)+'</div></div>'};
+  var sep='<div style="width:1px;background:#e8e8e5"></div>';
+  var info='<div style="height:50px;margin-bottom:8px;display:flex;border:1px solid #e8e8e5;border-radius:6px;overflow:hidden;flex-shrink:0;box-sizing:border-box">'+
+    card(hq?'발주처 · 자사 제작':'발주처',val('psCompany'),'flex:1',14,hq?C:'')+sep+
+    card('발주처 담당자',val('psOrderContact'),'flex:0 0 130px',12)+sep+
+    card('발주처 연락처',val('psOrderPhone'),'flex:0 0 130px',12)+sep+
+    card('담당자',val('psManager'),'flex:0 0 120px',12,C)+'</div>';
+
+  /* 제품 정보 (작업요청서와 같은 2단 표) */
+  var row=function(k,v,st){return '<tr style="height:24px"><td style="padding:0 12px;font-weight:600;color:#888;font-size:10px;letter-spacing:.3px;border-bottom:1px solid #f0f0f0;width:92px;background:#fafaf8;white-space:nowrap">'+k+'</td><td style="padding:0 12px;font-size:11px;border-bottom:1px solid #f0f0f0;color:#222;font-weight:500;'+(st||'')+'">'+v+'</td></tr>'};
+  var left=[['제품명 (품번)','<b style="font-weight:700">'+V(val('psProduct'))+'</b>'],['총 수량',V(qtyS)],['단가',V(unitP)],['발주일',V(fmtDate(val('psOrderDate')))]];
+  var right=[['납품일',V(fmtDate(val('psDeliveryDate')))],['납품 방식','<b style="color:'+C+';font-weight:700">'+V(val('psShipNote'))+'</b>'],['납품처',V(place)],['연결 문서',V(psLinkedDcNum?'디자인확인서 '+psLinkedDcNum:'')]];
+  var tbl=function(rs){return '<table style="width:100%;border-collapse:collapse;table-layout:fixed">'+rs.map(function(r){return row(r[0],r[1],r[0]==='납품처'?'font-size:'+(place.length>30?'9.5px':'10.5px')+';line-height:1.2;word-break:break-all':'white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}).join('')+'</table>'};
+  var prod='<div style="height:98px;margin-bottom:8px;display:flex;border:1px solid #e8e8e5;border-radius:6px;overflow:hidden;flex-shrink:0;box-sizing:border-box"><div style="flex:1;border-right:1px solid #e8e8e5;min-width:0">'+tbl(left)+'</div><div style="flex:1;min-width:0">'+tbl(right)+'</div></div>';
+
+  /* 부품별 사진 — 4열×3행 (요약 2×2, 패키지박스 가로 2칸) */
   var slot=function(sl){
-    var big=sl[0]==='sum',wide=sl[0]==='box',im=psImgs[sl[0]];   /* 요약 2×2, 패키지박스 가로 2칸 → 12칸이 빈틈없이 참 */
+    var big=sl[0]==='sum',wide=sl[0]==='box',im=psImgs[sl[0]];
     var w=(big||wide)?cellW*2+GAP:cellW,h=big?cellH*2+GAP:cellH;
-    return '<div style="position:relative;width:'+w+'px;height:'+h+'px;box-sizing:border-box;border:1px solid #bbb;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center;'+(big?'grid-column:1 / span 2;grid-row:1 / span 2;':wide?'grid-column:span 2;':'')+'">'+
-      '<span style="position:absolute;left:0;top:0;background:#222;color:#fff;font-size:'+(big?12:11)+'px;font-weight:700;padding:2px 8px;letter-spacing:1px">'+sl[1]+'</span>'+
-      (im?'<img src="'+im.url+'" style="max-width:'+(w-10)+'px;max-height:'+(h-26)+'px;object-fit:contain;margin-top:16px">':'')+'</div>';
+    return '<div style="position:relative;width:'+w+'px;height:'+h+'px;box-sizing:border-box;border:1px solid '+(im?'#e6e6e3':'#eeeeea')+';border-radius:5px;overflow:hidden;background:'+(im?'#fff':'#fcfcfa')+';display:flex;align-items:center;justify-content:center;'+(big?'grid-column:1 / span 2;grid-row:1 / span 2;':wide?'grid-column:span 2;':'')+'">'+
+      '<span style="position:absolute;left:0;top:0;background:'+(big?C:C2)+';color:'+(big?'#fff':C)+';font-size:'+(big?10:9.5)+'px;font-weight:800;padding:3px 9px;border-bottom-right-radius:5px;letter-spacing:.5px">'+sl[1]+'</span>'+
+      (im?'<img src="'+im.url+'" style="max-width:'+(w-16)+'px;max-height:'+(h-30)+'px;object-fit:contain;margin-top:14px">':'<span style="font-size:9px;color:#d4d4d0;margin-top:10px">사진 없음</span>')+'</div>';
   };
-  var imgBox='<div style="flex-shrink:0;height:'+imgH+'px;margin-top:9px;border:2px dashed #888;box-sizing:border-box;padding:'+PAD+'px;overflow:hidden">'+
-    '<div style="display:grid;grid-template-columns:repeat(4,'+cellW+'px);grid-template-rows:repeat(3,'+cellH+'px);gap:'+GAP+'px;justify-content:space-between">'+
-    PS_IMG_SLOTS.map(slot).join('')+'</div></div>';
+  var imgs='<div style="height:'+imgH+'px;margin-bottom:8px;padding:'+BP+'px;box-sizing:border-box;background:#fafafa;border:1px solid #eee;border-radius:6px;overflow:hidden;flex-shrink:0">'+
+    '<div style="display:grid;grid-template-columns:repeat(4,'+cellW+'px);grid-template-rows:repeat(3,'+cellH+'px);gap:'+GAP+'px;justify-content:space-between">'+PS_IMG_SLOTS.map(slot).join('')+'</div></div>';
 
+  /* 부품별 진행 표 */
+  var th=function(t,st){return '<th style="height:24px;padding:0 8px;background:#F4F3EA;font-size:10px;font-weight:700;color:#666;letter-spacing:1px;border-bottom:1px solid #e8e8e5;'+(st||'')+'">'+t+'</th>'};
   var cols=['qty','color','print','maker','note'];
-  var parts='<table style="width:100%;border-collapse:collapse;table-layout:fixed;flex-shrink:0;margin-top:9px;border:1.6px solid #333">'+
-    '<tr style="height:'+rowH+'px">'+td('','')+['수 량','색 상','인 쇄','제 작 처','비 고'].map(function(t){return lab(t,'font-size:13.5px')}).join('')+'</tr>'+
-    psParts.map(function(p){
-      return '<tr style="height:'+rowH+'px">'+lab(esc(p.name||''),'font-size:13px;letter-spacing:4px')+cols.map(function(k){return v(p[k]||'-','font-size:13px')}).join('')+'</tr>';
-    }).join('')+'</table>';
+  var parts='<div style="height:'+partsH+'px;border:1px solid #e8e8e5;border-radius:6px;overflow:hidden;flex-shrink:0;box-sizing:border-box">'+
+    '<table style="width:100%;border-collapse:collapse;table-layout:fixed"><colgroup><col style="width:112px"><col style="width:90px"><col><col><col><col></colgroup>'+
+    '<tr>'+th('부품','text-align:left;padding-left:12px')+th('수량')+th('색상')+th('인쇄')+th('제작처')+th('비고')+'</tr>'+
+    psParts.map(function(p,i){
+      var bg=i%2?'#fcfcfb':'#fff';
+      return '<tr style="height:'+rowH+'px;background:'+bg+'"><td style="padding:0 12px;font-size:10.5px;font-weight:700;color:#444;background:#fafaf8;border-bottom:1px solid #f0f0f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.name||'')+'</td>'+
+        cols.map(function(k){return '<td style="padding:0 6px;font-size:10.5px;color:#222;text-align:center;border-bottom:1px solid #f0f0f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+V(p[k])+'</td>'}).join('')+'</tr>';
+    }).join('')+'</table></div>';
 
-  var foot='<div style="flex-shrink:0;height:30px;display:flex;align-items:flex-end;justify-content:flex-end;color:#e11d24;font-size:19px;font-weight:700;letter-spacing:-.3px">해당 문서는 회사 내부 대외비 문서로 외부유출을 엄격히 금합니다.</div>';
+  /* 대외비 + 푸터 */
+  var notice='<div style="height:30px;margin-top:8px;box-sizing:border-box;background:'+C2+';border:1.5px solid '+C+';border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span style="font-size:11.5px;font-weight:900;color:#c41e3a">🔒 해당 문서는 회사 내부 대외비 문서로 외부유출을 엄격히 금합니다</span></div>';
+  var foot='<div style="height:34px;margin-top:6px;box-sizing:border-box;padding:0 14px;background:#222327;border-radius:5px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0"><img src="'+LOGO_WHITE+'" style="height:14px"><div style="color:rgba(255,255,255,.55);font-size:7px;line-height:1.5;text-align:right">서울 구로구 디지털로32길 30, 코오롱빌란트 1차 901호 | T. 02-2103-5757<br>klpkorea.co.kr | agift.kr | showroom.co.kr | klpkorea@agift.kr</div></div>';
 
-  document.getElementById('psDocEl').innerHTML='<div style="width:794px;height:1123px;overflow:hidden;background:#fff;font-family:\'Noto Sans KR\',\'Pretendard\',sans-serif;color:#111;box-sizing:border-box;padding:16px 18px;display:flex;flex-direction:column">'+
-    top+info+imgBox+parts+foot+'</div>';
+  document.getElementById('psDocEl').innerHTML='<div style="width:794px;height:1123px;overflow:hidden;background:#fff;font-family:\'Noto Sans KR\',sans-serif;font-size:12px;color:#222327;position:relative"><div style="padding:'+PT+'px '+PX+'px '+PB+'px;display:flex;flex-direction:column;height:1123px;box-sizing:border-box">'+
+    head+info+prod+imgs+parts+'<div style="flex:1"></div>'+notice+foot+'</div></div>';
   setTimeout(function(){fitToA4('psDocEl')},100);
 }
 
