@@ -3326,30 +3326,33 @@ async function buildPoDocAsync(){
   var secTitle=function(t,sub){return '<div style="height:34px;display:flex;align-items:center;gap:10px;flex-shrink:0;margin-bottom:10px"><span style="width:5px;height:22px;background:'+C+'"></span><span style="font-size:19px;font-weight:900;letter-spacing:1.5px">'+t+'</span>'+(sub?'<span style="font-size:12.5px;color:'+SUB+';font-weight:600">'+sub+'</span>':'')+'</div>'};
 
   /* ================= 1쪽: SUMMARY ================= */
-  var cell=function(lb,v,st,fs,col){return '<div style="'+st+';padding:9px 14px;min-width:0;box-sizing:border-box"><div style="font-size:11px;color:'+SUB+';font-weight:700;letter-spacing:1px;margin-bottom:3px">'+lb+'</div><div style="font-size:'+fs+'px;font-weight:800;color:'+(col||TX)+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+V(v)+'</div></div>'};
-  var vl='<div style="width:1px;background:'+LN2+'"></div>';
+  /* 받는 곳·품번 + 주문 조건을 한 표로 (빈칸 없이 이어짐) — 2026-10 피드백 */
+  var RW=44;
+  var cell=function(c){
+    return '<div style="flex:'+(c.w||1)+' 1 0;min-width:0;padding:6px 12px 0;box-sizing:border-box;'+(c.first?'':'border-left:1px solid '+LN2+';')+'">'+
+      '<div style="font-size:10px;color:'+(c.red?C:SUB)+';font-weight:700;letter-spacing:.8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.k)+'</div>'+
+      '<div style="font-size:'+(c.fs||14.5)+'px;font-weight:800;color:'+(c.red?C:TX)+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.45">'+V(c.v)+'</div></div>';
+  };
+  var row=function(cells,top){cells[0].first=1;return '<div style="display:flex;height:'+RW+'px;'+(top?'border-top:1px solid '+LN2+';':'')+'">'+cells.map(cell).join('')+'</div>'};
+  /* 주문 조건 칸: 각 그룹 첫 줄(주문 수량·단가·출고일 등)을 먼저, 나머지는 뒤에 — 한 줄 4칸, 긴 값은 2칸 */
+  var oc=[],rest=[];
+  po.spec.filter(poIsOrderGroup).forEach(function(g){
+    var rows=g.rows.filter(function(r){return String(r.v||'').trim()});
+    rows.forEach(function(r,i){var c={k:r.k,v:r.v,red:i===0||r.hl,w:String(r.v).length>20?2:1};(i===0?oc:rest).push(c)});
+  });
+  oc=oc.concat(rest);
+  var oRows=[],cur=[],units=0;
+  oc.forEach(function(c){if(units+c.w>4){oRows.push(cur);cur=[];units=0}cur.push(c);units+=c.w});
+  if(cur.length)oRows.push(cur);
+  /* 마지막 줄이 덜 차면 마지막 칸을 늘려서 빈칸 없게 */
+  oRows.forEach(function(r){var u=r.reduce(function(a,c){return a+c.w},0);if(u<4)r[r.length-1].w+=4-u});
   var info='<div style="border:1.5px solid '+TX+';flex-shrink:0;margin-bottom:16px">'+
-    '<div style="display:flex;height:62px">'+cell('TO',po.to,'flex:1',18)+vl+cell('ATTN',po.attn,'flex:0 0 200px',16)+vl+cell('FROM',po.from,'flex:0 0 180px',16)+'</div>'+
-    '<div style="height:1px;background:'+LN2+'"></div>'+
-    '<div style="display:flex;height:62px">'+cell('ITEM NO.',po.po_no,'flex:0 0 180px',18,C)+vl+cell('MODEL NAME',po.model,'flex:1',18)+vl+cell('DELIVERY DATE',po.need_by?poDateEn(po.need_by):'','flex:0 0 200px',18,C)+'</div></div>';
-  var used=128+16;
-
-  /* 주문 조건 (수량·단가·납기) — 사양표에서 빼서 SUMMARY에 크게 */
-  var ogs=po.spec.filter(poIsOrderGroup).map(function(g){return{g:g.g,rows:g.rows.filter(function(r){return String(r.v||'').trim()})}}).filter(function(g){return g.rows.length});
-  var orderH=0,orderHtml='';
-  if(ogs.length){
-    var maxRows=Math.max.apply(null,ogs.map(function(g){return g.rows.length}));
-    orderH=36+maxRows*50+6;
-    var ow=Math.floor((INW-(ogs.length-1)*12)/ogs.length);
-    orderHtml='<div style="display:flex;gap:12px;flex-shrink:0;margin-bottom:16px;height:'+orderH+'px">'+ogs.map(function(g){
-      return '<div style="width:'+ow+'px;border:1.5px solid '+C+';box-sizing:border-box">'+
-        '<div style="height:34px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid '+C+';font-size:13px;font-weight:900;letter-spacing:1.5px;color:'+C+'">'+esc(g.g)+'</div>'+
-        g.rows.map(function(r,i){var big=i===0;
-          return '<div style="height:50px;padding:5px 12px 0;box-sizing:border-box;'+(i?'border-top:1px solid '+LN2+';':'')+'"><div style="font-size:10.5px;color:'+SUB+';font-weight:700;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(r.k)+'</div>'+
-            '<div style="font-size:'+(big?17:13.5)+'px;font-weight:'+(big?900:700)+';color:'+(big||r.hl?C:TX)+';line-height:'+(big?1.4:1.2)+';max-height:32px;overflow:hidden;word-break:break-word">'+esc(r.v)+'</div></div>'}).join('')+'</div>';
-    }).join('')+'</div>';
-    used+=orderH+16;
-  }
+    row([{k:'TO',v:po.to,w:2,fs:15.5},{k:'ATTN',v:po.attn},{k:'FROM',v:po.from}])+
+    row([{k:'ITEM NO.',v:po.po_no,red:1},{k:'MODEL NAME',v:po.model,w:2,fs:15.5},{k:'DELIVERY DATE',v:po.need_by?poDateEn(po.need_by):'',red:1}],1)+
+    (oRows.length?'<div style="height:22px;display:flex;align-items:center;padding:0 12px;border-top:1.5px solid '+TX+';font-size:10.5px;font-weight:900;letter-spacing:1.5px;color:'+C+'">ORDER TERMS</div>'+
+      oRows.map(function(r,i){return row(r,1)}).join(''):'')+'</div>';
+  var used=2*RW+(oRows.length?22+oRows.length*RW:0)+3+16;
+  var orderHtml='';
 
   /* SUMMARY 사진 + 번호 붙은 문구 */
   var sImgs=po.summary.imgs.filter(function(i){return poImgs[i.key]});
@@ -3359,7 +3362,7 @@ async function buildPoDocAsync(){
   var linesH=lines.length*LH;
   var needH=need?60:0;
   var restH=usable-used-44-linesH-(lines.length?14:0)-needH;
-  var imgsH=sImgs.length?Math.max(200,Math.min(430,restH)):0;
+  var imgsH=sImgs.length?Math.max(200,Math.min(600,restH)):0;   /* 남는 높이를 사진이 채움 */
   var cw=Math.floor((INW-(sImgs.length-1)*14)/Math.max(1,sImgs.length));
   var sumHtml=secTitle('SUMMARY','KEY POINTS — PLEASE CHECK BEFORE PRODUCTION')+
     (sImgs.length?'<div style="height:'+imgsH+'px;display:flex;gap:14px;justify-content:center;flex-shrink:0">'+sImgs.map(function(it){
