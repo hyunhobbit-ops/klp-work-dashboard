@@ -8,7 +8,7 @@ function taskToken(id) {
   return crypto.createHmac('sha256', SERVICE_KEY).update('task:' + String(id)).digest('hex');
 }
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vtulmuxkriklpiibiues.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://api.klpkorea.cloud';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 // VAPID: 공개키는 비공개가 아니므로 코드에 둬도 됨. 비밀키는 환경변수에서만.
