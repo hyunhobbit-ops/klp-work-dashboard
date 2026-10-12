@@ -50,7 +50,7 @@
 - 디자인 변수는 CSS :root에 정의
 
 ## Supabase 연동
-- URL: `vtulmuxkriklpiibiues.supabase.co`
+- URL: **`https://api.klpkorea.cloud`** (맥미니 자체 운영, 2026-10-12 이전 완료 — 아래 "맥미니 서버" 참조). 예전 클라우드 `vtulmuxkriklpiibiues.supabase.co`는 Free로 내려 둔 비상 사본일 뿐 **운영에 쓰지 않음**
 - 인증: **Supabase Auth (signInWithPassword)** — 2026-05-19 Phase 1 보안 이전 완료
   - 사용자 입력 UX는 그대로 (이름 + 비번) — 내부적으로 name→email 매핑 후 Auth
   - 5명 직원의 email: 김현호는 `hyunhobbit@naver.com` (실제), 나머지는 `<로그인이름>@klp.local` (synthetic)
@@ -92,14 +92,28 @@
 - **범위 밖(다음 단계)**: 셀프 회원가입+자동 결제, 업종별 모듈팩(택배·문서생성 등), 랜딩. 설계·계획: `docs/superpowers/{specs,plans}/2026-07-20-multitenant-saas-*`.
 - **새 테넌트 테이블 추가 시**: `company_id bigint references companies(id) not null` + `set_company_id` 트리거 + 회사 스코프 RLS 필수.
 
-## 🖥️ 맥미니 서버 이전 (2026-10 진행 중) — Supabase를 맥미니 자체 운영으로
-- **왜**: Supabase Pro($25/월)를 쓰는 이유가 **Egress(전송량) 초과**(무료 5.5GB 넘어 2026-08에 요청 차단됨). 데이터 자체는 작음(DB 62MB · Storage 233MB · 사용자 8명). 현호님은 사진을 작게 압축해 깨져 보이는 걸 원치 않음 → 자체 운영으로 전송량 제한을 없애고 사진 화질 올리기
-  - 전송량 주범(2026-10 로그): `planning_posts select=*`(글 안 base64 사진, 하루 50회), 문서 미리보기 `confirmations` 단건 조회(images_data), `products select=id,image`, `inquiry_logs select=*`(사진)
-- **장비**: Mac mini **M6**(2026, 12코어) · 24GB · 256GB SSD + 외장 1TB(백업용) · Wi-Fi 7 내장이지만 **유선 랜** 권장 · Docker 설치 중. 맥미니 작업 폴더: **`~/hyunho-server`**
-- **현호님 결정**: 맥미니/사무실 인터넷이 꺼지면 대시보드가 멈추는 건 괜찮음. 걱정은 백업·보안·장애 대응 → 전부 자동화로 해결하기로
-- **구성**: Supabase self-host(docker compose: Postgres·GoTrue·PostgREST·Realtime·Storage·Kong·Studio) + **Cloudflare Tunnel**(포트 안 엶) + 서버 주소용 **별도 도메인 `klpkorea.cloud`**(2026-10-09 구매, Cloudflare Free · 네임서버 dion/sarah.ns.cloudflare.com 반영 확인 — 서버 주소 예: `api.klpkorea.cloud`. klpkorea.kr은 아임웹 홈페이지 + Microsoft 365 메일이라 건드리지 않음). Vercel(프론트·api)은 그대로
-- **단계**: ① 맥 설정(잠자기 끔·정전 후 자동 시동·자동 로그인·보안 업데이트 자동·Docker 로그인 시 시작·메모리 8GB) ② Supabase 설치(비밀 키는 맥미니에서 새로 생성 — **채팅에 붙여넣지 않기**) ③ Cloudflare Tunnel `https://api.<도메인>` ④ 리허설: pg_dump(public+auth+storage 스키마) 복원 + storage 파일 복사 → Vercel 미리보기 배포로 로그인·상담·문서생성기·사진·realtime·푸시 확인 ⑤ 실제 이전(퇴근 후): 쓰기 중지 → 최종 덤프 → `app.js`·`doc-generator.html`·`proposal-view.html` 등의 SUPABASE URL/anon key + Vercel env(SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY 등) 교체 → 배포 → 직원 재로그인 ⑥ 자동화: 매일 백업(맥미니+외장+클라우드, 30일 보관, 월 1회 복구 점검) · UptimeRobot 5분 감시→폰 알림 · Docker restart always · 월 1회 업데이트 스크립트 ⑦ 1~2주 Supabase 유지(롤백용) 후 해지 ⑧ 사진 업로드 축소 기준 올리고 목록은 썸네일
-- **옮길 것 체크**: 확장 pg_cron(job `daily-summary` 0,3,6,9,12시 → vercel `/api/daily-summary` net.http_post) · pg_net · pg_trgm · pgcrypto · uuid-ossp · supabase_vault, Storage 버킷·파일 148개, auth.users 8명(비번 해시 그대로), RLS·트리거·함수(migrations 001~059), realtime publication, 웹푸시 구독(push_subscriptions)
+## 🖥️ 맥미니 서버 (2026-10-12 이전 완료) — Supabase 자체 운영
+- **왜 옮겼나**: Supabase Pro($25/월)의 **Egress(전송량) 초과**(무료 5.5GB 넘어 2026-08 요청 차단). 데이터는 작음(DB ~60MB · 사진 ~240MB · 사용자 8명). 자체 운영으로 전송량 제한 없애고 사진 화질 올리기
+- **현재 구성**: 대시보드(프론트·`api/`)는 그대로 Vercel(`https://klp-work-dashboard.vercel.app`). 데이터 서버만 맥미니 → **`https://api.klpkorea.cloud`**
+  - 장비: Mac mini M6 · 24GB · 256GB SSD · 회사 유선 랜(내부 IP `172.30.1.85` 공유기 고정) · 외장 SSD Samsung T9 1TB(`KLP-Backup`, 백업 전용)
+  - Supabase self-host v0.8.2 (docker compose, Postgres 17.6) — 맥미니 `~/Desktop/hyunho-server/supabase` (`.env` 비밀 키 — **절대 채팅·커밋 금지**). 맥미니 전용 덮어쓰기 `docker-compose.klp.yml`: 포트는 127.0.0.1만, `restart: always`, **사진(Storage)은 Docker 볼륨 `supabase_storage-data`**(맥 폴더는 xattr 미지원이라 업로드 500 남)
+  - 외부 연결 = **직접 연결**: 회사 공유기(KT, 관리 `172.30.1.254:8899`)가 80·443만 맥미니로 포트포워딩 → Caddy(HTTPS 자동 발급·갱신, 응답 압축) → 앱이 쓰는 경로(`/rest|auth|storage|realtime|functions|graphql/v1`)만 열고 나머지(Studio 관리화면 등) 404. DNS `api.klpkorea.cloud` = 회사 공인 IP A 레코드(Cloudflare 회색 구름), IP 바뀌면 `scripts/ddns.py`가 5분마다 자동 수정
+    - Cloudflare Tunnel은 **예비**로만 켜 둠(한국 통신사가 무료 플랜을 LA로 보내 1~2초씩 느림). 공유기·직접 연결 장애 시 `scripts/switch-to-tunnel.sh`로 전환
+    - 속도(회사 안): 데이터 조회 0.02초(클라우드 0.1~0.6초)
+  - 도메인 `klpkorea.cloud`(가비아 구매, 네임서버 Cloudflare). `klpkorea.co.kr`은 아임웹 홈페이지 + Microsoft 365 메일이라 건드리지 않음
+- **⚠️ DB 작업 방법 바뀜**: Supabase MCP/대시보드는 **예전 클라우드**를 가리킴 → 마이그레이션·SQL을 거기에 적용하면 운영에 반영 안 됨. 맥미니에서 `docker exec -i supabase-db psql -U postgres -d postgres < migrations/0XX_….sql` 로 적용(+ 파일은 `migrations/`에 계속 커밋). 관리 화면 Studio는 맥미니에서만 `http://127.0.0.1:8000`(아이디 supabase, 비번은 `.env`의 DASHBOARD_PASSWORD)
+- **예약 작업**: pg_cron `daily-summary`(UTC 0,3,6,9,12시 = 한국 9·12·15·18·21시 → vercel `/api/daily-summary`)는 맥미니 DB에서 실행. 클라우드 쪽 같은 작업은 꺼 둠(active=false)
+- **자동화 (맥미니 LaunchAgent, 스크립트는 `~/Desktop/hyunho-server/scripts/`)**
+  - `backup.sh` 매일 03:30: DB 덤프 + 사진 볼륨 + 설정 → 내장 3일 · 외장 SSD 30일 · **구글 드라이브(rclone, 암호화) 14일**(hyunhobbit@gmail.com, 전용 OAuth 클라이언트 — 구글 클라우드 프로젝트 `klp-backup`). 암호 비번은 현호님이 맥미니 밖에 보관
+  - `restore-test.sh` 매월 1일 04:30: 최신 백업을 임시 DB에 실제 복원해 행 수 대조
+  - `monthly-update.sh` 매월 2일 05:00: 백업 성공 시에만 → 공식 `update.sh`(충돌·큰 변경 없을 때만 자동) → 정상 확인 / cloudflared·rclone 업데이트 / 옛 이미지 정리
+  - `ddns.py` 5분마다(회사 IP 변경 감지). 결과·상태: `~/Desktop/hyunho-server/logs/*-status.txt`, 실패 시 맥 알림
+  - 외부 감시: UptimeRobot `KLP Mac mini server`(`https://api.klpkorea.cloud/storage/v1/status`, 5분) → 메일·폰 푸시
+  - 맥 설정: 잠자기 끔 · 정전 후 자동 시동 · `/bin/bash`에 전체 디스크 접근 권한(데스크탑 폴더 보호 때문 — 자동 작업은 bash로 실행)
+- **이전 기록 (2026-10-12)**: 리허설(`macmini-preview` 브랜치·Vercel 미리보기)로 로그인·상담·사진 업로드·realtime·회사 안팎 접속 확인 → 16:12~16:16 실제 이전(직원 입력 중지 → `migrate-db.sh` 최종 복사 + `verify-db.sh` 전부 일치 → 사진 148개 → 커밋 `26aee72`로 URL/anon key 교체 + Vercel Production env 3개 교체). 데이터 안의 클라우드 사진 주소(planning_posts.images·market_db.image·meetings.content)는 `api.klpkorea.cloud`로 바꿈. 직원 재로그인 1회
+  - Supabase는 2026-10-12 **Free로 다운그레이드**. 최종 보관본: 외장 SSD `klp-supabase/archive/cloud-final-20261012`(전체 덤프 + 사진). 클라우드는 곧 자동 일시정지(90일 내 복구 가능) → 몇 달 안정 운영 후 프로젝트 삭제
+  - 되돌리기(비상): 커밋 26aee72 되돌림 + Vercel Production env를 클라우드 값으로 + 클라우드 프로젝트 재개·cron 다시 켜기 + 맥미니 cron 끄기 (단, 이전 이후 맥미니에 쌓인 데이터는 클라우드로 옮겨야 함)
+- **남은 개선**: ⑧ 사진 업로드 축소 기준 올리고 목록은 썸네일 — 특히 `planning_posts select=*`(본문 base64 사진 3.7MB를 목록에서 두 번 받음)·`products select=id,image`(base64 2.1MB)가 폰에서 첫 화면을 느리게 함 → 목록은 본문 빼고, 사진은 Storage+썸네일로. 리허설 때 덮어쓴 옛 사진 사본이 Storage 볼륨에 남아 있음(백업 241→465MB) — 정리 필요
 
 ## 프로젝트 진행사항 (국내)
 - **매출/매입 통합 단일 행**: 매출처 정보 + 매입처 상세(작업요청서용)를 한 프로젝트 행에 함께 저장
