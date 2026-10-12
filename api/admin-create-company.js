@@ -2,13 +2,13 @@
 // 흐름: 요청자 토큰 검증 → is_superadmin 확인 → 회사 생성 → 관리자 Auth 계정 생성 → 프로필 생성 → 임시 비번 반환
 //
 // 환경변수 (Vercel에 등록 필요):
-//   SUPABASE_URL                — 예) https://vtulmuxkriklpiibiues.supabase.co (미설정 시 기본값 사용)
+//   SUPABASE_URL                — 예) https://api.klpkorea.cloud (미설정 시 기본값 사용)
 //   SUPABASE_SERVICE_ROLE_KEY   — (필수) 서비스롤 키. 절대 브라우저 노출 금지, 서버에만 보관.
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vtulmuxkriklpiibiues.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://api.klpkorea.cloud';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ANON_KEY = process.env.SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkxNDcwNTMzLCJleHAiOjE5NDkxNTA1MzN9.kczeUuu_I5RdisWEr_vBeE97vaCH8ZRigFvK6pDOS9c';
 
 // 서비스롤로 Supabase REST/Auth 호출
 async function sbAdmin(path, opts = {}) {

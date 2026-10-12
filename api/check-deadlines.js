@@ -1,7 +1,7 @@
 // 매일 1회(크론) 실행 → 오늘/내일 납기 프로젝트를 찾아 전 직원에게 요약 알림.
 const { sendToAll } = require('./_push');
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vtulmuxkriklpiibiues.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://api.klpkorea.cloud';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const CRON_SECRET = process.env.CRON_SECRET || '';
 

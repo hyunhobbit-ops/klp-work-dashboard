@@ -3,9 +3,9 @@
 // 흐름: 로그인 토큰 검증 → Anthropic 호출(사진은 image, PDF는 document 블록, 도구로 JSON 강제) → 필드 반환
 // 환경변수: ANTHROPIC_API_KEY (필수), ANTHROPIC_INQUIRY_MODEL / ANTHROPIC_MODEL (선택)
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vtulmuxkriklpiibiues.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://api.klpkorea.cloud';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkxNDcwNTMzLCJleHAiOjE5NDkxNTA1MzN9.kczeUuu_I5RdisWEr_vBeE97vaCH8ZRigFvK6pDOS9c';
 const PRIMARY_MODEL = process.env.ANTHROPIC_INQUIRY_MODEL || 'claude-opus-5';
 const FALLBACK_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 

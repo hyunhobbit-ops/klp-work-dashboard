@@ -5,9 +5,9 @@
 //
 // 환경변수: ANTHROPIC_API_KEY (필수), ANTHROPIC_INQUIRY_MODEL (선택), SUPABASE_URL/ANON_KEY
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vtulmuxkriklpiibiues.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://api.klpkorea.cloud';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkxNDcwNTMzLCJleHAiOjE5NDkxNTA1MzN9.kczeUuu_I5RdisWEr_vBeE97vaCH8ZRigFvK6pDOS9c';
 // 기본은 최신 모델, 계정에서 못 쓰면 회의록 정리와 같은 모델로 한 번 더 시도
 const PRIMARY_MODEL = process.env.ANTHROPIC_INQUIRY_MODEL || 'claude-opus-5';
 const FALLBACK_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';

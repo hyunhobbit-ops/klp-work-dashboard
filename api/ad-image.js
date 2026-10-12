@@ -1,7 +1,7 @@
 // api/ad-image.js — 광고 배경 이미지 생성 (OpenAI Images). 로그인 직원만 호출.
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vtulmuxkriklpiibiues.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://api.klpkorea.cloud';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0dWxtdXhrcmlrbHBpaWJpdWVzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NzQwNTYsImV4cCI6MjA5MTM1MDA1Nn0.0v5i8IpF4ZbAByI3eM_X4Hj3zNn7wghQEFlZAEWzWVA';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkxNDcwNTMzLCJleHAiOjE5NDkxNTA1MzN9.kczeUuu_I5RdisWEr_vBeE97vaCH8ZRigFvK6pDOS9c';
 // 계정마다 쓸 수 있는 이미지 모델이 다름(신규 계정엔 dall-e 계열이 없음).
 // 최고 성능 우선으로 시도하고, 권한이 없으면 차선책으로 내려감.
 const MODEL_CANDIDATES = [process.env.OPENAI_IMAGE_MODEL, 'gpt-image-1', 'gpt-image-1-mini', 'dall-e-3', 'dall-e-2']

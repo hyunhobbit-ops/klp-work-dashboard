@@ -2,7 +2,7 @@
 // 보안: 알림 payload에 담긴 서명 토큰(HMAC)을 검증 → 그 id에 대해서만 허용.
 const crypto = require('crypto');
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vtulmuxkriklpiibiues.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://api.klpkorea.cloud';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 function taskToken(id) {
