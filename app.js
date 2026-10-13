@@ -14247,16 +14247,17 @@ const FUNDING_SPEC_STATUS = [
 function fundingSpecList(p) {
     const m = (p && p.fundingMeta) || {};
     const saved = Array.isArray(m.checklist) ? m.checklist : null;
-    const norm = x => ({ key: x.key, label: x.label || '', value: x.value || '', status: x.status || '', note: x.note || '', images: Array.isArray(x.images) ? x.images.filter(Boolean) : [], custom: !!x.custom });
+    const norm = x => ({ key: x.key, label: x.label || '', value: x.value || '', status: x.status || '', note: x.note || '', images: Array.isArray(x.images) ? x.images.filter(Boolean) : [], custom: !!x.custom, hidden: !!x.hidden });
     // 기본 항목은 항상 FUNDING_SPEC_DEFAULT 순서·이름으로 (나중에 추가된 기본 항목도 예전 프로젝트에 끼워짐) + 저장된 내용 붙이기, 직접 추가한 항목은 뒤에
     const byKey = {};
     (saved || []).forEach(x => { if (x && x.key) byKey[x.key] = x; });
+    // hidden = 이 프로젝트에선 안 쓰는 기본 항목(삭제 버튼) — 내용·사진은 보관, '숨긴 항목'에서 다시 꺼냄
     const base = FUNDING_SPEC_DEFAULT.map(d => Object.assign(norm(byKey[d.key] || { key: d.key }), { label: d.label, custom: false }));
     const extra = (saved || []).filter(x => x && x.custom && !FUNDING_SPEC_DEFAULT.some(d => d.key === x.key)).map(norm);
     return base.concat(extra);
 }
 function fundingSpecProgress(p) {
-    const list = fundingSpecList(p);
+    const list = fundingSpecList(p).filter(x => !x.hidden);
     const done = list.filter(x => x.status === 'done' || x.status === 'na').length;
     return { done, total: list.length, left: list.length - done };
 }
@@ -14266,6 +14267,7 @@ function fundingSpecHtml(p) {
     const pct = pr.total ? Math.round(pr.done / pr.total * 100) : 0;
     const esc = s => planningEsc(String(s == null ? '' : s));
     const cards = list.map((x, i) => {
+        if (x.hidden) return '';
         const d = FUNDING_SPEC_DEFAULT.find(z => z.key === x.key);
         const st = FUNDING_SPEC_STATUS.find(z => z[0] === x.status) || FUNDING_SPEC_STATUS[0];
         const empty = x.status !== 'na' && !x.value.trim();
@@ -14273,12 +14275,12 @@ function fundingSpecHtml(p) {
         const upload = (cls, inner) => `<label class="${cls}" title="사진 첨부 (여러 장 가능, 원본 화질)">${inner}<input type="file" accept="image/*" multiple hidden onchange="fundingSpecAddImages(${p.id},${i},this)"></label>`;
         const photo = imgs.length ? `
             <div class="fsc-photo">
-                <a href="${esc(imgs[0])}" target="_blank" rel="noopener" title="원본 보기"><img src="${esc(fundingSpecThumb(imgs[0], 800))}" loading="lazy" alt=""></a>
+                <a href="${esc(imgs[0])}" target="_blank" rel="noopener" title="크게 보기 (⌘/Ctrl+클릭: 새 탭)" onclick="if(!(event.metaKey||event.ctrlKey||event.shiftKey)){event.preventDefault();fundingSpecView(${p.id},${i},0)}"><img src="${esc(fundingSpecThumb(imgs[0], 800))}" loading="lazy" alt=""></a>
                 <button class="fsc-x" title="사진 빼기" onclick="fundingSpecRemoveImage(${p.id},${i},0)">✕</button>
                 ${imgs.length > 1 ? `<span class="fsc-count">1/${imgs.length}</span>` : ''}
             </div>
             <div class="fsc-strip">
-                ${imgs.slice(1).map((u, j) => `<div class="fsc-th"><a href="${esc(u)}" target="_blank" rel="noopener" title="원본 보기"><img src="${esc(fundingSpecThumb(u, 240))}" loading="lazy" alt=""></a><button class="fsc-x" title="사진 빼기" onclick="fundingSpecRemoveImage(${p.id},${i},${j + 1})">✕</button></div>`).join('')}
+                ${imgs.slice(1).map((u, j) => `<div class="fsc-th"><a href="${esc(u)}" target="_blank" rel="noopener" title="크게 보기 (⌘/Ctrl+클릭: 새 탭)" onclick="if(!(event.metaKey||event.ctrlKey||event.shiftKey)){event.preventDefault();fundingSpecView(${p.id},${i},${j + 1})}"><img src="${esc(fundingSpecThumb(u, 240))}" loading="lazy" alt=""></a><button class="fsc-x" title="사진 빼기" onclick="fundingSpecRemoveImage(${p.id},${i},${j + 1})">✕</button></div>`).join('')}
                 ${upload('fsc-th fsc-th-add', '＋<span>사진</span>')}
             </div>`
             : upload('fsc-photo fsc-photo-empty', '<span class="fsc-ph-ic">📷</span><span>사진 추가</span><small>클릭해서 여러 장 올리기 · 원본 화질</small>');
@@ -14292,7 +14294,7 @@ function fundingSpecHtml(p) {
                     <select class="fs-st" style="color:${st[2]};border-color:${st[2]}" onchange="fundingSpecSet(${p.id},${i},'status',this.value)">
                         ${FUNDING_SPEC_STATUS.map(z => `<option value="${z[0]}" ${z[0] === (x.status || '') ? 'selected' : ''}>${z[1]}</option>`).join('')}
                     </select>
-                    ${x.custom ? `<button class="fs-del" title="항목 삭제" onclick="fundingSpecRemove(${p.id},${i})">✕</button>` : ''}
+                    <button class="fs-del" title="${x.custom ? '항목 삭제' : '이 프로젝트에서 빼기 (아래 숨긴 항목에서 다시 꺼낼 수 있음)'}" onclick="fundingSpecRemove(${p.id},${i})">✕</button>
                 </div>
                 <label class="fsc-lbl">사양 내용</label>
                 <textarea class="fsc-val" rows="3" placeholder="${esc(d ? d.ph : '사양 내용')}" onchange="fundingSpecSet(${p.id},${i},'value',this.value)">${esc(x.value)}</textarea>
@@ -14314,12 +14316,13 @@ function fundingSpecHtml(p) {
             ${cards}
             <button class="fsc fsc-addcard" onclick="fundingSpecAdd(${p.id})"><span>＋</span>항목 추가<small>사용설명서·인증서·각인·여분 줄 …</small></button>
         </div>
+        ${list.some(x => x.hidden) ? `<div class="fs-hidden"><span>숨긴 항목</span>${list.map((x, i) => x.hidden ? `<button onclick="fundingSpecUnhide(${p.id},${i})" title="다시 꺼내기 (적어 둔 내용·사진 그대로)">＋ ${esc(x.label)}${x.images.length ? ` 📷${x.images.length}` : ''}</button>` : '').join('')}</div>` : ''}
     </div>`;
 }
 async function fundingSpecSave(id, list) {
     const p = planningProjects.find(x => x.id === id);
     if (!p) return;
-    const meta = Object.assign({}, p.fundingMeta || {}, { checklist: list.map(x => ({ key: x.key, label: x.label, value: x.value, status: x.status, note: x.note, ...(x.images && x.images.length ? { images: x.images } : {}), ...(x.custom ? { custom: true } : {}) })) });
+    const meta = Object.assign({}, p.fundingMeta || {}, { checklist: list.map(x => ({ key: x.key, label: x.label, value: x.value, status: x.status, note: x.note, ...(x.images && x.images.length ? { images: x.images } : {}), ...(x.custom ? { custom: true } : {}), ...(x.hidden ? { hidden: true } : {}) })) });
     try {
         const { error } = await sb.from('planning_projects').update({ funding_meta: meta, updated_at: new Date().toISOString() }).eq('id', id);
         if (error) throw error;
@@ -14342,6 +14345,57 @@ async function fundingSpecSet(id, i, field, val) {
 function fundingSpecThumb(u, w) {
     const px = w || 400;
     return /\/storage\/v1\/object\/public\//.test(u) ? u.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + `?width=${px}&resize=contain` : u;
+}
+// 사진 크게 보기 (화면 위 창) — Esc·바깥 클릭으로 닫기, ←/→ 같은 항목의 다른 사진
+let _fsView = { urls: [], idx: 0, label: '' };
+function fundingSpecView(id, i, j) {
+    const p = planningProjects.find(x => x.id === id);
+    const x = p && fundingSpecList(p)[i];
+    if (!x || !x.images.length) return;
+    _fsView = { urls: x.images.slice(), idx: Math.min(Math.max(0, j || 0), x.images.length - 1), label: x.label };
+    let ov = document.getElementById('fsViewer');
+    if (!ov) {
+        ov = document.createElement('div');
+        ov.id = 'fsViewer';
+        ov.className = 'fsv';
+        ov.innerHTML = `
+            <div class="fsv-top"><b id="fsvTitle"></b><span id="fsvCount"></span>
+                <a id="fsvOrig" target="_blank" rel="noopener">원본 새 탭 ↗</a>
+                <button onclick="fundingSpecViewClose()" title="닫기 (Esc)">✕</button></div>
+            <button class="fsv-nav prev" onclick="fundingSpecViewStep(-1)" title="이전 (←)">‹</button>
+            <img id="fsvImg" alt="">
+            <button class="fsv-nav next" onclick="fundingSpecViewStep(1)" title="다음 (→)">›</button>`;
+        ov.addEventListener('click', e => { if (e.target === ov) fundingSpecViewClose(); });
+        document.body.appendChild(ov);
+    }
+    ov.style.display = 'flex';
+    document.addEventListener('keydown', _fsViewKey, true);
+    _fsViewRender();
+}
+function _fsViewRender() {
+    const { urls, idx, label } = _fsView;
+    const img = document.getElementById('fsvImg');
+    if (img) img.src = urls[idx] || '';
+    const o = document.getElementById('fsvOrig'); if (o) o.href = urls[idx] || '#';
+    const t = document.getElementById('fsvTitle'); if (t) t.textContent = label || '';
+    const c = document.getElementById('fsvCount'); if (c) c.textContent = urls.length > 1 ? `${idx + 1} / ${urls.length}` : '';
+    document.querySelectorAll('#fsViewer .fsv-nav').forEach(b => { b.style.display = urls.length > 1 ? '' : 'none'; });
+}
+function fundingSpecViewStep(d) {
+    const n = _fsView.urls.length;
+    if (n < 2) return;
+    _fsView.idx = (_fsView.idx + d + n) % n;
+    _fsViewRender();
+}
+function fundingSpecViewClose() {
+    const ov = document.getElementById('fsViewer');
+    if (ov) ov.style.display = 'none';
+    document.removeEventListener('keydown', _fsViewKey, true);
+}
+function _fsViewKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fundingSpecViewClose(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); fundingSpecViewStep(-1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); fundingSpecViewStep(1); }
 }
 async function fundingSpecAddImages(id, i, input) {
     const files = Array.from((input && input.files) || []).filter(f => f.type.startsWith('image/'));
@@ -14390,8 +14444,25 @@ async function fundingSpecRemove(id, i) {
     const p = planningProjects.find(x => x.id === id);
     if (!p) return;
     const list = fundingSpecList(p);
-    if (!list[i] || !list[i].custom) return;
-    list.splice(i, 1);
+    const x = list[i];
+    if (!x) return;
+    if (x.custom) {
+        const has = x.value || x.note || x.images.length;
+        if (has && !confirm(`'${x.label || '이 항목'}'을(를) 삭제할까요? 적어 둔 내용${x.images.length ? '·사진' : ''}도 함께 지워집니다.`)) return;
+        list.splice(i, 1);
+    } else {
+        if (!confirm(`'${x.label}' 항목을 이 프로젝트에서 뺄까요?\n(맨 아래 '숨긴 항목'에서 언제든 다시 꺼낼 수 있고, 적어 둔 내용·사진은 보관됩니다)`)) return;
+        x.hidden = true;
+    }
+    await fundingSpecSave(id, list);
+    renderPlanning({ skipLoad: true });
+}
+async function fundingSpecUnhide(id, i) {
+    const p = planningProjects.find(x => x.id === id);
+    if (!p) return;
+    const list = fundingSpecList(p);
+    if (!list[i]) return;
+    list[i].hidden = false;
     await fundingSpecSave(id, list);
     renderPlanning({ skipLoad: true });
 }
