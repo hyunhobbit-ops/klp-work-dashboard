@@ -4566,7 +4566,7 @@ function openEditProject(id) {
 
         <div id="editSupplierDetailCard" style="background:var(--orange-light);border:1.5px solid var(--gray-200);border-left:4px solid var(--orange);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900);display:block">
             <div class="form-section-title" style="color:var(--klp-orange,#E67E22)">🏭 매입처 상세 (작업요청서용)</div>
-            <div id="editProjectSupNameHint" style="font-size:12.5px;font-weight:700;color:var(--klp-orange,#E67E22);background:#fff;border:1px dashed var(--klp-orange,#E67E22);border-radius:8px;padding:8px 12px;margin:-4px 0 12px;display:${p.supplier ? 'none' : 'block'}">👆 위 <b>매입처</b> 칸에 공장 이름을 먼저 입력해야 매입 정보가 저장됩니다</div>
+            <div id="editProjectSupNameHint" style="font-size:12.5px;font-weight:700;color:var(--klp-orange,#E67E22);background:var(--white);border:1px dashed var(--klp-orange,#E67E22);border-radius:8px;padding:8px 12px;margin:-4px 0 12px;display:${p.supplier ? 'none' : 'block'}">👆 위 <b>매입처</b> 칸에 공장 이름을 먼저 입력해야 매입 정보가 저장됩니다</div>
             ${ovsBoxHtml('editProject', p.supplierOverseas)}
             <div class="sup-dom" id="editProjectSupDom" style="display:${p.supplierOverseas ? 'none' : ''}">
             <div class="form-row" style="grid-template-columns:2fr 1fr">
@@ -5203,7 +5203,7 @@ function openModal(type) {
 
                 <div id="supplierDetailCard" style="background:var(--orange-light);border:1.5px solid var(--gray-200);border-left:4px solid var(--orange);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900);display:block">
                     <div class="form-section-title" style="color:var(--klp-orange,#E67E22)">🏭 매입처 상세 (작업요청서용)</div>
-                    <div id="newProjectSupNameHint" style="font-size:12.5px;font-weight:700;color:var(--klp-orange,#E67E22);background:#fff;border:1px dashed var(--klp-orange,#E67E22);border-radius:8px;padding:8px 12px;margin:-4px 0 12px;display:${v('supplier') ? 'none' : 'block'}">👆 위 <b>매입처</b> 칸에 공장 이름을 먼저 입력해야 매입 정보가 저장됩니다</div>
+                    <div id="newProjectSupNameHint" style="font-size:12.5px;font-weight:700;color:var(--klp-orange,#E67E22);background:var(--white);border:1px dashed var(--klp-orange,#E67E22);border-radius:8px;padding:8px 12px;margin:-4px 0 12px;display:${v('supplier') ? 'none' : 'block'}">👆 위 <b>매입처</b> 칸에 공장 이름을 먼저 입력해야 매입 정보가 저장됩니다</div>
                     <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:14px">매입 단가를 입력하면 저장 시 매입처 자식 프로젝트가 함께 생성됩니다. (수량·단위·품명은 위 제품 정보를 공유합니다)</div>
                     ${ovsBoxHtml('newProject', null)}
                     <div class="sup-dom" id="newProjectSupDom">
@@ -14241,8 +14241,8 @@ const FUNDING_SPEC_STATUS = [
 function fundingSpecList(p) {
     const m = (p && p.fundingMeta) || {};
     const saved = Array.isArray(m.checklist) ? m.checklist : null;
-    if (saved) return saved.map(x => ({ key: x.key, label: x.label || '', value: x.value || '', status: x.status || '', note: x.note || '', custom: !!x.custom }));
-    return FUNDING_SPEC_DEFAULT.map(d => ({ key: d.key, label: d.label, value: '', status: '', note: '' }));
+    if (saved) return saved.map(x => ({ key: x.key, label: x.label || '', value: x.value || '', status: x.status || '', note: x.note || '', images: Array.isArray(x.images) ? x.images.filter(Boolean) : [], custom: !!x.custom }));
+    return FUNDING_SPEC_DEFAULT.map(d => ({ key: d.key, label: d.label, value: '', status: '', note: '', images: [] }));
 }
 function fundingSpecProgress(p) {
     const list = fundingSpecList(p);
@@ -14269,7 +14269,11 @@ function fundingSpecHtml(p) {
             </select>
             <input class="fs-val" value="${esc(x.value)}" placeholder="${esc(d ? d.ph : '사양 내용')}" onchange="fundingSpecSet(${p.id},${i},'value',this.value)">
             <input class="fs-note" value="${esc(x.note)}" placeholder="메모 (확인할 것·담당·근거 자료)" onchange="fundingSpecSet(${p.id},${i},'note',this.value)">
+            <label class="fs-img-btn" title="사진 첨부 (여러 장 가능, 원본 화질)">📷${x.images.length ? ` <b>${x.images.length}</b>` : ''}<input type="file" accept="image/*" multiple hidden onchange="fundingSpecAddImages(${p.id},${i},this)"></label>
             ${x.custom ? `<button class="fs-del" title="항목 삭제" onclick="fundingSpecRemove(${p.id},${i})">✕</button>` : '<span></span>'}
+            ${x.images.length ? `<div class="fs-imgs">${x.images.map((u, j) => `
+                <div class="fs-img"><a href="${esc(u)}" target="_blank" rel="noopener" title="원본 보기"><img src="${esc(fundingSpecThumb(u))}" loading="lazy" alt=""></a>
+                <button title="사진 빼기" onclick="fundingSpecRemoveImage(${p.id},${i},${j})">✕</button></div>`).join('')}</div>` : ''}
         </div>`;
     }).join('');
     return `
@@ -14281,7 +14285,7 @@ function fundingSpecHtml(p) {
             </div>
             <div class="fs-prog"><div class="fs-prog-bar"><i style="width:${pct}%"></i></div><span><b>${pr.done}/${pr.total}</b> 완료${pr.left ? ` · 남음 ${pr.left}` : ' · 모두 확인 ✅'}</span></div>
         </div>
-        <div class="fs-row fs-colh"><div>항목</div><div>상태</div><div>사양 내용</div><div>메모</div><div></div></div>
+        <div class="fs-row fs-colh"><div>항목</div><div>상태</div><div>사양 내용</div><div>메모</div><div>사진</div><div></div></div>
         ${rows}
         <button class="fs-add" onclick="fundingSpecAdd(${p.id})">+ 항목 추가 (예: 사용설명서, 인증서, 각인, 시계 줄 여분 …)</button>
     </div>`;
@@ -14289,7 +14293,7 @@ function fundingSpecHtml(p) {
 async function fundingSpecSave(id, list) {
     const p = planningProjects.find(x => x.id === id);
     if (!p) return;
-    const meta = Object.assign({}, p.fundingMeta || {}, { checklist: list.map(x => ({ key: x.key, label: x.label, value: x.value, status: x.status, note: x.note, ...(x.custom ? { custom: true } : {}) })) });
+    const meta = Object.assign({}, p.fundingMeta || {}, { checklist: list.map(x => ({ key: x.key, label: x.label, value: x.value, status: x.status, note: x.note, ...(x.images && x.images.length ? { images: x.images } : {}), ...(x.custom ? { custom: true } : {}) })) });
     try {
         const { error } = await sb.from('planning_projects').update({ funding_meta: meta, updated_at: new Date().toISOString() }).eq('id', id);
         if (error) throw error;
@@ -14308,11 +14312,49 @@ async function fundingSpecSet(id, i, field, val) {
     await fundingSpecSave(id, list);
     if (field === 'status') renderPlanning({ skipLoad: true });   // 색·진행률 갱신 (글자 칸은 입력 중 깜빡임 방지로 다시 그리지 않음)
 }
+// 표에는 서버 썸네일(작게), 누르면 원본
+function fundingSpecThumb(u) {
+    return /\/storage\/v1\/object\/public\//.test(u) ? u.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/') + '?width=200&height=200&resize=cover' : u;
+}
+async function fundingSpecAddImages(id, i, input) {
+    const files = Array.from((input && input.files) || []).filter(f => f.type.startsWith('image/'));
+    if (input) input.value = '';
+    if (!files.length) return;
+    const big = files.filter(f => f.size > 25 * 1024 * 1024);
+    if (big.length) { showToast('25MB 넘는 사진은 뺐습니다: ' + big.map(f => f.name).join(', ')); }
+    const ok = files.filter(f => f.size <= 25 * 1024 * 1024);
+    if (!ok.length) return;
+    showToast(`사진 ${ok.length}장 올리는 중…`);
+    const urls = [];
+    for (const f of ok) {
+        try { urls.push(await uploadPlanningImage(f)); }
+        catch (err) { console.error(err); showToast('사진 업로드 실패: ' + (f.name || '') + ' — ' + err.message); }
+    }
+    if (!urls.length) return;
+    const p = planningProjects.find(x => x.id === id);
+    if (!p) return;
+    const list = fundingSpecList(p);          // 올리는 동안 바뀐 내용 반영
+    if (!list[i]) return;
+    list[i].images = (list[i].images || []).concat(urls);
+    await fundingSpecSave(id, list);
+    renderPlanning({ skipLoad: true });
+    showToast(`사진 ${urls.length}장 첨부했습니다`);
+}
+async function fundingSpecRemoveImage(id, i, j) {
+    const p = planningProjects.find(x => x.id === id);
+    if (!p) return;
+    const list = fundingSpecList(p);
+    if (!list[i] || !list[i].images[j]) return;
+    if (!confirm('이 사진을 항목에서 뺄까요?')) return;
+    list[i].images.splice(j, 1);
+    await fundingSpecSave(id, list);
+    renderPlanning({ skipLoad: true });
+}
 async function fundingSpecAdd(id) {
     const p = planningProjects.find(x => x.id === id);
     if (!p) return;
     const list = fundingSpecList(p);
-    list.push({ key: 'c' + Date.now().toString(36), label: '', value: '', status: '', note: '', custom: true });
+    list.push({ key: 'c' + Date.now().toString(36), label: '', value: '', status: '', note: '', images: [], custom: true });
     await fundingSpecSave(id, list);
     renderPlanning({ skipLoad: true });
     setTimeout(() => { const els = document.querySelectorAll('.fs-label-in'); if (els.length) els[els.length - 1].focus(); }, 50);
