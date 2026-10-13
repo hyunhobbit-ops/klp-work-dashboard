@@ -5928,44 +5928,58 @@ body.m-on .theme-toggle{display:none}
 .ovs-note{font-size:11.5px;color:var(--gray-500);line-height:1.5;align-self:end;padding-bottom:10px}
 .inq-ovs{font-weight:800;color:#B56500}
 
-/* ===== 펀딩 사양 체크리스트 (🧾 사양 체크 탭) ===== */
-.fs-wrap{background:var(--white); border:1px solid var(--gray-200); border-radius:14px; padding:18px 18px 14px}
-.fs-head{display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:12px}
+/* ===== 펀딩 사양 체크리스트 (🧾 사양 체크 탭) — 사진 위·내용 아래 카드, 3~4열 ===== */
+.fs-wrap{background:var(--white); border:1px solid var(--gray-200); border-radius:14px; padding:18px}
+.fs-head{display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:16px}
 .fs-title{font-size:17px; font-weight:800; color:var(--gray-900)}
 .fs-sub{font-size:12px; color:var(--gray-500); margin-top:4px}
 .fs-prog{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--gray-600)}
 .fs-prog-bar{width:140px; height:8px; background:var(--gray-100); border-radius:6px; overflow:hidden}
 .fs-prog-bar i{display:block; height:100%; background:#059669; border-radius:6px}
-.fs-row{display:grid; grid-template-columns:130px 104px minmax(180px,1.4fr) minmax(140px,1fr) 52px 28px; gap:8px; align-items:center; padding:8px 4px; border-top:1px solid var(--gray-100)}
-.fs-row.fs-colh{border-top:none; font-size:11.5px; font-weight:700; color:var(--gray-400,#9CA3AF); padding-bottom:4px}
-.fs-row.done{background:var(--green-light, #F0FDF4)}
-.fs-row.na{opacity:.6}
-.fs-label{display:flex; align-items:center; gap:6px; font-size:14px; color:var(--gray-900)}
-.fs-label-in{width:100%; height:34px; border:1px dashed var(--gray-300); border-radius:8px; padding:0 8px; font:inherit; font-weight:700; background:var(--white); color:var(--gray-900)}
 .fs-warn{color:#F59E0B; font-size:10px}
-.fs-st{height:34px; border:1.5px solid; border-radius:8px; background:var(--white); font:inherit; font-size:13px; font-weight:700; padding:0 6px}
-.fs-val,.fs-note{height:34px; border:1px solid var(--gray-200); border-radius:8px; padding:0 10px; font:inherit; font-size:13.5px; min-width:0; background:var(--white); color:var(--gray-900)}
-.fs-val::placeholder,.fs-note::placeholder,.fs-label-in::placeholder{color:var(--gray-400,#9CA3AF)}
+.fs-st{height:32px; border:1.5px solid; border-radius:8px; background:var(--white); font:inherit; font-size:13px; font-weight:700; padding:0 6px; flex-shrink:0}
 .fs-st option{background:var(--white); color:var(--gray-900)}
-.fs-val:focus,.fs-note:focus,.fs-label-in:focus{outline:none; border-color:var(--blue)}
-.fs-note{color:var(--gray-600); font-size:12.5px}
-.fs-del{width:28px; height:28px; border:none; background:transparent; color:var(--gray-400,#9CA3AF); cursor:pointer; border-radius:6px}
+.fs-del{width:28px; height:28px; border:none; background:transparent; color:var(--gray-400,#9CA3AF); cursor:pointer; border-radius:6px; flex-shrink:0}
 .fs-del:hover{background:var(--gray-100); color:var(--red,#EF4444)}
-.fs-add{margin-top:10px; width:100%; height:38px; border:1.5px dashed var(--gray-300); background:transparent; border-radius:10px; color:var(--gray-500); font:inherit; font-size:13px; cursor:pointer}
-.fs-add:hover{border-color:var(--blue); color:var(--blue)}
-/* 항목별 사진 */
-.fs-img-btn{height:34px; display:flex; align-items:center; justify-content:center; gap:2px; border:1px dashed var(--gray-300); border-radius:8px; cursor:pointer; font-size:15px; color:var(--gray-500); background:var(--white)}
-.fs-img-btn b{font-size:12px; color:var(--blue)}
-.fs-img-btn:hover{border-color:var(--blue)}
-.fs-imgs{grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:8px; padding:2px 0 4px 138px}
-.fs-img{position:relative; width:84px; height:84px; border-radius:8px; overflow:hidden; border:1px solid var(--gray-200); background:var(--gray-50)}
-.fs-img img{width:100%; height:100%; object-fit:cover; display:block}
-.fs-img button{position:absolute; top:3px; right:3px; width:22px; height:22px; border:none; border-radius:50%; background:rgba(0,0,0,.55); color:#fff; font-size:11px; cursor:pointer; opacity:0; transition:opacity .12s}
-.fs-img:hover button{opacity:1}
+
+.fsc-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:16px; align-items:start}
+.fsc{background:var(--white); border:1px solid var(--gray-200); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; transition:border-color .12s, box-shadow .12s}
+.fsc:hover{box-shadow:0 4px 16px rgba(0,0,0,.06)}
+.fsc.done{border-color:#059669; box-shadow:inset 0 3px 0 #059669}
+.fsc.na{opacity:.6}
+/* 사진 (위) */
+.fsc-photo{position:relative; display:block; aspect-ratio:4 / 3; background:var(--gray-50); border-bottom:1px solid var(--gray-100)}
+.fsc-photo img{width:100%; height:100%; object-fit:contain; display:block}
+.fsc-photo-empty{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; cursor:pointer; color:var(--gray-500); border:2px dashed var(--gray-200); border-radius:12px; margin:10px 10px 0; aspect-ratio:auto; height:180px; font-size:14px; font-weight:700}
+.fsc-photo-empty small{font-size:11px; font-weight:500; color:var(--gray-400,#9CA3AF)}
+.fsc-photo-empty:hover{border-color:var(--blue); color:var(--blue)}
+.fsc-ph-ic{font-size:30px}
+.fsc-count{position:absolute; left:8px; bottom:8px; background:rgba(0,0,0,.55); color:#fff; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px}
+.fsc-x{position:absolute; top:6px; right:6px; width:26px; height:26px; border:none; border-radius:50%; background:rgba(0,0,0,.55); color:#fff; font-size:12px; cursor:pointer; opacity:0; transition:opacity .12s}
+.fsc-photo:hover .fsc-x,.fsc-th:hover .fsc-x{opacity:1}
+.fsc-strip{display:flex; gap:6px; padding:8px 10px 0; overflow-x:auto}
+.fsc-th{position:relative; flex:0 0 64px; height:64px; border-radius:8px; overflow:hidden; border:1px solid var(--gray-200); background:var(--gray-50)}
+.fsc-th img{width:100%; height:100%; object-fit:cover; display:block}
+.fsc-th .fsc-x{top:3px; right:3px; width:20px; height:20px; font-size:10px}
+.fsc-th-add{display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; color:var(--gray-500); border-style:dashed; font-size:18px; line-height:1}
+.fsc-th-add span{font-size:10.5px; margin-top:3px}
+.fsc-th-add:hover{border-color:var(--blue); color:var(--blue)}
+/* 내용 (아래) */
+.fsc-body{padding:12px 14px 14px; display:flex; flex-direction:column; gap:4px}
+.fsc-top{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+.fsc-name{flex:1; font-size:16px; font-weight:800; color:var(--gray-900)}
+.fsc-name-in{flex:1; min-width:0; height:32px; border:1px dashed var(--gray-300); border-radius:8px; padding:0 8px; font:inherit; font-size:15px; font-weight:800; background:var(--white); color:var(--gray-900)}
+.fsc-lbl{font-size:11px; font-weight:700; color:var(--gray-400,#9CA3AF); margin-top:4px}
+.fsc-val,.fsc-note{width:100%; border:1px solid var(--gray-200); border-radius:8px; padding:8px 10px; font:inherit; font-size:13.5px; line-height:1.5; resize:vertical; background:var(--white); color:var(--gray-900); box-sizing:border-box}
+.fsc-note{font-size:12.5px; color:var(--gray-600)}
+.fsc-val::placeholder,.fsc-note::placeholder,.fsc-name-in::placeholder{color:var(--gray-400,#9CA3AF)}
+.fsc-val:focus,.fsc-note:focus,.fsc-name-in:focus{outline:none; border-color:var(--blue)}
+.fsc.done .fsc-val{border-color:#A7F3D0}
+.fsc-addcard{min-height:200px; align-items:center; justify-content:center; gap:4px; border:2px dashed var(--gray-300); background:transparent; color:var(--gray-500); font:inherit; font-size:14px; font-weight:700; cursor:pointer}
+.fsc-addcard span{font-size:30px; line-height:1}
+.fsc-addcard small{font-size:11px; font-weight:500; color:var(--gray-400,#9CA3AF)}
+.fsc-addcard:hover{border-color:var(--blue); color:var(--blue)}
 @media (max-width:760px){
-  .fs-imgs{padding-left:0}
-  .fs-img button{opacity:1}
-  .fs-row{grid-template-columns:1fr 104px 52px 28px}
-  .fs-row.fs-colh{display:none}
-  .fs-val,.fs-note{grid-column:1 / -1}
+  .fsc-grid{grid-template-columns:1fr}
+  .fsc-x{opacity:1}
 }
