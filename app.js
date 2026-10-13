@@ -4564,8 +4564,9 @@ function openEditProject(id) {
             </div>
         `)}
 
-        <div id="editSupplierDetailCard" style="background:var(--orange-light);border:1.5px solid var(--gray-200);border-left:4px solid var(--orange);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900);display:${p.supplier ? 'block' : 'none'}">
+        <div id="editSupplierDetailCard" style="background:var(--orange-light);border:1.5px solid var(--gray-200);border-left:4px solid var(--orange);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900);display:block">
             <div class="form-section-title" style="color:var(--klp-orange,#E67E22)">🏭 매입처 상세 (작업요청서용)</div>
+            <div id="editProjectSupNameHint" style="font-size:12.5px;font-weight:700;color:var(--klp-orange,#E67E22);background:#fff;border:1px dashed var(--klp-orange,#E67E22);border-radius:8px;padding:8px 12px;margin:-4px 0 12px;display:${p.supplier ? 'none' : 'block'}">👆 위 <b>매입처</b> 칸에 공장 이름을 먼저 입력해야 매입 정보가 저장됩니다</div>
             ${ovsBoxHtml('editProject', p.supplierOverseas)}
             <div class="sup-dom" id="editProjectSupDom" style="display:${p.supplierOverseas ? 'none' : ''}">
             <div class="form-row" style="grid-template-columns:2fr 1fr">
@@ -4726,7 +4727,9 @@ function toggleEditSupplierSection() {
     const card = document.getElementById('editSupplierDetailCard');
     if (!supEl || !card) return;
     const hasSupplier = (supEl.value || '').trim().length > 0;
-    card.style.display = hasSupplier ? 'block' : 'none';
+    card.style.display = 'block';   // 매입처 상세는 항상 보임 — 이름이 없을 땐 안내만
+    const hint = document.getElementById('editProjectSupNameHint');
+    if (hint) hint.style.display = hasSupplier ? 'none' : 'block';
     if (!hasSupplier) {
         const m = document.getElementById('editProjectMarginDisplay');
         if (m) m.innerHTML = '';
@@ -4763,6 +4766,10 @@ async function updateProject(id) {
     const client = getVal('editProjectClient');
     if (!name) { showToast('품명을 입력해주세요'); return; }
     if (!client) { showToast('거래처를 입력해주세요'); return; }
+    if (!getVal('editProjectSupplier') && (readProjectNumber('editProjectSupUnitPrice') > 0 || ovsIsOn('editProject'))) {
+        showToast('매입 정보를 저장하려면 매입처(공장) 이름을 입력해주세요');
+        document.getElementById('editProjectSupplier')?.focus(); return;
+    }
 
     const unitPrice = readProjectNumber('editProjectUnitPrice');
     const qty = readProjectNumber('editProjectQty');
@@ -5194,8 +5201,9 @@ function openModal(type) {
                     </div>
                 `)}
 
-                <div id="supplierDetailCard" style="background:var(--orange-light);border:1.5px solid var(--gray-200);border-left:4px solid var(--orange);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900);display:none">
+                <div id="supplierDetailCard" style="background:var(--orange-light);border:1.5px solid var(--gray-200);border-left:4px solid var(--orange);border-radius:10px;padding:16px 20px;margin-bottom:16px;color:var(--gray-900);display:block">
                     <div class="form-section-title" style="color:var(--klp-orange,#E67E22)">🏭 매입처 상세 (작업요청서용)</div>
+                    <div id="newProjectSupNameHint" style="font-size:12.5px;font-weight:700;color:var(--klp-orange,#E67E22);background:#fff;border:1px dashed var(--klp-orange,#E67E22);border-radius:8px;padding:8px 12px;margin:-4px 0 12px;display:${v('supplier') ? 'none' : 'block'}">👆 위 <b>매입처</b> 칸에 공장 이름을 먼저 입력해야 매입 정보가 저장됩니다</div>
                     <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:14px">매입 단가를 입력하면 저장 시 매입처 자식 프로젝트가 함께 생성됩니다. (수량·단위·품명은 위 제품 정보를 공유합니다)</div>
                     ${ovsBoxHtml('newProject', null)}
                     <div class="sup-dom" id="newProjectSupDom">
@@ -5739,7 +5747,9 @@ function toggleSupplierSection() {
     const card = document.getElementById('supplierDetailCard');
     if (!supEl || !card) return;
     const hasSupplier = (supEl.value || '').trim().length > 0;
-    card.style.display = hasSupplier ? 'block' : 'none';
+    card.style.display = 'block';   // 매입처 상세는 항상 보임 — 이름이 없을 땐 안내만
+    const hint = document.getElementById('newProjectSupNameHint');
+    if (hint) hint.style.display = hasSupplier ? 'none' : 'block';
     if (!hasSupplier) {
         const m = document.getElementById('newProjectMarginDisplay');
         if (m) m.innerHTML = '';
@@ -5959,6 +5969,11 @@ async function addProject(type) {
     const client = document.getElementById('newProjectClient').value.trim();
     if (!name) { showToast('품명을 입력해주세요'); return; }
     if (!client) { showToast('거래처를 입력해주세요'); return; }
+    if (type === 'domestic' && !document.getElementById('newProjectSupplier')?.value.trim()
+        && (readProjectNumber('newProjectSupUnitPrice') > 0 || ovsIsOn('newProject'))) {
+        showToast('매입 정보를 저장하려면 매입처(공장) 이름을 입력해주세요');
+        document.getElementById('newProjectSupplier')?.focus(); return;
+    }
 
     const unitPrice = readProjectNumber('newProjectUnitPrice');
     const qty = readProjectNumber('newProjectQty');
