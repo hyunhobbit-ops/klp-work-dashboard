@@ -14224,13 +14224,18 @@ function planningSetNoteFilter(k) {
 // ----- 펀딩 사양 체크리스트 (시계) : funding_meta.checklist = [{key,label,value,status,note}] -----
 // 진행하면서 빠뜨린 사양이 없는지 보는 표. 칸을 벗어나면 저장(realtime 으로 다른 사람 화면에도 반영)
 const FUNDING_SPEC_DEFAULT = [
-    { key: 'case',      label: '케이스',       ph: '소재·지름/두께·도금 색·방수 (예: SUS316L 40mm, 골드 IP, 5ATM)' },
-    { key: 'movement',  label: '무브먼트',     ph: '종류·제조사·모델 (예: 쿼츠 Miyota 2035 / 오토 Seiko NH35)' },
-    { key: 'band',      label: '밴드',         ph: '소재·색·폭·버클 (예: 가죽 브라운 20mm, 핀버클)' },
-    { key: 'box',       label: '패키지 박스',  ph: '박스 종류·인쇄·내지·쇼핑백' },
-    { key: 'origin',    label: '원산지',       ph: '원산지·표기 위치 (예: 중국, 뒷판 MADE IN CHINA 각인)' },
-    { key: 'warranty',  label: '품질보증서',   ph: '보증 기간·양식·A/S 문구' },
-    { key: 'label',     label: '라벨 & 택',    ph: 'KC/인증 표시·바코드·행택·제품 라벨' },
+    { key: 'case',      label: '케이스',          ph: '소재·지름/두께·도금 색·방수 (예: SUS316L 40mm, 골드 IP, 5ATM)' },
+    { key: 'movement',  label: '무브먼트',        ph: '종류·제조사·모델 (예: 쿼츠 Miyota 2035 / 오토 Seiko NH35)' },
+    { key: 'crown',     label: '용두',            ph: '모양·소재·로고 각인·스크류다운 여부' },
+    { key: 'dial',      label: '다이얼',          ph: '색·마감·인덱스·로고(인쇄/아플리케)·야광' },
+    { key: 'hands',     label: '핸즈',            ph: '모양·색·야광·초침 유무' },
+    { key: 'battery',   label: '배터리',          ph: '규격·제조사 (예: SR626SW Renata) — 오토매틱이면 해당 없음' },
+    { key: 'band',      label: '밴드',            ph: '소재·색·폭·버클 (예: 가죽 브라운 20mm, 핀버클)' },
+    { key: 'chain',     label: '체인 (회중시계일 경우)', ph: '종류·길이·도금·클립 — 손목시계면 해당 없음' },
+    { key: 'box',       label: '패키지박스',      ph: '박스 종류·인쇄·내지·쇼핑백' },
+    { key: 'origin',    label: '원산지 표기',     ph: '원산지·표기 위치 (예: 중국, 뒷판 MADE IN CHINA 각인)' },
+    { key: 'warranty',  label: '품질보증서',      ph: '보증 기간·양식·A/S 문구' },
+    { key: 'label',     label: '라벨&택',         ph: 'KC/인증 표시·바코드·행택·제품 라벨' },
 ];
 const FUNDING_SPEC_STATUS = [
     ['',      '미정',       '#9CA3AF'],
@@ -14241,8 +14246,13 @@ const FUNDING_SPEC_STATUS = [
 function fundingSpecList(p) {
     const m = (p && p.fundingMeta) || {};
     const saved = Array.isArray(m.checklist) ? m.checklist : null;
-    if (saved) return saved.map(x => ({ key: x.key, label: x.label || '', value: x.value || '', status: x.status || '', note: x.note || '', images: Array.isArray(x.images) ? x.images.filter(Boolean) : [], custom: !!x.custom }));
-    return FUNDING_SPEC_DEFAULT.map(d => ({ key: d.key, label: d.label, value: '', status: '', note: '', images: [] }));
+    const norm = x => ({ key: x.key, label: x.label || '', value: x.value || '', status: x.status || '', note: x.note || '', images: Array.isArray(x.images) ? x.images.filter(Boolean) : [], custom: !!x.custom });
+    // 기본 항목은 항상 FUNDING_SPEC_DEFAULT 순서·이름으로 (나중에 추가된 기본 항목도 예전 프로젝트에 끼워짐) + 저장된 내용 붙이기, 직접 추가한 항목은 뒤에
+    const byKey = {};
+    (saved || []).forEach(x => { if (x && x.key) byKey[x.key] = x; });
+    const base = FUNDING_SPEC_DEFAULT.map(d => Object.assign(norm(byKey[d.key] || { key: d.key }), { label: d.label, custom: false }));
+    const extra = (saved || []).filter(x => x && x.custom && !FUNDING_SPEC_DEFAULT.some(d => d.key === x.key)).map(norm);
+    return base.concat(extra);
 }
 function fundingSpecProgress(p) {
     const list = fundingSpecList(p);
