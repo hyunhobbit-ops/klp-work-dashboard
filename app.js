@@ -14184,7 +14184,7 @@ function renderPlanningDetail(p) {
             </div>
         </div>
         <div class="pl-body${board ? ' board' : ''}">
-            <div class="pl-main">${planningTabsHtml(p)}${planningTab === 'note' ? planningNotesHtml(p) : (board ? planningBoardHtml(p) : planningTaskListHtml(p))}</div>
+            <div class="pl-main">${planningTabsHtml(p)}${planningTab === 'spec' && p.access === 'funding' ? fundingSpecHtml(p) : planningTab === 'note' ? planningNotesHtml(p) : (board ? planningBoardHtml(p) : planningTaskListHtml(p))}</div>
             <aside class="pl-side">${planningSideHtml(p)}</aside>
         </div>
     </div>`;
@@ -14193,7 +14193,7 @@ function renderPlanningDetail(p) {
 // ----- 자료·제안 (kind = 'note') : 진행 상태가 없는 글. 제안은 검토 중 → 채택(할 일 생성) / 보류 -----
 const PLANNING_NOTE_CATS = ['propose', 'research', 'material'];
 const PLANNING_NOTE_STATUS = { review: '검토 중', adopted: '채택', hold: '보류' };
-let planningTab = (() => { try { return localStorage.getItem('pl_tab') === 'note' ? 'note' : 'task'; } catch (_) { return 'task'; } })();
+let planningTab = (() => { try { const t = localStorage.getItem('pl_tab'); return t === 'note' || t === 'spec' ? t : 'task'; } catch (_) { return 'task'; } })();
 let planningNoteFilter = 'all';
 
 function planningNotesOf(p) { return (p.posts || []).filter(x => !x.parentId && x.kind === 'note'); }
@@ -14212,7 +14212,7 @@ function planningImgCount(post) {
 }
 function planningSetModalTitle(t) { const el = document.getElementById('modalTitle'); if (el) el.textContent = t; }
 function planningSetTab(t) {
-    planningTab = t === 'note' ? 'note' : 'task';
+    planningTab = t === 'note' || t === 'spec' ? t : 'task';
     try { localStorage.setItem('pl_tab', planningTab); } catch (_) {}
     renderPlanning({ skipLoad: true });
 }
@@ -14221,11 +14221,119 @@ function planningSetNoteFilter(k) {
     renderPlanning({ skipLoad: true });
 }
 
+// ----- 펀딩 사양 체크리스트 (시계) : funding_meta.checklist = [{key,label,value,status,note}] -----
+// 진행하면서 빠뜨린 사양이 없는지 보는 표. 칸을 벗어나면 저장(realtime 으로 다른 사람 화면에도 반영)
+const FUNDING_SPEC_DEFAULT = [
+    { key: 'case',      label: '케이스',       ph: '소재·지름/두께·도금 색·방수 (예: SUS316L 40mm, 골드 IP, 5ATM)' },
+    { key: 'movement',  label: '무브먼트',     ph: '종류·제조사·모델 (예: 쿼츠 Miyota 2035 / 오토 Seiko NH35)' },
+    { key: 'band',      label: '밴드',         ph: '소재·색·폭·버클 (예: 가죽 브라운 20mm, 핀버클)' },
+    { key: 'box',       label: '패키지 박스',  ph: '박스 종류·인쇄·내지·쇼핑백' },
+    { key: 'origin',    label: '원산지',       ph: '원산지·표기 위치 (예: 중국, 뒷판 MADE IN CHINA 각인)' },
+    { key: 'warranty',  label: '품질보증서',   ph: '보증 기간·양식·A/S 문구' },
+    { key: 'label',     label: '라벨 & 택',    ph: 'KC/인증 표시·바코드·행택·제품 라벨' },
+];
+const FUNDING_SPEC_STATUS = [
+    ['',      '미정',       '#9CA3AF'],
+    ['doing', '진행 중',    '#2563EB'],
+    ['done',  '확정',       '#059669'],
+    ['na',    '해당 없음',  '#6B7280'],
+];
+function fundingSpecList(p) {
+    const m = (p && p.fundingMeta) || {};
+    const saved = Array.isArray(m.checklist) ? m.checklist : null;
+    if (saved) return saved.map(x => ({ key: x.key, label: x.label || '', value: x.value || '', status: x.status || '', note: x.note || '', custom: !!x.custom }));
+    return FUNDING_SPEC_DEFAULT.map(d => ({ key: d.key, label: d.label, value: '', status: '', note: '' }));
+}
+function fundingSpecProgress(p) {
+    const list = fundingSpecList(p);
+    const done = list.filter(x => x.status === 'done' || x.status === 'na').length;
+    return { done, total: list.length, left: list.length - done };
+}
+function fundingSpecHtml(p) {
+    const list = fundingSpecList(p);
+    const pr = fundingSpecProgress(p);
+    const pct = pr.total ? Math.round(pr.done / pr.total * 100) : 0;
+    const esc = s => planningEsc(String(s == null ? '' : s));
+    const rows = list.map((x, i) => {
+        const d = FUNDING_SPEC_DEFAULT.find(z => z.key === x.key);
+        const st = FUNDING_SPEC_STATUS.find(z => z[0] === x.status) || FUNDING_SPEC_STATUS[0];
+        const empty = !x.status || (x.status !== 'na' && !x.value.trim());
+        return `
+        <div class="fs-row${x.status === 'done' ? ' done' : ''}${x.status === 'na' ? ' na' : ''}">
+            <div class="fs-label">
+                ${x.custom ? `<input class="fs-label-in" value="${esc(x.label)}" placeholder="항목 이름" onchange="fundingSpecSet(${p.id},${i},'label',this.value)">` : `<b>${esc(x.label)}</b>`}
+                ${empty && x.status !== 'na' ? '<span class="fs-warn" title="아직 정해지지 않음">●</span>' : ''}
+            </div>
+            <select class="fs-st" style="color:${st[2]};border-color:${st[2]}" onchange="fundingSpecSet(${p.id},${i},'status',this.value)">
+                ${FUNDING_SPEC_STATUS.map(z => `<option value="${z[0]}" ${z[0] === (x.status || '') ? 'selected' : ''}>${z[1]}</option>`).join('')}
+            </select>
+            <input class="fs-val" value="${esc(x.value)}" placeholder="${esc(d ? d.ph : '사양 내용')}" onchange="fundingSpecSet(${p.id},${i},'value',this.value)">
+            <input class="fs-note" value="${esc(x.note)}" placeholder="메모 (확인할 것·담당·근거 자료)" onchange="fundingSpecSet(${p.id},${i},'note',this.value)">
+            ${x.custom ? `<button class="fs-del" title="항목 삭제" onclick="fundingSpecRemove(${p.id},${i})">✕</button>` : '<span></span>'}
+        </div>`;
+    }).join('');
+    return `
+    <div class="fs-wrap">
+        <div class="fs-head">
+            <div>
+                <div class="fs-title">🧾 시계 사양 체크리스트</div>
+                <div class="fs-sub">빠뜨린 사양이 없는지 확인하는 표 — <b>확정</b> 또는 <b>해당 없음</b>이면 완료로 셉니다. 칸을 벗어나면 자동 저장</div>
+            </div>
+            <div class="fs-prog"><div class="fs-prog-bar"><i style="width:${pct}%"></i></div><span><b>${pr.done}/${pr.total}</b> 완료${pr.left ? ` · 남음 ${pr.left}` : ' · 모두 확인 ✅'}</span></div>
+        </div>
+        <div class="fs-row fs-colh"><div>항목</div><div>상태</div><div>사양 내용</div><div>메모</div><div></div></div>
+        ${rows}
+        <button class="fs-add" onclick="fundingSpecAdd(${p.id})">+ 항목 추가 (예: 사용설명서, 인증서, 각인, 시계 줄 여분 …)</button>
+    </div>`;
+}
+async function fundingSpecSave(id, list) {
+    const p = planningProjects.find(x => x.id === id);
+    if (!p) return;
+    const meta = Object.assign({}, p.fundingMeta || {}, { checklist: list.map(x => ({ key: x.key, label: x.label, value: x.value, status: x.status, note: x.note, ...(x.custom ? { custom: true } : {}) })) });
+    try {
+        const { error } = await sb.from('planning_projects').update({ funding_meta: meta, updated_at: new Date().toISOString() }).eq('id', id);
+        if (error) throw error;
+        p.fundingMeta = meta; p.updatedAt = new Date().toISOString();
+    } catch (err) {
+        console.error(err);
+        showToast('사양 체크 저장 실패: ' + err.message);
+    }
+}
+async function fundingSpecSet(id, i, field, val) {
+    const p = planningProjects.find(x => x.id === id);
+    if (!p) return;
+    const list = fundingSpecList(p);
+    if (!list[i]) return;
+    list[i][field] = String(val == null ? '' : val).trim();
+    await fundingSpecSave(id, list);
+    if (field === 'status') renderPlanning({ skipLoad: true });   // 색·진행률 갱신 (글자 칸은 입력 중 깜빡임 방지로 다시 그리지 않음)
+}
+async function fundingSpecAdd(id) {
+    const p = planningProjects.find(x => x.id === id);
+    if (!p) return;
+    const list = fundingSpecList(p);
+    list.push({ key: 'c' + Date.now().toString(36), label: '', value: '', status: '', note: '', custom: true });
+    await fundingSpecSave(id, list);
+    renderPlanning({ skipLoad: true });
+    setTimeout(() => { const els = document.querySelectorAll('.fs-label-in'); if (els.length) els[els.length - 1].focus(); }, 50);
+}
+async function fundingSpecRemove(id, i) {
+    const p = planningProjects.find(x => x.id === id);
+    if (!p) return;
+    const list = fundingSpecList(p);
+    if (!list[i] || !list[i].custom) return;
+    list.splice(i, 1);
+    await fundingSpecSave(id, list);
+    renderPlanning({ skipLoad: true });
+}
+
 function planningTabsHtml(p) {
     const notes = planningNotesOf(p);
     const review = notes.filter(n => n.category === 'propose' && (n.noteStatus || 'review') === 'review').length;
+    const spec = p.access === 'funding' ? fundingSpecProgress(p) : null;
     return `
     <div class="pl-tabs">
+        ${spec ? `<button class="${planningTab === 'spec' ? 'on' : ''}" onclick="planningSetTab('spec')">🧾 사양 체크 <b>${spec.done}/${spec.total}</b>${spec.left ? `<em>남음 ${spec.left}</em>` : ''}</button>` : ''}
         <button class="${planningTab === 'task' ? 'on' : ''}" onclick="planningSetTab('task')">✅ 할 일 <b>${planningTasksOf(p).length}</b></button>
         <button class="${planningTab === 'note' ? 'on' : ''}" onclick="planningSetTab('note')">📎 자료·제안 <b>${notes.length}</b>${review ? `<em>검토 중 ${review}</em>` : ''}</button>
     </div>`;
@@ -15609,6 +15717,9 @@ async function saveFundingPlanningProject(id) {
         endDate: endDate || '',
         folderPath
     };
+    // 편집 창에 없는 값(🧾 사양 체크리스트 등)은 기존 것을 그대로 유지
+    const _prevFund = id ? planningProjects.find(x => x.id === id) : null;
+    if (_prevFund && _prevFund.fundingMeta && Array.isArray(_prevFund.fundingMeta.checklist)) fundingMeta.checklist = _prevFund.fundingMeta.checklist;
 
     const deadline = endDate || null;
 
