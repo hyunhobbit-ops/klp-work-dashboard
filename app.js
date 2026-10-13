@@ -14225,6 +14225,7 @@ function planningSetNoteFilter(k) {
 // 진행하면서 빠뜨린 사양이 없는지 보는 표. 칸을 벗어나면 저장(realtime 으로 다른 사람 화면에도 반영)
 const FUNDING_SPEC_DEFAULT = [
     { key: 'case',      label: '케이스',          ph: '소재·지름/두께·도금 색·방수 (예: SUS316L 40mm, 골드 IP, 5ATM)' },
+    { key: 'caseback',  label: '케이스백',        ph: '소재·고정 방식(나사/스크류백)·각인(로고·시리얼·문구)·방수 표기' },
     { key: 'movement',  label: '무브먼트',        ph: '종류·제조사·모델 (예: 쿼츠 Miyota 2035 / 오토 Seiko NH35)' },
     { key: 'crown',     label: '용두',            ph: '모양·소재·로고 각인·스크류다운 여부' },
     { key: 'dial',      label: '다이얼',          ph: '색·마감·인덱스·로고(인쇄/아플리케)·야광' },
