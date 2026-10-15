@@ -11762,8 +11762,18 @@ function _projectsTempRowToObj(r) {
         quoteNote: r.quote_note || '',
         transferredAt: r.transferred_at || '',
         transferredProjectIds: r.transferred_project_ids || [],
-        inquiryId: r.inquiry_id || null
+        inquiryId: r.inquiry_id || null,
+        quoteGroup: r.quote_group || ''
     };
+}
+// 견적 묶음 기준 — 묶음 번호(quote_group, migration 060)가 있으면 그걸로, 없으면(예전 견적) 날짜+매출처
+// 위 입력줄·새로 작성 = 새 묶음 번호(같은 날 같은 거래처라도 새 견적), 견적 아래 '품목 추가' = 그 견적 번호로 이어서
+function tempGroupKey(p) {
+    const qg = p && (p.quoteGroup || p.quote_group);
+    return qg ? 'g:' + qg : ((p && p.date) || '') + '||' + ((p && p.client) || '');
+}
+function newQuoteGroupId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
 function _rebuildTempProjectsFromPagination() {
@@ -11801,12 +11811,15 @@ function renderTempProjects() {
     tempGroups = [];
     const groups = tempGroups;
     sorted.forEach(p => {
-        const key = (p.date || '') + '||' + (p.client || '');
+        const key = tempGroupKey(p);
         let g = groups.find(x => x.key === key);
-        if (!g) { g = { key, date: p.date, client: p.client, clientContact: p.clientContact, quoteNote: p.quoteNote || '', items: [] }; groups.push(g); }
+        if (!g) { g = { key, quoteGroup: p.quoteGroup || '', date: p.date, client: p.client, clientContact: p.clientContact, quoteNote: p.quoteNote || '', items: [] }; groups.push(g); }
         if (!g.quoteNote && p.quoteNote) g.quoteNote = p.quoteNote;
         g.items.push(p);
     });
+    // 같은 날·같은 매출처 견적이 여러 개면 새로 만든 견적이 위로 (날짜 최신 → 매출처 → 새 견적)
+    const _gMaxId = g => Math.max(...g.items.map(p => p.id || 0));
+    groups.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (a.client || '').localeCompare(b.client || '') || (_gMaxId(b) - _gMaxId(a)));
 
     let rowHtml = '';
     let cardHtml = '';
@@ -12117,10 +12130,11 @@ async function saveTempProject(id) {
         } else {
             const _inqId = _inqPendingLink || null;
             if (_inqId) row.inquiry_id = _inqId;
+            row.quote_group = newQuoteGroupId();          // '새로 작성' = 새 견적
             const { data, error } = await sb.from('projects_temp').insert(row).select().single();
             if (error) throw error;
             tempProjects.unshift({ id: data.id, date, client, clientContact, supplier, supplierContact, item, unitPrice, supplierUnitPrice, qty, revenue, supplierRevenue });
-            if (tempProjects[0] && tempProjects[0].id === data.id) tempProjects[0].inquiryId = _inqId;
+            if (tempProjects[0] && tempProjects[0].id === data.id) { tempProjects[0].inquiryId = _inqId; tempProjects[0].quoteGroup = row.quote_group; }
             showToast('저장 완료');
             if (_inqId) inqOnQuoteAdded(_inqId, row);
         }
@@ -12295,9 +12309,12 @@ async function saveTempGroupItem(gi, date, client, clientContact) {
     try {
         const _inqId = (tempGroups[gi] && (tempGroups[gi].items.find(x => x.inquiryId) || {}).inquiryId) || _inqPendingLink || null;
         if (_inqId) row.inquiry_id = _inqId;
+        if (tempGroups[gi] && tempGroups[gi].quoteGroup) row.quote_group = tempGroups[gi].quoteGroup;   // 그 견적에 이어서 (예전 견적은 날짜+매출처로 붙음)
         const { data, error } = await sb.from('projects_temp').insert(row).select().single();
         if (error) throw error;
+        const _qgSaved = row.quote_group || '';
         tempProjects.unshift({ id: data.id, date, client, clientContact, supplier, supplierContact, item, unitPrice, supplierUnitPrice, qty, revenue, supplierRevenue, unitPriceVat: 'VAT 별도', supplierUnitPriceVat: 'VAT 별도', printFee: 0, packagingFee: 0, labelFee: 0, shippingFee: 0 });
+        if (tempProjects[0] && tempProjects[0].id === data.id) tempProjects[0].quoteGroup = _qgSaved;
         if (tempProjects[0] && tempProjects[0].id === data.id) tempProjects[0].inquiryId = _inqId;
         showToast('추가 완료');
         clientAutoAddNotice([client, supplier]);
@@ -12362,10 +12379,11 @@ async function saveTempInline() {
     try {
         const _inqId = _inqPendingLink || null;
         if (_inqId) row.inquiry_id = _inqId;
+        row.quote_group = newQuoteGroupId();              // 위 입력줄 = 항상 새 견적 (같은 날 같은 거래처라도)
         const { data, error } = await sb.from('projects_temp').insert(row).select().single();
         if (error) throw error;
         tempProjects.unshift({ id: data.id, date, client, clientContact, supplier, supplierContact, item, unitPrice, supplierUnitPrice, qty, revenue, supplierRevenue, unitPriceVat: 'VAT 별도', supplierUnitPriceVat: 'VAT 별도', printFee: 0, packagingFee: 0, labelFee: 0, shippingFee: 0 });
-        if (tempProjects[0] && tempProjects[0].id === data.id) tempProjects[0].inquiryId = _inqId;
+        if (tempProjects[0] && tempProjects[0].id === data.id) { tempProjects[0].inquiryId = _inqId; tempProjects[0].quoteGroup = row.quote_group; }
         showToast('저장 완료');
         if (_inqId) inqOnQuoteAdded(_inqId, row);
         clientAutoAddNotice([client, supplier]);
@@ -22624,6 +22642,12 @@ function inqQuoteGroupIndex(date, client) {
     if (!tempGroups.length) renderTempProjects();
     return tempGroups.findIndex(g => g.key === (date || '') + '||' + (client || ''));
 }
+// 견적 품목(또는 묶음 key) → 견적 목록의 묶음 번호
+function inqQuoteGroupIndexOf(pOrKey) {
+    if (!tempGroups.length) renderTempProjects();
+    const k = typeof pOrKey === 'string' ? pOrKey : tempGroupKey(pOrKey);
+    return tempGroups.findIndex(g => g.key === k);
+}
 
 function inqRenderQuotes(x) {
     const el = document.getElementById('inqQuotes');
@@ -22636,7 +22660,7 @@ function inqRenderQuotes(x) {
     // 견적 묶음(날짜+매출처)별 — 견적 목록과 같은 기준
     const groups = [];
     linked.slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || ((a.sortOrder ?? a.id) - (b.sortOrder ?? b.id))).forEach(p => {
-        const key = (p.date || '') + '||' + (p.client || '');
+        const key = tempGroupKey(p);
         let g = groups.find(q => q.key === key);
         if (!g) { g = { key, date: p.date, client: p.client, contact: p.clientContact, note: '', items: [] }; groups.push(g); }
         if (!g.note && p.quoteNote) g.note = p.quoteNote;
@@ -22704,7 +22728,7 @@ function inqRenderQuotes(x) {
         try { localStorage.setItem('inq_q_open', open ? '0' : '1'); } catch (_) {}
         inqRenderQuotes(x);
     });
-    const byKey = k => { const i = k.indexOf('||'); return inqQuoteGroupIndex(k.slice(0, i), k.slice(i + 2)); };
+    const byKey = k => inqQuoteGroupIndexOf(k);
     el.querySelectorAll('[data-qedit]').forEach(b => b.addEventListener('click', () => { const gi = byKey(b.dataset.qedit); if (gi >= 0) openTempGroupEdit(gi); }));
     el.querySelectorAll('[data-qdoc]').forEach(b => b.addEventListener('click', () => { const gi = byKey(b.dataset.qdoc); if (gi >= 0) openTempQuote(gi); }));
     inqRenderStage(x);
@@ -22715,7 +22739,7 @@ function inqLinkCands(x) {
     const key = clientNameKey(x.client || '');
     const out = [];
     tempProjects.filter(p => !p.inquiryId).forEach(p => {
-        const k = (p.date || '') + '||' + (p.client || '');
+        const k = tempGroupKey(p);
         let g = out.find(c => c.key === k);
         if (!g) {
             g = { key: k, date: p.date || '', client: p.client || '', contact: p.clientContact || '', items: [], rev: 0,
@@ -22779,15 +22803,14 @@ function inqOpenQuoteLinkPicker(x) {
         if (!c) return;
         if (!c.same && !confirm(`견적 거래처(${c.client || '없음'})가 이 상담(${x.client || '없음'})과 달라요.\n그래도 이 견적을 연결할까요?`)) return;
         close();
-        await inqLinkGroup(x.id, c.date, c.client);
+        await inqLinkGroup(x.id, c.key, c.date);
     });
 }
 
-async function inqLinkGroup(id, date, client) {
+async function inqLinkGroup(id, key, date) {
     const x = inqFind(id);
     if (!x) return;
-    const cl = client === undefined ? x.client : client;
-    const rows = tempProjects.filter(p => !p.inquiryId && (p.client || '') === (cl || '') && (p.date || '') === (date || ''));
+    const rows = tempProjects.filter(p => !p.inquiryId && tempGroupKey(p) === key);
     if (!rows.length) return;
     const { error } = await sb.from('projects_temp').update({ inquiry_id: id }).in('id', rows.map(p => p.id));
     if (error) { showToast('연결 실패: ' + error.message); return; }
@@ -23993,7 +24016,7 @@ async function inqDealAction(x, act, btn) {
     if (kind === 'quote-doc' || kind === 'transfer') {
         const q = tempProjects.filter(p => p.inquiryId === x.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
         if (!q) return;
-        const gi = inqQuoteGroupIndex(q.date, q.client);
+        const gi = inqQuoteGroupIndexOf(q);
         if (gi < 0) return;
         if (kind === 'quote-doc') openTempQuote(gi);
         else { await transferGroupToDomestic(gi); }
@@ -24415,7 +24438,7 @@ function inqSendMenu(x, btn) {
     if (!btn || !btn.isConnected) btn = document.getElementById('inqFSend') || btn;
     const groups = [];
     tempProjects.filter(p => p.inquiryId === x.id).forEach(p => {
-        const k = (p.date || '') + '||' + (p.client || '');
+        const k = tempGroupKey(p);
         let g = groups.find(v => v.k === k);
         if (!g) { g = { k, date: p.date, n: 0 }; groups.push(g); }
         g.n++;
@@ -24457,8 +24480,7 @@ async function inqSendGo(x, what) {
     if (!window.SendKit) { showToast('보내기 기능을 불러오지 못했습니다. 새로고침 해주세요'); return; }
     sendKitSetup();
     if (what.startsWith('quote:')) {
-        const [date, client] = what.slice(6).split('||');
-        const gi = inqQuoteGroupIndex(date, client);
+        const gi = inqQuoteGroupIndexOf(what.slice(6));
         if (gi < 0) { showToast('견적서를 찾지 못했습니다'); return; }
         openTempQuote(gi);
         await sendTempQuote();
@@ -24734,8 +24756,9 @@ async function renderClientHistory(c) {
     // 견적 — 날짜별 묶음
     const groups = [];
     h.quotes.forEach(p => {
-        let g = groups.find(x => x.date === p.date);
-        if (!g) { g = { date: p.date, items: [] }; groups.push(g); }
+        const _k = tempGroupKey(p);
+        let g = groups.find(x => x.key === _k);
+        if (!g) { g = { key: _k, date: p.date, items: [] }; groups.push(g); }
         g.items.push(p);
     });
     groups.sort((a, b) => String(b.date).localeCompare(String(a.date)));
@@ -24771,7 +24794,7 @@ async function renderClientHistory(c) {
         try { localStorage.setItem('tp_view', 'quote'); } catch (_) {}
         closeModal(); switchTab('projects-temp');
         const g = groups[Number(tr.dataset.hquote)];
-        setTimeout(() => { const gi = g ? inqQuoteGroupIndex(g.date, g.items[0].client) : -1; if (gi >= 0) openTempQuote(gi); }, 400);
+        setTimeout(() => { const gi = g ? inqQuoteGroupIndexOf(g.key) : -1; if (gi >= 0) openTempQuote(gi); }, 400);
     }));
     box.querySelectorAll('[data-hproj]').forEach(tr => tr.addEventListener('click', () => {
         const hit = h.projects.find(v => v.r.id === Number(tr.dataset.hproj));
