@@ -6002,3 +6002,16 @@ body.m-on .theme-toggle{display:none}
 .fsv-nav.prev{left:16px}
 .fsv-nav.next{right:16px}
 @media (max-width:760px){ .fsv img{max-width:100vw; max-height:calc(100vh - 120px); border-radius:0} .fsv-nav{width:40px; height:52px; font-size:28px} }
+
+/* ===== 택배 관리 표: 좁은 화면에서 품목·연락처·작성자 칸이 한 글자 폭으로 눌려 세로로 쌓이던 문제 (2026-10-15) =====
+   칸마다 최소 폭·줄바꿈 규칙 — 모자라면 칸을 찌그러뜨리지 않고 가로 스크롤
+   1 체크 2 날짜 3 종류 4 발송인 5 받는이 6 연락처 7 우편번호 8 주소 9 선/착불 10 품목 11 판매가 12 배송메모 13 작성자 14 운송장 15 평가 16 편집 */
+#tab-delivery .data-table th, #tab-delivery .data-table td { padding: 12px 10px; }
+#tab-delivery .data-table td:nth-child(2), #tab-delivery .data-table td:nth-child(3), #tab-delivery .data-table td:nth-child(4),
+#tab-delivery .data-table td:nth-child(6), #tab-delivery .data-table td:nth-child(7), #tab-delivery .data-table td:nth-child(9),
+#tab-delivery .data-table td:nth-child(11), #tab-delivery .data-table td:nth-child(13), #tab-delivery .data-table td:nth-child(14),
+#tab-delivery .data-table td:nth-child(15), #tab-delivery .data-table td:nth-child(16) { white-space: nowrap; }
+#tab-delivery .data-table td:nth-child(8)  { min-width: 260px !important; }   /* 주소 (기존 인라인 320px → 조금 줄임) */
+#tab-delivery .data-table td:nth-child(10) { min-width: 180px; word-break: keep-all; overflow-wrap: anywhere; }   /* 품목 */
+#tab-delivery .data-table td:nth-child(12) { min-width: 120px; word-break: keep-all; overflow-wrap: anywhere; }   /* 배송메모 */
+#tab-delivery .data-table td:nth-child(14) .inline-input { min-width: 120px; }
