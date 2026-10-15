@@ -6015,3 +6015,22 @@ body.m-on .theme-toggle{display:none}
 #tab-delivery .data-table td:nth-child(10) { min-width: 180px; word-break: keep-all; overflow-wrap: anywhere; }   /* 품목 */
 #tab-delivery .data-table td:nth-child(12) { min-width: 120px; word-break: keep-all; overflow-wrap: anywhere; }   /* 배송메모 */
 #tab-delivery .data-table td:nth-child(14) .inline-input { min-width: 120px; }
+
+/* ===== 상담·견적 > 견적 표: 입력칸이 몇 글자 폭으로 줄어들던 문제 (2026-10-15) =====
+   입력칸은 width:100% 라 칸 폭을 따라감 → 칸(머리줄)마다 최소 폭. 모자라면 가로 스크롤
+   1 날짜 2 매출처 3 담당자 4 품목 5 매출단가 6 수량 7 매출액 8 매입처 9 담당자 10 매입단가 11 매입액 12 마진 13 버튼 */
+#tempProjectTable th, #tempProjectTable td { padding-left: 6px; padding-right: 6px; }
+#tempProjectTable thead th:nth-child(1)  { min-width: 126px; }
+#tempProjectTable thead th:nth-child(2)  { min-width: 110px; }
+#tempProjectTable thead th:nth-child(3)  { min-width: 64px; }
+#tempProjectTable thead th:nth-child(4)  { min-width: 140px; }
+#tempProjectTable thead th:nth-child(5)  { min-width: 84px; }
+#tempProjectTable thead th:nth-child(6)  { min-width: 56px; }
+#tempProjectTable thead th:nth-child(7)  { min-width: 90px; }
+#tempProjectTable thead th:nth-child(8)  { min-width: 100px; }
+#tempProjectTable thead th:nth-child(9)  { min-width: 64px; }
+#tempProjectTable thead th:nth-child(10) { min-width: 84px; }
+#tempProjectTable thead th:nth-child(11) { min-width: 90px; }
+#tempProjectTable thead th:nth-child(12) { min-width: 90px; }
+#tempProjectTable thead th:nth-child(13) { min-width: 56px; }
+#tempProjectTable td input { min-width: 0; box-sizing: border-box; }
