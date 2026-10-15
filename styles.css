@@ -6034,3 +6034,10 @@ body.m-on .theme-toggle{display:none}
 #tempProjectTable thead th:nth-child(12) { min-width: 90px; }
 #tempProjectTable thead th:nth-child(13) { min-width: 56px; }
 #tempProjectTable td input { min-width: 0; box-sizing: border-box; }
+/* 기존 국내 프로젝트 연결 창 (여러 개 고르기) */
+.dlp-row{cursor:pointer}
+.dlp-row input[type=checkbox]{flex:none; width:18px; height:18px; accent-color:var(--blue)}
+.dlp-row.on{background:var(--blue-light); border-color:color-mix(in srgb, var(--blue) 35%, transparent)}
+.dlp-foot{display:flex; align-items:center; gap:8px; padding:10px 18px 14px; border-top:1px solid var(--border)}
+.dlp-n{font-size:13px; font-weight:700; color:var(--gray-600)}
+.dlp-foot .inq-mini[disabled]{opacity:.45; cursor:not-allowed}

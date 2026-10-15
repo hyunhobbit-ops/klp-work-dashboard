@@ -11883,7 +11883,7 @@ function renderTempProjects() {
                 ${pi === 0 ? `<button class="edit-btn" onclick="openTempQuote(${gi})" style="color:#16A34A;margin-right:4px">견적서</button>` : ''}
                 ${pi === 0 ? (g.items.some(it => it.transferredAt)
                     ? `<button class="edit-btn" onclick="transferGroupToDomestic(${gi})" style="color:#12B76A;margin-right:4px" title="${(g.items.find(it=>it.transferredAt)?.transferredAt || '').slice(0,10)} 등록 — 다시 누르면 추가 등록">✓ 등록 완료</button>`
-                    : `<button class="edit-btn" onclick="transferGroupToDomestic(${gi})" style="color:#7C3AED;margin-right:4px">📥 국내 등록</button>`) : ''}
+                    : `<button class="edit-btn" onclick="transferGroupToDomestic(${gi})" style="color:#7C3AED;margin-right:4px">📥 국내 등록</button><button class="edit-btn" onclick="tempLinkGroupToDomestic(${gi})" style="color:#7C3AED;margin-right:4px" title="국내 메뉴에 이미 만든 프로젝트와 연결 (새로 만들지 않음)">🔗 국내 연결</button>`) : ''}
                 <button class="edit-btn" onclick="deleteTempProject(${p.id})" style="color:var(--toss-red)">삭제</button>
             </td></tr>`;
         });
@@ -22804,6 +22804,134 @@ async function inqLinkGroup(id, date, client) {
     showToast('견적을 연결했습니다');
 }
 
+// ---------- 기존 국내 프로젝트 연결 (국내 메뉴에서 바로 만든 건을 상담·견적에 붙이기) ----------
+// 공용 고르기 창: 같은 거래처 먼저, 검색, 여러 개 체크 → onPick(ids)
+async function domLinkPicker({ title, sub, clientKey, exclude, onPick }) {
+    const { data, error } = await sb.from('projects_domestic')
+        .select('id, client, contact_person, product_name, quantity, unit, revenue, status, supplier, created_at, inquiry_id')
+        .neq('status', '취소').order('created_at', { ascending: false }).limit(600);
+    if (error) { showToast('국내 프로젝트를 불러오지 못했습니다: ' + error.message); return; }
+    const cands = (data || []).filter(r => !exclude(r)).map(r => ({ ...r, same: !!clientKey && clientNameKey(r.client || '') === clientKey }));
+    if (!cands.length) { showToast('연결할 수 있는 국내 프로젝트가 없습니다'); return; }
+    const old = document.getElementById('domLinkPick'); if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.id = 'domLinkPick';
+    ov.className = 'inq-qlp';
+    ov.innerHTML = `
+      <div class="inq-qlp-box" role="dialog" aria-label="${escHtml(title)}">
+        <div class="inq-qlp-head"><b>${escHtml(title)}</b><span>${escHtml(sub)}</span>
+          <div class="inq-spacer"></div><button type="button" class="inq-qlp-x" data-x aria-label="닫기">✕</button></div>
+        <input type="search" class="inq-qlp-q" placeholder="거래처·품목·매입처로 찾기" autocomplete="off">
+        <div class="inq-qlp-list"></div>
+        <div class="dlp-foot"><span class="dlp-n">고른 것 0건</span><div class="inq-spacer"></div>
+          <button type="button" class="inq-mini" data-x>취소</button><button type="button" class="inq-mini primary" data-go disabled>연결</button></div>
+      </div>`;
+    document.body.appendChild(ov);
+    const listEl = ov.querySelector('.inq-qlp-list'), q = ov.querySelector('.inq-qlp-q'), go = ov.querySelector('[data-go]'), nEl = ov.querySelector('.dlp-n');
+    const picked = new Set();
+    const won = n => Number(n || 0).toLocaleString() + '원';
+    const row = c => `
+        <label class="inq-qlp-row dlp-row${picked.has(c.id) ? ' on' : ''}">
+          <input type="checkbox" data-id="${c.id}" ${picked.has(c.id) ? 'checked' : ''}>
+          <span class="inq-qlp-d">${escHtml(String(c.created_at || '').slice(0, 10).replace(/-/g, '.'))}</span>
+          <span class="inq-qlp-m"><b>${escHtml(c.client || '(거래처 없음)')}</b>${c.contact_person ? `<em>${escHtml(c.contact_person)}</em>` : ''}
+            <small>${escHtml(c.product_name || '(품목 없음)')}${c.quantity ? ' · ' + Number(c.quantity).toLocaleString() + (c.unit || '개') : ''}${c.supplier ? ' · 매입 ' + escHtml(c.supplier) : ''} · ${escHtml(c.status || '')}</small></span>
+          <span class="inq-qlp-r">${won(c.revenue)}</span>
+        </label>`;
+    const draw = () => {
+        const t = q.value.trim().toLowerCase();
+        const hit = c => !t || [c.client, c.contact_person, c.product_name, c.supplier].some(v => String(v || '').toLowerCase().includes(t));
+        const same = cands.filter(c => c.same && hit(c));
+        const other = cands.filter(c => !c.same && hit(c)).slice(0, t ? 80 : 25);
+        listEl.innerHTML =
+            (same.length ? `<div class="inq-qlp-sec">같은 거래처</div>${same.map(row).join('')}` : '') +
+            (other.length ? `<div class="inq-qlp-sec">${t ? '찾은 국내 프로젝트' : '다른 거래처 · 최근'}</div>${other.map(row).join('')}` : '') +
+            (!same.length && !other.length ? '<div class="inq-qlp-empty">찾는 국내 프로젝트가 없어요</div>' : '');
+    };
+    draw();
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey, true); };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    document.addEventListener('keydown', onKey, true);
+    q.addEventListener('input', draw);
+    setTimeout(() => q.focus(), 0);
+    listEl.addEventListener('change', e => {
+        const cb = e.target.closest('input[type=checkbox][data-id]');
+        if (!cb) return;
+        const id = Number(cb.dataset.id);
+        if (cb.checked) picked.add(id); else picked.delete(id);
+        cb.closest('.dlp-row').classList.toggle('on', cb.checked);
+        nEl.textContent = `고른 것 ${picked.size}건`;
+        go.disabled = !picked.size;
+    });
+    ov.addEventListener('click', async e => {
+        if (e.target === ov || e.target.closest('[data-x]')) { close(); return; }
+        if (e.target.closest('[data-go]') && picked.size) {
+            const chosen = cands.filter(c => picked.has(c.id));
+            const diff = chosen.filter(c => !c.same).map(c => c.client || '(없음)');
+            if (diff.length && !confirm(`거래처가 다른 프로젝트가 있어요: ${[...new Set(diff)].join(', ')}\n그래도 연결할까요?`)) return;
+            close();
+            await onPick(chosen);
+        }
+    });
+}
+
+// 상담 → 국내 프로젝트 연결 (projects_domestic.inquiry_id). 상담 상태·배송 정보 공유는 DB 트리거가 맞춤
+async function inqOpenDomesticLinkPicker(x) {
+    await domLinkPicker({
+        title: '기존 국내 프로젝트 연결',
+        sub: `${x.client || ''} 상담에 국내 메뉴에서 바로 만든 프로젝트를 붙여요`,
+        clientKey: clientNameKey(x.client || ''),
+        exclude: r => !!r.inquiry_id,
+        onPick: async chosen => {
+            const ids = chosen.map(c => c.id);
+            const { error } = await sb.from('projects_domestic').update({ inquiry_id: x.id }).in('id', ids);
+            if (error) { showToast('연결 실패: ' + error.message); return; }
+            ids.forEach(id => { const p = (typeof projects !== 'undefined' ? projects : []).find(v => v.id === id); if (p) p.inquiryId = x.id; });
+            await inqAddLog(x.id, { direction: 'system', body: `국내 프로젝트 연결 · ${chosen.map(c => c.product_name || '품목').join(', ')} (${ids.length}건)` });
+            const fresh = await inqReloadInquiry(x.id);
+            if (fresh) Object.assign(x, fresh);
+            await inqLoadDeal(x);
+            await inqLoadLogs(x.id);
+            inqRenderDetail();
+            showToast(`국내 프로젝트 ${ids.length}건을 연결했습니다`);
+        }
+    });
+}
+
+// 견적 메뉴 → 이미 만든 국내 프로젝트와 연결 (새로 만들지 않고 '등록 완료' 표시만). 견적이 상담에 붙어 있으면 국내도 같은 상담에
+async function tempLinkGroupToDomestic(gi) {
+    const g = tempGroups[gi];
+    if (!g || !g.items.length) return;
+    const { data: used } = await sb.from('projects_temp').select('transferred_project_ids').not('transferred_project_ids', 'is', null);
+    const usedIds = new Set((used || []).flatMap(r => r.transferred_project_ids || []));
+    const inqId = (g.items.find(p => p.inquiryId) || {}).inquiryId || null;
+    await domLinkPicker({
+        title: '국내 프로젝트와 연결',
+        sub: `${g.client || ''} · ${String(g.date || '').replace(/-/g, '.')} 견적 ${g.items.length}품목 — 국내에 이미 만든 프로젝트를 고르세요 (새로 만들지 않음)`,
+        clientKey: clientNameKey(g.client || ''),
+        exclude: r => usedIds.has(r.id) || (inqId && r.inquiry_id && r.inquiry_id !== inqId),
+        onPick: async chosen => {
+            const ids = chosen.map(c => c.id);
+            const { error } = await sb.from('projects_temp')
+                .update({ transferred_at: new Date().toISOString(), transferred_project_ids: ids })
+                .in('id', g.items.map(p => p.id));
+            if (error) { showToast('연결 실패: ' + error.message); return; }
+            if (inqId) {
+                const need = chosen.filter(c => !c.inquiry_id).map(c => c.id);
+                if (need.length) {
+                    const { error: e2 } = await sb.from('projects_domestic').update({ inquiry_id: inqId }).in('id', need);
+                    if (e2) console.error('상담 연결 실패', e2);
+                }
+                try { await inqAddLog(inqId, { direction: 'system', body: `견적 ↔ 국내 프로젝트 연결 · ${ids.length}건` }); await inqReloadInquiry(inqId); } catch (e) { console.error(e); }
+            }
+            showToast(`견적을 국내 프로젝트 ${ids.length}건과 연결했습니다`);
+            await Promise.all([loadTempProjects(), loadDomesticProjectsFromDb()]);
+            renderProjects();
+            renderHome();
+        }
+    });
+}
+
 function inqStartQuote(id) {
     const x = inqFind(id);
     if (!x) return;
@@ -23797,6 +23925,7 @@ function inqRenderStage(x) {
             msg = '가격이 확정 전이면 가견적을, 확정됐으면 견적을 보내세요';
             btns.push(['pre-new', '가견적 안내']);
             if (inqLinkCands(x).length) btns.push(['quote-link', '🔗 기존 견적 연결']);
+            btns.push(['dom-link', '🔗 기존 국내 연결']);
             btns.push(['quote-new', '+ 이 상담으로 견적 작성', 1]);
         }
     }
@@ -23807,6 +23936,7 @@ function inqRenderStage(x) {
             if (inqLinkCands(x).length) btns.push(['quote-link', '🔗 기존 견적 연결']);
             btns.push(['quote-new', '+ 이 상담으로 견적 작성', 1]);
         }
+        btns.push(['dom-link', '🔗 기존 국내 연결']);
     } else if (cur.key === 'design') {
         const p = firstLack('design');
         msg = `디자인확인서를 만들고 고객 컨펌을 받으세요${projs.length > 1 ? ` · ${p.product_name || ''}` : ''}`;
@@ -23858,6 +23988,7 @@ async function inqDealAction(x, act, btn) {
     const row = idStr ? _inqProjs.find(p => p.id === Number(idStr)) : null;
     if (kind === 'quote-new') { inqStartQuote(x.id); return; }
     if (kind === 'quote-link') { inqOpenQuoteLinkPicker(x); return; }
+    if (kind === 'dom-link') { inqOpenDomesticLinkPicker(x); return; }
     if (kind.startsWith('pre-')) { await inqPreAction(x, kind.slice(4)); return; }
     if (kind === 'quote-doc' || kind === 'transfer') {
         const q = tempProjects.filter(p => p.inquiryId === x.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
@@ -23946,7 +24077,7 @@ function inqRenderProjs(x) {
     const won = n => Number(n || 0).toLocaleString() + '원';
     const open = inqCardOpen('pj');
     el.innerHTML = `
-      <div class="inq-q-head">${inqCardToggleBtn('pj', open)}<b>국내 진행</b><span class="inq-q-sum"><em>${projs.length}건 · 매출 <b class="rev">${won(projs.reduce((s, p) => s + (p.revenue || 0), 0))}</b></em></span></div>
+      <div class="inq-q-head">${inqCardToggleBtn('pj', open)}<b>국내 진행</b><span class="inq-q-sum"><em>${projs.length}건 · 매출 <b class="rev">${won(projs.reduce((s, p) => s + (p.revenue || 0), 0))}</b></em></span><div class="inq-spacer"></div><button class="inq-mini" data-act="dom-link" title="국내 메뉴에서 바로 만든 프로젝트를 이 상담에 붙여요">🔗 기존 국내 연결</button></div>
       ${open ? `<div class="inq-pj-list">${projs.map(p => {
           const cd = p.check_dates || {};
           const done = CHECK_ITEMS.filter(it => p.checks && p.checks[it.key]).length;
