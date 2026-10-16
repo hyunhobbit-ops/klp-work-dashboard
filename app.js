@@ -2388,6 +2388,9 @@ async function toggleProjectCheck(id, key) {
     if (allChecked && p.status !== '완료') {
         p.status = '완료';
         update.status = '완료';
+    } else if (!allChecked && p.category !== '해외 주문' && ['시작 전', '진행 중', '', undefined, null].includes(p.status)) {
+        // 국내: 하나라도 체크 → 진행 중, 하나도 없으면 → 시작 전 (DB 트리거 migration 061 과 같은 규칙 — 화면에 바로 반영)
+        p.status = CHECK_ITEMS.some(item => !!p.checks[item.key]) ? '진행 중' : '시작 전';
     }
     renderProjects();
     if (p.category !== '해외 주문') {
@@ -24073,7 +24076,7 @@ async function inqToggleProjCheck(x, row, key) {
     Object.assign(row, data);
     const gp = projects.find(v => v.id === row.id);
     if (gp) {
-        gp.checks = data.checks; if (update.status) gp.status = update.status;
+        gp.checks = data.checks; gp.status = data.status || update.status || gp.status;   // DB 트리거가 바꾼 상태(시작 전↔진행 중)까지
         gp.designConfirmChannel = data.design_confirm_channel || ''; gp.designConfirmDate = data.design_confirm_date || '';
         gp.workOrderChannel = data.work_order_channel || ''; gp.workOrderDate = data.work_order_date || '';
         gp.advancePaymentDate = data.advance_payment_date || ''; gp.finalPaymentDate = data.final_payment_date || '';
