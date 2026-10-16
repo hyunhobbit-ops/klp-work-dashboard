@@ -2904,8 +2904,8 @@ function buildPsDoc(){
   setTimeout(function(){fitToA4('psDocEl')},100);
 }
 
-// 파일 이름용 회사명 — '주식회사'·'(주)'·'㈜' 빼기 (문서 안 회사명은 그대로)
-function fileCo(s, fb){var t=String(s||'').replace(/주식회사|\(\s*주\s*\)|㈜/g,' ').replace(/\s+/g,' ').trim();return t||fb||'업체'}
+// 파일 이름용 회사명 — 법인 표기 빼기: 주식회사·유한회사·사단법인… / (주)(사)(유)(재)(합)(학)(의)(복)(협) / ㈜㈔… (문서 안 회사명은 그대로)
+function fileCo(s, fb){var t=String(s||'').replace(/주식회사|유한책임회사|유한회사|합자회사|합명회사|사단법인|재단법인|[(（]\s*(주|사|유|재|합|학|의|복|협)\s*[)）]|[㈜㈔㈕㈖㈗㈘㈙㈚㈛]/g,' ').replace(/\s+/g,' ').trim();return t||fb||'업체'}
 function psFileBase(){return getYYMMDD(val('psDate'))+'_케이엘피코리아_'+fileCo(val('psCompany'),'발주처')+'_'+(val('psProduct')||'제품')+'_제작진행표'}
 async function dlPs(type){
   var b1=document.getElementById('btnPsJpg'),b2=document.getElementById('btnPsPdf');b1.disabled=b2.disabled=true;
