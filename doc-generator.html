@@ -1303,9 +1303,9 @@ function buildWrDoc(){
 /* YYMMDD 포맷 함수 */
 function getYYMMDD(dateStr){if(!dateStr)return'000000';var d=dateStr.replace(/-/g,'');return d.length>=8?d.substring(2,8):d}
 
-async function dl(type){var el=document.getElementById('docEl');var b1=document.getElementById('btnJpg'),b2=document.getElementById('btnPdf');b1.disabled=b2.disabled=true;b1.textContent='생성 중...';b2.textContent='생성 중...';try{var canvas=await html2canvas(el,{scale:3,useCORS:true,backgroundColor:'#fff',logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123});var fname=getYYMMDD(val('date'))+'_케이엘피코리아_'+(val('companyName')||'업체')+'_'+(val('productName')||'품명')+'_디자인확인서';if(type==='jpg'){var a=document.createElement('a');a.download=fname+'.jpg';a.href=canvas.toDataURL('image/jpeg',0.92);a.click()}else{var pdf=new jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});var pw=pdf.internal.pageSize.getWidth();var ph=pdf.internal.pageSize.getHeight();pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',0,0,pw,ph);pdf.save(fname+'.pdf')}}catch(err){alert('오류: '+err.message)}b1.disabled=b2.disabled=false;b1.textContent='📷 JPG';b2.textContent='📄 PDF'}
+async function dl(type){var el=document.getElementById('docEl');var b1=document.getElementById('btnJpg'),b2=document.getElementById('btnPdf');b1.disabled=b2.disabled=true;b1.textContent='생성 중...';b2.textContent='생성 중...';try{var canvas=await html2canvas(el,{scale:3,useCORS:true,backgroundColor:'#fff',logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123});var fname=getYYMMDD(val('date'))+'_케이엘피코리아_'+fileCo(val('companyName'))+'_'+(val('productName')||'품명')+'_디자인확인서';if(type==='jpg'){var a=document.createElement('a');a.download=fname+'.jpg';a.href=canvas.toDataURL('image/jpeg',0.92);a.click()}else{var pdf=new jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});var pw=pdf.internal.pageSize.getWidth();var ph=pdf.internal.pageSize.getHeight();pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',0,0,pw,ph);pdf.save(fname+'.pdf')}}catch(err){alert('오류: '+err.message)}b1.disabled=b2.disabled=false;b1.textContent='📷 JPG';b2.textContent='📄 PDF'}
 
-async function dlWr(type){var el=document.getElementById('wrDocEl');var b1=document.getElementById('btnWrJpg'),b2=document.getElementById('btnWrPdf');b1.disabled=b2.disabled=true;b1.textContent='생성 중...';b2.textContent='생성 중...';try{var canvas=await html2canvas(el,{scale:3,useCORS:true,backgroundColor:'#fff',logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123});var fname=getYYMMDD(val('wrDate'))+'_케이엘피코리아_'+(val('wrCompany')||'업체')+'_'+(val('wrProduct')||'품명')+'_작업요청서';if(type==='jpg'){var a=document.createElement('a');a.download=fname+'.jpg';a.href=canvas.toDataURL('image/jpeg',0.92);a.click()}else{var pdf=new jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});var pw=pdf.internal.pageSize.getWidth();var ph=pdf.internal.pageSize.getHeight();pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',0,0,pw,ph);pdf.save(fname+'.pdf')}}catch(err){alert('오류: '+err.message)}b1.disabled=b2.disabled=false;b1.textContent='📷 JPG';b2.textContent='📄 PDF'}
+async function dlWr(type){var el=document.getElementById('wrDocEl');var b1=document.getElementById('btnWrJpg'),b2=document.getElementById('btnWrPdf');b1.disabled=b2.disabled=true;b1.textContent='생성 중...';b2.textContent='생성 중...';try{var canvas=await html2canvas(el,{scale:3,useCORS:true,backgroundColor:'#fff',logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123});var fname=getYYMMDD(val('wrDate'))+'_케이엘피코리아_'+fileCo(val('wrCompany'))+'_'+(val('wrProduct')||'품명')+'_작업요청서';if(type==='jpg'){var a=document.createElement('a');a.download=fname+'.jpg';a.href=canvas.toDataURL('image/jpeg',0.92);a.click()}else{var pdf=new jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});var pw=pdf.internal.pageSize.getWidth();var ph=pdf.internal.pageSize.getHeight();pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',0,0,pw,ph);pdf.save(fname+'.pdf')}}catch(err){alert('오류: '+err.message)}b1.disabled=b2.disabled=false;b1.textContent='📷 JPG';b2.textContent='📄 PDF'}
 
 /* === 견적서 (Quote) === */
 var _quoteData=null;
@@ -1617,7 +1617,7 @@ async function dlQuote(type){
   b1.disabled=b2.disabled=true;b1.textContent='생성 중...';b2.textContent='생성 중...';
   try{
     var canvas=await html2canvas(el,{scale:3,useCORS:true,backgroundColor:'#fff',logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123});
-    var fname=getYYMMDD(_quoteData.date)+'_케이엘피코리아_'+(_quoteData.companyName||'업체')+'_'+(_quoteData.productName||'품명')+'_견적서';
+    var fname=getYYMMDD(_quoteData.date)+'_케이엘피코리아_'+fileCo(_quoteData.companyName)+'_'+(_quoteData.productName||'품명')+'_견적서';
     if(type==='jpg'){var a=document.createElement('a');a.download=fname+'.jpg';a.href=canvas.toDataURL('image/jpeg',0.92);a.click()}
     else{var pdf=new jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});var pw=pdf.internal.pageSize.getWidth();var ph=pdf.internal.pageSize.getHeight();pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',0,0,pw,ph);pdf.save(fname+'.pdf')}
   }catch(err){alert('오류: '+err.message)}
@@ -1666,7 +1666,7 @@ async function sendDocOptions(kind){
     return ({docType:'wr',title:(co||'공장')+' · '+(val('wrProduct')||'작업요청서'),
       vars:{'거래처':co,'담당자':val('wrContact'),'품목':val('wrProduct'),'수량':qty?qty+'개':'','단가':won(val('wrUnitPrice'),val('wrUnitPriceVat')),'합계':(function(){try{calcWrEst();}catch(_){}var e=window._wrEst;return e&&e.grand?Number(e.grand).toLocaleString()+'원 (VAT 포함)':'';})(),'납기':sendMD(val('wrDeliveryDate')),'납기일':kd(val('wrDeliveryDate'),val('wrShippingType')),'문서번호':val('wrDocNum'),'작성자':me,'작성자직함':meT},
       to:{email:cli?(cli.staff_email||cli.email||''):'',phone:cli?(cli.staff_mobile||cli.mobile||''):''},
-      fileBase:getYYMMDD(val('wrDate'))+'_케이엘피코리아_'+(co||'업체')+'_'+(val('wrProduct')||'품명')+'_작업요청서',
+      fileBase:getYYMMDD(val('wrDate'))+'_케이엘피코리아_'+fileCo(co)+'_'+(val('wrProduct')||'품명')+'_작업요청서',
       makeCanvas:function(){return sendCanvasOf('wrDocEl');}});
     return;
   }
@@ -1676,7 +1676,7 @@ async function sendDocOptions(kind){
     return ({docType:'quote',title:(q.companyName||'업체')+' · '+(q.productName||'견적서'),
       vars:{'거래처':q.companyName,'담당자':q.contactPerson,'품목':q.productName,'수량':q.quantity?Number(q.quantity).toLocaleString()+(q.unit||'개'):'','단가':won(q.unitPrice,q.unitPriceVat),'합계':(q.est&&q.est.grand)?Number(q.est.grand).toLocaleString()+'원 (VAT 포함)':'','납기':sendMD(q.deliveryDate),'납기일':kd(q.deliveryDate,q.shippingType),'문서번호':q.docNumber||'','작성자':me,'작성자직함':meT},
       to:{email:cq?(cq.staff_email||cq.email||''):'',phone:cq?(cq.staff_mobile||cq.mobile||''):''},
-      fileBase:getYYMMDD(q.date)+'_케이엘피코리아_'+(q.companyName||'업체')+'_'+(q.productName||'품명')+'_견적서',
+      fileBase:getYYMMDD(q.date)+'_케이엘피코리아_'+fileCo(q.companyName)+'_'+(q.productName||'품명')+'_견적서',
       makeCanvas:function(){return sendCanvasOf('quoteDocEl');}});
     return;
   }
@@ -1684,7 +1684,7 @@ async function sendDocOptions(kind){
   return ({docType:'dc',title:(co2||'업체')+' · '+(val('productName')||'디자인확인서'),
     vars:{'거래처':co2,'담당자':val('contactPerson'),'품목':val('productName'),'수량':val('quantity')?val('quantity')+(val('unit')||'개'):'','단가':won(val('unitPrice'),val('unitPriceVat')),'합계':(function(){try{calcEst();}catch(_){}var e=window._est;return e&&e.grand?Number(e.grand).toLocaleString()+'원 (VAT 포함)':'';})(),'납기':sendMD(val('deliveryDate')),'납기일':kd(val('deliveryDate'),val('shippingType')),'문서번호':dn?dn.textContent:'','작성자':me,'작성자직함':meT},
     to:{email:cd?(cd.staff_email||cd.email||''):'',phone:cd?(cd.staff_mobile||cd.mobile||''):''},
-    fileBase:getYYMMDD(val('date'))+'_케이엘피코리아_'+(co2||'업체')+'_'+(val('productName')||'품명')+'_디자인확인서',
+    fileBase:getYYMMDD(val('date'))+'_케이엘피코리아_'+fileCo(co2)+'_'+(val('productName')||'품명')+'_디자인확인서',
     makeCanvas:function(){return sendCanvasOf('docEl');}});
 }
 
@@ -2904,7 +2904,9 @@ function buildPsDoc(){
   setTimeout(function(){fitToA4('psDocEl')},100);
 }
 
-function psFileBase(){return getYYMMDD(val('psDate'))+'_케이엘피코리아_'+(val('psCompany')||'발주처')+'_'+(val('psProduct')||'제품')+'_제작진행표'}
+// 파일 이름용 회사명 — '주식회사'·'(주)'·'㈜' 빼기 (문서 안 회사명은 그대로)
+function fileCo(s, fb){var t=String(s||'').replace(/주식회사|\(\s*주\s*\)|㈜/g,' ').replace(/\s+/g,' ').trim();return t||fb||'업체'}
+function psFileBase(){return getYYMMDD(val('psDate'))+'_케이엘피코리아_'+fileCo(val('psCompany'),'발주처')+'_'+(val('psProduct')||'제품')+'_제작진행표'}
 async function dlPs(type){
   var b1=document.getElementById('btnPsJpg'),b2=document.getElementById('btnPsPdf');b1.disabled=b2.disabled=true;
   try{

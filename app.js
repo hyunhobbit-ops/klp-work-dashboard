@@ -13114,7 +13114,7 @@ async function dlTempQuote(type) {
     try {
         const canvas = await html2canvas(el, { scale: 3, useCORS: true, backgroundColor: '#fff', logging: false, width: 794, height: 1123, windowWidth: 794, windowHeight: 1123 });
         const dateP = (_tempQuoteGroup.date || '').replace(/-/g, '');
-        const fname = dateP + '_케이엘피코리아_' + (_tempQuoteGroup.client || '업체') + '_견적서';
+        const fname = dateP + '_케이엘피코리아_' + fileCo(_tempQuoteGroup.client) + '_견적서';
         if (type === 'jpg') {
             const a = document.createElement('a');
             a.download = fname + '.jpg';
@@ -13199,7 +13199,7 @@ async function sendTempQuote() {
             문서번호: '', 작성자: (currentUser && currentUser.name) || '', 작성자직함: sendMyTitle()
         },
         to: { email: (inq && inq.contact_email) || (cli && (cli.staffEmail || cli.email)) || '', phone: (inq && inq.contact_phone) || (cli && (cli.staffMobile || cli.mobile)) || '' },
-        fileBase: dateP + '_케이엘피코리아_' + (g.client || '업체') + '_견적서',
+        fileBase: dateP + '_케이엘피코리아_' + fileCo(g.client) + '_견적서',
         makeCanvas: () => html2canvas(document.getElementById('tempQuoteDocEl'), { scale: 3, useCORS: true, backgroundColor: '#fff', logging: false, width: 794, height: 1123, windowWidth: 794, windowHeight: 1123 }),
         onSent: inqId ? async ({ channel, text }) => {
             const saved = await inqAddLog(inqId, { direction: 'out', channel, body: `[견적서 발송]\n${text}` });
@@ -17320,7 +17320,7 @@ async function dlQuotePreview(type) {
         const dateP = (q.date || '').replace(/-/g, '').substring(2);
         const firstItem = (q.items && q.items[0]) || {};
         const productLabel = firstItem.productName ? (firstItem.productName + (q.items.length > 1 ? ` 외 ${q.items.length - 1}건` : '')) : '품명';
-        const fname = dateP + '_케이엘피코리아_' + (q.companyName || '업체') + '_' + productLabel + '_견적서';
+        const fname = dateP + '_케이엘피코리아_' + fileCo(q.companyName) + '_' + productLabel + '_견적서';
         if (type === 'jpg') {
             const a = document.createElement('a');
             a.download = fname + '.jpg';
@@ -24704,6 +24704,8 @@ function inqBindCardToggle(el, key, rerender) {
 // ---------- 거래처 상세: 상담 · 견적 · 프로젝트 이력 (DB에서 직접 조회) ----------
 // 예전엔 화면에 불러온 프로젝트(최근 200건)에서만 찾고, 상담·견적은 아예 안 보여줬음.
 // 이름 표기가 조금 달라도('(주)삼인물산' / '삼인물산주식회사') 같은 거래처로 본다.
+// 파일 이름용 회사명 — '주식회사'·'(주)'·'㈜' 빼기 (문서 안 회사명은 그대로)
+function fileCo(s, fb){var t=String(s||'').replace(/주식회사|\(\s*주\s*\)|㈜/g,' ').replace(/\s+/g,' ').trim();return t||fb||'업체'}
 function clientNameKey(n) {
     return String(n || '').replace(/주식회사|유한회사|\(주\)|\(유\)|㈜|\s/g, '').toLowerCase();
 }
