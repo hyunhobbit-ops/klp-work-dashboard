@@ -92,6 +92,12 @@
 - **범위 밖(다음 단계)**: 셀프 회원가입+자동 결제, 업종별 모듈팩(택배·문서생성 등), 랜딩. 설계·계획: `docs/superpowers/{specs,plans}/2026-07-20-multitenant-saas-*`.
 - **새 테넌트 테이블 추가 시**: `company_id bigint references companies(id) not null` + `set_company_id` 트리거 + 회사 스코프 RLS 필수.
 
+## 📘 회사 매뉴얼 (2026-10-16 오픈)
+- 메뉴 '회사 매뉴얼'(`tab-manual` → `#manualRoot`, `manualEnter()`). 테이블 `manuals`(migration 062): category·title·content(HTML)·pinned·sort_order·created_by·updated_by, company_id + RLS(회사 스코프, 직원 누구나 쓰기), realtime
+- 카테고리 `MANUAL_CATS`(업무 프로세스/장비 사용법/신입 온보딩/회사 규정/기타) + 검색(제목·내용 ilike) + 📌 고정. 목록은 본문 없이, 본문은 열 때 불러옴(`_mnBody` 캐시)
+- 편집기 = `mountPlanningRichEditor(…, { headers:true, imageUploader: uploadPlanningImage })` — 사진을 base64 대신 planning-images 저장소에 올려 주소만 (opts 없으면 예전처럼 base64)
+- 초안 10편(sort_order·pinned)은 마이그레이션에서 KLP(company 1)에 넣음 — 실제 업무에 맞게 직원이 고쳐 쓰는 용도
+
 ## 🖥️ 맥미니 서버 (2026-10-12 이전 완료) — Supabase 자체 운영
 - **왜 옮겼나**: Supabase Pro($25/월)의 **Egress(전송량) 초과**(무료 5.5GB 넘어 2026-08 요청 차단). 데이터는 작음(DB ~60MB · 사진 ~240MB · 사용자 8명). 자체 운영으로 전송량 제한 없애고 사진 화질 올리기
 - **현재 구성**: 대시보드(프론트·`api/`)는 그대로 Vercel(`https://klp-work-dashboard.vercel.app`). 데이터 서버만 맥미니 → **`https://api.klpkorea.cloud`**

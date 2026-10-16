@@ -1623,6 +1623,7 @@ function switchTab(tabId, fromHistory = false) {
     if (tabId === 'company-settings') { try { renderCompanySettings(); } catch (e) { console.error(e); } }
     // 내 하루(타임박스) 탭 진입 시 로드+렌더
     if (tabId === 'timebox') { try { tbxEnter(); } catch (e) { console.error(e); } }
+    if (tabId === 'manual') { try { manualEnter(); } catch (e) { console.error(e); } }
 
     // Close mobile sidebar
     document.getElementById('sidebar').classList.remove('open');
@@ -13631,6 +13632,226 @@ async function planningResizeImageDataUrl(dataUrl, maxSide = 1600, quality = 0.8
 let currentPlanningQuill = null;
 
 // 4개 모달이 공유하는 빌더. div#containerId 자리에 Quill 마운트.
+// ===================== 회사 매뉴얼 (manuals, migration 062) =====================
+// 카테고리 + 검색 + 읽기/편집. 직원 누구나 작성·수정(마지막 수정자 표시). 목록은 본문 없이, 본문은 열 때 불러옴
+const MANUAL_CATS = ['업무 프로세스', '장비 사용법', '신입 온보딩', '회사 규정', '기타'];
+let _mnList = [], _mnLoaded = false, _mnSel = null, _mnCat = 'all', _mnQ = '', _mnHits = null, _mnEdit = null, _mnQuill = null, _mnChan = null;
+const _mnBody = {};
+function mnEsc(s) { return planningEsc(String(s == null ? '' : s)); }
+function mnMe() { return (typeof inqMe === 'function' ? inqMe() : '') || (currentUser && currentUser.name) || ''; }
+function mnDate(ts) { return ts ? String(ts).slice(0, 10).replace(/-/g, '.') : ''; }
+
+async function manualLoad() {
+    const { data, error } = await sb.from('manuals')
+        .select('id, category, title, pinned, sort_order, created_by, updated_by, created_at, updated_at')
+        .order('pinned', { ascending: false }).order('sort_order').order('id');
+    if (error) { showToast('매뉴얼을 불러오지 못했습니다: ' + error.message); return; }
+    _mnList = data || [];
+    _mnLoaded = true;
+}
+async function manualEnter() {
+    if (!_mnLoaded) await manualLoad();
+    try { const v = Number(localStorage.getItem('mn_sel')); if (!_mnSel && v && _mnList.some(m => m.id === v)) _mnSel = v; } catch (_) {}
+    if (!_mnSel && _mnList.length) _mnSel = (_mnList.find(m => m.pinned) || _mnList[0]).id;
+    manualSubscribe();
+    manualRender();
+}
+function manualSubscribe() {
+    if (_mnChan) return;
+    _mnChan = sb.channel('manuals_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'manuals' }, async payload => {
+            const id = (payload.new && payload.new.id) || (payload.old && payload.old.id);
+            if (id) delete _mnBody[id];
+            await manualLoad();
+            if (_mnEdit) return;                     // 쓰는 중이면 화면 유지 (저장할 때 반영)
+            if (_mnSel && !_mnList.some(m => m.id === _mnSel)) _mnSel = _mnList.length ? _mnList[0].id : null;
+            manualRender();
+        })
+        .subscribe();
+}
+function manualVisible() {
+    return _mnList.filter(m => (_mnCat === 'all' || m.category === _mnCat) && (!_mnHits || _mnHits.has(m.id)));
+}
+let _mnSearchT = null;
+function manualSearch(v) {
+    _mnQ = v;
+    clearTimeout(_mnSearchT);
+    _mnSearchT = setTimeout(async () => {
+        const q = _mnQ.trim();
+        if (!q) { _mnHits = null; manualRenderList(); return; }
+        const like = '%' + q.replace(/[%_,()]/g, ' ') + '%';
+        const { data } = await sb.from('manuals').select('id').or(`title.ilike.${like},content.ilike.${like},category.ilike.${like}`);
+        _mnHits = new Set((data || []).map(r => r.id));
+        manualRenderList();
+    }, 250);
+}
+function manualRender() {
+    const root = document.getElementById('manualRoot');
+    if (!root) return;
+    root.innerHTML = `
+      <div class="mn">
+        <aside class="mn-side">
+          <div class="mn-side-top">
+            <input class="mn-q" type="search" placeholder="매뉴얼 검색 (제목·내용)" value="${mnEsc(_mnQ)}" oninput="manualSearch(this.value)">
+            <button class="btn-primary mn-new" onclick="manualNew()">＋ 새 글</button>
+          </div>
+          <div class="mn-cats" id="mnCats"></div>
+          <div class="mn-list" id="mnList"></div>
+        </aside>
+        <section class="mn-main" id="mnMain"></section>
+      </div>`;
+    manualRenderList();
+    manualRenderMain();
+}
+function manualRenderList() {
+    const cats = document.getElementById('mnCats'), list = document.getElementById('mnList');
+    if (!cats || !list) return;
+    const base = _mnList.filter(m => !_mnHits || _mnHits.has(m.id));
+    const n = c => base.filter(m => c === 'all' || m.category === c).length;
+    const allCats = MANUAL_CATS.concat([...new Set(_mnList.map(m => m.category))].filter(c => !MANUAL_CATS.includes(c)));
+    cats.innerHTML = ['all'].concat(allCats).map(c =>
+        `<button class="${_mnCat === c ? 'on' : ''}" onclick="_mnCat='${c === 'all' ? 'all' : mnEsc(c)}';manualRenderList()">${c === 'all' ? '전체' : mnEsc(c)} <b>${n(c)}</b></button>`).join('');
+    const vis = manualVisible();
+    if (!vis.length) { list.innerHTML = `<div class="mn-empty">${_mnQ ? '찾는 글이 없어요' : '아직 글이 없어요 — ＋ 새 글로 시작하세요'}</div>`; return; }
+    const groups = allCats.filter(c => vis.some(m => m.category === c));
+    list.innerHTML = groups.map(c => `
+        <div class="mn-sec">${mnEsc(c)}</div>
+        ${vis.filter(m => m.category === c).map(m => `
+          <button class="mn-row${m.id === _mnSel ? ' on' : ''}" onclick="manualOpen(${m.id})">
+            <span class="mn-row-t">${m.pinned ? '📌 ' : ''}${mnEsc(m.title || '(제목 없음)')}</span>
+            <span class="mn-row-m">${mnEsc(m.updated_by || m.created_by || '')} · ${mnDate(m.updated_at)}</span>
+          </button>`).join('')}`).join('');
+}
+async function manualOpen(id) {
+    if (_mnEdit && !confirm('작성 중인 내용이 있어요. 저장하지 않고 다른 글을 열까요?')) return;
+    _mnEdit = null; _mnQuill = null;
+    _mnSel = id;
+    try { localStorage.setItem('mn_sel', String(id)); } catch (_) {}
+    manualRenderList();
+    await manualRenderMain();
+}
+async function manualBody(id) {
+    if (_mnBody[id] != null) return _mnBody[id];
+    const { data, error } = await sb.from('manuals').select('content').eq('id', id).maybeSingle();
+    if (error) { showToast('글을 불러오지 못했습니다: ' + error.message); return ''; }
+    return (_mnBody[id] = (data && data.content) || '');
+}
+async function manualRenderMain() {
+    const main = document.getElementById('mnMain');
+    if (!main) return;
+    if (_mnEdit) return manualRenderEditor();
+    const m = _mnList.find(x => x.id === _mnSel);
+    if (!m) { main.innerHTML = `<div class="mn-empty big">왼쪽에서 글을 고르거나 ＋ 새 글을 쓰세요</div>`; return; }
+    main.innerHTML = `<div class="mn-doc"><div class="mn-loading">불러오는 중…</div></div>`;
+    const html = await manualBody(m.id);
+    if (_mnSel !== m.id || _mnEdit) return;
+    main.innerHTML = `
+      <article class="mn-doc">
+        <div class="mn-doc-head">
+          <div>
+            <div class="mn-doc-cat">${mnEsc(m.category)}</div>
+            <h1>${m.pinned ? '📌 ' : ''}${mnEsc(m.title || '(제목 없음)')}</h1>
+            <div class="mn-doc-meta">${m.updated_by && m.updated_by !== m.created_by ? `작성 ${mnEsc(m.created_by)} · ` : ''}마지막 수정 ${mnEsc(m.updated_by || m.created_by || '')} · ${mnDate(m.updated_at)}</div>
+          </div>
+          <div class="mn-doc-act">
+            <button class="pl-btn" onclick="manualTogglePin(${m.id})">${m.pinned ? '📌 고정 해제' : '📌 고정'}</button>
+            <button class="pl-btn" onclick="manualEditOpen(${m.id})">✏️ 편집</button>
+            <button class="pl-btn red" onclick="manualDelete(${m.id})">삭제</button>
+          </div>
+        </div>
+        <div class="ql-snow planning-content-readonly mn-body"><div class="ql-editor">${html ? planningSanitizeHtml(html) : '<p class="mn-muted">내용이 없습니다 — 편집을 눌러 작성하세요</p>'}</div></div>
+      </article>`;
+}
+function manualNew() {
+    if (_mnEdit && !confirm('작성 중인 내용이 있어요. 새 글을 시작할까요?')) return;
+    _mnEdit = { id: null, category: _mnCat !== 'all' ? _mnCat : MANUAL_CATS[0], title: '', content: '' };
+    manualRenderEditor();
+}
+async function manualEditOpen(id) {
+    const m = _mnList.find(x => x.id === id);
+    if (!m) return;
+    _mnEdit = { id, category: m.category, title: m.title, content: await manualBody(id) };
+    manualRenderEditor();
+}
+function manualRenderEditor() {
+    const main = document.getElementById('mnMain');
+    if (!main || !_mnEdit) return;
+    const e = _mnEdit;
+    const cats = MANUAL_CATS.includes(e.category) ? MANUAL_CATS : MANUAL_CATS.concat([e.category]);
+    main.innerHTML = `
+      <div class="mn-doc mn-editor">
+        <div class="mn-ed-row">
+          <select id="mnEdCat" class="form-select">${cats.map(c => `<option ${c === e.category ? 'selected' : ''}>${mnEsc(c)}</option>`).join('')}</select>
+          <input id="mnEdTitle" class="form-input" placeholder="제목" value="${mnEsc(e.title)}">
+        </div>
+        <div id="mnEdBody"></div>
+        <div class="mn-ed-foot">
+          <span class="mn-muted">사진: 붙여넣기·끌어다 놓기·사진 버튼 (원본 화질로 저장)</span>
+          <div class="inq-spacer"></div>
+          <button class="pl-btn" onclick="manualEditCancel()">취소</button>
+          <button class="btn-primary" onclick="manualSave()">저장</button>
+        </div>
+      </div>`;
+    _mnQuill = mountPlanningRichEditor('mnEdBody', e.content, { placeholder: '내용을 쓰세요 — 순서가 있는 일은 번호 목록으로', headers: true, imageUploader: uploadPlanningImage });
+    setTimeout(() => { const t = document.getElementById('mnEdTitle'); if (t && !e.title) t.focus(); }, 30);
+}
+function manualEditCancel() {
+    if (_mnQuill && _mnEdit && (_mnQuill.root.innerHTML !== (_mnEdit.content || '') || (document.getElementById('mnEdTitle') || {}).value !== _mnEdit.title)
+        && !confirm('저장하지 않고 닫을까요?')) return;
+    _mnEdit = null; _mnQuill = null;
+    manualRenderMain();
+}
+async function manualSave() {
+    if (!_mnEdit || !_mnQuill) return;
+    const title = (document.getElementById('mnEdTitle').value || '').trim();
+    const category = document.getElementById('mnEdCat').value || '기타';
+    if (!title) { showToast('제목을 입력하세요'); document.getElementById('mnEdTitle').focus(); return; }
+    const empty = !_mnQuill.getText().trim() && !/<img\b/i.test(_mnQuill.root.innerHTML);
+    const content = empty ? '' : _mnQuill.root.innerHTML;
+    const me = mnMe();
+    try {
+        if (_mnEdit.id) {
+            const { error } = await sb.from('manuals').update({ title, category, content, updated_by: me, updated_at: new Date().toISOString() }).eq('id', _mnEdit.id);
+            if (error) throw error;
+            _mnBody[_mnEdit.id] = content;
+            _mnSel = _mnEdit.id;
+        } else {
+            const { data, error } = await sb.from('manuals').insert({ title, category, content, created_by: me, updated_by: me }).select('id').single();
+            if (error) throw error;
+            _mnBody[data.id] = content;
+            _mnSel = data.id;
+        }
+        _mnEdit = null; _mnQuill = null;
+        try { localStorage.setItem('mn_sel', String(_mnSel)); } catch (_) {}
+        await manualLoad();
+        _mnCat = 'all';
+        manualRender();
+        showToast('저장했습니다');
+    } catch (err) {
+        console.error(err);
+        showToast('저장 실패: ' + err.message);
+    }
+}
+async function manualTogglePin(id) {
+    const m = _mnList.find(x => x.id === id);
+    if (!m) return;
+    const { error } = await sb.from('manuals').update({ pinned: !m.pinned }).eq('id', id);
+    if (error) { showToast('실패: ' + error.message); return; }
+    await manualLoad();
+    manualRender();
+}
+async function manualDelete(id) {
+    const m = _mnList.find(x => x.id === id);
+    if (!m || !confirm(`'${m.title}' 글을 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    const { error } = await sb.from('manuals').delete().eq('id', id);
+    if (error) { showToast('삭제 실패: ' + error.message); return; }
+    delete _mnBody[id];
+    await manualLoad();
+    _mnSel = _mnList.length ? _mnList[0].id : null;
+    manualRender();
+    showToast('삭제했습니다');
+}
+
 function mountPlanningRichEditor(containerId, initialHtml, opts) {
     opts = opts || {};
     const el = document.getElementById(containerId);
@@ -13652,6 +13873,7 @@ function mountPlanningRichEditor(containerId, initialHtml, opts) {
         modules: {
             toolbar: {
                 container: [
+                    ...(opts.headers ? [[{ header: [2, 3, false] }]] : []),
                     [{ font: ['sans', 'pretendard', 'nanumgothic', 'malgun', 'serif', 'mono'] },
                      { size: ['small', false, 'large', 'huge'] }],
                     ['bold', 'italic', 'underline', 'strike'],
@@ -13669,6 +13891,19 @@ function mountPlanningRichEditor(containerId, initialHtml, opts) {
         // dangerouslyPasteHTML은 Quill이 허용하지 않는 태그를 자동 정리
         quill.clipboard.dangerouslyPasteHTML(0, initialHtml);
     }
+    // opts.imageUploader(file) → URL 이 있으면 사진을 글 안 base64 대신 저장소에 올려 주소만 넣음 (글이 가벼움)
+    const insertImg = opts.imageUploader
+        ? async file => {
+            if (file.size > 25 * 1024 * 1024) { showToast('사진이 너무 큽니다 (25MB 초과)'); return; }
+            showToast('사진 올리는 중…');
+            try {
+                const url = await opts.imageUploader(file);
+                const range = quill.getSelection(true) || { index: quill.getLength() - 1, length: 0 };
+                quill.insertEmbed(range.index, 'image', url, 'user');
+                quill.setSelection(range.index + 1, 0);
+            } catch (err) { console.error(err); showToast('사진 올리기 실패: ' + err.message); }
+        }
+        : file => insertResizedImageIntoQuill(quill, file);
     // 이미지 붙여넣기 → 자동 리사이즈 (Quill 2.x clipboard 모듈 onCapturePaste 오버라이드)
     const clipboard = quill.getModule('clipboard');
     if (clipboard && typeof clipboard.onCapturePaste === 'function') {
@@ -13681,7 +13916,7 @@ function mountPlanningRichEditor(containerId, initialHtml, opts) {
                         e.preventDefault();
                         e.stopPropagation();
                         const file = item.getAsFile();
-                        if (file) await insertResizedImageIntoQuill(quill, file);
+                        if (file) await insertImg(file);
                         return;
                     }
                 }
@@ -13698,7 +13933,7 @@ function mountPlanningRichEditor(containerId, initialHtml, opts) {
         const imgs = Array.from(files).filter(f => f.type.startsWith('image/'));
         if (!imgs.length) return;
         for (const file of imgs) {
-            await insertResizedImageIntoQuill(quill, file);
+            await insertImg(file);
         }
     });
     // 툴바 이미지 버튼 → 자체 핸들러로 교체 (리사이즈 포함)
@@ -13709,7 +13944,7 @@ function mountPlanningRichEditor(containerId, initialHtml, opts) {
         input.accept = 'image/*';
         input.onchange = async () => {
             const file = input.files && input.files[0];
-            if (file) await insertResizedImageIntoQuill(quill, file);
+            if (file) await insertImg(file);
         };
         input.click();
     });
