@@ -12545,7 +12545,7 @@ function openTempGroupEdit(gi) {
     };
     const customVal = (v, list) => (v && !list.includes(v)) ? v : '';
     const customDisplay = (v, list) => (v && !list.includes(v)) || v === '기타' ? 'block' : 'none';
-    const RC = (prefix, i, qty) => `recalcTempFeeRow('${prefix}',${i},${qty})`;
+    const RC = (prefix, i) => `recalcTempFeeRow('${prefix}',${i},tgeQty(${i}))`;
     const TL = 'font-size:11px;font-weight:700;color:#1B64DA;margin-top:4px;min-height:16px';
 
     // 부대비용 섹션 HTML 헬퍼 (compact 2-col layout)
@@ -12606,7 +12606,14 @@ function openTempGroupEdit(gi) {
 
     let itemsHtml = g.items.map((p, i) => `
     <div style="background:var(--gray-50);border-radius:14px;padding:16px;margin-bottom:14px">
-        <div style="font-weight:700;font-size:15px;margin-bottom:14px;color:var(--gray-900)">${p.item || '품목 ' + (i + 1)}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px">
+            <div style="font-weight:700;font-size:15px;color:var(--gray-900)">${p.item || '품목 ' + (i + 1)}</div>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                <label for="tge_qty_${i}" style="font-size:12px;font-weight:700;color:var(--gray-600)">수량</label>
+                <input id="tge_qty_${i}" value="${fmtV(p.qty)}" placeholder="0" inputmode="numeric" oninput="fmtCommaTemp(this);tgeQtyChanged(${i})" style="${IS};width:110px;text-align:right;font-weight:700">
+                <span style="font-size:12px;color:var(--gray-500)">개</span>
+            </div>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <!-- 매출 -->
             <div style="${secStyle('#1B64DA', 'rgba(27,100,218,0.05)')}">
@@ -12659,6 +12666,16 @@ function openTempGroupEdit(gi) {
     });
 }
 
+// 견적 편집창 수량 — 부대비용(1개당) 합계가 바뀐 수량으로 다시 계산됨
+function tgeQty(i) {
+    return Number((document.getElementById(`tge_qty_${i}`)?.value || '').replace(/[^0-9]/g, '')) || 0;
+}
+function tgeQtyChanged(i) {
+    const q = tgeQty(i);
+    recalcTempFeeRow('tge', i, q);
+    recalcTempFeeRow('tgs', i, q);
+}
+
 // 견적서 비고 textarea — Enter 키로 자동 bullet 줄바꿈, 빈 상태 포커스 시 bullet prepend
 function handleQuoteNoteKey(ev) {
     if (ev.key !== 'Enter' || ev.shiftKey) return;
@@ -12692,7 +12709,8 @@ async function saveTempGroupEdit(gi) {
         const p = g.items[i];
         p.quoteNote = quoteNote;
 
-        // 단가
+        // 수량·단가
+        if (document.getElementById(`tge_qty_${i}`)) p.qty = getNum(`tge_qty_${i}`);
         p.unitPrice = getNum(`tge_up_${i}`);
         p.unitPriceVat = getVal(`tge_upv_${i}`);
         p.supplierUnitPrice = getNum(`tge_sup_${i}`);
@@ -12741,6 +12759,7 @@ async function saveTempGroupEdit(gi) {
         p.supplierRevenue = calcTempGroupSupRevenue(p);
 
         const dbRow = {
+            qty: p.qty,
             unit_price: p.unitPrice,
             unit_price_vat: p.unitPriceVat,
             supplier_unit_price: p.supplierUnitPrice,
