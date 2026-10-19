@@ -12,6 +12,7 @@
 - `index.html` — 전체 HTML 구조
 - `styles.css` — Toss 스타일 디자인 시스템
 - `doc-generator.html` — 디자인확인서(DC)/작업요청서(WR) 생성기 (독립 페이지)
+  - 인쇄 방법·포장 select는 목록에 없는 값이면 `setSelOrCustom`으로 '기타 + 직접 입력' (그냥 value에 넣으면 빈 값 → 저장 때 사라지고, 다시 열면 '없음'으로 읽혀 인쇄비가 합계에서 빠졌음 · 2026-10-19). 문서 생성기에서 DC를 불러와 WR을 만들면(`selectLinkedDC`) 같은 `source_doc_number`의 국내 프로젝트 매입 정보를 채움
 - 단일 파일 구조 유지, 파일 분리하지 않음
 
 ## 배포 규칙
