@@ -898,6 +898,15 @@ function togglePrintFee(){syncDcSections();}
 function toggleWrPrintFee(){syncDcSections();}
 function togglePayPreview(){document.getElementById('payPreview').style.display=document.getElementById('showPaymentNotice').checked?'':'none'}
 
+/* 목록에 없는 값(예: '자수인쇄_금사')은 '기타' + 직접 입력칸으로 — select에 그냥 넣으면 빈 값이 되어 저장 때 사라짐 */
+function setSelOrCustom(selId,v,def){
+  var sel=document.getElementById(selId);if(!sel)return;
+  var custom=document.getElementById(selId+'Custom');
+  v=v||def||'';
+  var has=[].some.call(sel.options,function(o){return o.value===v});
+  if(has){sel.value=v;if(custom){custom.value='';custom.classList.add('hidden')}}
+  else{sel.value='기타';if(custom){custom.value=v;custom.classList.remove('hidden')}}
+}
 /* #1: 기타 선택 시 텍스트 입력창 토글 */
 function togglePrintCustom(selectId,wrapId,customId){
   var sel=document.getElementById(selectId);
@@ -1106,8 +1115,8 @@ async function selectLinkedDC(id){
   document.getElementById('wrUnit').value=r.unit||'개';
   document.getElementById('wrColor').value=r.color||'-';
   document.getElementById('wrPrintColorSize').value=r.print_color_size||'시안 확인';
-  document.getElementById('wrPrintMethod').value=r.print_method||'없음';toggleWrPrintFee();
-  document.getElementById('wrPackaging').value=r.packaging||'개별박스';
+  setSelOrCustom('wrPrintMethod',r.print_method,'없음');toggleWrPrintFee();
+  setSelOrCustom('wrPackaging',r.packaging,'개별박스');
   document.getElementById('wrDeliveryDate').value=r.delivery_date||'';
 
   /* 배송 정보 연동 (JSON/구버전 호환 복원) */
@@ -1136,6 +1145,31 @@ async function selectLinkedDC(id){
   var imgNote=(!mainImg&&subImgs.length===0)?'<br>⚠️ 시안 이미지는 디자인확인서에 먼저 첨부하거나, 여기서 직접 첨부해주세요.':'';
   info.innerHTML='✅ 연동 완료: <b>'+esc(r.doc_number)+'</b> — '+esc(r.title)+' ('+esc(r.company_name)+')'+imgNote;
   document.getElementById('wrLinkBtn').classList.add('hidden');
+
+  /* 매입 정보 연동 — 이 디자인확인서로 만든 국내 프로젝트의 매입처·매입 단가·인쇄·포장·배송비를 채움
+     (프로젝트에서 '작업요청서 만들기'로 들어온 경우는 이 뒤에 프로젝트 값으로 다시 채워짐) */
+  if(!toNum(val('wrUnitPrice'))&&dcNum){
+    try{
+      var pj=await sbFetch('projects_domestic?source_doc_number=eq.'+encodeURIComponent(dcNum)+'&order=id.desc&limit=1','GET');
+      pj=pj&&pj[0];
+      if(pj){
+        var put=function(id,v){var el=document.getElementById(id);if(el&&v!==undefined&&v!==null&&v!==''){el.value=v;if(el.tagName==='INPUT'&&typeof v==='number')fmtComma(el)}};
+        if(!val('wrCompany'))put('wrCompany',pj.supplier);
+        if(!val('wrContact'))put('wrContact',pj.supplier_contact);
+        put('wrUnitPrice',pj.supplier_unit_price||'');put('wrUnitPriceVat',pj.supplier_unit_price_vat);
+        put('wrPrintFee',pj.supplier_print_fee||'');put('wrPrintFeeVat',pj.supplier_print_fee_vat);put('wrPrintFeeApply',pj.supplier_print_fee_apply);
+        put('wrPkgFee',pj.supplier_packaging_fee||'');put('wrPkgFeeVat',pj.supplier_packaging_fee_vat);put('wrPkgFeeApply',pj.supplier_packaging_fee_apply);
+        var st=pj.supplier_shipping_type||'';
+        if(st){
+          put('wrShippingType',st);put('wrShippingVat',pj.supplier_shipping_vat);
+          if(st==='택배'){put('wrShippingPerBox',pj.supplier_shipping_cost_per_box||'');put('wrShippingBoxes',pj.supplier_shipping_boxes||'')}
+          if(st==='퀵'){put('wrShippingCost',pj.supplier_shipping_cost||'')}
+          try{toggleWrShipping();calcWrShipTotal();}catch(e){}
+        }
+        try{toggleWrPrintFee();}catch(e){}
+      }
+    }catch(e){console.warn('국내 프로젝트 매입 정보 연동 실패',e);}
+  }
 
   calcWrEst();
   showMsg('✅ 디자인확인서 연동 완료!')}catch(err){showMsg('❌ 연동 실패',true)}
@@ -2033,6 +2067,12 @@ async function loadRecord(id){
       }else{
         wrLinkBtnEl.classList.remove('hidden');
         wrLinkInfoEl.classList.add('hidden');
+      }
+      /* 예전에 인쇄 방법이 빈 값으로 저장된 작업요청서(목록에 없는 방법이라 사라짐) — 인쇄비가 있으면 '없음'으로 보지 않음.
+         그대로 두면 인쇄비가 합계에서 빠져 저장한 금액과 서류 금액이 달라졌음 */
+      if(!r.print_method&&toNum(r.print_fee)>0){
+        var dcPm=linkedDC&&linkedDC.print_method&&linkedDC.print_method!=='없음'?linkedDC.print_method:'기타';
+        setSelOrCustom('wrPrintMethod',dcPm,'기타');toggleWrPrintFee();
       }
       calcWrEst();
       try{syncDcSections();}catch(e){}
