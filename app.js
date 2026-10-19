@@ -22477,16 +22477,23 @@ const _inqNewImages = [];        // 새 상담 첫 문의 내용에 붙인 사�
 
 // ---------- 화면 전환 ----------
 function tpSetView(v) {
-    if (v !== 'inq' && v !== 'quote') v = 'inq';
+    if (v !== 'inq' && v !== 'quote' && v !== 'board') v = 'inq';
     try { localStorage.setItem('tp_view', v); } catch (_) {}
     const iv = document.getElementById('tpInqView');
     const qv = document.getElementById('tpQuoteView');
+    const bv = document.getElementById('tpBoardView');
     if (!iv || !qv) return;
     iv.style.display = v === 'inq' ? '' : 'none';
     qv.style.display = v === 'quote' ? '' : 'none';
+    if (bv) bv.style.display = v === 'board' ? '' : 'none';
     document.getElementById('tpSwInq').classList.toggle('on', v === 'inq');
     document.getElementById('tpSwQuote').classList.toggle('on', v === 'quote');
-    if (v === 'inq') {
+    document.getElementById('tpSwBoard')?.classList.toggle('on', v === 'board');
+    if (v === 'board') {
+        _inqPendingLink = null;
+        inqRenderLinkBanner();
+        inqBoardEnter();
+    } else if (v === 'inq') {
         _inqPendingLink = null;       // 상담 화면으로 돌아오면 견적 연결 모드 해제
         inqRenderLinkBanner();
         inqEnter();
@@ -22501,6 +22508,134 @@ function tpInitView() {
     if (v === 'quote') inqLoad();     // 목록 화면이어도 상단 건수는 보여준다
     tpSetView(v);
     tpMaybeAutoTour();   // 처음 들어온 사람에게 사용법 안내 한 번
+}
+
+// ---------- 한눈에 보기 (상담 진행 현황판) ----------
+// 진행 중 상담을 상태별 칸으로 나눠 한 화면에 — 카드 누르면 상담 관리에서 그 건이 열림
+const INQB_COLS = ['신규', '상담중', '가견적', '견적발송', '수주', '제작중', '납품완료'];
+const INQB_PRE_WON = ['신규', '상담중', '가견적', '견적발송'];   // 연락이 뜸하면 놓칠 수 있는 단계
+const INQB_STALE_DAYS = 7;
+let _inqbWho = (() => { try { return localStorage.getItem('inqb_who') || ''; } catch (_) { return ''; } })();
+let _inqbFocus = '';   // '' | 'late' | 'stale' | 'new'
+
+async function inqBoardEnter() {
+    const el = document.getElementById('tpBoardView');
+    if (!el) return;
+    if (!el.innerHTML) el.innerHTML = '<div class="inqb-empty">불러오는 중…</div>';
+    await inqLoad();
+    inqBoardRender();
+    // 견적 금액은 견적 목록이 다 불러와진 뒤 한 번 더
+    if (typeof tempProjects !== 'undefined' && !tempProjects.length) {
+        try { await loadTempProjects(); } catch (_) {}
+        if (document.getElementById('tpBoardView')?.style.display !== 'none') inqBoardRender();
+    }
+}
+function inqbDaysSince(ts) { return ts ? Math.floor((Date.now() - new Date(ts).getTime()) / 86400000) : 999; }
+function inqbIsStale(x) { return INQB_PRE_WON.includes(x.status) && inqbDaysSince(x.last_contact_at || x.created_at) >= INQB_STALE_DAYS; }
+function inqbIsNewThisMonth(x) { return String(x.created_at || '').slice(0, 7) === getTodayStr().slice(0, 7); }
+function inqbAmounts() {
+    const m = {};
+    (typeof tempProjects !== 'undefined' ? tempProjects : []).forEach(p => {
+        if (p.inquiryId) m[p.inquiryId] = (m[p.inquiryId] || 0) + calcTempRevenueWithVat(p);
+    });
+    return m;
+}
+function inqbWon(n) {
+    if (!n) return '';
+    if (n >= 100000000) return (n / 100000000).toFixed(n >= 1000000000 ? 0 : 1).replace(/\.0$/, '') + '억';
+    if (n >= 10000) return Math.round(n / 10000).toLocaleString() + '만';
+    return n.toLocaleString() + '원';
+}
+
+function inqBoardRender() {
+    const el = document.getElementById('tpBoardView');
+    if (!el) return;
+    const amt = inqbAmounts();
+    const people = [...new Set(_inqList.map(x => x.assignee).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
+    if (_inqbWho && !people.includes(_inqbWho)) _inqbWho = '';
+    const mine = _inqList.filter(x => !_inqbWho || x.assignee === _inqbWho);
+    const active = mine.filter(x => INQ_ACTIVE.includes(x.status));
+    const late = active.filter(inqIsOverdue), stale = active.filter(inqbIsStale), fresh = mine.filter(inqbIsNewThisMonth);
+    const pipeSum = active.reduce((s, x) => s + (amt[x.id] || 0), 0);
+    const focusFn = { late: inqIsOverdue, stale: inqbIsStale, new: inqbIsNewThisMonth }[_inqbFocus];
+    const shown = focusFn ? active.filter(focusFn) : active;
+
+    const tile = (key, label, n, sub, tone) => `<button type="button" class="inqb-tile ${tone || ''} ${_inqbFocus === key ? 'on' : ''}" ${key ? `data-focus="${key}"` : 'data-focus=""'}>
+        <span>${label}</span><b>${n}</b><small>${sub}</small></button>`;
+    const card = x => {
+        const d = inqbDaysSince(x.last_contact_at || x.created_at);
+        const isLate = inqIsOverdue(x), isStale = inqbIsStale(x);
+        const who = x.contact_name || x.client_contact || '';
+        return `<div class="inqb-card ${isLate ? 'late' : ''}" data-id="${x.id}" role="button" tabindex="0">
+            <div class="inqb-c-top">${clientGradeBadge(x.grade)}<b>${escHtml(x.client || '(거래처 미정)')}</b>${amt[x.id] ? `<em>${inqbWon(amt[x.id])}</em>` : ''}</div>
+            ${x.title || who ? `<div class="inqb-c-title">${escHtml(x.title || who)}</div>` : ''}
+            ${x.next_action ? `<div class="inq-next ${isLate ? 'late' : ''}">▶ ${x.next_action_date ? inqMD(x.next_action_date) + ' · ' : ''}${escHtml(x.next_action)}</div>` : ''}
+            <div class="inqb-c-meta">
+                <span>${x.assignee ? escHtml(x.assignee) : '담당 없음'}</span>
+                <span class="${isStale ? 'stale' : ''}">${isStale ? `${d}일째 연락 없음` : '연락 ' + inqRel(x.last_contact_at || x.created_at)}</span>
+                ${x.due_date ? `<span>납기 ${inqMD(x.due_date)}</span>` : ''}
+            </div>
+        </div>`;
+    };
+    const sortCards = (a, b) => (inqIsOverdue(b) - inqIsOverdue(a)) || (inqbIsStale(b) - inqbIsStale(a))
+        || String(b.last_contact_at || '').localeCompare(String(a.last_contact_at || ''));
+    const cols = INQB_COLS.map(st => {
+        const list = shown.filter(x => x.status === st).sort(sortCards);
+        const sum = list.reduce((s, x) => s + (amt[x.id] || 0), 0);
+        return `<section class="inqb-col">
+            <header><span class="inq-st ${INQ_STATUS_CLS[st] || ''}">${st}</span><b>${list.length}</b>${sum ? `<em>${inqbWon(sum)}</em>` : ''}</header>
+            <div class="inqb-cards">${list.map(card).join('') || '<div class="inqb-none">없음</div>'}</div>
+        </section>`;
+    }).join('');
+    const ended = ['정산완료', '보류', '실패'].map(st => {
+        const n = mine.filter(x => x.status === st).length;
+        return `<button type="button" class="inqb-end" data-status="${st}"><span class="inq-st ${INQ_STATUS_CLS[st]}">${st}</span><b>${n}</b></button>`;
+    }).join('');
+    const focusLabel = { late: '할 일 날짜가 오늘이거나 지난 건', stale: `견적 전 단계에서 ${INQB_STALE_DAYS}일 넘게 연락 없는 건`, new: '이번 달 새로 들어온 건' }[_inqbFocus];
+
+    el.innerHTML = `
+        <div class="inqb-bar">
+            <label class="inqb-who">담당
+                <select id="inqbWho">${['', ...people].map(p => `<option value="${escHtml(p)}" ${p === _inqbWho ? 'selected' : ''}>${p ? escHtml(p) : '전체'}</option>`).join('')}</select>
+            </label>
+            <div class="inq-spacer"></div>
+            <span class="inqb-ended-lbl">끝난 건</span>${ended}
+        </div>
+        <div class="inqb-tiles">
+            ${tile('', '진행 중', active.length, pipeSum ? `견적 ${inqbWon(pipeSum)}` : '견적 금액 없음')}
+            ${tile('late', '챙길 할 일', late.length, '오늘·지난 날짜', late.length ? 'warn' : '')}
+            ${tile('stale', '연락 뜸함', stale.length, `${INQB_STALE_DAYS}일 넘게 연락 없음`, stale.length ? 'caution' : '')}
+            ${tile('new', '이번 달 새 문의', fresh.length, `${+getTodayStr().slice(5, 7)}월 접수`)}
+        </div>
+        ${focusLabel ? `<div class="inqb-focus">${focusLabel}만 보는 중 · <button type="button" data-focus="">전체 보기</button></div>` : ''}
+        <div class="inqb-board">${cols}</div>`;
+
+    el.querySelector('#inqbWho').addEventListener('change', e => {
+        _inqbWho = e.target.value;
+        try { localStorage.setItem('inqb_who', _inqbWho); } catch (_) {}
+        inqBoardRender();
+    });
+    el.querySelectorAll('[data-focus]').forEach(b => b.addEventListener('click', () => {
+        const f = b.dataset.focus;
+        _inqbFocus = f && _inqbFocus !== f ? f : '';
+        inqBoardRender();
+    }));
+    const open = id => {
+        const x = inqFind(id);
+        if (!x) return;
+        _inqSel = id;
+        _inqFilter = INQ_ACTIVE.includes(x.status) ? 'active' : x.status;
+        const q = document.getElementById('inqSearch'); if (q) q.value = '';
+        tpSetView('inq');
+    };
+    el.querySelectorAll('.inqb-card').forEach(c => {
+        c.addEventListener('click', () => open(Number(c.dataset.id)));
+        c.addEventListener('keydown', e => { if (e.key === 'Enter') open(Number(c.dataset.id)); });
+    });
+    el.querySelectorAll('[data-status]').forEach(b => b.addEventListener('click', () => {
+        _inqFilter = b.dataset.status; _inqSel = null;
+        tpSetView('inq');
+    }));
 }
 
 // ---------- 데이터 ----------

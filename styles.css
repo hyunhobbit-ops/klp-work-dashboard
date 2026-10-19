@@ -6112,3 +6112,48 @@ body.m-on .theme-toggle{display:none}
 .tge-xf-etc .tge-xf-list { margin-top: 0; padding-top: 0; border-top: none; }
 .tge-xf-etc-add { width: 100%; padding: 7px; border: 1.5px dashed var(--gray-300); border-radius: 8px; background: transparent; color: var(--gray-500); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .tge-xf-etc-add:hover { border-color: #1B64DA; color: #1B64DA; }
+
+/* 상담 — 한눈에 보기 (진행 현황판) */
+.inqb { display: flex; flex-direction: column; gap: 12px; }
+.inqb-empty { padding: 60px 0; text-align: center; color: var(--gray-400); font-weight: 600; }
+.inqb-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.inqb-who { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--gray-600); }
+.inqb-who select { height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--white); color: var(--gray-900); font: inherit; font-size: 13px; }
+.inqb-ended-lbl { font-size: 12px; font-weight: 700; color: var(--gray-400); }
+.inqb-end { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px 0 6px; border: 1px solid var(--border); border-radius: 9px; background: var(--white); cursor: pointer; font: inherit; }
+.inqb-end b { font-size: 12px; color: var(--gray-600); font-variant-numeric: tabular-nums; }
+.inqb-end:hover { border-color: var(--gray-400); }
+.inqb-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.inqb-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--white); cursor: pointer; font: inherit; text-align: left; color: var(--gray-900); }
+.inqb-tile span { font-size: 12px; font-weight: 700; color: var(--gray-500); }
+.inqb-tile b { font-size: 24px; font-weight: 900; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+.inqb-tile small { font-size: 11.5px; font-weight: 600; color: var(--gray-400); }
+.inqb-tile:hover { border-color: var(--gray-400); }
+.inqb-tile.warn b { color: var(--red); }
+.inqb-tile.caution b { color: var(--orange); }
+.inqb-tile.on { border-color: var(--gray-900); box-shadow: inset 0 0 0 1px var(--gray-900); }
+.inqb-focus { font-size: 12.5px; font-weight: 600; color: var(--gray-600); }
+.inqb-focus button { border: none; background: none; color: var(--blue); font: inherit; font-weight: 700; cursor: pointer; padding: 0; }
+.inqb-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(190px, 1fr); gap: 10px; overflow-x: auto; padding-bottom: 6px; align-items: start; }
+.inqb-col { background: var(--gray-50); border: 1px solid var(--border-soft); border-radius: 12px; display: flex; flex-direction: column; max-height: calc(100vh - 330px); min-height: 160px; }
+.inqb-col header { display: flex; align-items: center; gap: 7px; padding: 10px 12px 8px; }
+.inqb-col header b { font-size: 13px; font-weight: 800; color: var(--gray-700); font-variant-numeric: tabular-nums; }
+.inqb-col header em { margin-left: auto; font-style: normal; font-size: 12px; font-weight: 700; color: var(--gray-500); }
+.inqb-cards { overflow-y: auto; padding: 0 8px 8px; display: flex; flex-direction: column; gap: 6px; }
+.inqb-none { padding: 14px 0; text-align: center; font-size: 12px; color: var(--gray-400); }
+.inqb-card { background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; cursor: pointer; }
+.inqb-card:hover { border-color: var(--blue); }
+.inqb-card:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.inqb-card.late { border-left: 3px solid var(--red); }
+.inqb-c-top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.inqb-c-top b { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gray-900); }
+.inqb-c-top em { flex-shrink: 0; font-style: normal; font-size: 12px; font-weight: 800; color: var(--blue); }
+.inqb-c-title { margin-top: 2px; font-size: 12px; font-weight: 600; color: var(--gray-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inqb-card .inq-next { margin-top: 5px; font-size: 11px; }
+.inqb-c-meta { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--gray-400); }
+.inqb-c-meta .stale { color: var(--orange); font-weight: 800; }
+@media (max-width: 760px) {
+  .inqb-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .inqb-board { grid-auto-columns: 78vw; }
+  .inqb-col { max-height: none; }
+}
