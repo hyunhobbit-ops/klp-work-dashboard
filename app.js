@@ -12570,7 +12570,7 @@ function openTempGroupEdit(gi) {
     // hideMethod=true 면 인쇄/포장 '방법' 필드를 생략하고 비용만 렌더 (매출/매입이 방법을 공유하기 위함)
     const feeSection = (prefix, i, data, qty, hideMethod) => `
         <div style="background:var(--white);border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid var(--gray-200)">
-            <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px">🖨 인쇄${hideMethod ? ' 비용' : ''}</div>
+            <div class="tge-fee-hd"><span>🖨 인쇄${hideMethod ? ' 비용' : ''}</span><button type="button" class="tge-xf-add" onclick="tgeAddExtra(${i},'인쇄')" title="인쇄 줄 하나 더 (예: 방법이 2가지일 때)">+ 추가</button></div>
             ${hideMethod ? `
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:end">
                 <div><label style="${LB}">금액</label><input id="${prefix}_pf_${i}" value="${fmtV(data.pf)}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
@@ -12584,9 +12584,10 @@ function openTempGroupEdit(gi) {
                 <div><label style="${LB}">VAT</label><select id="${prefix}_pfv_${i}" style="${SS}">${vatOpts(data.pfv)}</select></div>
             </div>`}
             <div id="${prefix}_pf_total_${i}" style="${TL}"></div>
+            <div class="tge-xf-list" id="${prefix}_xf_${i}_${TGE_XF_KEY['인쇄']}"></div>
         </div>
         <div style="background:var(--white);border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid var(--gray-200)">
-            <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px">📦 포장${hideMethod ? ' 비용' : ''}</div>
+            <div class="tge-fee-hd"><span>📦 포장${hideMethod ? ' 비용' : ''}</span><button type="button" class="tge-xf-add" onclick="tgeAddExtra(${i},'포장')" title="포장 줄 하나 더 (예: 방법이 2가지일 때)">+ 추가</button></div>
             ${hideMethod ? `
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:end">
                 <div><label style="${LB}">금액</label><input id="${prefix}_pkf_${i}" value="${fmtV(data.pkf)}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
@@ -12600,25 +12601,33 @@ function openTempGroupEdit(gi) {
                 <div><label style="${LB}">VAT</label><select id="${prefix}_pkfv_${i}" style="${SS}">${vatOpts(data.pkfv)}</select></div>
             </div>`}
             <div id="${prefix}_pkf_total_${i}" style="${TL}"></div>
+            <div class="tge-xf-list" id="${prefix}_xf_${i}_${TGE_XF_KEY['포장']}"></div>
         </div>
         <div style="background:var(--white);border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid var(--gray-200)">
-            <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px">🏷 라벨</div>
+            <div class="tge-fee-hd"><span>🏷 라벨</span><button type="button" class="tge-xf-add" onclick="tgeAddExtra(${i},'라벨')" title="라벨 줄 하나 더 (예: 방법이 2가지일 때)">+ 추가</button></div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:end">
                 <div><label style="${LB}">단가</label><input id="${prefix}_lf_${i}" value="${fmtV(data.lf)}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
                 <div><label style="${LB}">적용</label><select id="${prefix}_lfa_${i}" style="${SS}" onchange="${RC(prefix,i,qty)}"><option${(data.lfa||'1개당')==='1개당'?' selected':''}>1개당</option><option${data.lfa==='일괄'?' selected':''}>일괄</option></select></div>
                 <div><label style="${LB}">VAT</label><select id="${prefix}_lfv_${i}" style="${SS}">${vatOpts(data.lfv)}</select></div>
             </div>
             <div id="${prefix}_lf_total_${i}" style="${TL}"></div>
+            <div class="tge-xf-list" id="${prefix}_xf_${i}_${TGE_XF_KEY['라벨']}"></div>
         </div>
         <div style="background:var(--white);border-radius:8px;padding:10px;margin-bottom:6px;border:1px solid var(--gray-200)">
-            <div style="font-size:11px;font-weight:700;color:var(--gray-500);margin-bottom:6px">🚚 택배</div>
+            <div class="tge-fee-hd"><span>🚚 택배</span><button type="button" class="tge-xf-add" onclick="tgeAddExtra(${i},'배송')" title="택배 줄 하나 더 (예: 방법이 2가지일 때)">+ 추가</button></div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:end">
                 <div><label style="${LB}">박스수</label><input id="${prefix}_sb_${i}" value="${data.sb || ''}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
                 <div><label style="${LB}">박스당 단가</label><input id="${prefix}_sf_${i}" value="${fmtV(data.sf)}" placeholder="0" oninput="fmtCommaTemp(this);${RC(prefix,i,qty)}" style="${IS};text-align:right"></div>
                 <div><label style="${LB}">VAT</label><select id="${prefix}_sfv_${i}" style="${SS}">${vatOpts(data.sfv)}</select></div>
             </div>
             <div id="${prefix}_sf_total_${i}" style="${TL}"></div>
-        </div>`;
+            <div class="tge-xf-list" id="${prefix}_xf_${i}_${TGE_XF_KEY['배송']}"></div>
+        </div>
+        <div class="tge-xf-etc" id="${prefix}_xfetc_${i}" style="display:none">
+            <div class="tge-fee-hd"><span>➕ 기타 비용</span></div>
+            <div class="tge-xf-list" id="${prefix}_xf_${i}_${TGE_XF_KEY['기타']}"></div>
+        </div>
+        ${prefix === 'tge' ? `<button type="button" class="tge-xf-etc-add" onclick="tgeAddExtra(${i},'기타')">+ 기타 비용 추가</button>` : ''}`;
 
     const secStyle = (color, bg) => `border-left:3px solid ${color};background:${bg};border-radius:10px;padding:14px;margin-bottom:10px`;
 
@@ -12652,13 +12661,6 @@ function openTempGroupEdit(gi) {
                 ${feeSection('tgs', i, { pm: p.supPrintMethod, pf: p.supPrintFee, pfa: p.supPrintFeeApply, pfv: p.supPrintFeeVat, pkm: p.supPackMethod, pkf: p.supPackagingFee, pkfa: p.supPackagingFeeApply, pkfv: p.supPackagingFeeVat, lf: p.supLabelFee, lfa: p.supLabelFeeApply, lfv: p.supLabelFeeVat, sb: p.supShippingBoxes, sf: p.supShippingFee, sfv: p.supShippingFeeVat }, p.qty || 0, true)}
             </div>
         </div>
-        <div class="tge-xf">
-            <div class="tge-xf-head">
-                <b>➕ 추가 비용</b><span>배송 방법이 2가지일 때처럼 칸이 더 필요하면 추가하세요</span>
-                <div class="tge-xf-btns">${TEMP_EXTRA_KINDS.map(k => `<button type="button" onclick="tgeAddExtra(${i},'${k}')">+ ${k}</button>`).join('')}</div>
-            </div>
-            <div id="tge_xf_${i}">${tempExtras(p).map(e => tgeExtraRowHtml(i, e)).join('')}</div>
-        </div>
     </div>`).join('');
 
     const html = `
@@ -12688,58 +12690,82 @@ function openTempGroupEdit(gi) {
     g.items.forEach((p, i) => {
         recalcTempFeeRow('tge', i, p.qty || 0);
         recalcTempFeeRow('tgs', i, p.qty || 0);
+        tempExtras(p).forEach(e => tgeAddExtra(i, e.kind, e, true));
         tgeExtraRecalc(i);
     });
 }
 
-// 편집창 '추가 비용' 한 줄
-function tgeExtraRowHtml(i, e) {
+// 편집창 '추가 비용' — 인쇄·포장·라벨·택배 칸마다 '+ 추가'. 매출 칸에 내용·적용·금액, 매입 칸 같은 자리에 짝 줄(금액만)
+const TGE_XF_KEY = { 인쇄: 'print', 포장: 'pack', 라벨: 'label', 배송: 'ship', 기타: 'etc' };
+let _tgeXfSeq = 0;
+function tgeAddExtra(i, kind, e, silent) {
     e = e || {};
+    kind = TGE_XF_KEY[kind] ? kind : '기타';
+    const key = TGE_XF_KEY[kind];
+    const saleBox = document.getElementById(`tge_xf_${i}_${key}`), buyBox = document.getElementById(`tgs_xf_${i}_${key}`);
+    if (!saleBox || !buyBox) return;
+    const uid = 'x' + (++_tgeXfSeq);
     const fmtV = n => n ? Number(n).toLocaleString() : '';
     const vatOpts = v => `<option${v !== 'VAT 포함' ? ' selected' : ''}>VAT 별도</option><option${v === 'VAT 포함' ? ' selected' : ''}>VAT 포함</option>`;
-    const kind = TEMP_EXTRA_KINDS.includes(e.kind) ? e.kind : '기타';
     const apply = ['1개당', '일괄', '박스'].includes(e.apply) ? e.apply : (kind === '배송' ? '박스' : kind === '포장' || kind === '기타' ? '일괄' : '1개당');
-    const ph = { 배송: '예: 퀵, 화물, 직접 배송', 포장: '예: 선물포장, 쇼핑백', 라벨: '예: 바코드 라벨', 인쇄: '예: 2도 인쇄, 추가 위치', 기타: '항목 이름' }[kind];
+    const ph = { 배송: '예: 퀵, 화물, 직접 배송', 포장: '예: 선물포장, 쇼핑백', 라벨: '예: 바코드 라벨', 인쇄: '예: 2도 인쇄, 뒷면 인쇄', 기타: '항목 이름' }[kind];
     const R = `tgeExtraRecalc(${i})`;
-    return `<div class="tge-xf-row" data-kind="${kind}">
+    saleBox.insertAdjacentHTML('beforeend', `<div class="tge-xf-row" data-x="${uid}" data-kind="${kind}">
         <div class="tge-xf-l1">
-            <span class="tge-xf-kind">${kind}</span>
-            <input data-f="name" value="${escHtml(e.name || '')}" placeholder="${ph}" aria-label="내용">
+            <input data-f="name" value="${escHtml(e.name || '')}" placeholder="${ph}" aria-label="내용" oninput="${R}">
             <select data-f="apply" onchange="${R}" aria-label="적용"><option${apply === '1개당' ? ' selected' : ''}>1개당</option><option${apply === '일괄' ? ' selected' : ''}>일괄</option><option${apply === '박스' ? ' selected' : ''}>박스</option></select>
             <input data-f="boxes" value="${e.boxes || ''}" placeholder="박스수" inputmode="numeric" oninput="fmtCommaTemp(this);${R}" aria-label="박스수" style="display:${apply === '박스' ? '' : 'none'}">
-            <button type="button" class="tge-xf-del" onclick="this.closest('.tge-xf-row').remove()" title="이 줄 삭제" aria-label="삭제">✕</button>
+            <button type="button" class="tge-xf-del" onclick="tgeDelExtra(${i},'${uid}')" title="이 줄 삭제" aria-label="삭제">✕</button>
         </div>
-        <div class="tge-xf-l2">
-            <label class="sale">매출<input data-f="fee" value="${fmtV(e.fee)}" placeholder="0" inputmode="numeric" oninput="fmtCommaTemp(this);${R}"><select data-f="vat">${vatOpts(e.vat)}</select><em data-t="sale"></em></label>
-            <label class="buy">매입<input data-f="supFee" value="${fmtV(e.supFee)}" placeholder="0" inputmode="numeric" oninput="fmtCommaTemp(this);${R}"><select data-f="supVat">${vatOpts(e.supVat)}</select><em data-t="buy"></em></label>
-        </div>
-    </div>`;
-}
-function tgeAddExtra(i, kind) {
-    const box = document.getElementById(`tge_xf_${i}`);
-    if (!box) return;
-    box.insertAdjacentHTML('beforeend', tgeExtraRowHtml(i, { kind }));
+        <div class="tge-xf-l2"><input data-f="fee" value="${fmtV(e.fee)}" placeholder="금액" inputmode="numeric" oninput="fmtCommaTemp(this);${R}" aria-label="매출 금액"><select data-f="vat" aria-label="VAT">${vatOpts(e.vat)}</select><em data-t></em></div>
+    </div>`);
+    buyBox.insertAdjacentHTML('beforeend', `<div class="tge-xf-row buy" data-x="${uid}">
+        <div class="tge-xf-l1"><span class="tge-xf-mirror" data-m></span></div>
+        <div class="tge-xf-l2"><input data-f="supFee" value="${fmtV(e.supFee)}" placeholder="금액" inputmode="numeric" oninput="fmtCommaTemp(this);${R}" aria-label="매입 금액"><select data-f="supVat" aria-label="VAT">${vatOpts(e.supVat)}</select><em data-t></em></div>
+    </div>`);
+    if (silent) return;
     tgeExtraRecalc(i);
-    const last = box.lastElementChild;
-    last && last.querySelector('[data-f=name]')?.focus();
+    saleBox.lastElementChild.querySelector('[data-f=name]').focus();
+}
+function tgeDelExtra(i, uid) {
+    document.querySelectorAll(`#tempModalOverlay [data-x="${uid}"]`).forEach(el => el.remove());
+    tgeExtraRecalc(i);
 }
 function tgeReadExtras(i) {
     const n = v => Number(String(v || '').replace(/[^0-9]/g, '')) || 0;
-    return [...document.querySelectorAll(`#tge_xf_${i} .tge-xf-row`)].map(r => {
-        const f = k => r.querySelector(`[data-f=${k}]`)?.value || '';
-        return { kind: r.dataset.kind, name: f('name').trim(), apply: f('apply'), boxes: n(f('boxes')), fee: n(f('fee')), vat: f('vat'), supFee: n(f('supFee')), supVat: f('supVat') };
+    const out = [];
+    Object.values(TGE_XF_KEY).forEach(key => {
+        document.querySelectorAll(`#tge_xf_${i}_${key} .tge-xf-row`).forEach(r => {
+            const b = document.querySelector(`#tgs_xf_${i}_${key} [data-x="${r.dataset.x}"]`);
+            const f = (el, k) => el?.querySelector(`[data-f=${k}]`)?.value || '';
+            out.push({ kind: r.dataset.kind, name: f(r, 'name').trim(), apply: f(r, 'apply'), boxes: n(f(r, 'boxes')), fee: n(f(r, 'fee')), vat: f(r, 'vat') || 'VAT 별도', supFee: n(f(b, 'supFee')), supVat: f(b, 'supVat') || 'VAT 별도' });
+        });
     });
+    return out;
 }
 function tgeExtraRecalc(i) {
     const q = tgeQty(i);
-    document.querySelectorAll(`#tge_xf_${i} .tge-xf-row`).forEach(r => {
-        const apply = r.querySelector('[data-f=apply]').value;
-        r.querySelector('[data-f=boxes]').style.display = apply === '박스' ? '' : 'none';
-        const n = k => Number((r.querySelector(`[data-f=${k}]`).value || '').replace(/[^0-9]/g, '')) || 0;
-        const e = { apply, boxes: n('boxes'), fee: n('fee'), supFee: n('supFee') };
-        const t = (el, v) => { el.textContent = v ? `= ${v.toLocaleString()}원` : ''; };
-        t(r.querySelector('[data-t=sale]'), tempExtraTotal(e, q));
-        t(r.querySelector('[data-t=buy]'), tempExtraTotal(e, q, true));
+    const n = el => Number((el?.value || '').replace(/[^0-9]/g, '')) || 0;
+    const t = (el, v) => { if (el) el.textContent = v ? `= ${v.toLocaleString()}원` : ''; };
+    Object.values(TGE_XF_KEY).forEach(key => {
+        document.querySelectorAll(`#tge_xf_${i}_${key} .tge-xf-row`).forEach(r => {
+            const b = document.querySelector(`#tgs_xf_${i}_${key} [data-x="${r.dataset.x}"]`);
+            const apply = r.querySelector('[data-f=apply]').value;
+            const boxesEl = r.querySelector('[data-f=boxes]');
+            boxesEl.style.display = apply === '박스' ? '' : 'none';
+            const e = { apply, boxes: n(boxesEl), fee: n(r.querySelector('[data-f=fee]')), supFee: n(b?.querySelector('[data-f=supFee]')) };
+            t(r.querySelector('[data-t]'), tempExtraTotal(e, q));
+            if (b) {
+                t(b.querySelector('[data-t]'), tempExtraTotal(e, q, true));
+                const name = r.querySelector('[data-f=name]').value.trim();
+                b.querySelector('[data-m]').textContent = `↳ ${name || '(내용 없음)'} · ${apply === '박스' ? `${e.boxes || 0}박스` : apply}`;
+            }
+        });
+    });
+    // 기타 칸은 줄이 있을 때만
+    ['tge', 'tgs'].forEach(pre => {
+        const box = document.getElementById(`${pre}_xfetc_${i}`);
+        if (box) box.style.display = document.querySelector(`#${pre}_xf_${i}_etc .tge-xf-row`) ? '' : 'none';
     });
 }
 
@@ -12833,7 +12859,7 @@ async function saveTempGroupEdit(gi) {
         p.supShippingFeeVat = getVal(`tgs_sfv_${i}`);
 
         // 추가 비용 — 이름·금액이 모두 빈 줄은 버림
-        if (document.getElementById(`tge_xf_${i}`)) p.extraFees = tgeReadExtras(i).filter(e => e.name || e.fee || e.supFee);
+        if (document.getElementById(`tge_xf_${i}_ship`)) p.extraFees = tgeReadExtras(i).filter(e => e.name || e.fee || e.supFee);
 
         // 매출액/매입액 재계산
         p.revenue = calcTempGroupRevenue(p);
