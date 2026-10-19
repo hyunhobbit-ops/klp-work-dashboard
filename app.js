@@ -11767,7 +11767,8 @@ function _projectsTempRowToObj(r) {
         transferredAt: r.transferred_at || '',
         transferredProjectIds: r.transferred_project_ids || [],
         inquiryId: r.inquiry_id || null,
-        quoteGroup: r.quote_group || ''
+        quoteGroup: r.quote_group || '',
+        extraFees: Array.isArray(r.extra_fees) ? r.extra_fees : []
     };
 }
 // 견적 묶음 기준 — 묶음 번호(quote_group, migration 060)가 있으면 그걸로, 없으면(예전 견적) 날짜+매출처
@@ -11869,7 +11870,8 @@ function renderTempProjects() {
                 printTotal > 0 ? `인쇄 ${printTotal.toLocaleString()}` : '',
                 packTotal > 0 ? `포장 ${packTotal.toLocaleString()}` : '',
                 labelTotal > 0 ? `라벨 ${labelTotal.toLocaleString()}` : '',
-                shipTotal > 0 ? `택배 ${shipTotal.toLocaleString()}` : ''
+                shipTotal > 0 ? `택배 ${shipTotal.toLocaleString()}` : '',
+                ...tempExtras(p).map(e => { const t = tempExtraTotal(e, p.qty || 0); return t > 0 ? `${escHtml(tempExtraLabel(e))} ${t.toLocaleString()}` : ''; })
             ].filter(Boolean);
             const feeBadge = feeDetails.length > 0 ? `<div style="margin-top:4px;font-size:10px;color:var(--text-tertiary);line-height:1.5">${feeDetails.map(f => '+' + f).join('<br>')}</div>` : '';
 
@@ -11882,7 +11884,8 @@ function renderTempProjects() {
                 supPrintTotal > 0 ? `인쇄 ${supPrintTotal.toLocaleString()}` : '',
                 supPackTotal > 0 ? `포장 ${supPackTotal.toLocaleString()}` : '',
                 supLabelTotal > 0 ? `라벨 ${supLabelTotal.toLocaleString()}` : '',
-                supShipTotal > 0 ? `택배 ${supShipTotal.toLocaleString()}` : ''
+                supShipTotal > 0 ? `택배 ${supShipTotal.toLocaleString()}` : '',
+                ...tempExtras(p).map(e => { const t = tempExtraTotal(e, p.qty || 0, true); return t > 0 ? `${escHtml(tempExtraLabel(e))} ${t.toLocaleString()}` : ''; })
             ].filter(Boolean);
             const supFeeBadge = supFeeDetails.length > 0 ? `<div style="margin-top:4px;font-size:10px;color:var(--text-tertiary);line-height:1.5">${supFeeDetails.map(f => '+' + f).join('<br>')}</div>` : '';
 
@@ -12444,6 +12447,17 @@ function calcTempFeeTotal(fee, apply, qty) {
     return (apply === '1개당') ? (fee || 0) * qty : (fee || 0);
 }
 
+// 추가 비용 (migration 063 extra_fees) — 기본 인쇄·포장·라벨·택배 칸 외에 더 넣는 줄 (예: 배송 방법 2가지)
+// 한 줄 = { kind: 배송|포장|라벨|인쇄|기타, name, apply: 1개당|일괄|박스, boxes, fee, vat, supFee, supVat }
+const TEMP_EXTRA_KINDS = ['배송', '포장', '라벨', '인쇄', '기타'];
+function tempExtras(p) { return Array.isArray(p && p.extraFees) ? p.extraFees : []; }
+function tempExtraQty(e, qty) { return e.apply === '1개당' ? (qty || 0) : e.apply === '박스' ? (e.boxes || 0) : 1; }
+function tempExtraTotal(e, qty, sup) { return ((sup ? e.supFee : e.fee) || 0) * tempExtraQty(e, qty); }
+function tempExtraLabel(e) {
+    const k = e.kind && e.kind !== '기타' ? e.kind : '';
+    return k && e.name ? `${k} (${e.name})` : (e.name || k || '추가 비용');
+}
+
 // VAT 포함가 기준 매출액
 function calcTempRevenueWithVat(p) {
     const qty = p.qty || 0;
@@ -12453,6 +12467,7 @@ function calcTempRevenueWithVat(p) {
     total += addVat(calcTempFeeTotal(p.packagingFee, p.packagingFeeApply, qty), p.packagingFeeVat);
     total += addVat(calcTempFeeTotal(p.labelFee, p.labelFeeApply || '1개당', qty), p.labelFeeVat);
     total += addVat((p.shippingFee || 0) * (p.shippingBoxes || 0), p.shippingFeeVat);
+    tempExtras(p).forEach(e => { total += addVat(tempExtraTotal(e, qty), e.vat); });
     return total;
 }
 
@@ -12465,6 +12480,7 @@ function calcTempSupRevenueWithVat(p) {
     total += addVat(calcTempFeeTotal(p.supPackagingFee, p.supPackagingFeeApply, qty), p.supPackagingFeeVat);
     total += addVat(calcTempFeeTotal(p.supLabelFee, p.supLabelFeeApply || '1개당', qty), p.supLabelFeeVat);
     total += addVat((p.supShippingFee || 0) * (p.supShippingBoxes || 0), p.supShippingFeeVat);
+    tempExtras(p).forEach(e => { total += addVat(tempExtraTotal(e, qty, true), e.supVat); });
     return total;
 }
 
@@ -12474,7 +12490,8 @@ function calcTempGroupRevenue(p) {
         + calcTempFeeTotal(p.printFee, p.printFeeApply, qty)
         + calcTempFeeTotal(p.packagingFee, p.packagingFeeApply, qty)
         + calcTempFeeTotal(p.labelFee, p.labelFeeApply || '1개당', qty)
-        + (p.shippingFee || 0) * (p.shippingBoxes || 0);
+        + (p.shippingFee || 0) * (p.shippingBoxes || 0)
+        + tempExtras(p).reduce((s, e) => s + tempExtraTotal(e, qty), 0);
 }
 
 function calcTempGroupSupRevenue(p) {
@@ -12483,7 +12500,8 @@ function calcTempGroupSupRevenue(p) {
         + calcTempFeeTotal(p.supPrintFee, p.supPrintFeeApply, qty)
         + calcTempFeeTotal(p.supPackagingFee, p.supPackagingFeeApply, qty)
         + calcTempFeeTotal(p.supLabelFee, p.supLabelFeeApply || '1개당', qty)
-        + (p.supShippingFee || 0) * (p.supShippingBoxes || 0);
+        + (p.supShippingFee || 0) * (p.supShippingBoxes || 0)
+        + tempExtras(p).reduce((s, e) => s + tempExtraTotal(e, qty, true), 0);
 }
 
 // 기타 선택 시 커스텀 입력 토글
@@ -12634,6 +12652,13 @@ function openTempGroupEdit(gi) {
                 ${feeSection('tgs', i, { pm: p.supPrintMethod, pf: p.supPrintFee, pfa: p.supPrintFeeApply, pfv: p.supPrintFeeVat, pkm: p.supPackMethod, pkf: p.supPackagingFee, pkfa: p.supPackagingFeeApply, pkfv: p.supPackagingFeeVat, lf: p.supLabelFee, lfa: p.supLabelFeeApply, lfv: p.supLabelFeeVat, sb: p.supShippingBoxes, sf: p.supShippingFee, sfv: p.supShippingFeeVat }, p.qty || 0, true)}
             </div>
         </div>
+        <div class="tge-xf">
+            <div class="tge-xf-head">
+                <b>➕ 추가 비용</b><span>배송 방법이 2가지일 때처럼 칸이 더 필요하면 추가하세요</span>
+                <div class="tge-xf-btns">${TEMP_EXTRA_KINDS.map(k => `<button type="button" onclick="tgeAddExtra(${i},'${k}')">+ ${k}</button>`).join('')}</div>
+            </div>
+            <div id="tge_xf_${i}">${tempExtras(p).map(e => tgeExtraRowHtml(i, e)).join('')}</div>
+        </div>
     </div>`).join('');
 
     const html = `
@@ -12663,6 +12688,58 @@ function openTempGroupEdit(gi) {
     g.items.forEach((p, i) => {
         recalcTempFeeRow('tge', i, p.qty || 0);
         recalcTempFeeRow('tgs', i, p.qty || 0);
+        tgeExtraRecalc(i);
+    });
+}
+
+// 편집창 '추가 비용' 한 줄
+function tgeExtraRowHtml(i, e) {
+    e = e || {};
+    const fmtV = n => n ? Number(n).toLocaleString() : '';
+    const vatOpts = v => `<option${v !== 'VAT 포함' ? ' selected' : ''}>VAT 별도</option><option${v === 'VAT 포함' ? ' selected' : ''}>VAT 포함</option>`;
+    const kind = TEMP_EXTRA_KINDS.includes(e.kind) ? e.kind : '기타';
+    const apply = ['1개당', '일괄', '박스'].includes(e.apply) ? e.apply : (kind === '배송' ? '박스' : kind === '포장' || kind === '기타' ? '일괄' : '1개당');
+    const ph = { 배송: '예: 퀵, 화물, 직접 배송', 포장: '예: 선물포장, 쇼핑백', 라벨: '예: 바코드 라벨', 인쇄: '예: 2도 인쇄, 추가 위치', 기타: '항목 이름' }[kind];
+    const R = `tgeExtraRecalc(${i})`;
+    return `<div class="tge-xf-row" data-kind="${kind}">
+        <div class="tge-xf-l1">
+            <span class="tge-xf-kind">${kind}</span>
+            <input data-f="name" value="${escHtml(e.name || '')}" placeholder="${ph}" aria-label="내용">
+            <select data-f="apply" onchange="${R}" aria-label="적용"><option${apply === '1개당' ? ' selected' : ''}>1개당</option><option${apply === '일괄' ? ' selected' : ''}>일괄</option><option${apply === '박스' ? ' selected' : ''}>박스</option></select>
+            <input data-f="boxes" value="${e.boxes || ''}" placeholder="박스수" inputmode="numeric" oninput="fmtCommaTemp(this);${R}" aria-label="박스수" style="display:${apply === '박스' ? '' : 'none'}">
+            <button type="button" class="tge-xf-del" onclick="this.closest('.tge-xf-row').remove()" title="이 줄 삭제" aria-label="삭제">✕</button>
+        </div>
+        <div class="tge-xf-l2">
+            <label class="sale">매출<input data-f="fee" value="${fmtV(e.fee)}" placeholder="0" inputmode="numeric" oninput="fmtCommaTemp(this);${R}"><select data-f="vat">${vatOpts(e.vat)}</select><em data-t="sale"></em></label>
+            <label class="buy">매입<input data-f="supFee" value="${fmtV(e.supFee)}" placeholder="0" inputmode="numeric" oninput="fmtCommaTemp(this);${R}"><select data-f="supVat">${vatOpts(e.supVat)}</select><em data-t="buy"></em></label>
+        </div>
+    </div>`;
+}
+function tgeAddExtra(i, kind) {
+    const box = document.getElementById(`tge_xf_${i}`);
+    if (!box) return;
+    box.insertAdjacentHTML('beforeend', tgeExtraRowHtml(i, { kind }));
+    tgeExtraRecalc(i);
+    const last = box.lastElementChild;
+    last && last.querySelector('[data-f=name]')?.focus();
+}
+function tgeReadExtras(i) {
+    const n = v => Number(String(v || '').replace(/[^0-9]/g, '')) || 0;
+    return [...document.querySelectorAll(`#tge_xf_${i} .tge-xf-row`)].map(r => {
+        const f = k => r.querySelector(`[data-f=${k}]`)?.value || '';
+        return { kind: r.dataset.kind, name: f('name').trim(), apply: f('apply'), boxes: n(f('boxes')), fee: n(f('fee')), vat: f('vat'), supFee: n(f('supFee')), supVat: f('supVat') };
+    });
+}
+function tgeExtraRecalc(i) {
+    const q = tgeQty(i);
+    document.querySelectorAll(`#tge_xf_${i} .tge-xf-row`).forEach(r => {
+        const apply = r.querySelector('[data-f=apply]').value;
+        r.querySelector('[data-f=boxes]').style.display = apply === '박스' ? '' : 'none';
+        const n = k => Number((r.querySelector(`[data-f=${k}]`).value || '').replace(/[^0-9]/g, '')) || 0;
+        const e = { apply, boxes: n('boxes'), fee: n('fee'), supFee: n('supFee') };
+        const t = (el, v) => { el.textContent = v ? `= ${v.toLocaleString()}원` : ''; };
+        t(r.querySelector('[data-t=sale]'), tempExtraTotal(e, q));
+        t(r.querySelector('[data-t=buy]'), tempExtraTotal(e, q, true));
     });
 }
 
@@ -12674,6 +12751,7 @@ function tgeQtyChanged(i) {
     const q = tgeQty(i);
     recalcTempFeeRow('tge', i, q);
     recalcTempFeeRow('tgs', i, q);
+    tgeExtraRecalc(i);
 }
 
 // 견적서 비고 textarea — Enter 키로 자동 bullet 줄바꿈, 빈 상태 포커스 시 bullet prepend
@@ -12754,6 +12832,9 @@ async function saveTempGroupEdit(gi) {
         p.supShippingFee = getNum(`tgs_sf_${i}`);
         p.supShippingFeeVat = getVal(`tgs_sfv_${i}`);
 
+        // 추가 비용 — 이름·금액이 모두 빈 줄은 버림
+        if (document.getElementById(`tge_xf_${i}`)) p.extraFees = tgeReadExtras(i).filter(e => e.name || e.fee || e.supFee);
+
         // 매출액/매입액 재계산
         p.revenue = calcTempGroupRevenue(p);
         p.supplierRevenue = calcTempGroupSupRevenue(p);
@@ -12794,7 +12875,8 @@ async function saveTempGroupEdit(gi) {
             sup_shipping_fee_vat: p.supShippingFeeVat,
             revenue: p.revenue,
             supplier_revenue: p.supplierRevenue,
-            quote_note: p.quoteNote
+            quote_note: p.quoteNote,
+            extra_fees: tempExtras(p)
         };
 
         // Supabase JS 클라이언트는 에러를 throw 하지 않고 { data, error } 로 반환함.
@@ -12952,7 +13034,8 @@ async function transferGroupToDomestic(gi) {
         assignees: [],
         start_date: null,
         checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
-        memo: '',
+        // 국내에는 추가 비용 칸이 없어 — 금액은 매출·매입 합계에 들어가 있고, 내용은 메모로 남김
+        memo: tempExtras(p).filter(e => e.fee || e.supFee).map(e => `추가 비용 ${tempExtraLabel(e)}: 매출 ${tempExtraTotal(e, p.qty || 0).toLocaleString()}원 / 매입 ${tempExtraTotal(e, p.qty || 0, true).toLocaleString()}원`).join('\n'),
         inquiry_id: p.inquiryId || null,   // 상담에 연결 → 상담 화면에서 이어서 진행 (migration 038)
         supplier: p.supplier || '',
         supplier_contact: p.supplierContact || '',
@@ -13054,7 +13137,8 @@ function renderTempQuoteDoc(g) {
             { name: '인쇄비' + (hasPrintMethod ? ' (' + p.printMethod + ')' : ''), unitVal: p.printFee || 0, apply: p.printFeeApply || '1개당', vat: p.printFeeVat, show: (p.printFee || 0) > 0 },
             { name: '포장비' + (hasPackMethod ? ' (' + p.packMethod + ')' : ''),    unitVal: p.packagingFee || 0, apply: p.packagingFeeApply || '일괄', vat: p.packagingFeeVat, show: (p.packagingFee || 0) > 0 },
             { name: '라벨비', unitVal: p.labelFee || 0, apply: p.labelFeeApply || '1개당', vat: p.labelFeeVat, show: (p.labelFee || 0) > 0 },
-            { name: '택배비', unitVal: p.shippingFee || 0, apply: '박스', fQtyOverride: p.shippingBoxes || 0, vat: p.shippingFeeVat, show: (p.shippingFee || 0) > 0 }
+            { name: '택배비', unitVal: p.shippingFee || 0, apply: '박스', fQtyOverride: p.shippingBoxes || 0, vat: p.shippingFeeVat, show: (p.shippingFee || 0) > 0 },
+            ...tempExtras(p).map(e => ({ name: esc(tempExtraLabel(e)), unitVal: e.fee || 0, apply: e.apply === '박스' ? '박스' : (e.apply || '일괄'), fQtyOverride: e.apply === '박스' ? (e.boxes || 0) : undefined, vat: e.vat, show: (e.fee || 0) > 0 }))
         ].filter(f => f.show);
 
         fees.forEach(f => {
@@ -22940,6 +23024,12 @@ function inqFeeLines(p, sup) {
     });
     const boxes = sup ? p.supShippingBoxes : p.shippingBoxes, sf = sup ? p.supShippingFee : p.shippingFee;
     if (boxes && sf) out.push(`택배 ${boxes}박스 × ${won(sf)} = ${won(boxes * sf)} (${vat(sup ? p.supShippingFeeVat : p.shippingFeeVat)})`);
+    tempExtras(p).forEach(e => {
+        const fee = sup ? e.supFee : e.fee, total = tempExtraTotal(e, q, sup);
+        if (!total) return;
+        const how = e.apply === '1개당' ? `개당 ${won(fee)} = ${won(total)}` : e.apply === '박스' ? `${e.boxes}박스 × ${won(fee)} = ${won(total)}` : `일괄 ${won(total)}`;
+        out.push(`${tempExtraLabel(e)} · ${how} (${vat(sup ? e.supVat : e.vat)})`);
+    });
     return out;
 }
 
@@ -25334,6 +25424,10 @@ function inqQuoteBreakdown(p) {
     const ship = (boxes, per, vat) => ({ amt: (boxes || 0) * (per || 0), vat, calc: boxes && per ? `${boxes}박스 × ${Number(per).toLocaleString()}` : '' });
     rows.push({ label: '택배', sub: '',
         sale: ship(p.shippingBoxes, p.shippingFee, p.shippingFeeVat), buy: ship(p.supShippingBoxes, p.supShippingFee, p.supShippingFeeVat) });
+    tempExtras(p).forEach(e => {
+        const x = (fee, vat, sup) => ({ amt: tempExtraTotal(e, q, sup), vat, calc: fee ? (e.apply === '1개당' ? `${Number(fee).toLocaleString()} × ${q.toLocaleString()}` : e.apply === '박스' ? `${e.boxes || 0}박스 × ${Number(fee).toLocaleString()}` : '일괄') : '' });
+        rows.push({ label: e.kind && e.kind !== '기타' ? e.kind : '기타', sub: e.name || '', sale: x(e.fee, e.vat), buy: x(e.supFee, e.supVat, true) });
+    });
     // 금액도 내용도 없는 줄은 뺀다 (제품 줄은 항상)
     const shown = rows.filter((r, i) => i === 0 || r.sale.amt || r.buy.amt || r.sub);
     const tot = side => {

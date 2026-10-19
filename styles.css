@@ -6089,3 +6089,29 @@ body.m-on .theme-toggle{display:none}
   .mn-doc{padding:18px 16px 28px}
   .mn-ed-row{grid-template-columns:minmax(0,1fr)}
 }
+
+/* 견적 편집창 — 추가 비용 (배송 2가지 등) */
+.tge-xf { margin-top: 2px; background: var(--white); border: 1px dashed var(--gray-300); border-radius: 12px; padding: 12px; }
+.tge-xf-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.tge-xf-head b { font-size: 13px; color: var(--gray-900); }
+.tge-xf-head span { font-size: 11px; color: var(--gray-500); }
+.tge-xf-btns { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; }
+.tge-xf-btns button { padding: 5px 10px; border: 1.5px solid var(--gray-200); border-radius: 999px; background: var(--white); color: var(--gray-700); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.tge-xf-btns button:hover { border-color: #1B64DA; color: #1B64DA; }
+#tempModalOverlay [id^="tge_xf_"]:empty { display: none; }
+#tempModalOverlay [id^="tge_xf_"] { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.tge-xf-row { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.tge-xf-row input, .tge-xf-row select { padding: 6px 8px; border: 1.5px solid var(--gray-200); border-radius: 8px; font: inherit; font-size: 12px; background: var(--white); color: var(--gray-900); min-width: 0; }
+.tge-xf-l1 { display: flex; align-items: center; gap: 6px; }
+.tge-xf-l1 [data-f=name] { flex: 1; }
+.tge-xf-l1 [data-f=boxes] { width: 80px; text-align: right; }
+.tge-xf-kind { flex-shrink: 0; font-size: 11px; font-weight: 800; color: #1B64DA; background: rgba(27,100,218,.1); border-radius: 6px; padding: 4px 8px; }
+.tge-xf-del { flex-shrink: 0; border: none; background: transparent; color: var(--gray-400); font-size: 14px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
+.tge-xf-del:hover { color: #E03131; background: rgba(224,49,49,.08); }
+.tge-xf-l2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tge-xf-l2 label { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; flex-wrap: wrap; }
+.tge-xf-l2 label.sale { color: #1B64DA; }
+.tge-xf-l2 label.buy { color: #E67E22; }
+.tge-xf-l2 [data-f=fee], .tge-xf-l2 [data-f=supFee] { width: 110px; text-align: right; }
+.tge-xf-l2 em { font-style: normal; font-weight: 700; color: inherit; }
+@media (max-width: 640px) { .tge-xf-l2 { grid-template-columns: 1fr; } .tge-xf-btns { margin-left: 0; } }
