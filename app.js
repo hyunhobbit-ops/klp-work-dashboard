@@ -12830,6 +12830,48 @@ function openTempQuote(gi) {
     _tempQuoteGroup = g;
     renderTempQuoteDoc(g);
     document.getElementById('tempQuoteOverlay').style.display = 'block';
+    requestAnimationFrame(() => fitTempQuoteDoc());
+}
+
+// 견적서는 A4 한 장 고정 — 품목 표는 남은 칸에만 들어가서 넘치면 말없이 잘렸음.
+// 넘치면 비고 글자를 먼저 조금 줄이고, 그래도 넘치는 만큼만 품목 표를 비율대로 축소(최소 72%). 그래도 넘치면 경고
+function fitTempQuoteDoc() {
+    const inner = document.getElementById('tempQuoteDocInner');
+    if (!inner || !inner.offsetParent) return true;
+    const sec = inner.querySelector('[data-qt-items]'), note = inner.querySelector('[data-qt-note]');
+    const tbl = sec && sec.querySelector('table');
+    if (!sec || !tbl) return true;
+    // 처음 값 기억 → 매번 그 값으로 되돌린 뒤 다시 계산 (빈 값으로 지우면 문서에 적힌 10px·100% 까지 사라짐)
+    if (!tbl.dataset.w0) tbl.dataset.w0 = tbl.style.width || '100%';
+    tbl.style.transform = ''; tbl.style.transformOrigin = ''; tbl.style.width = tbl.dataset.w0;
+    if (note) {
+        if (!note.dataset.fs0) { note.dataset.fs0 = note.style.fontSize || '10px'; note.dataset.lh0 = note.style.lineHeight || '1.6'; }
+        note.style.fontSize = note.dataset.fs0; note.style.lineHeight = note.dataset.lh0;
+    }
+    const need = () => tbl.offsetHeight / Math.max(1, sec.clientHeight);
+    if (need() > 1.1 && note) { note.style.fontSize = '9px'; note.style.lineHeight = '1.45'; }
+    let sc = Math.min(1, 1 / need());
+    const MIN = 0.72;
+    const ok = sc >= MIN;
+    sc = Math.max(sc, MIN);
+    if (sc < 0.999) {
+        tbl.style.transformOrigin = 'top left';
+        tbl.style.transform = `scale(${sc.toFixed(3)})`;
+        tbl.style.width = (100 / sc).toFixed(2) + '%';
+    }
+    let w = document.getElementById('tempQuoteFitWarn');
+    const host = document.getElementById('tempQuoteDocEl');
+    if (!w && host) {
+        w = document.createElement('div');
+        w.id = 'tempQuoteFitWarn';
+        w.style.cssText = 'display:none;margin:0 auto 12px;max-width:794px;padding:10px 14px;border-radius:10px;background:#FEF2F2;border:1px solid #FCA5A5;color:#B91C1C;font-size:13px;font-weight:700';
+        host.parentNode.insertBefore(w, host);
+    }
+    if (w) {
+        w.style.display = ok ? 'none' : 'block';
+        w.textContent = '⚠️ 품목·비고가 너무 많아 한 장에 다 들어가지 않습니다 — 아래쪽 품목이 잘려요. 비고를 줄이거나 견적을 둘로 나눠 주세요';
+    }
+    return ok;
 }
 
 function closeTempQuote() {
@@ -12970,8 +13012,13 @@ function renderTempQuoteDoc(g) {
         totalSup += prodT;
         totalVat += prodV;
 
+        // 0원이지만 방법이 정해진 인쇄·포장 → 따로 줄 대신 품명 아래 '포함: …' (견적서가 길어져 품목이 잘리던 문제)
+        const _noM = v => !v || ['없음', '해당 없음', '해당없음', '기본박스', '-'].includes(String(v).trim());
+        const _incl = [];
+        if (!_noM(p.printMethod) && !((p.printFee || 0) > 0)) _incl.push(p.printMethod);
+        if (!_noM(p.packMethod) && !((p.packagingFee || 0) > 0)) _incl.push(p.packMethod);
         let rows = `<tr>
-            <td style="padding:10px 12px;border-bottom:1px solid #eef0f5;font-weight:700;color:#1a1d29;font-size:11px">${esc(p.item || '')}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid #eef0f5;font-weight:700;color:#1a1d29;font-size:11px">${esc(p.item || '')}${_incl.length ? `<div style="font-size:9px;font-weight:500;color:#6b7280;margin-top:2px">포함: ${esc(_incl.join(' · '))}</div>` : ''}</td>
             <td style="${ic}">${fmtNTemp(p.qty || 0)}</td>
             <td style="${ic}">${fmtNTemp(p.unitPrice || 0)}${(p.unitPrice || 0) > 0 ? '<div style="font-size:8px;color:#9aa3b0;font-weight:500;margin-top:1px">' + (p.unitPriceVat === 'VAT 포함' ? 'VAT 포함' : 'VAT 별도') + '</div>' : ''}</td>
             <td style="${ic}">${fmtNTemp(prodT)}</td>
@@ -12982,11 +13029,11 @@ function renderTempQuoteDoc(g) {
         // 인쇄/포장은 "방법"이 유의미하면 0원이어도 견적서에 표시 (인쇄 '없음' / 포장 '기본박스'는 제외)
         // 라벨/택배는 방법 개념이 없으므로 금액 > 0 인 경우만 표시
         const qty = p.qty || 0;
-        const hasPrintMethod = !!p.printMethod && p.printMethod !== '없음';
-        const hasPackMethod  = !!p.packMethod  && p.packMethod !== '기본박스';
+        const hasPrintMethod = !_noM(p.printMethod);
+        const hasPackMethod  = !_noM(p.packMethod);
         const fees = [
-            { name: '인쇄비' + (hasPrintMethod ? ' (' + p.printMethod + ')' : ''), unitVal: p.printFee || 0, apply: p.printFeeApply || '1개당', vat: p.printFeeVat, show: hasPrintMethod || (p.printFee || 0) > 0 },
-            { name: '포장비' + (hasPackMethod ? ' (' + p.packMethod + ')' : ''),    unitVal: p.packagingFee || 0, apply: p.packagingFeeApply || '일괄', vat: p.packagingFeeVat, show: hasPackMethod || (p.packagingFee || 0) > 0 },
+            { name: '인쇄비' + (hasPrintMethod ? ' (' + p.printMethod + ')' : ''), unitVal: p.printFee || 0, apply: p.printFeeApply || '1개당', vat: p.printFeeVat, show: (p.printFee || 0) > 0 },
+            { name: '포장비' + (hasPackMethod ? ' (' + p.packMethod + ')' : ''),    unitVal: p.packagingFee || 0, apply: p.packagingFeeApply || '일괄', vat: p.packagingFeeVat, show: (p.packagingFee || 0) > 0 },
             { name: '라벨비', unitVal: p.labelFee || 0, apply: p.labelFeeApply || '1개당', vat: p.labelFeeVat, show: (p.labelFee || 0) > 0 },
             { name: '택배비', unitVal: p.shippingFee || 0, apply: '박스', fQtyOverride: p.shippingBoxes || 0, vat: p.shippingFeeVat, show: (p.shippingFee || 0) > 0 }
         ].filter(f => f.show);
@@ -13073,7 +13120,7 @@ function renderTempQuoteDoc(g) {
       </div>
     </div>
     <!-- 품목 테이블 -->
-    <div style="border:1px solid #d5dae3;border-radius:8px 8px 0 0;overflow:hidden;background:#fff;flex:1;display:flex;flex-direction:column">
+    <div data-qt-items style="border:1px solid #d5dae3;border-radius:8px 8px 0 0;overflow:hidden;background:#fff;flex:1;display:flex;flex-direction:column">
       <table style="width:100%;border-collapse:collapse;font-size:10.5px">
         <thead><tr>
           <th style="${headCell};text-align:left;padding-left:12px">품 명 및 규 격</th>
@@ -13097,7 +13144,7 @@ function renderTempQuoteDoc(g) {
     <!-- 비고 -->
     <div style="display:flex;border:1px solid #d5dae3;border-radius:8px;overflow:hidden;margin-top:10px;background:#fff">
       <div style="background:#f5f7fa;padding:10px 14px;font-weight:700;font-size:10.5px;color:#4a5568;border-right:1px solid #e2e6ee;display:flex;align-items:center;min-width:60px">비 고</div>
-      <div style="padding:10px 14px;flex:1;font-size:10px;color:#666;min-height:36px;line-height:1.6;white-space:pre-line">${esc(g.quoteNote || '• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.\n• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.')}</div>
+      <div data-qt-note style="padding:10px 14px;flex:1;font-size:10px;color:#666;min-height:36px;line-height:1.6;white-space:pre-line">${esc(g.quoteNote || '• 본 견적은 유효기간 내에만 유효하며, 자재·환율 변동 시 조정될 수 있습니다.\n• 제품은 선입금 50% 확인 후 제작되며, 잔금 결제 확인 후 출고됩니다.')}</div>
     </div>
     <!-- 푸터 -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:8px;border-top:1px solid #e2e6ee;font-size:9px;color:#888">
@@ -13116,6 +13163,7 @@ async function dlTempQuote(type) {
     b1.textContent = '생성 중...';
     b2.textContent = '생성 중...';
     try {
+        if (!fitTempQuoteDoc()) showToast('⚠️ 한 장에 다 들어가지 않아 아래쪽이 잘린 채로 저장됩니다');
         const canvas = await html2canvas(el, { scale: 3, useCORS: true, backgroundColor: '#fff', logging: false, width: 794, height: 1123, windowWidth: 794, windowHeight: 1123 });
         const dateP = (_tempQuoteGroup.date || '').replace(/-/g, '');
         const fname = dateP + '_케이엘피코리아_' + fileCo(_tempQuoteGroup.client) + '_견적서';
