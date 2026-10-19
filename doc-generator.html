@@ -463,6 +463,7 @@ body:not(.view-mode):not(.quote-only-mode) .preview-area .action-bar,body:not(.v
     <div class="row"><div class="field"><label>수령인 <span class="req">*</span></label><input id="wrRecipient" placeholder="수령인 이름"></div><div class="field"><label>핸드폰번호 <span class="req">*</span></label><input id="wrPhone" placeholder="010-0000-0000"></div></div>
     <div class="row"><div class="field" style="flex:1"><label>주소 <span class="req">*</span></label><input id="wrAddress" placeholder="배송지 주소"></div></div>
   </div>
+  <div class="section"><div class="section-title">📝 메모 (선택)</div><div class="row"><div class="field" style="flex:1"><label>작업요청서에 표시할 메모 <small style="color:#999;font-weight:500">— 디자인확인서를 불러오면 그 메모가 들어와요</small></label><textarea id="wrMemo" rows="2" placeholder="예: 강남지부 353개 10/30 발송, 나머지 11/11" style="width:100%;resize:vertical;font-family:inherit;font-size:14px;padding:9px 12px;border:1px solid #ddd;border-radius:8px;box-sizing:border-box"></textarea></div></div></div>
 
   <div class="section"><div class="section-title">💬 공장 전달 안내 문구</div>
     <div class="wr-emphasis">⚠️ 발송인은 꼭 <span style="color:var(--klp-red);font-size:16px">케이엘피코리아</span> 로 작성해서 발송해주세요</div>
@@ -1118,6 +1119,7 @@ async function selectLinkedDC(id){
   setSelOrCustom('wrPrintMethod',r.print_method,'없음');toggleWrPrintFee();
   setSelOrCustom('wrPackaging',r.packaging,'개별박스');
   document.getElementById('wrDeliveryDate').value=r.delivery_date||'';
+  if(!val('wrMemo'))document.getElementById('wrMemo').value=r.memo||'';
 
   /* 배송 정보 연동 (JSON/구버전 호환 복원) */
   var shipParts=unpackShip(r.delivery_address);
@@ -1281,6 +1283,8 @@ function buildWrDoc(){
   var estRows=0;
   if(we&&we.sup>0){estRows=1;if(we.hasPr)estRows++;if(we.hasPk)estRows++;if(we.hasSh)estRows++;fixedBottom+=26+(estRows*16)+32}
   fixedBottom+=shipBlockH(val('wrRecipient'),val('wrPhone'),val('wrAddress')); /* 배송 정보(동적: 긴 주소 잘림 방지) */
+  var wrMemoTxt=val('wrMemo');
+  if(wrMemoTxt){var wrMemoLines=0;wrMemoTxt.split('\n').forEach(function(ln){wrMemoLines+=Math.max(1,Math.ceil(ln.length/68));});fixedBottom+=24+wrMemoLines*15;} /* 메모(디자인확인서와 같은 방식) */
   var fixedTop=270; /* 헤더+라인+업체+제목+제품테이블 */
   var wrImgMaxH=1123-36-fixedTop-fixedBottom;
   if(wrImgMaxH<100)wrImgMaxH=100;
@@ -1322,6 +1326,7 @@ function buildWrDoc(){
   /* 제품 정보 테이블 */
   '<div style="display:flex;gap:0;border:1px solid #e8e8e5;border-radius:6px;overflow:hidden;flex-shrink:0"><div style="flex:1;border-right:1px solid #e8e8e5"><table style="width:100%;border-collapse:collapse">'+leftRows.map(function(r){return row(r[0],r[1])}).join('')+'</table></div><div style="flex:1"><table style="width:100%;border-collapse:collapse">'+rightRows.map(function(r){return row(r[0],r[1])}).join('')+'</table></div></div>'+
   estHtml+shipHtml+
+  (wrMemoTxt?'<div style="padding:8px 0;border-top:1px solid #e8e8e5;flex-shrink:0"><div style="font-size:10px;font-weight:700;color:#888;letter-spacing:1.5px;margin-bottom:4px">메모</div><div style="font-size:11px;color:#222;line-height:1.5;white-space:pre-wrap;word-break:break-all">'+esc(wrMemoTxt)+'</div></div>':'')+
   /* 발송인 경고 */
   '<div style="padding:8px 14px;background:#FFF5F0;border:2px solid #E67E22;border-radius:6px;text-align:center;flex-shrink:0"><span style="font-size:12px;font-weight:900;color:#c41e3a">⚠️ 발송인은 꼭 케이엘피코리아 로 작성해서 발송해주세요</span></div>'+
   '<div style="flex:1"></div>'+
@@ -1779,6 +1784,7 @@ async function saveWrToDb(){
     shipping_type:val('wrShippingType')||'',shipping_cost:getWrShipCost()||0,shipping_cost_per_box:toNum(val('wrShippingPerBox'))||0,shipping_boxes:toNum(val('wrShippingBoxes'))||0,shipping_vat:val('wrShippingVat')||'VAT 별도',
     delivery_date:val('wrDeliveryDate')||null,
     delivery_address:packShip(val('wrRecipient'),val('wrPhone'),val('wrAddress')),
+    memo:val('wrMemo')||'',
     show_payment_notice:true,
     total_amount:we?we.grand:0,
     status:'작업요청서',
@@ -2045,6 +2051,7 @@ async function loadRecord(id){
       document.getElementById('wrRecipient').value=addrParts[0];
       document.getElementById('wrPhone').value=addrParts[1];
       document.getElementById('wrAddress').value=addrParts[2];
+      document.getElementById('wrMemo').value=r.memo||'';
       /* 이미지 복원 (FIX #10) */
       if(r.images_data){var imgs=unpackImages(r.images_data);wrMainImg=imgs.main;wrSubImgs=imgs.subs}else{wrMainImg=null;wrSubImgs=[]}
       renderWrMainThumb();renderWrSubThumbs();
@@ -2070,6 +2077,8 @@ async function loadRecord(id){
       }
       /* 예전에 인쇄 방법이 빈 값으로 저장된 작업요청서(목록에 없는 방법이라 사라짐) — 인쇄비가 있으면 '없음'으로 보지 않음.
          그대로 두면 인쇄비가 합계에서 빠져 저장한 금액과 서류 금액이 달라졌음 */
+      /* 메모 없는 예전 작업요청서 — 연결된 디자인확인서 메모를 가져옴 (저장하면 같이 저장) */
+      if(!r.memo&&linkedDC&&linkedDC.memo)document.getElementById('wrMemo').value=linkedDC.memo;
       if(!r.print_method&&toNum(r.print_fee)>0){
         var dcPm=linkedDC&&linkedDC.print_method&&linkedDC.print_method!=='없음'?linkedDC.print_method:'기타';
         setSelOrCustom('wrPrintMethod',dcPm,'기타');toggleWrPrintFee();
@@ -2275,6 +2284,7 @@ async function applyProjectPrefillData(pf, opts){
     setVal('wrRecipient',pf.recipient);
     setVal('wrPhone',pf.phone);
     setVal('wrAddress',pf.address);
+    if(pf.memo&&!val('wrMemo'))setVal('wrMemo',pf.memo);
     try{calcWrEst();}catch(e){}
   }
 }
@@ -2544,7 +2554,7 @@ function newWrDoc(){
   document.getElementById('wrColor').value='-';document.getElementById('wrPrintColorSize').value='시안 확인';
   document.getElementById('wrUnit').value='개';document.getElementById('wrUnitPriceVat').value='VAT 별도';
   document.getElementById('wrPrintMethod').value='없음';toggleWrPrintFee();
-  document.getElementById('wrPackaging').value='개별박스';document.getElementById('wrDeliveryDate').value='';
+  document.getElementById('wrPackaging').value='개별박스';document.getElementById('wrDeliveryDate').value='';document.getElementById('wrMemo').value='';
   document.getElementById('wrRequester').value=getLoginManager()||'김현호 팀장';
   renderWrMainThumb();renderWrSubThumbs();
   document.getElementById('wrEstCard').classList.add('hidden');
