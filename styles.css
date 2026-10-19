@@ -6157,3 +6157,5 @@ body.m-on .theme-toggle{display:none}
   .inqb-board { grid-auto-columns: 78vw; }
   .inqb-col { max-height: none; }
 }
+.s-wait{background:var(--yellow-light); color:#b45309}
+[data-theme="dark"] .s-wait{color:var(--yellow)}

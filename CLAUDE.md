@@ -206,7 +206,7 @@
   - AFTER 트리거 `projects_domestic_inquiry_sync` → 체크 시 상담 타임라인에 system 기록 + `inq_sync_stage()`로 상담 상태 자동: 국내 연결 있으면 수주 → 작지 발송 체크 시 제작중 → 전부 납품 시 납품완료 → 납품+잔금+계산서+송금 전부 시 정산완료 (보류·실패는 안 건드림). 그래서 앱은 상태를 직접 바꾸지 않고 `inqReloadInquiry`로 다시 읽음
   - 화면: `inqRenderStage`(10칸 막대 — 상담·견적·수주·디자인확인·작업요청 + `INQ_PAY_STAGES` 선금 입금·잔금 입금·계산서 발행·공급처 송금·납품(2026-10 '납품·정산' 한 칸을 쪼갬) + '지금 할 일' 버튼 — 견적 작성/국내로 넘기기/디자인확인서·작업요청서 만들기/체크), `inqRenderProjs`(국내 진행 칸, 7개 체크 칩 = `inqToggleProjCheck`, 국내 메뉴와 같은 규칙), 고객 정보는 한 줄 요약으로 접힘(`inqContactSummary`)
   - 문서 만들기·국내 상세는 전역 `projects` 배열을 쓰므로 `inqEnsureProject`로 없으면 넣고 호출
-  - 상태 목록: 신규/상담중/견적발송/수주/제작중/납품완료/정산완료/보류/실패. '진행 중' 필터 = 정산완료·보류·실패 제외
+  - 상태 목록: 신규/상담중/가견적/견적발송/대기(고객 답 기다림, 진행 중으로 셈 · 2026-10-19)/수주/제작중/납품완료/정산완료/보류/실패. '진행 중' 필터 = 정산완료·보류·실패 제외
 - **연결된 견적 품목 명세**: `inqQuoteItemHtml`/`inqQuoteBreakdown` — 품목마다 판매·매입 나란히 표(제품 단가×수량, 인쇄·포장·라벨·택배 금액 또는 '단가에 포함', 공급가·부가세·합계, 마진=판매합계−매입합계). 합계는 `calcTempRevenueWithVat`/`calcTempSupRevenueWithVat`와 동일
 - **가견적 (migration 039)**: 디자인 확정 전 예상가 범위. `inquiries.pre_estimate` jsonb `{items:[{item,qty,min,max}], vat, lead, note, sent_at, sent_count}` — 견적(projects_temp)과 분리해 매출·마진·국내 등록에 안 섞임. `inqRenderPre`(보기/편집), `inqPreText`(고객용 안내문), `inqPreAction`: copy(클립보드) / send(우리 답변으로 기록 + sent_at + 상태 신규·상담중→**가견적**) / quote(견적 입력칸에 품목·수량 채우고 단가는 비워 확정가 입력). 상태 순서: 신규/상담중/가견적/견적발송/…
 - **상세 화면 2단 배치**: 위(`.inq-head`) = 거래처·상태·제목 한 줄 + 고객 정보 입력칸 2줄(`#inqFields.inq-hfields`: 담당자 줄·회사 줄, 항상 보이고 바로 수정) + 단계 막대 / 아래 `.inq-body2` = 왼쪽 `.inq-main`(대화 기록, 화면 높이 전체 + 입력칸) · 오른쪽 `.inq-side`(따로 스크롤: `#inqNow` 지금 할 일 → 다음 할 일 → 가견적 → 견적 → 국내 진행 카드). 카드 접기 상태는 localStorage `inq_card_{pre,pj}`·`inq_q_open`. 견적·가견적은 좁은 패널용 품목 카드(`.inq-qi`)로 표시(표 아님). 1100px 이하는 위아래로 쌓임

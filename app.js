@@ -22460,10 +22460,10 @@ function closeClientExportMenu() {
 // 상담 관리 (견적 의뢰 화면 안) — 문의 접수부터 수주/실패까지
 // 상담 건(inquiries) + 타임라인(inquiry_logs), 견적 품목은 projects_temp.inquiry_id로 연결
 // =====================================
-const INQ_STATUSES = ['신규', '상담중', '가견적', '견적발송', '수주', '제작중', '납품완료', '정산완료', '보류', '실패'];
-const INQ_ACTIVE = ['신규', '상담중', '가견적', '견적발송', '수주', '제작중', '납품완료'];   // 정산완료·보류·실패만 '끝난 건'
+const INQ_STATUSES = ['신규', '상담중', '가견적', '견적발송', '대기', '수주', '제작중', '납품완료', '정산완료', '보류', '실패'];
+const INQ_ACTIVE = ['신규', '상담중', '가견적', '견적발송', '대기', '수주', '제작중', '납품완료'];   // 정산완료·보류·실패만 '끝난 건' (대기 = 고객 답 기다리는 중, 보류 = 사실상 취소)
 const INQ_CHANNELS = ['전화', '카톡', '문자', '이메일', '방문', '홈페이지', '기타'];
-const INQ_STATUS_CLS = { '신규': 's-new', '상담중': 's-talk', '가견적': 's-pre', '견적발송': 's-quote', '수주': 's-won', '제작중': 's-make', '납품완료': 's-deliv', '정산완료': 's-done', '보류': 's-hold', '실패': 's-lost' };
+const INQ_STATUS_CLS = { '신규': 's-new', '상담중': 's-talk', '가견적': 's-pre', '견적발송': 's-quote', '대기': 's-wait', '수주': 's-won', '제작중': 's-make', '납품완료': 's-deliv', '정산완료': 's-done', '보류': 's-hold', '실패': 's-lost' };
 const INQ_DIR_LABEL = { in: '고객', out: '우리', memo: '내부 메모' };
 
 let _inqList = [];
@@ -22512,8 +22512,8 @@ function tpInitView() {
 
 // ---------- 한눈에 보기 (상담 진행 현황판) ----------
 // 진행 중 상담을 상태별 칸으로 나눠 한 화면에 — 카드 누르면 상담 관리에서 그 건이 열림
-const INQB_COLS = ['신규', '상담중', '가견적', '견적발송', '수주', '제작중', '납품완료'];
-const INQB_PRE_WON = ['신규', '상담중', '가견적', '견적발송'];   // 연락이 뜸하면 놓칠 수 있는 단계
+const INQB_COLS = ['신규', '상담중', '가견적', '견적발송', '대기', '수주', '제작중', '납품완료'];
+const INQB_PRE_WON = ['신규', '상담중', '가견적', '견적발송', '대기'];   // 연락이 뜸하면 놓칠 수 있는 단계
 const INQB_STALE_DAYS = 7;
 let _inqbWho = (() => { try { return localStorage.getItem('inqb_who') || ''; } catch (_) { return ''; } })();
 let _inqbFocus = '';   // '' | 'late' | 'stale' | 'new'
@@ -22591,7 +22591,7 @@ function inqBoardRender() {
         const n = mine.filter(x => x.status === st).length;
         return `<button type="button" class="inqb-end" data-status="${st}"><span class="inq-st ${INQ_STATUS_CLS[st]}">${st}</span><b>${n}</b></button>`;
     }).join('');
-    const focusLabel = { late: '할 일 날짜가 오늘이거나 지난 건', stale: `견적 전 단계에서 ${INQB_STALE_DAYS}일 넘게 연락 없는 건`, new: '이번 달 새로 들어온 건' }[_inqbFocus];
+    const focusLabel = { late: '할 일 날짜가 오늘이거나 지난 건', stale: `수주 전 단계에서 ${INQB_STALE_DAYS}일 넘게 연락 없는 건`, new: '이번 달 새로 들어온 건' }[_inqbFocus];
 
     el.innerHTML = `
         <div class="inqb-bar">
