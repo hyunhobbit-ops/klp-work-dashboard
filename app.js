@@ -22567,11 +22567,11 @@ function inqBoardRender() {
         const isLate = inqIsOverdue(x), isStale = inqbIsStale(x);
         const who = x.contact_name || x.client_contact || '';
         return `<div class="inqb-card ${isLate ? 'late' : ''}" data-id="${x.id}" role="button" tabindex="0">
+            <div class="inqb-c-who ${x.assignee ? '' : 'none'}">${x.assignee ? escHtml(x.assignee) : '담당 없음'}</div>
             <div class="inqb-c-top">${clientGradeBadge(x.grade)}<b>${escHtml(x.client || '(거래처 미정)')}</b>${amt[x.id] ? `<em>${inqbWon(amt[x.id])}</em>` : ''}</div>
             ${x.title || who ? `<div class="inqb-c-title">${escHtml(x.title || who)}</div>` : ''}
             ${x.next_action ? `<div class="inq-next ${isLate ? 'late' : ''}">▶ ${x.next_action_date ? inqMD(x.next_action_date) + ' · ' : ''}${escHtml(x.next_action)}</div>` : ''}
             <div class="inqb-c-meta">
-                <span>${x.assignee ? escHtml(x.assignee) : '담당 없음'}</span>
                 <span class="${isStale ? 'stale' : ''}">${isStale ? `${d}일째 연락 없음` : '연락 ' + inqRel(x.last_contact_at || x.created_at)}</span>
                 ${x.due_date ? `<span>납기 ${inqMD(x.due_date)}</span>` : ''}
             </div>
@@ -22595,9 +22595,10 @@ function inqBoardRender() {
 
     el.innerHTML = `
         <div class="inqb-bar">
-            <label class="inqb-who">담당
-                <select id="inqbWho">${['', ...people].map(p => `<option value="${escHtml(p)}" ${p === _inqbWho ? 'selected' : ''}>${p ? escHtml(p) : '전체'}</option>`).join('')}</select>
-            </label>
+            <div class="inqb-who" role="group" aria-label="담당자">
+                <span>담당</span>
+                ${['', ...people].map(p => `<button type="button" data-who="${escHtml(p)}" class="${p === _inqbWho ? 'on' : ''}">${p ? escHtml(p) : '전체'}<b>${(p ? _inqList.filter(x => x.assignee === p) : _inqList).filter(x => INQ_ACTIVE.includes(x.status)).length}</b></button>`).join('')}
+            </div>
             <div class="inq-spacer"></div>
             <span class="inqb-ended-lbl">끝난 건</span>${ended}
         </div>
@@ -22610,11 +22611,11 @@ function inqBoardRender() {
         ${focusLabel ? `<div class="inqb-focus">${focusLabel}만 보는 중 · <button type="button" data-focus="">전체 보기</button></div>` : ''}
         <div class="inqb-board">${cols}</div>`;
 
-    el.querySelector('#inqbWho').addEventListener('change', e => {
-        _inqbWho = e.target.value;
+    el.querySelectorAll('[data-who]').forEach(b => b.addEventListener('click', () => {
+        _inqbWho = b.dataset.who;
         try { localStorage.setItem('inqb_who', _inqbWho); } catch (_) {}
         inqBoardRender();
-    });
+    }));
     el.querySelectorAll('[data-focus]').forEach(b => b.addEventListener('click', () => {
         const f = b.dataset.focus;
         _inqbFocus = f && _inqbFocus !== f ? f : '';

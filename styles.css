@@ -6117,8 +6117,15 @@ body.m-on .theme-toggle{display:none}
 .inqb { display: flex; flex-direction: column; gap: 12px; }
 .inqb-empty { padding: 60px 0; text-align: center; color: var(--gray-400); font-weight: 600; }
 .inqb-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.inqb-who { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--gray-600); }
-.inqb-who select { height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 9px; background: var(--white); color: var(--gray-900); font: inherit; font-size: 13px; }
+.inqb-who { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 13px; font-weight: 700; color: var(--gray-600); }
+.inqb-who > span { margin-right: 2px; }
+.inqb-who button { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 1px solid var(--border); border-radius: 17px; background: var(--white); color: var(--gray-700); font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
+.inqb-who button b { font-size: 11.5px; font-weight: 800; color: var(--gray-400); font-variant-numeric: tabular-nums; }
+.inqb-who button:hover { border-color: var(--gray-400); }
+.inqb-who button.on { background: var(--gray-900); border-color: var(--gray-900); color: var(--white); }
+.inqb-who button.on b { color: var(--gray-400); }
+.inqb-c-who { display: inline-block; margin-bottom: 5px; padding: 2px 9px; border-radius: 6px; background: var(--blue-light); color: var(--blue); font-size: 12.5px; font-weight: 800; }
+.inqb-c-who.none { background: var(--gray-100); color: var(--gray-500); }
 .inqb-ended-lbl { font-size: 12px; font-weight: 700; color: var(--gray-400); }
 .inqb-end { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px 0 6px; border: 1px solid var(--border); border-radius: 9px; background: var(--white); cursor: pointer; font: inherit; }
 .inqb-end b { font-size: 12px; color: var(--gray-600); font-variant-numeric: tabular-nums; }
