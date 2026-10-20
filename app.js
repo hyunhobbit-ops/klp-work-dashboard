@@ -22530,6 +22530,16 @@ async function inqBoardEnter() {
         if (document.getElementById('tpBoardView')?.style.display !== 'none') inqBoardRender();
     }
 }
+// 담당자 이름표 색 — 직원 목록 순서대로 색을 하나씩 (사람끼리 겹치지 않게). 목록에 없는 이름은 그 뒤 순서
+function inqbWhoColor(name) {
+    const staff = (typeof meetingStaffList === 'function' ? meetingStaffList() : []).filter(n => n !== '대표님');
+    let i = staff.indexOf(name);
+    if (i < 0) {
+        const extra = [...new Set(_inqList.map(x => x.assignee).filter(n => n && !staff.includes(n)))].sort((a, b) => a.localeCompare(b, 'ko'));
+        i = staff.length + Math.max(0, extra.indexOf(name));
+    }
+    return 'w' + (i % 8);
+}
 function inqbDaysSince(ts) { return ts ? Math.floor((Date.now() - new Date(ts).getTime()) / 86400000) : 999; }
 function inqbIsStale(x) { return INQB_PRE_WON.includes(x.status) && inqbDaysSince(x.last_contact_at || x.created_at) >= INQB_STALE_DAYS; }
 function inqbIsNewThisMonth(x) { return String(x.created_at || '').slice(0, 7) === getTodayStr().slice(0, 7); }
@@ -22567,7 +22577,7 @@ function inqBoardRender() {
         const isLate = inqIsOverdue(x), isStale = inqbIsStale(x);
         const who = x.contact_name || x.client_contact || '';
         return `<div class="inqb-card ${isLate ? 'late' : ''}" data-id="${x.id}" role="button" tabindex="0">
-            <div class="inqb-c-who ${x.assignee ? '' : 'none'}">${x.assignee ? escHtml(x.assignee) : '담당 없음'}</div>
+            <div class="inqb-c-who ${x.assignee ? inqbWhoColor(x.assignee) : 'none'}">${x.assignee ? escHtml(x.assignee) : '담당 없음'}</div>
             <div class="inqb-c-top">${clientGradeBadge(x.grade)}<b>${escHtml(x.client || '(거래처 미정)')}</b>${amt[x.id] ? `<em>${inqbWon(amt[x.id])}</em>` : ''}</div>
             ${x.title || who ? `<div class="inqb-c-title">${escHtml(x.title || who)}</div>` : ''}
             ${x.next_action ? `<div class="inq-next ${isLate ? 'late' : ''}">▶ ${x.next_action_date ? inqMD(x.next_action_date) + ' · ' : ''}${escHtml(x.next_action)}</div>` : ''}
@@ -22597,7 +22607,7 @@ function inqBoardRender() {
         <div class="inqb-bar">
             <div class="inqb-who" role="group" aria-label="담당자">
                 <span>담당</span>
-                ${['', ...people].map(p => `<button type="button" data-who="${escHtml(p)}" class="${p === _inqbWho ? 'on' : ''}">${p ? escHtml(p) : '전체'}<b>${(p ? _inqList.filter(x => x.assignee === p) : _inqList).filter(x => INQ_ACTIVE.includes(x.status)).length}</b></button>`).join('')}
+                ${['', ...people].map(p => `<button type="button" data-who="${escHtml(p)}" class="${p === _inqbWho ? 'on' : ''}">${p ? `<i class="inqb-dot ${inqbWhoColor(p)}"></i>${escHtml(p)}` : '전체'}<b>${(p ? _inqList.filter(x => x.assignee === p) : _inqList).filter(x => INQ_ACTIVE.includes(x.status)).length}</b></button>`).join('')}
             </div>
             <div class="inq-spacer"></div>
             <span class="inqb-ended-lbl">끝난 건</span>${ended}

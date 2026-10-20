@@ -6126,6 +6126,24 @@ body.m-on .theme-toggle{display:none}
 .inqb-who button.on b { color: var(--gray-400); }
 .inqb-c-who { display: inline-block; margin-bottom: 5px; padding: 2px 9px; border-radius: 6px; background: var(--blue-light); color: var(--blue); font-size: 12.5px; font-weight: 800; }
 .inqb-c-who.none { background: var(--gray-100); color: var(--gray-500); }
+.inqb-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+/* 담당자별 이름표 색 (inqbWhoColor) */
+.inqb-c-who.w0 { background: #E8F0FE; color: #1B64DA; } .inqb-dot.w0 { background: #1B64DA; }
+[data-theme="dark"] .inqb-c-who.w0 { background: #1d2f4f; color: #8AB4F8; } [data-theme="dark"] .inqb-dot.w0 { background: #8AB4F8; }
+.inqb-c-who.w1 { background: #FDECEC; color: #C2410C; } .inqb-dot.w1 { background: #C2410C; }
+[data-theme="dark"] .inqb-c-who.w1 { background: #3f2219; color: #FDBA74; } [data-theme="dark"] .inqb-dot.w1 { background: #FDBA74; }
+.inqb-c-who.w2 { background: #E7F6EC; color: #15803D; } .inqb-dot.w2 { background: #15803D; }
+[data-theme="dark"] .inqb-c-who.w2 { background: #16301f; color: #86EFAC; } [data-theme="dark"] .inqb-dot.w2 { background: #86EFAC; }
+.inqb-c-who.w3 { background: #F3E8FF; color: #7C3AED; } .inqb-dot.w3 { background: #7C3AED; }
+[data-theme="dark"] .inqb-c-who.w3 { background: #2e2140; color: #C4B5FD; } [data-theme="dark"] .inqb-dot.w3 { background: #C4B5FD; }
+.inqb-c-who.w4 { background: #FFF4D6; color: #A16207; } .inqb-dot.w4 { background: #A16207; }
+[data-theme="dark"] .inqb-c-who.w4 { background: #3a2f14; color: #FCD34D; } [data-theme="dark"] .inqb-dot.w4 { background: #FCD34D; }
+.inqb-c-who.w5 { background: #E0F7FA; color: #0E7490; } .inqb-dot.w5 { background: #0E7490; }
+[data-theme="dark"] .inqb-c-who.w5 { background: #123238; color: #67E8F9; } [data-theme="dark"] .inqb-dot.w5 { background: #67E8F9; }
+.inqb-c-who.w6 { background: #FCE7F3; color: #BE185D; } .inqb-dot.w6 { background: #BE185D; }
+[data-theme="dark"] .inqb-c-who.w6 { background: #3d1a2c; color: #F9A8D4; } [data-theme="dark"] .inqb-dot.w6 { background: #F9A8D4; }
+.inqb-c-who.w7 { background: #ECEFF3; color: #334155; } .inqb-dot.w7 { background: #334155; }
+[data-theme="dark"] .inqb-c-who.w7 { background: #262c34; color: #CBD5E1; } [data-theme="dark"] .inqb-dot.w7 { background: #CBD5E1; }
 .inqb-ended-lbl { font-size: 12px; font-weight: 700; color: var(--gray-400); }
 .inqb-end { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px 0 6px; border: 1px solid var(--border); border-radius: 9px; background: var(--white); cursor: pointer; font: inherit; }
 .inqb-end b { font-size: 12px; color: var(--gray-600); font-variant-numeric: tabular-nums; }
