@@ -6184,3 +6184,6 @@ body.m-on .theme-toggle{display:none}
 }
 .s-wait{background:var(--yellow-light); color:#b45309}
 [data-theme="dark"] .s-wait{color:var(--yellow)}
+.s-close{background:#1a8a41; color:#fff}
+[data-theme="dark"] .s-close{background:var(--green); color:#0b1a10}
+.inqb-col header small { font-size: 11px; font-weight: 700; color: var(--gray-400); }

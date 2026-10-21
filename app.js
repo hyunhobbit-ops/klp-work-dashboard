@@ -2389,6 +2389,10 @@ async function toggleProjectCheck(id, key) {
     if (allChecked && p.status !== '완료') {
         p.status = '완료';
         update.status = '완료';
+    } else if (!allChecked && p.status === '완료' && p.category !== '해외 주문') {
+        // 국내: 다 체크해서 완료됐다가 하나를 풀면 다시 진행 중 (DB 트리거 migration 064 와 같은 규칙)
+        p.status = '진행 중';
+        update.status = '진행 중';
     } else if (!allChecked && p.category !== '해외 주문' && ['시작 전', '진행 중', '', undefined, null].includes(p.status)) {
         // 국내: 하나라도 체크 → 진행 중, 하나도 없으면 → 시작 전 (DB 트리거 migration 061 과 같은 규칙 — 화면에 바로 반영)
         p.status = CHECK_ITEMS.some(item => !!p.checks[item.key]) ? '진행 중' : '시작 전';
@@ -22460,10 +22464,10 @@ function closeClientExportMenu() {
 // 상담 관리 (견적 의뢰 화면 안) — 문의 접수부터 수주/실패까지
 // 상담 건(inquiries) + 타임라인(inquiry_logs), 견적 품목은 projects_temp.inquiry_id로 연결
 // =====================================
-const INQ_STATUSES = ['신규', '상담중', '가견적', '견적발송', '수주', '제작중', '납품완료', '정산완료', '대기', '보류', '실패'];   // 대기는 보류 위 (고르는 칸 아래쪽)
+const INQ_STATUSES = ['신규', '상담중', '가견적', '견적발송', '수주', '제작중', '납품완료', '정산완료', '마감', '대기', '보류', '실패'];   // 대기는 보류 위 (고르는 칸 아래쪽)
 const INQ_ACTIVE = ['신규', '상담중', '가견적', '견적발송', '대기', '수주', '제작중', '납품완료'];   // 정산완료·보류·실패만 '끝난 건' (대기 = 고객 답 기다리는 중, 보류 = 사실상 취소)
 const INQ_CHANNELS = ['전화', '카톡', '문자', '이메일', '방문', '홈페이지', '기타'];
-const INQ_STATUS_CLS = { '신규': 's-new', '상담중': 's-talk', '가견적': 's-pre', '견적발송': 's-quote', '대기': 's-wait', '수주': 's-won', '제작중': 's-make', '납품완료': 's-deliv', '정산완료': 's-done', '보류': 's-hold', '실패': 's-lost' };
+const INQ_STATUS_CLS = { '신규': 's-new', '상담중': 's-talk', '가견적': 's-pre', '견적발송': 's-quote', '대기': 's-wait', '수주': 's-won', '제작중': 's-make', '납품완료': 's-deliv', '정산완료': 's-done', '마감': 's-close', '보류': 's-hold', '실패': 's-lost' };
 const INQ_DIR_LABEL = { in: '고객', out: '우리', memo: '내부 메모' };
 
 let _inqList = [];
@@ -22512,7 +22516,7 @@ function tpInitView() {
 
 // ---------- 한눈에 보기 (상담 진행 현황판) ----------
 // 진행 중 상담을 상태별 칸으로 나눠 한 화면에 — 카드 누르면 상담 관리에서 그 건이 열림
-const INQB_COLS = ['신규', '상담중', '가견적', '견적발송', '수주', '제작중', '납품완료', '대기'];   // 대기는 맨 끝 칸
+const INQB_COLS = ['신규', '상담중', '가견적', '견적발송', '수주', '제작중', '납품완료', '대기', '마감'];   // 대기 다음 맨 끝 = 마감(이번 달에 마감된 것만)
 const INQB_PRE_WON = ['신규', '상담중', '가견적', '견적발송', '대기'];   // 연락이 뜸하면 놓칠 수 있는 단계
 const INQB_STALE_DAYS = 7;
 let _inqbWho = (() => { try { return localStorage.getItem('inqb_who') || ''; } catch (_) { return ''; } })();
@@ -22589,15 +22593,18 @@ function inqBoardRender() {
     };
     const sortCards = (a, b) => (inqIsOverdue(b) - inqIsOverdue(a)) || (inqbIsStale(b) - inqbIsStale(a))
         || String(b.last_contact_at || '').localeCompare(String(a.last_contact_at || ''));
+    // 마감 칸 = 이번 달에 마감된 건 (모든 체크 완료 → DB가 '마감'으로 바꿈, migration 064)
+    const ym = getTodayStr().slice(0, 7);
+    const closed = mine.filter(x => x.status === '마감' && String(x.updated_at || x.last_contact_at || '').slice(0, 7) === ym);
     const cols = INQB_COLS.map(st => {
-        const list = shown.filter(x => x.status === st).sort(sortCards);
+        const list = (st === '마감' ? (_inqbFocus ? [] : closed) : shown.filter(x => x.status === st)).sort(sortCards);
         const sum = list.reduce((s, x) => s + (amt[x.id] || 0), 0);
         return `<section class="inqb-col">
-            <header><span class="inq-st ${INQ_STATUS_CLS[st] || ''}">${st}</span><b>${list.length}</b>${sum ? `<em>${inqbWon(sum)}</em>` : ''}</header>
+            <header><span class="inq-st ${INQ_STATUS_CLS[st] || ''}">${st}</span><b>${list.length}</b>${st === '마감' ? '<small>이번 달</small>' : ''}${sum ? `<em>${inqbWon(sum)}</em>` : ''}</header>
             <div class="inqb-cards">${list.map(card).join('') || '<div class="inqb-none">없음</div>'}</div>
         </section>`;
     }).join('');
-    const ended = ['정산완료', '보류', '실패'].map(st => {
+    const ended = ['정산완료', '마감', '보류', '실패'].map(st => {
         const n = mine.filter(x => x.status === st).length;
         return `<button type="button" class="inqb-end" data-status="${st}"><span class="inq-st ${INQ_STATUS_CLS[st]}">${st}</span><b>${n}</b></button>`;
     }).join('');
@@ -24459,7 +24466,7 @@ function inqStages(x) {
     const kDate = k => inqMaxDate(projs.map(p => (CHECK_INFO[k] && p[CHECK_INFO[k].col + '_date']) || inqDateOf((p.check_dates || {})[k])));   // 직접 입력한 날짜 우선
     const st = [];
     st.push({ key: 'talk', label: '상담', done: true, sub: x.started_at ? inqMD(x.started_at) : '' });
-    const qDone = quotes.length > 0 || ['견적발송', '수주', '제작중', '납품완료', '정산완료'].includes(x.status);
+    const qDone = quotes.length > 0 || ['견적발송', '수주', '제작중', '납품완료', '정산완료', '마감'].includes(x.status);
     const pre = x.pre_estimate && (x.pre_estimate.items || []).length ? x.pre_estimate : null;
     st.push({ key: 'quote', label: '견적', done: qDone,
         sub: quotes.length ? inqMD(inqMinDate(quotes.map(q => q.date))) + ' 발송' : (pre && pre.sent_at ? '가견적 ' + inqMD(inqDateOf(pre.sent_at)) : (pre ? '가견적 작성' : '')) });
