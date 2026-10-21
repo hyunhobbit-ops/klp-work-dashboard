@@ -1645,6 +1645,10 @@
                                     <input id="cashSnapBalance" placeholder="예: 11,000,000" inputmode="decimal" style="padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:14px;width:100%;background:var(--white);color:var(--gray-900);font-family:inherit;text-align:right">
                                 </div>
                             </div>
+                            <div class="field" id="cashSnapLimitWrap" style="display:none">
+                                <label style="color:var(--gray-900)">대출 한도 <span style="font-weight:400;color:var(--text-tertiary);font-size:11px">— 남은 한도 계산용, 바뀌었을 때만 고치세요</span></label>
+                                <input id="cashSnapLimit" placeholder="예: 150,000,000" inputmode="numeric" oninput="fmtCommaTemp(this)" style="padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:10px;font-size:14px;width:100%;background:var(--white);color:var(--gray-900);font-family:inherit">
+                            </div>
                             <div class="field">
                                 <label style="color:var(--gray-900)">증빙 이미지 (선택) <span style="font-weight:400;color:var(--text-tertiary);font-size:11px">— 업로드하면 OCR로 잔액 자동 추출</span></label>
                                 <input type="file" id="cashSnapImage" accept="image/*" style="padding:8px;border:1.5px dashed var(--gray-300);border-radius:10px;font-size:13px;width:100%;background:var(--gray-50);color:var(--gray-900);font-family:inherit">
@@ -1944,6 +1948,6 @@
     </div>
 
     <script src="send-kit.js?v=20261001i"></script>
-    <script src="app.js?v=20261021c"></script>
+    <script src="app.js?v=20261021d"></script>
 </body>
 </html>

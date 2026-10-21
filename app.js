@@ -19102,6 +19102,15 @@ function _categoryTotal(catId) {
     return totals;
 }
 
+// 대출 남은 한도 = 한도(credit_limit, migration 066) − 대출잔액. 한도 없는 계좌는 null
+function _loanRoom(a) {
+    if (a.category !== 'loan' || !(Number(a.credit_limit) > 0)) return null;
+    const latest = cashLatestByAccount[a.id];
+    const used = latest ? Math.abs(Number(latest.balance) || 0) : 0;
+    const limit = Number(a.credit_limit);
+    return { limit, used, room: Math.max(0, limit - used), pct: Math.min(100, Math.round(used / limit * 100)) };
+}
+
 function renderCashDashboard() {
     const summary = document.getElementById('cashSummaryPanel');
     const sections = document.getElementById('cashSections');
@@ -19114,9 +19123,17 @@ function renderCashDashboard() {
             ? Object.entries(totals).map(([cur, v]) => _fmtCurrency(v, cur)).join(' / ')
             : '<span style="color:var(--text-tertiary)">데이터 없음</span>';
         const isNeg = Object.values(totals).some(v => v < 0);
+        let extra = '';
+        if (cat.id === 'loan') {
+            const rooms = cashAccounts.map(_loanRoom).filter(Boolean);
+            if (rooms.length) {
+                const room = rooms.reduce((t, r) => t + r.room, 0), limit = rooms.reduce((t, r) => t + r.limit, 0);
+                extra = `<div style="font-size:12px;font-weight:700;color:${room > 0 ? '#12B76A' : '#E03131'};margin-top:4px">남은 한도 ${_fmtCurrency(room, 'KRW')}<span style="color:var(--text-tertiary);font-weight:500"> / 한도 ${_fmtCurrency(limit, 'KRW')}</span></div>`;
+            }
+        }
         return `<div style="flex:1;min-width:180px;padding:14px 16px;background:var(--gray-50);border-radius:12px;border:1px solid var(--gray-100)">
             <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:4px">${cat.icon} ${cat.label}</div>
-            <div style="font-size:16px;font-weight:800;color:${isNeg ? '#E03131' : 'var(--text-primary)'};letter-spacing:-.3px">${display}</div>
+            <div style="font-size:16px;font-weight:800;color:${isNeg ? '#E03131' : 'var(--text-primary)'};letter-spacing:-.3px">${display}</div>${extra}
         </div>`;
     }).join('');
 
@@ -19143,6 +19160,12 @@ function renderCashDashboard() {
                 <div style="min-width:0;flex:1">
                     <div style="font-size:14px;font-weight:700;color:var(--text-primary)">${escHtml(a.label)}${nick}</div>
                     <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">${escHtml(a.account_number || '계좌번호 없음')} · 최근 ${dateStr}${sourceBadge}</div>
+                    ${(r => r ? `<div style="margin-top:8px;max-width:420px">
+                        <div style="height:6px;border-radius:3px;background:var(--gray-100);overflow:hidden"><div style="height:100%;width:${r.pct}%;background:${r.room > 0 ? '#F59E0B' : '#E03131'}"></div></div>
+                        <div style="display:flex;justify-content:space-between;gap:8px;margin-top:4px;font-size:12px;font-weight:700">
+                            <span style="color:${r.room > 0 ? '#12B76A' : '#E03131'}">남은 한도 ${_fmtCurrency(r.room, 'KRW')}</span>
+                            <span style="color:var(--text-tertiary);font-weight:500">한도 ${_fmtCurrency(r.limit, 'KRW')} 중 ${r.pct}% 사용</span>
+                        </div></div>` : '')(_loanRoom(a))}
                 </div>
                 <div style="font-size:16px;font-weight:800;color:${isNeg ? '#E03131' : 'var(--text-primary)'};letter-spacing:-.3px;white-space:nowrap">${balStr}</div>
             </div>`;
@@ -19170,6 +19193,15 @@ function openCashSnapshotModal(accountId) {
         return `<option value="${a.id}" data-currency="${a.currency}">[${catLabel}] ${escHtml(a.label)}${escHtml(nick)} — ${a.currency}</option>`;
     }).join('');
     if (accountId) sel.value = accountId;
+    // 대출 계좌면 한도 칸 보이기 (migration 066)
+    const syncLimit = () => {
+        const a = cashAccounts.find(x => x.id === Number(sel.value));
+        const isLoan = !!a && a.category === 'loan';
+        document.getElementById('cashSnapLimitWrap').style.display = isLoan ? '' : 'none';
+        document.getElementById('cashSnapLimit').value = isLoan && Number(a.credit_limit) > 0 ? Number(a.credit_limit).toLocaleString() : '';
+    };
+    sel.onchange = syncLimit;
+    syncLimit();
     document.getElementById('cashSnapDate').value = getTodayStr();
     document.getElementById('cashSnapBalance').value = '';
     document.getElementById('cashSnapImage').value = '';
@@ -19287,6 +19319,12 @@ async function saveCashSnapshot() {
     try {
         const { error } = await sb.from('cash_snapshots').insert(row);
         if (error) throw error;
+        const acc = cashAccounts.find(x => x.id === accountId);
+        const limRaw = (document.getElementById('cashSnapLimit').value || '').replace(/[^0-9]/g, '');
+        if (acc && acc.category === 'loan' && limRaw && Number(limRaw) !== Number(acc.credit_limit || 0)) {
+            const { error: le } = await sb.from('cash_accounts').update({ credit_limit: Number(limRaw), updated_at: new Date().toISOString() }).eq('id', accountId);
+            if (le) showToast('한도 저장 실패: ' + le.message);
+        }
         showToast('잔액이 등록되었습니다');
         closeCashSnapshotModal();
         await loadCashDashboard();
