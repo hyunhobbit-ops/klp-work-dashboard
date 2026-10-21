@@ -19045,7 +19045,8 @@ const CASH_CATEGORIES = [
     { id: 'foreign',  label: '외화',       icon: '🌐', hint: '외화예금 잔액 (USD)' },
     { id: 'pension',  label: '퇴직연금',   icon: '🎯', hint: 'DC형 퇴직연금 잔액' },
     { id: 'payoneer', label: '페이오니아', icon: '💳', hint: 'Payoneer 잔액 (USD)' },
-    { id: 'shopify',  label: '쇼피파이',   icon: '🛍️', hint: 'Shopify 정산 잔액 (USD)' }
+    { id: 'shopify',  label: '쇼피파이',   icon: '🛍️', hint: 'Shopify 정산 잔액 (USD)' },
+    { id: 'receivable', label: '미수금',   icon: '📥', hint: '아직 입금 안 된 받을 돈 — 들어오면 0으로 업데이트' }   // migration 065
 ];
 
 let cashAccounts = [];           // cash_accounts rows
