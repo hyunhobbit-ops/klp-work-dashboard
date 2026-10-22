@@ -6226,8 +6226,8 @@ body.m-on .theme-toggle{display:none}
 .cl-card h3{font-size:13px; font-weight:800; color:var(--gray-500); margin:0 0 8px}
 .cl-summary{font-size:15.5px; line-height:1.7; color:var(--gray-900); margin:0}
 .cl-todos{display:flex; flex-direction:column; gap:6px}
-.cl-todo{display:flex; gap:9px; align-items:flex-start; font-size:14.5px; color:var(--gray-900); cursor:pointer; line-height:1.5}
-.cl-todo input{width:17px; height:17px; margin-top:2px; flex:none}
+.cl-todo{display:flex; gap:9px; align-items:flex-start; font-size:14.5px; color:var(--gray-900); line-height:1.5}
+.cl-todo input[type=checkbox]{width:17px; height:17px; margin-top:2px; flex:none}
 .cl-todo.done span{color:var(--gray-400); text-decoration:line-through}
 .cl-todo i{font-style:normal; font-size:11.5px; color:var(--gray-500); text-decoration:none; display:inline-block}
 .cl-todo-add{margin-top:10px}
@@ -6242,8 +6242,35 @@ body.m-on .theme-toggle{display:none}
 .cl-bub b{display:block; font-size:11.5px; color:var(--gray-500); margin-bottom:2px}
 .cl-say.me .cl-bub{background:var(--blue); color:#fff}
 .cl-say.me .cl-bub b{color:rgba(255,255,255,.8)}
+.cl-h-who{font-size:16px; font-weight:700; color:var(--gray-600); margin-left:4px}
+.cl-two{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px}
+.cl-two .cl-card{min-width:0}
+.cl-card h3{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.cl-card h3 .mn-muted{font-weight:600; font-size:11.5px}
+.cl-fields{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px 10px}
+.cl-fields label{display:flex; flex-direction:column; gap:3px; min-width:0}
+.cl-fields label span{font-size:11.5px; font-weight:700; color:var(--gray-500)}
+.cl-fields .form-input{width:100%; height:36px; font-size:14px}
+.cl-inq{display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border, var(--gray-200)); border-radius:10px; margin-bottom:8px}
+.cl-inq-b{flex:1; min-width:0; display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; font-size:14px}
+.cl-inq-b > span:last-child{flex-basis:100%; font-size:12.5px; color:var(--gray-600); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.cl-new-badge{font-size:11.5px; font-weight:800; color:var(--blue); background:var(--blue-light); border-radius:6px; padding:2px 7px}
+.cl-newinq{width:100%; height:40px; margin:2px 0 10px}
+.cl-inq-find .form-input{width:100%; height:36px; font-size:13.5px; margin-bottom:8px}
+.cl-link-btn{border:0; background:transparent; color:var(--gray-500); font:inherit; font-size:12px; cursor:pointer; padding:2px 0; text-decoration:underline}
+.cl-sendall{margin-left:auto; height:30px}
+.cl-todo{align-items:center; flex-wrap:wrap; padding:6px 0; border-bottom:1px dashed var(--gray-100)}
+.cl-todo:last-child{border-bottom:0}
+.cl-todo input[type=checkbox]{margin-top:0}
+.cl-todo-t{flex:1; min-width:180px}
+.cl-todo.done .cl-todo-t{color:var(--gray-400); text-decoration:line-through}
+.cl-who{height:32px; font-size:13px; padding:0 8px; width:auto}
+.cl-due{height:32px; font-size:13px; padding:0 8px; width:140px}
+.cl-send{height:32px}
+.cl-sent{font-size:12px; font-weight:700; color:#1a8a41; background:var(--green-light); border-radius:6px; padding:3px 8px}
 @media (max-width:900px){
   .cl-stats{grid-template-columns:repeat(2, minmax(0,1fr))}
+  .cl-two{grid-template-columns:minmax(0,1fr)}
   .cl{grid-template-columns:minmax(0,1fr); height:auto}
   .cl-side{max-height:50vh}
   .cl-bub{max-width:88%}

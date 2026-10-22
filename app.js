@@ -14258,12 +14258,17 @@ function planningCanSeeProject(p) {
     return false;
 }
 // ===================== 통화 기록 (calls · call_lines, migration 067) =====================
-// 맥미니가 회사 인터넷전화를 수집 → 받아쓰기·요약해서 calls에 넣음. 여기는 보기·할 일 체크·메모·확인 완료만
+// 맥미니가 회사 인터넷전화를 수집 → 받아쓰기·요약해서 calls에 넣음. 여기는 보기·고객 정보 고치기·상담 연결·할 일 보내기·메모·확인 완료
 // 직원 전원이 회사 전체 통화를 봄. 목록은 녹취록 없이 가볍게, 녹취록·녹음은 열 때 불러옴
+// 상담 연결(migration 068): 진행 중 상담이 하나면 맥미니가 자동 기록(inquiry_link 'auto'), 아니면 여기서 고르거나 새 상담으로 등록('new')
 let _clList = [], _clLines = [], _clLoaded = false, _clSel = null, _clWho = 'all', _clFilter = 'all', _clQ = '', _clChan = null;
 let _clLimit = 300, _clHasMore = false;
 const _clDetail = {};            // id → {transcript, audioUrl}
-const CL_LIST_COLS = 'id, line_id, line_number, direction, other_number, client_id, client_name, started_at, duration_sec, answered, status, error, summary, topic, todos, memo, checked, checked_by, checked_at, audio_path';
+const _clInq = {};               // 통화 id → {linked:{…}|null, cands:[…]} (상담 카드용)
+const CL_LIST_COLS = 'id, line_id, line_number, direction, other_number, client_id, client_name, started_at, duration_sec, answered, status, error, summary, topic, todos, memo, checked, checked_by, checked_at, audio_path, contact_name, contact_dept, contact_title, contact_phone, contact_email, inquiry_title, inquiry_id, inquiry_log_id, inquiry_link';
+const CL_CONTACT_FIELDS = [['client_name', '회사명'], ['contact_name', '담당자'], ['contact_dept', '부서'], ['contact_title', '직함'], ['contact_phone', '연락처'], ['contact_email', '이메일']];
+function clPeople() { return assigneeOptionList().filter(n => n !== '전체' && n !== '임원'); }   // 할 일 받을 사람 (KLP: 대표님 포함)
+function clWhoName(n) { return DISPLAY_NAME_MAP[n] || n || ''; }
 function clEsc(s) { return planningEsc(String(s == null ? '' : s)); }
 function clMe() { return (typeof inqMe === 'function' ? inqMe() : '') || (currentUser && currentUser.name) || ''; }
 function clLine(c) { return _clLines.find(l => l.id === c.line_id) || null; }
@@ -14439,7 +14444,7 @@ async function callsRenderMain() {
     const c = _clList.find(x => x.id === _clSel);
     if (!c) { main.innerHTML = `<div class="mn-empty big">왼쪽에서 통화를 고르세요</div>`; return; }
     main.innerHTML = `<div class="mn-doc"><div class="mn-loading">불러오는 중…</div></div>`;
-    const d = await callsDetail(c);
+    const [d] = await Promise.all([callsDetail(c), callsLoadInq(c)]);
     if (_clSel !== c.id) return;
     const l = clLine(c);
     const todos = Array.isArray(c.todos) ? c.todos : [];
@@ -14450,8 +14455,8 @@ async function callsRenderMain() {
         <div class="mn-doc-head">
           <div>
             <div class="mn-doc-cat">${c.answered ? (c.direction === 'out' ? '↗ 건 전화' : '↙ 받은 전화') : '✕ 부재중'} · ${clEsc(l ? l.label : clLineName(c))}${l && l.number ? ` (${clEsc(l.number)})` : ''}</div>
-            <h1>${clEsc(clOther(c))}</h1>
-            <div class="mn-doc-meta">${clDay(c.started_at)} ${clTime(c.started_at)}${c.answered ? ' · ' + clDur(c.duration_sec) : ''}${c.client_name && c.other_number ? ' · ' + clEsc(c.other_number) : ''}${c.topic ? ' · ' + clEsc(c.topic) : ''}</div>
+            <h1>${clEsc(clOther(c))}${c.contact_name ? ` <span class="cl-h-who">${clEsc(c.contact_name)}${c.contact_title ? ' ' + clEsc(c.contact_title) : ''}</span>` : ''}</h1>
+            <div class="mn-doc-meta">${clDay(c.started_at)} ${clTime(c.started_at)}${c.answered ? ' · ' + clDur(c.duration_sec) : ''}${c.other_number ? ' · ' + clEsc(c.other_number) : ''}${c.topic ? ' · ' + clEsc(c.topic) : ''}</div>
           </div>
           <div class="mn-doc-act">
             ${c.checked
@@ -14465,14 +14470,22 @@ async function callsRenderMain() {
           <h3>요약</h3>
           <p class="cl-summary">${c.summary ? clEsc(c.summary).replace(/\n/g, '<br>') : '<span class="mn-muted">요약이 아직 없어요</span>'}</p>
         </section>
+        <div class="cl-two">
+          <section class="cl-card">
+            <h3>고객 정보 <span class="mn-muted">통화 내용으로 미리 채움 · 고치면 바로 저장</span></h3>
+            <div class="cl-fields">
+              ${CL_CONTACT_FIELDS.map(([f, label]) => `
+                <label><span>${label}</span><input class="form-input" data-f="${f}" value="${clEsc(c[f])}" placeholder="${label}"
+                  onchange="callsSaveField(${c.id}, this.dataset.f, this.value)"></label>`).join('')}
+            </div>
+          </section>
+          <section class="cl-card" id="clInqCard">${callsInqCardHtml(c)}</section>
+        </div>
         <section class="cl-card">
-          <h3>할 일 <span class="mn-muted">${todos.length ? `${todos.length - clTodosLeft(c)}/${todos.length}` : ''}</span></h3>
+          <h3>할 일 <span class="mn-muted">${todos.length ? `${todos.length - clTodosLeft(c)}/${todos.length} 완료 · 담당자를 고르고 📤 보내면 그 사람 일일계획표에 등록` : ''}</span>
+            ${todos.some(t => !t.sent_at && !t.done) ? `<button class="pl-btn cl-sendall" onclick="callsSendAllTodos(${c.id})">📤 남은 할 일 모두 보내기</button>` : ''}</h3>
           <div class="cl-todos">
-            ${todos.map((t, i) => `
-              <label class="cl-todo${t.done ? ' done' : ''}">
-                <input type="checkbox" ${t.done ? 'checked' : ''} onchange="callsToggleTodo(${c.id}, ${i}, this.checked)">
-                <span>${clEsc(t.text)}${t.done && t.done_by ? ` <i>${clEsc(t.done_by)}</i>` : ''}</span>
-              </label>`).join('') || '<span class="mn-muted">통화에서 나온 할 일이 없어요</span>'}
+            ${todos.map((t, i) => callsTodoRowHtml(c, t, i)).join('') || '<span class="mn-muted">통화에서 나온 할 일이 없어요</span>'}
           </div>
           <div class="cl-todo-add">
             <input class="form-input" id="clTodoNew" placeholder="할 일 직접 추가 (Enter)" onkeydown="if(event.key==='Enter'&&!event.isComposing){callsAddTodo(${c.id})}">
@@ -14488,7 +14501,7 @@ async function callsRenderMain() {
             ${tx.map(s => `
               <div class="cl-say ${s.who === 'me' ? 'me' : 'other'}">
                 <button class="cl-ts" onclick="callsSeek(${Number(s.start) || 0})">${clDur(Math.floor(Number(s.start) || 0))}</button>
-                <div class="cl-bub"><b>${s.who === 'me' ? clEsc(l ? l.staff_name || l.label : '우리') : clEsc(c.client_name || '상대방')}</b>${clEsc(s.text)}</div>
+                <div class="cl-bub"><b>${s.who === 'me' ? clEsc(l ? l.staff_name || l.label : '우리') : clEsc(c.contact_name || c.client_name || '상대방')}</b>${clEsc(s.text)}</div>
               </div>`).join('') || '<span class="mn-muted">녹취록이 없어요</span>'}
           </div>
         </section>
@@ -14512,20 +14525,258 @@ async function callsCheck(id, on) {
     if (!ok) return;
     callsRenderStats(); callsRenderList(); callsRenderMain();
 }
+async function callsSaveField(id, f, v) {
+    if (!CL_CONTACT_FIELDS.some(([k]) => k === f)) return;
+    v = String(v || '').trim();
+    if (f === 'contact_phone') v = inqNormPhone(v);
+    if (!(await callsPatch(id, { [f]: v }))) return;
+    callsRenderList();
+    if (f === 'client_name' || f === 'contact_phone') {           // 회사·연락처가 바뀌면 관련 상담을 다시 찾음
+        const c = _clList.find(x => x.id === id);
+        delete _clInq[id];
+        if (c) { await callsLoadInq(c); callsRenderInqCard(c); }
+    }
+}
+
+// ---------- 상담 연결 ----------
+const CL_INQ_COLS = 'id, client, title, status, contact_name, last_contact_at';
+async function callsLoadInq(c) {
+    if (_clInq[c.id]) return _clInq[c.id];
+    const r = { linked: null, cands: [], search: null };
+    if (c.inquiry_id) {
+        const { data } = await sb.from('inquiries').select(CL_INQ_COLS).eq('id', c.inquiry_id).maybeSingle();
+        r.linked = data || { id: c.inquiry_id, client: '(지워진 상담)', title: '', status: '' };
+    } else if (c.answered) {
+        const { data, error } = await sb.rpc('call_find_inquiries', { p_company: 0, p_name: c.client_name || '', p_number: c.contact_phone || c.other_number || '' });
+        if (error) console.error('관련 상담 찾기 실패', error);
+        r.cands = data || [];
+    }
+    return (_clInq[c.id] = r);
+}
+function callsInqRowHtml(c, x, act) {
+    return `<div class="cl-inq">
+        <div class="cl-inq-b"><b>${clEsc(x.client)}</b>${x.status ? ` <span class="inq-st ${INQ_STATUS_CLS[x.status] || ''}">${clEsc(x.status)}</span>` : ''}
+          <span>${clEsc(x.title || '')}${x.contact_name ? ' · ' + clEsc(x.contact_name) : ''}</span></div>
+        ${act}
+      </div>`;
+}
+function callsInqCardHtml(c) {
+    const r = _clInq[c.id] || { linked: null, cands: [] };
+    if (!c.answered) return `<h3>상담</h3><span class="mn-muted">부재중 전화예요 — 다시 걸어 통화하면 상담으로 이어집니다</span>`;
+    if (r.linked) {
+        const how = { auto: '진행 중 상담이라 자동으로 기록했어요', new: '이 통화로 새 상담을 등록했어요', manual: '상담에 기록했어요' }[c.inquiry_link] || '상담에 연결됨';
+        return `<h3>상담 <span class="mn-muted">${how}</span></h3>
+          ${callsInqRowHtml(c, r.linked, `<button class="pl-btn" onclick="callsOpenInquiry(${r.linked.id})">상담 열기</button>`)}
+          <button class="cl-link-btn" onclick="callsUnlinkInquiry(${c.id})">연결 해제</button>`;
+    }
+    const cands = r.cands || [];
+    return `<h3>상담 ${cands.length ? `<span class="mn-muted">이 거래처의 진행 중 상담 ${cands.length}건 — 이어지는 건이면 골라서 기록</span>` : '<span class="cl-new-badge">신규 문의</span>'}</h3>
+      ${cands.map(x => callsInqRowHtml(c, x, `<button class="pl-btn" onclick="callsLinkInquiry(${c.id}, ${x.id})">이 상담에 기록</button>`)).join('')}
+      <button class="${cands.length ? 'pl-btn' : 'btn-primary'} cl-newinq" onclick="callsCreateInquiry(${c.id})">＋ 새 상담으로 등록</button>
+      <div class="cl-inq-find">
+        <input class="form-input" placeholder="다른 상담 찾기 (거래처·제목)" oninput="callsFindInquiry(${c.id}, this.value)">
+        <div id="clInqFound"></div>
+      </div>`;
+}
+function callsRenderInqCard(c) {
+    const el = document.getElementById('clInqCard');
+    if (el && _clSel === c.id) el.innerHTML = callsInqCardHtml(c);
+}
+let _clFindT = null;
+function callsFindInquiry(id, q) {
+    clearTimeout(_clFindT);
+    _clFindT = setTimeout(async () => {
+        const box = document.getElementById('clInqFound');
+        if (!box) return;
+        q = String(q || '').trim();
+        if (q.length < 2) { box.innerHTML = ''; return; }
+        const like = '%' + q.replace(/[%_,()]/g, ' ') + '%';
+        const { data, error } = await sb.from('inquiries').select(CL_INQ_COLS)
+            .or(`client.ilike.${like},title.ilike.${like},contact_name.ilike.${like}`)
+            .order('last_contact_at', { ascending: false }).limit(8);
+        if (error) { box.innerHTML = `<span class="mn-muted">찾기 실패: ${clEsc(error.message)}</span>`; return; }
+        const c = _clList.find(x => x.id === id);
+        box.innerHTML = (data || []).map(x => callsInqRowHtml(c, x, `<button class="pl-btn" onclick="callsLinkInquiry(${id}, ${x.id})">이 상담에 기록</button>`)).join('')
+            || '<span class="mn-muted">찾는 상담이 없어요</span>';
+    }, 250);
+}
+// 상담 타임라인에 남길 통화 요약
+function callsInqLogBody(c) {
+    const l = clLine(c);
+    const head = `📞 ${c.direction === 'out' ? '건' : '받은'} 전화 · ${(l && l.staff_name) || clLineName(c)} · ${clDur(c.duration_sec)}`;
+    const todos = (Array.isArray(c.todos) ? c.todos : []).map(t => `\n- ${t.text}`).join('');
+    return `${head}\n${c.summary || ''}${todos ? `\n\n할 일${todos}` : ''}`;
+}
+async function callsLinkInquiry(id, inqId) {
+    const c = _clList.find(x => x.id === id);
+    if (!c) return;
+    const { data: log, error } = await sb.from('inquiry_logs').insert({
+        inquiry_id: inqId, direction: c.direction === 'out' ? 'out' : 'in', channel: '전화',
+        body: callsInqLogBody(c), images: [], author: clMe()
+    }).select('id').single();
+    if (error) { showToast('상담 기록 실패: ' + error.message); return; }
+    if (!(await callsPatch(id, { inquiry_id: inqId, inquiry_log_id: log.id, inquiry_link: 'manual' }))) return;
+    delete _clInq[id];
+    await callsLoadInq(c);
+    callsRenderInqCard(c);
+    showToast('상담 타임라인에 통화 내용을 남겼어요');
+}
+async function callsCreateInquiry(id) {
+    const c = _clList.find(x => x.id === id);
+    if (!c) return;
+    const client = (c.client_name || '').trim();
+    if (!client) {
+        showToast('고객 정보의 회사명을 먼저 적어 주세요');
+        const el = document.querySelector('#clMain input[data-f="client_name"]');
+        if (el) el.focus();
+        return;
+    }
+    const l = clLine(c);
+    const who = clWhoName((l && l.staff_name) || clMe());
+    const { data: inq, error } = await sb.from('inquiries').insert({
+        client, channel: '전화', assignee: who, title: c.inquiry_title || c.topic || '전화 문의',
+        contact_name: c.contact_name || '', contact_dept: c.contact_dept || '', contact_title: c.contact_title || '',
+        contact_phone: inqNormPhone(c.contact_phone || c.other_number || ''), contact_email: c.contact_email || '',
+        status: '신규', started_at: (c.started_at || '').slice(0, 10) || getTodayStr(),
+        last_contact_at: c.started_at || new Date().toISOString(), created_by: clMe()
+    }).select().single();
+    if (error) { showToast('상담 등록 실패: ' + error.message); return; }
+    try { clientAutoAddNotice([client]); } catch (_) {}
+    const author = clMe();
+    // 한 번에 넣는 행들은 칸 구성이 같아야 함 (images NOT NULL)
+    const { data: logs, error: lErr } = await sb.from('inquiry_logs').insert([
+        { inquiry_id: inq.id, direction: 'system', channel: '', body: '상담 시작 · 전화로 문의 (통화 기록에서 등록)', images: [], author: '' },
+        { inquiry_id: inq.id, direction: c.direction === 'out' ? 'out' : 'in', channel: '전화', body: callsInqLogBody(c), images: [], author }
+    ]).select('id, direction');
+    if (lErr) showToast('통화 내용 기록 실패: ' + lErr.message);
+    const logId = (logs || []).find(x => x.direction !== 'system')?.id || null;
+    await callsPatch(id, { inquiry_id: inq.id, inquiry_log_id: logId, inquiry_link: 'new' });
+    try { if (typeof _inqList !== 'undefined' && Array.isArray(_inqList)) _inqList.unshift(inq); } catch (_) {}
+    delete _clInq[id];
+    await callsLoadInq(c);
+    callsRenderInqCard(c);
+    showToast(`상담을 등록했어요 — ${client}`);
+}
+async function callsUnlinkInquiry(id) {
+    const c = _clList.find(x => x.id === id);
+    if (!c || !c.inquiry_id) return;
+    if (!confirm('이 통화와 상담의 연결을 끊을까요?')) return;
+    if (c.inquiry_log_id && confirm('상담 타임라인에 남긴 통화 기록도 지울까요?\n(취소 = 기록은 남기고 연결만 끊기)')) {
+        const { error } = await sb.from('inquiry_logs').delete().eq('id', c.inquiry_log_id);
+        if (error) showToast('상담 기록 삭제 실패: ' + error.message);
+    }
+    if (!(await callsPatch(id, { inquiry_id: null, inquiry_log_id: null, inquiry_link: '' }))) return;
+    delete _clInq[id];
+    await callsLoadInq(c);
+    callsRenderInqCard(c);
+}
+function callsOpenInquiry(inqId) {
+    switchTab('projects-temp');
+    inqOpenFromQuote(inqId);
+}
+
+// ---------- 할 일 (담당자 지정 → 일일계획표/상담 할 일로 보내기) ----------
+function callsTodoRowHtml(c, t, i) {
+    const people = clPeople();
+    const who = clWhoName(t.assignee);
+    const opts = (who && !people.includes(who) ? [who] : []).concat(people);
+    const sent = !!t.sent_at;
+    return `<div class="cl-todo${t.done ? ' done' : ''}">
+        <input type="checkbox" ${t.done ? 'checked' : ''} onchange="callsToggleTodo(${c.id}, ${i}, this.checked)">
+        <span class="cl-todo-t">${clEsc(t.text)}${t.done && t.done_by ? ` <i>✓ ${clEsc(t.done_by)}</i>` : ''}</span>
+        ${sent
+            ? `<span class="cl-sent">📤 ${clEsc(clWhoName(t.assignee))}${t.due ? ' · ' + inqMD(t.due) : ''}${t.inquiry_todo_id ? ' · 상담 할 일' : ' · 계획표'}</span>`
+            : `<select class="form-select cl-who" onchange="callsTodoSet(${c.id}, ${i}, 'assignee', this.value)">
+                 <option value="">담당자</option>${opts.map(n => `<option ${n === who ? 'selected' : ''}>${clEsc(n)}</option>`).join('')}
+               </select>
+               <input type="date" class="form-input cl-due" value="${clEsc(t.due || '')}" onchange="callsTodoSet(${c.id}, ${i}, 'due', this.value)">
+               ${t.done ? '' : `<button class="pl-btn cl-send" onclick="callsSendTodo(${c.id}, ${i})">📤 보내기</button>`}`}
+      </div>`;
+}
+function callsTodosCopy(c) { return (Array.isArray(c.todos) ? c.todos : []).map(t => Object.assign({}, t)); }
+async function callsTodoSet(id, i, k, v) {
+    const c = _clList.find(x => x.id === id);
+    if (!c) return;
+    const todos = callsTodosCopy(c);
+    if (!todos[i]) return;
+    todos[i][k] = v || (k === 'due' ? null : '');
+    await callsPatch(id, { todos });
+}
+// 보내기: 상담에 연결돼 있으면 상담 할 일(→ 일일계획표 자동), 아니면 일일계획표에 바로. 둘 다 받는 사람에게 알림이 감
+async function callsSendTodo(id, i, quiet) {
+    const c = _clList.find(x => x.id === id);
+    if (!c) return false;
+    const todos = callsTodosCopy(c);
+    const t = todos[i];
+    if (!t || t.sent_at) return false;
+    const who = clWhoName(t.assignee);
+    if (!who) { if (!quiet) showToast('받을 담당자를 골라 주세요'); return false; }
+    const due = t.due || null;
+    const client = (c.client_name || '').trim();
+    if (c.inquiry_id) {
+        const r = _clInq[c.id] || await callsLoadInq(c);
+        const x = Object.assign({ id: c.inquiry_id, client, title: '' }, r.linked || {});
+        const dailyId = await inqTodoCreateDaily(x, t.text, due, who);
+        const { data, error } = await sb.from('inquiry_todos').insert({
+            inquiry_id: c.inquiry_id, task: t.text, due_date: due, assignee: who, daily_task_id: dailyId, created_by: clMe()
+        }).select('id').single();
+        if (error) {
+            showToast('상담 할 일 저장 실패: ' + error.message);
+            if (dailyId) { await dbDeleteTask(dailyId); inqDailyRemoveLocal(dailyId); tbxSyncViews(); }
+            return false;
+        }
+        await sb.from('inquiry_logs').insert({ inquiry_id: c.inquiry_id, direction: 'system', channel: '', body: `할 일 추가 · ${t.text} (${who}${due ? ' · ' + inqMD(due) : ''}) — 통화 기록에서`, images: [], author: '' });
+        Object.assign(t, { assignee: who, inquiry_todo_id: data.id, daily_task_id: dailyId });
+    } else {
+        const saved = await dbInsertTask({
+            task: client ? `[${client}] ${t.text}` : t.text, date: due || getTodayStr(), assignee: who, target: '',
+            label: '회사 업무', client, note: `통화 기록: ${clDay(c.started_at)} ${clTime(c.started_at)} ${clOther(c)}`,
+            priority: '🟡 보통', done: false
+        });
+        if (!saved || !saved.id) return false;
+        try { dailyTasks.push(saved); } catch (_) {}
+        try { tbxSyncViews(); } catch (_) {}
+        Object.assign(t, { assignee: who, daily_task_id: saved.id });
+    }
+    t.sent_at = new Date().toISOString();
+    t.sent_by = clMe();
+    if (!(await callsPatch(id, { todos }))) return false;
+    if (!quiet) { showToast(`${who}에게 보냈어요 (${inqMD(due || getTodayStr())} 일일계획표)`); callsRenderMain(); }
+    return true;
+}
+async function callsSendAllTodos(id) {
+    const c = _clList.find(x => x.id === id);
+    if (!c) return;
+    const idx = (c.todos || []).map((t, i) => (!t.sent_at && !t.done) ? i : -1).filter(i => i >= 0);
+    if (idx.some(i => !clWhoName(c.todos[i].assignee))) { showToast('담당자가 비어 있는 할 일이 있어요'); return; }
+    let n = 0;
+    for (const i of idx) if (await callsSendTodo(id, i, true)) n++;
+    showToast(`할 일 ${n}개를 보냈어요`);
+    callsRenderMain();
+}
 async function callsToggleTodo(id, i, done) {
     const c = _clList.find(x => x.id === id);
     if (!c) return;
-    const todos = (Array.isArray(c.todos) ? c.todos : []).map(t => Object.assign({}, t));
-    if (!todos[i]) return;
-    Object.assign(todos[i], done ? { done: true, done_by: clMe(), done_at: new Date().toISOString() } : { done: false, done_by: '', done_at: null });
-    if (await callsPatch(id, { todos })) { callsRenderStats(); callsRenderList(); callsRenderMain(); }
+    const todos = callsTodosCopy(c);
+    const t = todos[i];
+    if (!t) return;
+    Object.assign(t, done ? { done: true, done_by: clMe(), done_at: new Date().toISOString() } : { done: false, done_by: '', done_at: null });
+    if (!(await callsPatch(id, { todos }))) return;
+    // 보낸 할 일이면 일일계획표·상담 할 일도 같이 완료 처리
+    if (t.daily_task_id) {
+        await dbUpdateTask(t.daily_task_id, { done, completedAt: done ? new Date().toISOString() : null });
+        try { const g = inqDailyLocal(t.daily_task_id); if (g) Object.assign(g, { done }); tbxSyncViews(); } catch (_) {}
+    }
+    if (t.inquiry_todo_id) await sb.from('inquiry_todos').update({ done, done_at: done ? new Date().toISOString() : null }).eq('id', t.inquiry_todo_id);
+    callsRenderStats(); callsRenderList(); callsRenderMain();
 }
 async function callsAddTodo(id) {
     const inp = document.getElementById('clTodoNew');
     const text = ((inp && inp.value) || '').trim();
     const c = _clList.find(x => x.id === id);
     if (!text || !c) return;
-    const todos = (Array.isArray(c.todos) ? c.todos : []).concat([{ text, done: false, done_by: '', done_at: null }]);
+    const l = clLine(c);
+    const todos = callsTodosCopy(c).concat([{ text, due: null, assignee: clWhoName((l && l.staff_name) || clMe()), done: false, done_by: '', done_at: null }]);
     if (await callsPatch(id, { todos })) { callsRenderStats(); callsRenderList(); await callsRenderMain(); const n = document.getElementById('clTodoNew'); if (n) n.focus(); }
 }
 async function callsSaveMemo(id, memo) {
