@@ -6275,3 +6275,32 @@ body.m-on .theme-toggle{display:none}
   .cl-side{max-height:50vh}
   .cl-bub{max-width:88%}
 }
+
+/* 매뉴얼 — 마크다운 글 (migration 067) */
+.mn-fmt{display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:12.5px; font-weight:700; color:var(--gray-500)}
+.mn-fmt button{height:30px; padding:0 12px; border:1px solid var(--border, var(--gray-200)); border-radius:15px; background:transparent; color:var(--gray-600); font:inherit; font-size:12.5px; font-weight:700; cursor:pointer}
+.mn-fmt button.on{background:var(--gray-900); border-color:var(--gray-900); color:var(--white)}
+.mn-md-ta{width:100%; min-height:460px; resize:vertical; padding:14px 16px; border:1px solid var(--border, var(--gray-200)); border-radius:10px; background:var(--gray-50); color:var(--gray-900); font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:13.5px; line-height:1.6; tab-size:2}
+.mn-md-ta:focus{outline:none; border-color:var(--blue); background:var(--white)}
+.mn-md-prev{border:1px dashed var(--border, var(--gray-200)); border-radius:10px; padding:16px 20px; min-height:300px}
+.mn-md{font-size:15px; line-height:1.75; color:var(--gray-900); word-break:keep-all; overflow-wrap:anywhere}
+.mn-md h1{font-size:22px; font-weight:900; letter-spacing:-.4px; margin:26px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--border, var(--gray-100))}
+.mn-md h2{font-size:19px; font-weight:800; margin:24px 0 8px}
+.mn-md h3{font-size:16.5px; font-weight:800; margin:20px 0 6px}
+.mn-md h4{font-size:15px; font-weight:800; margin:16px 0 4px}
+.mn-md > :first-child{margin-top:0}
+.mn-md p{margin:6px 0}
+.mn-md strong{font-weight:800}
+.mn-md ul, .mn-md ol{padding-left:22px; margin:6px 0}
+.mn-md li{margin:3px 0}
+.mn-md code{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.88em; background:var(--gray-100); padding:1px 5px; border-radius:4px}
+.mn-md pre{background:var(--gray-100); padding:12px 14px; border-radius:8px; overflow-x:auto; line-height:1.5}
+.mn-md pre code{background:none; padding:0; font-size:13px}
+.mn-md blockquote{margin:8px 0; padding:4px 14px; border-left:3px solid var(--blue); color:var(--gray-600); background:var(--gray-50)}
+.mn-md hr{border:none; border-top:1px solid var(--border, var(--gray-200)); margin:18px 0}
+.mn-md table{border-collapse:collapse; margin:10px 0; font-size:13.5px; display:block; max-width:100%; overflow-x:auto}
+.mn-md th, .mn-md td{border:1px solid var(--border, var(--gray-200)); padding:6px 10px; text-align:left; vertical-align:top}
+.mn-md th{background:var(--gray-50); font-weight:800}
+.mn-md a{color:var(--blue)}
+.mn-md table.mn-front{font-size:12.5px; margin:0 0 18px}
+.mn-md table.mn-front th{width:110px; color:var(--gray-500)}

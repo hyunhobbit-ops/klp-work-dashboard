@@ -94,6 +94,8 @@
 - **새 테넌트 테이블 추가 시**: `company_id bigint references companies(id) not null` + `set_company_id` 트리거 + 회사 스코프 RLS 필수.
 
 ## 📘 회사 매뉴얼 (2026-10-16 오픈)
+
+- **매뉴얼 마크다운 (migration 067, 2026-10-22)**: `manuals.format` 'md'|'html'. md 글은 원문 그대로 저장, 볼 때 `mnMdToHtml`(marked@12 + 맨 위 `---` 머리말은 표) → `planningSanitizeHtml`. 편집창 형식 버튼(문서/마크다운, 미리보기), 빈 편집기에 md처럼 보이는 글(`mnLooksMd`)을 붙여넣으면 자동으로 md 형식. '📋 md 복사' = 원문 복사. 카테고리 맨 앞 '스킬md'(고르면 md 형식). 초안 10편 삭제(백업 ~/Desktop/hyunho-server/backups/manuals/)
 - 메뉴 '회사 매뉴얼'(`tab-manual` → `#manualRoot`, `manualEnter()`). 테이블 `manuals`(migration 062): category·title·content(HTML)·pinned·sort_order·created_by·updated_by, company_id + RLS(회사 스코프, 직원 누구나 쓰기), realtime
 - 카테고리 `MANUAL_CATS`(업무 프로세스/장비 사용법/신입 온보딩/회사 규정/기타) + 검색(제목·내용 ilike) + 📌 고정. 목록은 본문 없이, 본문은 열 때 불러옴(`_mnBody` 캐시)
 - 편집기 = `mountPlanningRichEditor(…, { headers:true, imageUploader: uploadPlanningImage })` — 사진을 base64 대신 planning-images 저장소에 올려 주소만 (opts 없으면 예전처럼 base64)

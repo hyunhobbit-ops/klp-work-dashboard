@@ -13818,16 +13818,37 @@ let currentPlanningQuill = null;
 // 4개 모달이 공유하는 빌더. div#containerId 자리에 Quill 마운트.
 // ===================== 회사 매뉴얼 (manuals, migration 062) =====================
 // 카테고리 + 검색 + 읽기/편집. 직원 누구나 작성·수정(마지막 수정자 표시). 목록은 본문 없이, 본문은 열 때 불러옴
-const MANUAL_CATS = ['업무 프로세스', '장비 사용법', '신입 온보딩', '회사 규정', '기타'];
+const MANUAL_CATS = ['스킬md', '업무 프로세스', '장비 사용법', '신입 온보딩', '회사 규정', '기타'];
+let _mnMdPreview = false;
 let _mnList = [], _mnLoaded = false, _mnSel = null, _mnCat = 'all', _mnQ = '', _mnHits = null, _mnEdit = null, _mnQuill = null, _mnChan = null;
 const _mnBody = {};
 function mnEsc(s) { return planningEsc(String(s == null ? '' : s)); }
 function mnMe() { return (typeof inqMe === 'function' ? inqMe() : '') || (currentUser && currentUser.name) || ''; }
 function mnDate(ts) { return ts ? String(ts).slice(0, 10).replace(/-/g, '.') : ''; }
+// 마크다운(format 'md', migration 067) → 화면용 HTML. 맨 위 '---' 머리말(name·description)은 표로 보여줌
+function mnMdToHtml(md) {
+    let src = String(md || '').replace(/\r\n/g, '\n');
+    let front = '';
+    const fm = src.match(/^---\n([\s\S]*?)\n---\n?/);
+    if (fm) {
+        src = src.slice(fm[0].length);
+        const rows = fm[1].split('\n').map(l => l.match(/^([\w-]+):\s*(.*)$/)).filter(Boolean)
+            .map(m => `<tr><th>${mnEsc(m[1])}</th><td>${mnEsc(m[2].replace(/^["']|["']$/g, ''))}</td></tr>`).join('');
+        if (rows) front = `<table class="mn-front">${rows}</table>`;
+    }
+    if (typeof marked === 'undefined') return front + `<pre>${mnEsc(src)}</pre>`;
+    return front + marked.parse(src, { gfm: true, breaks: true });
+}
+// 붙여넣은 글이 마크다운처럼 보이나 (제목 #, 굵게 **, 목록 - / 1., 표 |, 코드 ```) — 두 가지 이상이면 마크다운
+function mnLooksMd(t) {
+    t = String(t || '');
+    const hits = [/^#{1,6}\s+\S/m, /\*\*[^*\n]+\*\*/, /^\s*[-*]\s+\S/m, /^\s*\d+\.\s+\S/m, /^\|.+\|\s*$/m, /^```/m, /^---\n[\w-]+:/].filter(r => r.test(t)).length;
+    return hits >= 2;
+}
 
 async function manualLoad() {
     const { data, error } = await sb.from('manuals')
-        .select('id, category, title, pinned, sort_order, created_by, updated_by, created_at, updated_at')
+        .select('id, category, title, format, pinned, sort_order, created_by, updated_by, created_at, updated_at')
         .order('pinned', { ascending: false }).order('sort_order').order('id');
     if (error) { showToast('매뉴얼을 불러오지 못했습니다: ' + error.message); return; }
     _mnList = data || [];
@@ -13938,23 +13959,31 @@ async function manualRenderMain() {
             <div class="mn-doc-meta">${m.updated_by && m.updated_by !== m.created_by ? `작성 ${mnEsc(m.created_by)} · ` : ''}마지막 수정 ${mnEsc(m.updated_by || m.created_by || '')} · ${mnDate(m.updated_at)}</div>
           </div>
           <div class="mn-doc-act">
+            ${m.format === 'md' ? `<button class="pl-btn" onclick="manualCopyMd(${m.id})" title="마크다운 원문 복사 (스킬 파일로 쓸 때)">📋 md 복사</button>` : ''}
             <button class="pl-btn" onclick="manualTogglePin(${m.id})">${m.pinned ? '📌 고정 해제' : '📌 고정'}</button>
             <button class="pl-btn" onclick="manualEditOpen(${m.id})">✏️ 편집</button>
             <button class="pl-btn red" onclick="manualDelete(${m.id})">삭제</button>
           </div>
         </div>
-        <div class="ql-snow planning-content-readonly mn-body"><div class="ql-editor">${html ? planningSanitizeHtml(html) : '<p class="mn-muted">내용이 없습니다 — 편집을 눌러 작성하세요</p>'}</div></div>
+        ${m.format === 'md'
+            ? `<div class="mn-body mn-md">${html ? planningSanitizeHtml(mnMdToHtml(html)) : '<p class="mn-muted">내용이 없습니다 — 편집을 눌러 작성하세요</p>'}</div>`
+            : `<div class="ql-snow planning-content-readonly mn-body"><div class="ql-editor">${html ? planningSanitizeHtml(html) : '<p class="mn-muted">내용이 없습니다 — 편집을 눌러 작성하세요</p>'}</div></div>`}
       </article>`;
 }
 function manualNew() {
     if (_mnEdit && !confirm('작성 중인 내용이 있어요. 새 글을 시작할까요?')) return;
-    _mnEdit = { id: null, category: _mnCat !== 'all' ? _mnCat : MANUAL_CATS[0], title: '', content: '' };
+    const cat = _mnCat !== 'all' ? _mnCat : '업무 프로세스';
+    _mnEdit = { id: null, category: cat, title: '', content: '', format: cat === '스킬md' ? 'md' : 'html' };
+    _mnEdit.orig = { t: '', c: '', f: _mnEdit.format };
+    _mnMdPreview = false;
     manualRenderEditor();
 }
 async function manualEditOpen(id) {
     const m = _mnList.find(x => x.id === id);
     if (!m) return;
-    _mnEdit = { id, category: m.category, title: m.title, content: await manualBody(id) };
+    _mnEdit = { id, category: m.category, title: m.title, content: await manualBody(id), format: m.format || 'html' };
+    _mnEdit.orig = { t: _mnEdit.title, c: _mnEdit.content, f: _mnEdit.format };
+    _mnMdPreview = false;
     manualRenderEditor();
 }
 function manualRenderEditor() {
@@ -13962,45 +13991,113 @@ function manualRenderEditor() {
     if (!main || !_mnEdit) return;
     const e = _mnEdit;
     const cats = MANUAL_CATS.includes(e.category) ? MANUAL_CATS : MANUAL_CATS.concat([e.category]);
+    const isMd = e.format === 'md';
     main.innerHTML = `
       <div class="mn-doc mn-editor">
         <div class="mn-ed-row">
-          <select id="mnEdCat" class="form-select">${cats.map(c => `<option ${c === e.category ? 'selected' : ''}>${mnEsc(c)}</option>`).join('')}</select>
+          <select id="mnEdCat" class="form-select" onchange="manualCatChanged(this.value)">${cats.map(c => `<option ${c === e.category ? 'selected' : ''}>${mnEsc(c)}</option>`).join('')}</select>
           <input id="mnEdTitle" class="form-input" placeholder="제목" value="${mnEsc(e.title)}">
         </div>
-        <div id="mnEdBody"></div>
+        <div class="mn-fmt">
+          <span>형식</span>
+          <button type="button" class="${isMd ? '' : 'on'}" onclick="manualSetFormat('html')">문서 (편집기)</button>
+          <button type="button" class="${isMd ? 'on' : ''}" onclick="manualSetFormat('md')">마크다운 (md 붙여넣기)</button>
+          ${isMd ? `<div class="inq-spacer"></div><button type="button" class="${_mnMdPreview ? 'on' : ''}" onclick="manualMdPreview()">${_mnMdPreview ? '✏️ 다시 쓰기' : '👀 미리보기'}</button>` : ''}
+        </div>
+        ${isMd
+            ? (_mnMdPreview
+                ? `<div class="mn-body mn-md mn-md-prev">${planningSanitizeHtml(mnMdToHtml(e.content)) || '<p class="mn-muted">내용이 없어요</p>'}</div>`
+                : `<textarea id="mnEdMd" class="mn-md-ta" spellcheck="false" placeholder="md 파일 내용을 그대로 붙여넣으세요 — # 제목, **굵게**, - 목록, 표가 그대로 보여요">${mnEsc(e.content)}</textarea>`)
+            : `<div id="mnEdBody"></div>`}
         <div class="mn-ed-foot">
-          <span class="mn-muted">사진: 붙여넣기·끌어다 놓기·사진 버튼 (원본 화질로 저장)</span>
+          <span class="mn-muted">${isMd ? '마크다운 원문 그대로 저장돼요 (📋 md 복사로 다시 꺼낼 수 있어요)' : '사진: 붙여넣기·끌어다 놓기·사진 버튼 (원본 화질로 저장) · md 글을 붙여넣으면 마크다운으로 바꿔줘요'}</span>
           <div class="inq-spacer"></div>
           <button class="pl-btn" onclick="manualEditCancel()">취소</button>
           <button class="btn-primary" onclick="manualSave()">저장</button>
         </div>
       </div>`;
-    _mnQuill = mountPlanningRichEditor('mnEdBody', e.content, { placeholder: '내용을 쓰세요 — 순서가 있는 일은 번호 목록으로', headers: true, imageUploader: uploadPlanningImage });
-    setTimeout(() => { const t = document.getElementById('mnEdTitle'); if (t && !e.title) t.focus(); }, 30);
+    _mnQuill = null;
+    if (isMd) {
+        const ta = document.getElementById('mnEdMd');
+        if (ta) ta.addEventListener('input', () => { _mnEdit.content = ta.value; });
+    } else {
+        _mnQuill = mountPlanningRichEditor('mnEdBody', e.content, { placeholder: '내용을 쓰세요 — 순서가 있는 일은 번호 목록으로', headers: true, imageUploader: uploadPlanningImage });
+        // md 파일 내용을 붙여넣으면 (그리고 편집기가 비어 있으면) 마크다운 형식으로 바꿔서 원문 그대로 보관
+        _mnQuill.root.addEventListener('paste', ev => {
+            const t = ev.clipboardData && ev.clipboardData.getData('text/plain');
+            if (!t || !mnLooksMd(t) || _mnQuill.getText().trim()) return;
+            ev.preventDefault(); ev.stopPropagation();
+            _mnEdit.title = (document.getElementById('mnEdTitle') || {}).value || _mnEdit.title;
+            _mnEdit.category = (document.getElementById('mnEdCat') || {}).value || _mnEdit.category;
+            _mnEdit.format = 'md'; _mnEdit.content = t; _mnMdPreview = true;
+            manualRenderEditor();
+            showToast('마크다운으로 붙여넣었어요 — 제목·굵게·표가 그대로 보여요');
+        }, true);
+    }
+    setTimeout(() => { const t = document.getElementById('mnEdTitle'); if (t && !t.value) t.focus(); }, 30);
+}
+// 편집기 형식 바꾸기 — 쓰던 내용은 가져감 (문서→md 는 글자만, md→문서 는 화면 모양 그대로)
+function manualSyncEdit() {
+    if (!_mnEdit) return;
+    _mnEdit.title = (document.getElementById('mnEdTitle') || {}).value ?? _mnEdit.title;
+    _mnEdit.category = (document.getElementById('mnEdCat') || {}).value || _mnEdit.category;
+    const ta = document.getElementById('mnEdMd');
+    if (ta) _mnEdit.content = ta.value;
+    else if (_mnQuill) _mnEdit.content = _mnQuill.root.innerHTML;
+}
+function manualSetFormat(f) {
+    if (!_mnEdit || _mnEdit.format === f) return;
+    manualSyncEdit();
+    if (f === 'md') _mnEdit.content = _mnQuill ? _mnQuill.getText().replace(/\n$/, '') : '';
+    else _mnEdit.content = planningSanitizeHtml(mnMdToHtml(_mnEdit.content));
+    _mnEdit.format = f; _mnMdPreview = false;
+    manualRenderEditor();
+}
+function manualCatChanged(c) {
+    if (c === '스킬md' && _mnEdit && _mnEdit.format !== 'md' && !(_mnQuill && _mnQuill.getText().trim())) manualSetFormat('md');
+}
+function manualMdPreview() {
+    manualSyncEdit();
+    _mnMdPreview = !_mnMdPreview;
+    manualRenderEditor();
+}
+async function manualCopyMd(id) {
+    const t = await manualBody(id);
+    try { await navigator.clipboard.writeText(t); showToast('md 원문을 복사했어요'); }
+    catch (_) { showToast('복사하지 못했어요 — 편집을 눌러 직접 복사하세요'); }
 }
 function manualEditCancel() {
-    if (_mnQuill && _mnEdit && (_mnQuill.root.innerHTML !== (_mnEdit.content || '') || (document.getElementById('mnEdTitle') || {}).value !== _mnEdit.title)
-        && !confirm('저장하지 않고 닫을까요?')) return;
+    if (_mnEdit) {
+        const before = _mnEdit.orig;
+        manualSyncEdit();
+        if (before && (before.t !== _mnEdit.title || before.c !== _mnEdit.content || before.f !== _mnEdit.format) && !confirm('저장하지 않고 닫을까요?')) return;
+    }
     _mnEdit = null; _mnQuill = null;
     manualRenderMain();
 }
 async function manualSave() {
-    if (!_mnEdit || !_mnQuill) return;
-    const title = (document.getElementById('mnEdTitle').value || '').trim();
-    const category = document.getElementById('mnEdCat').value || '기타';
-    if (!title) { showToast('제목을 입력하세요'); document.getElementById('mnEdTitle').focus(); return; }
-    const empty = !_mnQuill.getText().trim() && !/<img\b/i.test(_mnQuill.root.innerHTML);
-    const content = empty ? '' : _mnQuill.root.innerHTML;
+    if (!_mnEdit) return;
+    manualSyncEdit();
+    const title = (_mnEdit.title || '').trim();
+    const category = _mnEdit.category || '기타';
+    const format = _mnEdit.format === 'md' ? 'md' : 'html';
+    if (!title) { showToast('제목을 입력하세요'); document.getElementById('mnEdTitle')?.focus(); return; }
+    let content;
+    if (format === 'md') content = String(_mnEdit.content || '').trim() ? _mnEdit.content : '';
+    else {
+        if (!_mnQuill) return;
+        const empty = !_mnQuill.getText().trim() && !/<img\b/i.test(_mnQuill.root.innerHTML);
+        content = empty ? '' : _mnQuill.root.innerHTML;
+    }
     const me = mnMe();
     try {
         if (_mnEdit.id) {
-            const { error } = await sb.from('manuals').update({ title, category, content, updated_by: me, updated_at: new Date().toISOString() }).eq('id', _mnEdit.id);
+            const { error } = await sb.from('manuals').update({ title, category, content, format, updated_by: me, updated_at: new Date().toISOString() }).eq('id', _mnEdit.id);
             if (error) throw error;
             _mnBody[_mnEdit.id] = content;
             _mnSel = _mnEdit.id;
         } else {
-            const { data, error } = await sb.from('manuals').insert({ title, category, content, created_by: me, updated_by: me }).select('id').single();
+            const { data, error } = await sb.from('manuals').insert({ title, category, content, format, created_by: me, updated_by: me }).select('id').single();
             if (error) throw error;
             _mnBody[data.id] = content;
             _mnSel = data.id;
