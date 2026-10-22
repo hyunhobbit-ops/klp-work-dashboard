@@ -6304,3 +6304,14 @@ body.m-on .theme-toggle{display:none}
 .mn-md a{color:var(--blue)}
 .mn-md table.mn-front{font-size:12.5px; margin:0 0 18px}
 .mn-md table.mn-front th{width:110px; color:var(--gray-500)}
+/* 스킬md 글 맨 위 사용 방법 (강조) */
+.mn-skill-howto{margin:0 0 20px; padding:14px 18px; border:2px solid #F59E0B; border-radius:12px; background:#FFFBEB; color:#451a03}
+.mn-skill-howto-t{font-size:15.5px; font-weight:900; margin-bottom:6px; color:#B45309}
+.mn-skill-howto ol{margin:0; padding-left:22px; font-size:14px; line-height:1.75}
+.mn-skill-howto b{font-weight:800}
+.mn-skill-howto b.red{color:#D92D20}
+.mn-skill-howto-s{margin-top:6px; font-size:12.5px; color:#92400e}
+[data-theme="dark"] .mn-skill-howto{background:#3a2f1a; border-color:#F59E0B; color:#fde68a}
+[data-theme="dark"] .mn-skill-howto-t{color:#FCD34D}
+[data-theme="dark"] .mn-skill-howto b.red{color:#F87171}
+[data-theme="dark"] .mn-skill-howto-s{color:#fcd34d}

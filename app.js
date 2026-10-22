@@ -13965,6 +13965,16 @@ async function manualRenderMain() {
             <button class="pl-btn red" onclick="manualDelete(${m.id})">삭제</button>
           </div>
         </div>
+        ${m.category === '스킬md' ? `
+        <div class="mn-skill-howto" role="note">
+          <div class="mn-skill-howto-t">⚠️ 이 스킬을 쓰려면 — 각자 Aside에 저장해야 해요</div>
+          <ol>
+            <li>위 <b>📋 md 복사</b>를 누른다 (대시보드 매뉴얼은 Aside가 읽지 않아요)</li>
+            <li><b>본인 컴퓨터 Aside</b>에 새 스킬로 붙여넣어 저장한다 — 스킬은 컴퓨터(사람)마다 따로예요</li>
+            <li>저장하기 전에 <b class="red">{사용자 이름}</b>을 <b class="red">본인 이름</b>으로 바꾼다 (예: 유지은 / 이현주 실장 / 김관택 대표)</li>
+          </ol>
+          <div class="mn-skill-howto-s">저장한 뒤에는 "메일 써줘"처럼 평소대로 말하면 돼요. 확실히 하려면 "회사 메일 규칙대로"처럼 한마디 붙이세요.</div>
+        </div>` : ''}
         ${m.format === 'md'
             ? `<div class="mn-body mn-md">${html ? planningSanitizeHtml(mnMdToHtml(html)) : '<p class="mn-muted">내용이 없습니다 — 편집을 눌러 작성하세요</p>'}</div>`
             : `<div class="ql-snow planning-content-readonly mn-body"><div class="ql-editor">${html ? planningSanitizeHtml(html) : '<p class="mn-muted">내용이 없습니다 — 편집을 눌러 작성하세요</p>'}</div></div>`}
