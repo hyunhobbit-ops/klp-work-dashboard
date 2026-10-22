@@ -6187,3 +6187,64 @@ body.m-on .theme-toggle{display:none}
 .s-close{background:#1a8a41; color:#fff}
 [data-theme="dark"] .s-close{background:var(--green); color:#0b1a10}
 .inqb-col header small { font-size: 11px; font-weight: 700; color: var(--gray-400); }
+
+/* ===== 통화 기록 (migration 067) — 회사 매뉴얼(.mn) 2단 틀을 같이 씀 ===== */
+.cl-stats{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; margin-bottom:12px}
+.cl-stat{display:flex; flex-direction:column; align-items:flex-start; gap:4px; padding:12px 14px; border:1px solid var(--border, var(--gray-200)); border-radius:12px; background:var(--white); font:inherit; cursor:pointer; text-align:left}
+.cl-stat span{font-size:12.5px; font-weight:700; color:var(--gray-500)}
+.cl-stat b{font-size:22px; font-weight:900; color:var(--gray-900); letter-spacing:-.5px}
+.cl-stat.blue b{color:var(--blue)} .cl-stat.orange b{color:var(--orange)} .cl-stat.red b{color:var(--red)}
+.cl-stat.on{border-color:var(--gray-900); box-shadow:inset 0 0 0 1px var(--gray-900)}
+.cl{display:grid; grid-template-columns:clamp(300px, 26vw, 380px) minmax(0,1fr); gap:14px; height:calc(100vh - var(--topbar-h, 64px) - 130px); min-height:480px}
+.cl-side{display:flex; flex-direction:column; min-height:0; background:var(--white); border:1px solid var(--border, var(--gray-200)); border-radius:12px; overflow:hidden}
+.cl-side-top{display:flex; gap:8px; padding:12px 12px 8px}
+.cl-filters{display:flex; gap:4px; padding:8px 12px; border-bottom:1px solid var(--border, var(--gray-100))}
+.cl-filters button{height:26px; padding:0 9px; border:0; border-radius:7px; background:transparent; color:var(--gray-500); font:inherit; font-size:12px; font-weight:700; cursor:pointer}
+.cl-filters button.on{background:var(--gray-100); color:var(--gray-900)}
+.cl-row{display:flex; gap:10px; align-items:flex-start; width:100%; text-align:left; padding:10px; border:1px solid transparent; border-radius:9px; background:transparent; cursor:pointer; font:inherit}
+.cl-row:hover{background:var(--gray-50)}
+.cl-row.on{background:var(--blue-light); border-color:color-mix(in srgb, var(--blue) 35%, transparent)}
+.cl-row.done .cl-row-t{color:var(--gray-500)}
+.cl-dir{flex:none; width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font-size:14px; font-weight:900}
+.cl-dir.in{background:var(--blue-light); color:var(--blue)}
+.cl-dir.out{background:var(--green-light); color:#1a8a41}
+.cl-dir.miss{background:var(--red-light); color:var(--red)}
+.cl-row-b{display:flex; flex-direction:column; gap:2px; min-width:0; flex:1}
+.cl-row-t{font-size:14px; font-weight:800; color:var(--gray-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.cl-topic{font-style:normal; font-size:11px; font-weight:700; color:var(--gray-600); background:var(--gray-100); border-radius:5px; padding:1px 6px; margin-left:4px}
+.cl-row-s{font-size:12.5px; color:var(--gray-700); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+.cl-row-m{font-size:11.5px; color:var(--gray-500)}
+.cl-left{color:var(--orange); font-weight:800}
+.cl-st{font-style:normal; font-weight:700; color:var(--blue)} .cl-st.err{color:var(--red)}
+.cl-more{width:100%; margin-top:8px}
+.cl-doc{display:flex; flex-direction:column; gap:14px}
+.cl-doc .mn-doc-head{margin-bottom:0}
+.cl-banner{padding:10px 14px; border-radius:10px; background:var(--blue-light); color:var(--blue-dark); font-size:13px; font-weight:700}
+.cl-banner.err{background:var(--red-light); color:var(--red)}
+.cl-audio{width:100%}
+.cl-card{border:1px solid var(--border, var(--gray-200)); border-radius:12px; padding:14px 16px}
+.cl-card h3{font-size:13px; font-weight:800; color:var(--gray-500); margin:0 0 8px}
+.cl-summary{font-size:15.5px; line-height:1.7; color:var(--gray-900); margin:0}
+.cl-todos{display:flex; flex-direction:column; gap:6px}
+.cl-todo{display:flex; gap:9px; align-items:flex-start; font-size:14.5px; color:var(--gray-900); cursor:pointer; line-height:1.5}
+.cl-todo input{width:17px; height:17px; margin-top:2px; flex:none}
+.cl-todo.done span{color:var(--gray-400); text-decoration:line-through}
+.cl-todo i{font-style:normal; font-size:11.5px; color:var(--gray-500); text-decoration:none; display:inline-block}
+.cl-todo-add{margin-top:10px}
+.cl-todo-add .form-input,.cl-memo{width:100%; font-size:14px}
+.cl-memo{resize:vertical}
+.cl-tx{display:flex; flex-direction:column; gap:8px}
+.cl-say{display:flex; gap:8px; align-items:flex-start}
+.cl-say.me{flex-direction:row-reverse}
+.cl-ts{flex:none; border:0; background:transparent; color:var(--gray-400); font:inherit; font-size:11px; padding:6px 0; cursor:pointer}
+.cl-ts:hover{color:var(--blue)}
+.cl-bub{max-width:78%; padding:9px 12px; border-radius:12px; font-size:14px; line-height:1.6; background:var(--gray-100); color:var(--gray-900)}
+.cl-bub b{display:block; font-size:11.5px; color:var(--gray-500); margin-bottom:2px}
+.cl-say.me .cl-bub{background:var(--blue); color:#fff}
+.cl-say.me .cl-bub b{color:rgba(255,255,255,.8)}
+@media (max-width:900px){
+  .cl-stats{grid-template-columns:repeat(2, minmax(0,1fr))}
+  .cl{grid-template-columns:minmax(0,1fr); height:auto}
+  .cl-side{max-height:50vh}
+  .cl-bub{max-width:88%}
+}

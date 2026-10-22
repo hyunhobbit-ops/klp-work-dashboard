@@ -99,6 +99,14 @@
 - 편집기 = `mountPlanningRichEditor(…, { headers:true, imageUploader: uploadPlanningImage })` — 사진을 base64 대신 planning-images 저장소에 올려 주소만 (opts 없으면 예전처럼 base64)
 - 초안 10편(sort_order·pinned)은 마이그레이션에서 KLP(company 1)에 넣음 — 실제 업무에 맞게 직원이 고쳐 쓰는 용도
 
+## 📞 통화 기록 (2026-10-22, migration 067)
+- 회사 인터넷전화(KT 070·02, 누리보이스 IP520S)를 맥미니가 자동 녹음 → 받아쓰기 → 요약 → `calls`에 저장. 대시보드 메뉴 '통화 기록'(`tab-calls` → `#callsRoot`, `callsEnter()`)은 **보기·할 일 체크·메모·확인 완료만** (통화를 만들지 않음). 직원 전원이 회사 전체 통화를 봄(현호님 결정)
+- 테이블: `call_lines`(자리표 — label·staff_name·number·`number_key`=숫자만) / `calls`(line_id, direction in/out, other_number, client_id·client_name, started_at, duration_sec, answered, status recording/transcribing/summarizing/done/error, audio_path, transcript jsonb `[{start,end,who:'me'|'other',text}]`, summary, topic, todos jsonb `[{text,done,done_by,done_at}]`, memo, checked·checked_by·checked_at, `sip_call_id` 고유 → 다시 넣으면 덮어씀). 회사 스코프 RLS, realtime. 녹음은 비공개 버킷 `call-recordings` (`<company_id>/YYYY/MM/…ogg`, 화면에서 1시간짜리 서명 주소로 재생)
+- `call_find_client(company, 번호)`: 거래처 DB phone·mobile·staff_mobile을 숫자만 비교 (service role 전용)
+- 화면: 위 숫자 4칸(오늘 통화·확인 안 한 통화·남은 할 일·오늘 부재중 — 누르면 그 조건만) / 왼쪽 목록(자리 칩, 마지막 선택 localStorage `cl_who`, 날짜별 묶음, 최신 300건 + 더 보기) / 오른쪽 상세(녹음 재생, 요약, 할 일 체크·추가, 메모(포커스 빠질 때 저장), 녹취록 말풍선 — 시각 누르면 그 지점부터 재생). 목록은 녹취록 없이, 녹취록·녹음 주소는 열 때 불러옴(`_clDetail`)
+- 맥미니 처리 쪽: `~/Desktop/hyunho-server/call-recorder/process_call.py` (uv 프로젝트, Python 3.12) — 스테레오(왼쪽 우리·오른쪽 상대) 녹음을 무음 감지로 말한 구간만 잘라 mlx-whisper `large-v3-turbo` + 회사 용어 힌트로 받아쓰고, `claude -p --json-schema`(Max 구독, sonnet)로 요약·분류·할 일 → service role로 저장. 시험 녹음 만들기 `test/make_test_call.py`
+- 수집(아직 미연결): TP-Link TL-SG105E를 KT 회선과 공유기 WAN 사이에 넣고 포트 미러링 → 맥미니 USB 랜 어댑터 → 패킷에서 통화(SIP/RTP)를 음성으로 → `process_call.py` 호출 예정
+
 ## 🖥️ 맥미니 서버 (2026-10-12 이전 완료) — Supabase 자체 운영
 - **왜 옮겼나**: Supabase Pro($25/월)의 **Egress(전송량) 초과**(무료 5.5GB 넘어 2026-08 요청 차단). 데이터는 작음(DB ~60MB · 사진 ~240MB · 사용자 8명). 자체 운영으로 전송량 제한 없애고 사진 화질 올리기
 - **현재 구성**: 대시보드(프론트·`api/`)는 그대로 Vercel(`https://klp-work-dashboard.vercel.app`). 데이터 서버만 맥미니 → **`https://api.klpkorea.cloud`**

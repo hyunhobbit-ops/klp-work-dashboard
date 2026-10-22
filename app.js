@@ -310,6 +310,7 @@ function applyCompanySettingsNav() {
 const AC_MODULE_OPTIONS = [
     { key: 'daily', label: '일일계획표', core: true },
     { key: 'meetings', label: '회의록', core: true },
+    { key: 'calls', label: '통화 기록' },
     { key: 'clients', label: '거래처', core: true },
     { key: 'projects', label: '프로젝트', core: true },
     { key: 'proposals', label: '제안서' },
@@ -691,7 +692,7 @@ function applyModuleGating() {
         'projects-temp':'projects','projects-domestic':'projects','projects-overseas':'projects',
         'daily':'daily','timebox':'daily','meetings':'meetings','delivery':'delivery','marketing':'marketing',
         'marketdb':'marketdb','cash':'cash','product-db':'product-db','proposals':'proposals',
-        'docs':'docs','manual':'manual','ceo-vision':'ceo-vision','clients':'clients',
+        'docs':'docs','manual':'manual','calls':'calls','ceo-vision':'ceo-vision','clients':'clients',
         'clients-overseas':'clients-overseas','quotes':'quotes','margin-calc':'margin-calc','ad-studio':'ad-studio'
     };
     const ALWAYS = new Set(['home', 'admin-add', 'admin-manage', 'company-settings']); // 관리자/슈퍼관리자 로직이 별도 제어
@@ -1022,6 +1023,7 @@ const pageTitles = {
     proposals: '제안서 관리',
     docs: '회사 문서',
     manual: '회사 매뉴얼',
+    calls: '통화 기록',
     'ceo-vision': '경영목표',
     clients: '국내 거래처 DB',
     'clients-overseas': '해외 거래처 DB',
@@ -1624,6 +1626,7 @@ function switchTab(tabId, fromHistory = false) {
     // 내 하루(타임박스) 탭 진입 시 로드+렌더
     if (tabId === 'timebox') { try { tbxEnter(); } catch (e) { console.error(e); } }
     if (tabId === 'manual') { try { manualEnter(); } catch (e) { console.error(e); } }
+    if (tabId === 'calls') { try { callsEnter(); } catch (e) { console.error(e); } }
 
     // Close mobile sidebar
     document.getElementById('sidebar').classList.remove('open');
@@ -14254,6 +14257,283 @@ function planningCanSeeProject(p) {
     if (currentPlanningMode === 'personal') return acc === 'personal';
     return false;
 }
+// ===================== 통화 기록 (calls · call_lines, migration 067) =====================
+// 맥미니가 회사 인터넷전화를 수집 → 받아쓰기·요약해서 calls에 넣음. 여기는 보기·할 일 체크·메모·확인 완료만
+// 직원 전원이 회사 전체 통화를 봄. 목록은 녹취록 없이 가볍게, 녹취록·녹음은 열 때 불러옴
+let _clList = [], _clLines = [], _clLoaded = false, _clSel = null, _clWho = 'all', _clFilter = 'all', _clQ = '', _clChan = null;
+let _clLimit = 300, _clHasMore = false;
+const _clDetail = {};            // id → {transcript, audioUrl}
+const CL_LIST_COLS = 'id, line_id, line_number, direction, other_number, client_id, client_name, started_at, duration_sec, answered, status, error, summary, topic, todos, memo, checked, checked_by, checked_at, audio_path';
+function clEsc(s) { return planningEsc(String(s == null ? '' : s)); }
+function clMe() { return (typeof inqMe === 'function' ? inqMe() : '') || (currentUser && currentUser.name) || ''; }
+function clLine(c) { return _clLines.find(l => l.id === c.line_id) || null; }
+function clLineName(c) { const l = clLine(c); return l ? l.label : (c.line_number || '자리 미지정'); }
+function clOther(c) { return c.client_name || c.other_number || '번호 없음'; }
+function clDur(sec) { sec = sec || 0; const m = Math.floor(sec / 60), s = sec % 60; return m ? `${m}분 ${s}초` : `${s}초`; }
+function clTodosLeft(c) { return (Array.isArray(c.todos) ? c.todos : []).filter(t => !t.done).length; }
+function clDay(ts) {
+    const d = new Date(ts), t = new Date();
+    const same = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    if (same(d, t)) return '오늘';
+    const y = new Date(t); y.setDate(t.getDate() - 1);
+    if (same(d, y)) return '어제';
+    return `${d.getMonth() + 1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]})`;
+}
+function clTime(ts) { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
+function clStatusText(c) {
+    if (c.status === 'error') return '처리 실패';
+    if (c.status && c.status !== 'done') return { recording: '통화 중', transcribing: '받아쓰는 중', summarizing: '요약하는 중' }[c.status] || '처리 중';
+    return '';
+}
+
+async function callsLoad() {
+    const [lines, calls] = await Promise.all([
+        sb.from('call_lines').select('id, label, staff_name, number, sort_order, active').order('sort_order').order('id'),
+        sb.from('calls').select(CL_LIST_COLS).order('started_at', { ascending: false }).limit(_clLimit + 1)
+    ]);
+    if (lines.error || calls.error) {
+        const e = lines.error || calls.error;
+        console.error('통화 기록 로드 실패', e);
+        showToast('통화 기록을 불러오지 못했습니다: ' + e.message);
+        return;
+    }
+    _clLines = lines.data || [];
+    _clHasMore = (calls.data || []).length > _clLimit;
+    _clList = (calls.data || []).slice(0, _clLimit);
+    _clLoaded = true;
+}
+async function callsEnter() {
+    if (!_clLoaded) await callsLoad();
+    try { const w = localStorage.getItem('cl_who'); if (w) _clWho = w; } catch (_) {}
+    callsSubscribe();
+    callsRender();
+}
+function callsSubscribe() {
+    if (_clChan) return;
+    _clChan = sb.channel('calls_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, async payload => {
+            const id = (payload.new && payload.new.id) || (payload.old && payload.old.id);
+            if (id) delete _clDetail[id];
+            await callsLoad();
+            callsRenderList();
+            callsRenderStats();
+            if (id && id === _clSel && !document.activeElement?.closest?.('#clMain textarea, #clMain input')) callsRenderMain();
+        })
+        .subscribe();
+}
+async function callsMore() {
+    _clLimit += 300;
+    await callsLoad();
+    callsRenderList();
+}
+function callsVisible() {
+    const q = _clQ.trim().toLowerCase();
+    return _clList.filter(c => {
+        if (_clWho !== 'all' && String(c.line_id) !== _clWho) return false;
+        if (_clFilter === 'unchecked' && c.checked) return false;
+        if (_clFilter === 'todo' && !clTodosLeft(c)) return false;
+        if (_clFilter === 'missed' && c.answered) return false;
+        if (q) {
+            const hay = [c.client_name, c.other_number, c.summary, c.topic, c.memo, clLineName(c)].join(' ').toLowerCase();
+            const qd = q.replace(/\D/g, '');
+            if (!hay.includes(q) && !(qd.length >= 3 && String(c.other_number || '').replace(/\D/g, '').includes(qd))) return false;
+        }
+        return true;
+    });
+}
+
+function callsRender() {
+    const root = document.getElementById('callsRoot');
+    if (!root) return;
+    root.innerHTML = `
+      <div class="cl-stats" id="clStats"></div>
+      <div class="cl">
+        <aside class="cl-side">
+          <div class="cl-side-top">
+            <input class="mn-q" type="search" placeholder="거래처·번호·요약 검색" value="${clEsc(_clQ)}" oninput="_clQ=this.value;callsRenderList()">
+          </div>
+          <div class="mn-cats" id="clWho"></div>
+          <div class="cl-filters" id="clFilters"></div>
+          <div class="mn-list" id="clList"></div>
+        </aside>
+        <section class="mn-main" id="clMain"></section>
+      </div>`;
+    callsRenderStats();
+    callsRenderList();
+    callsRenderMain();
+}
+function callsRenderStats() {
+    const box = document.getElementById('clStats');
+    if (!box) return;
+    const today = _clList.filter(c => clDay(c.started_at) === '오늘');
+    const unchecked = _clList.filter(c => !c.checked && c.answered).length;
+    const todos = _clList.reduce((n, c) => n + clTodosLeft(c), 0);
+    const missed = today.filter(c => !c.answered).length;
+    const stat = (label, val, key, tone) =>
+        `<button class="cl-stat${tone ? ' ' + tone : ''}${_clFilter === key ? ' on' : ''}" onclick="callsSetFilter('${key}')"><span>${label}</span><b>${val}</b></button>`;
+    box.innerHTML = stat('오늘 통화', today.length, 'all', '') +
+        stat('확인 안 한 통화', unchecked, 'unchecked', unchecked ? 'blue' : '') +
+        stat('남은 할 일', todos, 'todo', todos ? 'orange' : '') +
+        stat('오늘 부재중', missed, 'missed', missed ? 'red' : '');
+}
+function callsSetFilter(k) {
+    _clFilter = (_clFilter === k && k !== 'all') ? 'all' : k;
+    callsRenderStats();
+    callsRenderList();
+}
+function callsSetWho(w) {
+    _clWho = w;
+    try { localStorage.setItem('cl_who', w); } catch (_) {}
+    callsRenderList();
+}
+function callsRenderList() {
+    const who = document.getElementById('clWho'), filters = document.getElementById('clFilters'), list = document.getElementById('clList');
+    if (!who || !list) return;
+    const n = id => _clList.filter(c => id === 'all' || String(c.line_id) === id).length;
+    who.innerHTML = [{ id: 'all', label: '전체' }].concat(_clLines.filter(l => l.active).map(l => ({ id: String(l.id), label: l.label })))
+        .map(o => `<button class="${_clWho === o.id ? 'on' : ''}" onclick="callsSetWho('${o.id}')">${clEsc(o.label)} <b>${n(o.id)}</b></button>`).join('');
+    const F = [['all', '전체'], ['unchecked', '확인 전'], ['todo', '할 일 남음'], ['missed', '부재중']];
+    if (filters) filters.innerHTML = F.map(([k, l]) => `<button class="${_clFilter === k ? 'on' : ''}" onclick="callsSetFilter('${k}')">${l}</button>`).join('');
+    const vis = callsVisible();
+    if (!vis.length) {
+        list.innerHTML = `<div class="mn-empty">${_clList.length ? '조건에 맞는 통화가 없어요' : '아직 기록된 통화가 없어요<br><span class="mn-muted">통화 수집을 연결하면 여기에 자동으로 쌓입니다</span>'}</div>`;
+        return;
+    }
+    let lastDay = '';
+    list.innerHTML = vis.map(c => {
+        const day = clDay(c.started_at);
+        const head = day !== lastDay ? `<div class="mn-sec">${day}</div>` : '';
+        lastDay = day;
+        const left = clTodosLeft(c), st = clStatusText(c);
+        return `${head}
+          <button class="cl-row${c.id === _clSel ? ' on' : ''}${c.checked ? ' done' : ''}" onclick="callsOpen(${c.id})">
+            <span class="cl-dir ${c.answered ? (c.direction === 'out' ? 'out' : 'in') : 'miss'}" title="${c.answered ? (c.direction === 'out' ? '건 전화' : '받은 전화') : '부재중'}">${c.answered ? (c.direction === 'out' ? '↗' : '↙') : '✕'}</span>
+            <span class="cl-row-b">
+              <span class="cl-row-t">${clEsc(clOther(c))}${c.topic ? ` <i class="cl-topic">${clEsc(c.topic)}</i>` : ''}</span>
+              <span class="cl-row-s">${st ? `<em class="cl-st${c.status === 'error' ? ' err' : ''}">${st}</em> ` : ''}${clEsc(c.summary || (c.answered ? '' : '부재중 전화'))}</span>
+              <span class="cl-row-m">${clTime(c.started_at)} · ${clEsc(clLineName(c))}${c.answered ? ' · ' + clDur(c.duration_sec) : ''}${left ? ` · <b class="cl-left">할 일 ${left}</b>` : ''}${c.checked ? ' · ✓ 확인' : ''}</span>
+            </span>
+          </button>`;
+    }).join('') + (_clHasMore ? `<button class="pl-btn cl-more" onclick="callsMore()">이전 통화 더 보기</button>` : '');
+}
+async function callsOpen(id) {
+    _clSel = id;
+    callsRenderList();
+    await callsRenderMain();
+}
+async function callsDetail(c) {
+    if (_clDetail[c.id]) return _clDetail[c.id];
+    const { data, error } = await sb.from('calls').select('transcript').eq('id', c.id).maybeSingle();
+    if (error) { showToast('녹취록을 불러오지 못했습니다: ' + error.message); return { transcript: [], audioUrl: '' }; }
+    let audioUrl = '';
+    if (c.audio_path) {
+        const s = await sb.storage.from('call-recordings').createSignedUrl(c.audio_path, 3600);
+        if (s.error) console.error('녹음 주소 만들기 실패', s.error);
+        else audioUrl = s.data.signedUrl;
+    }
+    return (_clDetail[c.id] = { transcript: (data && data.transcript) || [], audioUrl });
+}
+async function callsRenderMain() {
+    const main = document.getElementById('clMain');
+    if (!main) return;
+    const c = _clList.find(x => x.id === _clSel);
+    if (!c) { main.innerHTML = `<div class="mn-empty big">왼쪽에서 통화를 고르세요</div>`; return; }
+    main.innerHTML = `<div class="mn-doc"><div class="mn-loading">불러오는 중…</div></div>`;
+    const d = await callsDetail(c);
+    if (_clSel !== c.id) return;
+    const l = clLine(c);
+    const todos = Array.isArray(c.todos) ? c.todos : [];
+    const st = clStatusText(c);
+    const tx = Array.isArray(d.transcript) ? d.transcript : [];
+    main.innerHTML = `
+      <article class="mn-doc cl-doc">
+        <div class="mn-doc-head">
+          <div>
+            <div class="mn-doc-cat">${c.answered ? (c.direction === 'out' ? '↗ 건 전화' : '↙ 받은 전화') : '✕ 부재중'} · ${clEsc(l ? l.label : clLineName(c))}${l && l.number ? ` (${clEsc(l.number)})` : ''}</div>
+            <h1>${clEsc(clOther(c))}</h1>
+            <div class="mn-doc-meta">${clDay(c.started_at)} ${clTime(c.started_at)}${c.answered ? ' · ' + clDur(c.duration_sec) : ''}${c.client_name && c.other_number ? ' · ' + clEsc(c.other_number) : ''}${c.topic ? ' · ' + clEsc(c.topic) : ''}</div>
+          </div>
+          <div class="mn-doc-act">
+            ${c.checked
+                ? `<button class="pl-btn" onclick="callsCheck(${c.id}, false)">✓ ${clEsc(c.checked_by)} 확인함 · 취소</button>`
+                : `<button class="btn-primary" onclick="callsCheck(${c.id}, true)">확인 완료</button>`}
+          </div>
+        </div>
+        ${st ? `<div class="cl-banner${c.status === 'error' ? ' err' : ''}">${st}${c.error ? ' — ' + clEsc(c.error) : ''}</div>` : ''}
+        ${d.audioUrl ? `<audio id="clAudio" class="cl-audio" controls preload="metadata" src="${clEsc(d.audioUrl)}"></audio>` : ''}
+        <section class="cl-card">
+          <h3>요약</h3>
+          <p class="cl-summary">${c.summary ? clEsc(c.summary).replace(/\n/g, '<br>') : '<span class="mn-muted">요약이 아직 없어요</span>'}</p>
+        </section>
+        <section class="cl-card">
+          <h3>할 일 <span class="mn-muted">${todos.length ? `${todos.length - clTodosLeft(c)}/${todos.length}` : ''}</span></h3>
+          <div class="cl-todos">
+            ${todos.map((t, i) => `
+              <label class="cl-todo${t.done ? ' done' : ''}">
+                <input type="checkbox" ${t.done ? 'checked' : ''} onchange="callsToggleTodo(${c.id}, ${i}, this.checked)">
+                <span>${clEsc(t.text)}${t.done && t.done_by ? ` <i>${clEsc(t.done_by)}</i>` : ''}</span>
+              </label>`).join('') || '<span class="mn-muted">통화에서 나온 할 일이 없어요</span>'}
+          </div>
+          <div class="cl-todo-add">
+            <input class="form-input" id="clTodoNew" placeholder="할 일 직접 추가 (Enter)" onkeydown="if(event.key==='Enter'&&!event.isComposing){callsAddTodo(${c.id})}">
+          </div>
+        </section>
+        <section class="cl-card">
+          <h3>메모</h3>
+          <textarea class="form-input cl-memo" id="clMemo" rows="2" placeholder="이 통화에 대한 메모" onblur="callsSaveMemo(${c.id}, this.value)">${clEsc(c.memo)}</textarea>
+        </section>
+        <section class="cl-card">
+          <h3>녹취록</h3>
+          <div class="cl-tx">
+            ${tx.map(s => `
+              <div class="cl-say ${s.who === 'me' ? 'me' : 'other'}">
+                <button class="cl-ts" onclick="callsSeek(${Number(s.start) || 0})">${clDur(Math.floor(Number(s.start) || 0))}</button>
+                <div class="cl-bub"><b>${s.who === 'me' ? clEsc(l ? l.staff_name || l.label : '우리') : clEsc(c.client_name || '상대방')}</b>${clEsc(s.text)}</div>
+              </div>`).join('') || '<span class="mn-muted">녹취록이 없어요</span>'}
+          </div>
+        </section>
+      </article>`;
+}
+function callsSeek(sec) {
+    const a = document.getElementById('clAudio');
+    if (!a) return;
+    a.currentTime = sec;
+    a.play().catch(() => {});
+}
+async function callsPatch(id, patch) {
+    const { error } = await sb.from('calls').update(patch).eq('id', id);
+    if (error) { console.error('통화 저장 실패', error); showToast('저장하지 못했습니다: ' + error.message); return false; }
+    const c = _clList.find(x => x.id === id);
+    if (c) Object.assign(c, patch);
+    return true;
+}
+async function callsCheck(id, on) {
+    const ok = await callsPatch(id, on ? { checked: true, checked_by: clMe(), checked_at: new Date().toISOString() } : { checked: false, checked_by: '', checked_at: null });
+    if (!ok) return;
+    callsRenderStats(); callsRenderList(); callsRenderMain();
+}
+async function callsToggleTodo(id, i, done) {
+    const c = _clList.find(x => x.id === id);
+    if (!c) return;
+    const todos = (Array.isArray(c.todos) ? c.todos : []).map(t => Object.assign({}, t));
+    if (!todos[i]) return;
+    Object.assign(todos[i], done ? { done: true, done_by: clMe(), done_at: new Date().toISOString() } : { done: false, done_by: '', done_at: null });
+    if (await callsPatch(id, { todos })) { callsRenderStats(); callsRenderList(); callsRenderMain(); }
+}
+async function callsAddTodo(id) {
+    const inp = document.getElementById('clTodoNew');
+    const text = ((inp && inp.value) || '').trim();
+    const c = _clList.find(x => x.id === id);
+    if (!text || !c) return;
+    const todos = (Array.isArray(c.todos) ? c.todos : []).concat([{ text, done: false, done_by: '', done_at: null }]);
+    if (await callsPatch(id, { todos })) { callsRenderStats(); callsRenderList(); await callsRenderMain(); const n = document.getElementById('clTodoNew'); if (n) n.focus(); }
+}
+async function callsSaveMemo(id, memo) {
+    const c = _clList.find(x => x.id === id);
+    if (!c || (c.memo || '') === memo) return;
+    if (await callsPatch(id, { memo })) showToast('메모를 저장했어요');
+}
+
 // ===== 프로젝트 화면 (2단: 왼쪽 목록 · 오른쪽 할 일 리스트) =====
 // 왼쪽: 주간/월간/연간(펀딩은 하나) 묶음의 한 줄 목록 + 검색 + 상태 칩
 // 오른쪽: 고른 프로젝트의 진행률 + 할 일 리스트(진행 중 → 할 일 → 완료) + 정보 패널 / 아무것도 안 고르면 전체 마감 요약
