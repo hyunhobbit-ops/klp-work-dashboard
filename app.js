@@ -13825,7 +13825,7 @@ const _mnBody = {};
 function mnEsc(s) { return planningEsc(String(s == null ? '' : s)); }
 function mnMe() { return (typeof inqMe === 'function' ? inqMe() : '') || (currentUser && currentUser.name) || ''; }
 function mnDate(ts) { return ts ? String(ts).slice(0, 10).replace(/-/g, '.') : ''; }
-// 마크다운(format 'md', migration 067) → 화면용 HTML. 맨 위 '---' 머리말(name·description)은 표로 보여줌
+// 마크다운(format 'md', migration 069) → 화면용 HTML. 맨 위 '---' 머리말(name·description)은 표로 보여줌
 function mnMdToHtml(md) {
     let src = String(md || '').replace(/\r\n/g, '\n');
     let front = '';
