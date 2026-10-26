@@ -14520,7 +14520,7 @@ function callsRenderList() {
         const left = clTodosLeft(c), st = clStatusText(c);
         return `${head}
           <button class="cl-row${c.id === _clSel ? ' on' : ''}${c.checked ? ' done' : ''}" onclick="callsOpen(${c.id})">
-            <span class="cl-dir ${c.answered ? (c.direction === 'out' ? 'out' : 'in') : 'miss'}" title="${c.answered ? (c.direction === 'out' ? '건 전화' : '받은 전화') : '부재중'}">${c.answered ? (c.direction === 'out' ? '↗' : '↙') : '✕'}</span>
+            <span class="cl-dir ${c.answered ? (c.direction === 'out' ? 'out' : 'in') : 'miss'}" title="${c.answered ? (c.direction === 'out' ? '발신' : '수신') : '부재중'}">${c.answered ? (c.direction === 'out' ? '↗' : '↙') : '✕'}</span>
             <span class="cl-row-b">
               <span class="cl-row-t">${clEsc(clOther(c))}${c.topic ? ` <i class="cl-topic">${clEsc(c.topic)}</i>` : ''}</span>
               <span class="cl-row-s">${st ? `<em class="cl-st${c.status === 'error' ? ' err' : ''}">${st}</em> ` : ''}${clEsc(c.summary || (c.answered ? '' : '부재중 전화'))}</span>
@@ -14562,7 +14562,7 @@ async function callsRenderMain() {
       <article class="mn-doc cl-doc">
         <div class="mn-doc-head">
           <div>
-            <div class="mn-doc-cat">${c.answered ? (c.direction === 'out' ? '↗ 건 전화' : '↙ 받은 전화') : '✕ 부재중'} · ${clEsc(l ? l.label : clLineName(c))}${l && l.number ? ` (${clEsc(l.number)})` : ''}</div>
+            <div class="mn-doc-cat">${c.answered ? (c.direction === 'out' ? '↗ 발신' : '↙ 수신') : '✕ 부재중'} · ${clEsc(l ? l.label : clLineName(c))}${l && l.number ? ` (${clEsc(l.number)})` : ''}</div>
             <h1>${clEsc(clOther(c))}${c.contact_name ? ` <span class="cl-h-who">${clEsc(c.contact_name)}${c.contact_title ? ' ' + clEsc(c.contact_title) : ''}</span>` : ''}</h1>
             <div class="mn-doc-meta">${clDay(c.started_at)} ${clTime(c.started_at)}${c.answered ? ' · ' + clDur(c.duration_sec) : ''}${c.other_number ? ' · ' + clEsc(c.other_number) : ''}${c.topic ? ' · ' + clEsc(c.topic) : ''}</div>
           </div>
