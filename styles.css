@@ -6509,3 +6509,67 @@ button.sc-kpi{cursor:pointer}
 .xs-dbtn{padding:6px 12px;border:1.5px solid var(--orange);background:var(--white);color:var(--orange);border-radius:7px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
 .inq-pj-xs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0 2px;font-size:12px;font-weight:700;color:#B56500}
 @media (max-width:640px){.xs-row-top{grid-template-columns:1fr 1fr 32px}.xs-row-top .xs-item{grid-column:1/3}.xs-row-bot{grid-template-columns:1fr 1fr}}
+
+/* ===== ✉️ 메일 홍보 배너 (마케팅, migration 074) ===== */
+.mkt-switch{display:flex;gap:6px;padding:12px 16px 0}
+.mkt-sw{padding:8px 16px;border:1.5px solid var(--gray-200);background:var(--white);border-radius:999px;font-size:13.5px;font-weight:700;color:var(--gray-600);cursor:pointer;font-family:inherit}
+.mkt-sw.on{border-color:var(--blue);background:var(--blue);color:#fff}
+#mailBannerRoot{padding:12px 16px 40px}
+.mb-guide{background:#F2F7FF;border:1.5px solid #BCD4FF;border-radius:12px;padding:14px 18px;margin-bottom:14px;font-size:13.5px;color:var(--gray-800);line-height:1.6}
+.mb-guide>b{font-size:15px;color:var(--blue)}
+.mb-guide ol{margin:6px 0 4px 20px;padding:0}
+.mb-guide p{margin:6px 0 0;font-size:12.5px;color:var(--gray-600)}
+.mb-wrap{display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:16px;align-items:start}
+.mb-left,.mb-right{background:var(--white);border:1px solid var(--gray-200);border-radius:12px;padding:14px 16px}
+.mb-right{position:sticky;top:12px}
+.mb-left-head,.mb-right-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.mb-left-head span,.mb-right-head span{font-size:12px;color:var(--gray-500)}
+.mb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.mb-card{position:relative;border:2px solid var(--gray-200);border-radius:10px;overflow:hidden;background:var(--white);display:flex;flex-direction:column}
+.mb-card.on{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.mb-pick{position:absolute;top:8px;left:8px;width:30px;height:30px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.45);color:#fff;font-weight:800;font-size:14px;cursor:pointer;z-index:1}
+.mb-card.on .mb-pick{background:var(--blue)}
+.mb-thumb{background:#f4f4f5;aspect-ratio:2/1;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden}
+.mb-thumb img{width:100%;height:100%;object-fit:contain}
+.mb-thumb span{font-size:12px;color:var(--gray-400)}
+.mb-info{padding:10px 12px 6px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.mb-info b{font-size:14px}
+.mb-info a{font-size:12px;color:var(--blue);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:none}
+.mb-nolink{font-style:normal;font-size:12px;color:var(--red)}
+.mb-meta{font-size:11.5px;color:var(--gray-500)}
+.mb-acts{display:flex;gap:6px;padding:4px 12px 10px;margin-top:auto}
+.mb-acts button{padding:5px 10px;border:1px solid var(--gray-200);background:var(--white);border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit}
+.mb-acts button:hover{border-color:var(--gray-400)}
+.mb-empty{padding:30px 16px;text-align:center;color:var(--gray-500);font-size:13.5px}
+.mb-empty.sm{padding:18px 8px;font-size:12.5px;border:1.5px dashed var(--gray-200);border-radius:8px;margin-top:16px}
+.mb-order{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.mb-ord{display:flex;align-items:center;gap:6px;font-size:13px;padding:5px 8px;background:var(--gray-50);border-radius:7px}
+.mb-ord i{font-style:normal;width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.mb-ord span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mb-ord button{width:26px;height:26px;border:1px solid var(--gray-200);background:var(--white);border-radius:6px;cursor:pointer;font-size:12px}
+.mb-ord button:disabled{opacity:.35;cursor:default}
+.mb-opts{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12.5px;color:var(--gray-700);margin-bottom:10px}
+.mb-opts select{margin-left:4px;padding:3px 6px;border:1px solid var(--gray-200);border-radius:6px;font-family:inherit}
+.mb-ck{display:flex;align-items:center;gap:4px;cursor:pointer}
+.mb-mail{background:#fff;color:#222;border:1px solid var(--gray-200);border-radius:8px;padding:16px;max-height:520px;overflow:auto}
+.mb-mail-body{font-size:13px;color:#888;line-height:1.6}
+.mb-btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.mb-copy{flex:1 1 200px;padding:11px 14px;border:0;border-radius:9px;background:var(--blue);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit}
+.mb-copy2{flex:0 1 auto;padding:11px 14px;border:1.5px solid var(--gray-300);border-radius:9px;background:var(--white);color:var(--gray-700);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+.mb-copy:disabled,.mb-copy2:disabled{opacity:.4;cursor:default}
+.mb-tip{font-size:11.5px;color:var(--gray-500);margin-top:8px}
+.mb-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;display:flex;align-items:center;justify-content:center;padding:16px}
+.mb-modal{background:var(--white);color:var(--gray-900);border-radius:14px;width:min(560px,100%);max-height:92vh;overflow:auto;padding:18px 20px;display:flex;flex-direction:column;gap:10px}
+.mb-m-head{display:flex;justify-content:space-between;align-items:center;font-size:16px}
+.mb-m-head button{border:0;background:none;font-size:18px;cursor:pointer;color:var(--gray-500)}
+.mb-modal label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:700;color:var(--gray-600)}
+.mb-modal label small{font-weight:500;color:var(--gray-400)}
+.mb-m-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mb-drop{border:2px dashed var(--gray-300);border-radius:10px;min-height:150px;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;cursor:pointer;font-size:13px;color:var(--gray-600);background:var(--gray-50)}
+.mb-drop.over{border-color:var(--blue);background:#EEF4FF}
+.mb-drop img{max-width:100%;max-height:260px;display:block}
+.mb-drop small{color:var(--gray-500)}
+.mb-m-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.mb-cancel{padding:9px 16px;border:1px solid var(--gray-200);background:var(--white);border-radius:8px;cursor:pointer;font-family:inherit}
+@media (max-width:980px){.mb-wrap{grid-template-columns:1fr}.mb-right{position:static}}
+@media (max-width:560px){.mb-m-row{grid-template-columns:1fr}}

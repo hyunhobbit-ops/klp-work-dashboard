@@ -28528,3 +28528,211 @@ async function scOpenDomestic(id) {
     switchTab('projects-domestic');
     setTimeout(() => showProjectDetail(id), 150);
 }
+
+// =====================================================================
+// ✉️ 메일 홍보 배너 (마케팅 > 메일 홍보 배너, migration 074 mail_banners)
+// 배너(이미지 + 하이퍼링크)를 등록해 두고, 이번 메일에 넣을 것만 골라 순서대로 →
+// '메일에 붙여넣기용 복사'(text/html 클립보드)로 Gmail·네이버웍스 메일 하단에 이미지·링크 그대로 붙여넣기
+// 이미지는 planning-images/mail-banners/ 공개 주소(맥미니 서버) — 받는 사람 메일에서 이 주소로 그림을 불러옴
+// =====================================================================
+let _mb = { list: [], loaded: false, gap: 12, divider: true };
+let _mkView = 'camp';
+function mktSetView(v) {
+    _mkView = v;
+    document.querySelectorAll('#tab-marketing .mkt-sw').forEach(b => b.classList.toggle('on', b.dataset.mkv === v));
+    const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+    show('mktCampToolbar', v === 'camp'); show('mktCampSection', v === 'camp'); show('mailBannerRoot', v === 'banner');
+    if (v === 'banner') mbLoad();
+}
+function mbSel() { try { const a = JSON.parse(localStorage.getItem('mb_sel') || '[]'); return Array.isArray(a) ? a : []; } catch (_) { return []; } }
+function mbSetSel(a) { try { localStorage.setItem('mb_sel', JSON.stringify(a)); } catch (_) {} }
+function mbOpt() { try { return Object.assign({ gap: 12, divider: true }, JSON.parse(localStorage.getItem('mb_opt') || '{}')); } catch (_) { return { gap: 12, divider: true }; } }
+function mbSetOpt(o) { try { localStorage.setItem('mb_opt', JSON.stringify(o)); } catch (_) {} }
+async function mbLoad() {
+    const root = document.getElementById('mailBannerRoot');
+    if (!root) return;
+    if (!_mb.loaded) root.innerHTML = '<div class="mb-empty">불러오는 중…</div>';
+    const { data, error } = await sb.from('mail_banners').select('*').order('sort').order('id');
+    if (error) { root.innerHTML = `<div class="mb-empty">배너를 못 불러왔어요: ${escHtml(error.message)}</div>`; return; }
+    _mb.list = data || []; _mb.loaded = true;
+    const ids = new Set(_mb.list.map(b => b.id));
+    mbSetSel(mbSel().filter(id => ids.has(id)));
+    mbRender();
+}
+function mbLink(u) { u = String(u || '').trim(); if (!u) return ''; return /^(https?:|mailto:|tel:)/i.test(u) ? u : 'https://' + u; }
+function mbAttr(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+// 메일용 HTML — 표(table) + 인라인 스타일만 (메일 프로그램이 CSS를 대부분 지움)
+function mbHtml(list, opt) {
+    opt = opt || mbOpt();
+    const gap = Math.max(0, Number(opt.gap) || 0);
+    const rows = list.map((b, i) => {
+        const w = Number(b.width) || 600;
+        const img = `<img src="${mbAttr(b.image_url)}" alt="${mbAttr(b.alt || b.title)}" width="${w}" style="display:block;width:${w}px;max-width:100%;height:auto;border:0;outline:none;text-decoration:none">`;
+        const link = mbLink(b.link_url);
+        const inner = link ? `<a href="${mbAttr(link)}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none;border:0">${img}</a>` : img;
+        return `<tr><td style="padding:0 0 ${i < list.length - 1 ? gap : 0}px 0">${inner}</td></tr>`;
+    }).join('');
+    const line = opt.divider ? `<tr><td style="padding:0 0 16px 0"><div style="border-top:1px solid #e5e5e5;width:100%;max-width:600px;height:0;line-height:0;font-size:0">&nbsp;</div></td></tr>` : '';
+    return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:24px 0 0 0">${line}${rows}</table>`;
+}
+function mbPicked() { const by = new Map(_mb.list.map(b => [b.id, b])); return mbSel().map(id => by.get(id)).filter(Boolean); }
+function mbRender() {
+    const root = document.getElementById('mailBannerRoot');
+    if (!root) return;
+    const sel = mbSel(), opt = mbOpt(), picked = mbPicked();
+    const card = b => {
+        const n = sel.indexOf(b.id);
+        const link = mbLink(b.link_url);
+        return `<div class="mb-card ${n >= 0 ? 'on' : ''}">
+            <button type="button" class="mb-pick" onclick="mbToggle(${b.id})" title="${n >= 0 ? '이번 메일에서 빼기' : '이번 메일에 넣기'}">${n >= 0 ? n + 1 : '+'}</button>
+            <div class="mb-thumb" onclick="mbToggle(${b.id})">${b.image_url ? `<img src="${mbAttr(b.image_url)}" alt="">` : '<span>이미지 없음</span>'}</div>
+            <div class="mb-info">
+                <b>${escHtml(b.title || '(이름 없음)')}</b>
+                ${link ? `<a href="${mbAttr(link)}" target="_blank" rel="noopener" title="${mbAttr(link)}">🔗 ${escHtml(link.replace(/^https?:\/\//, ''))}</a>` : '<em class="mb-nolink">⚠️ 링크 없음 (누르면 아무 데도 안 열려요)</em>'}
+                <span class="mb-meta">메일 폭 ${Number(b.width) || 600}px${b.created_by ? ' · ' + escHtml(b.created_by) : ''}</span>
+            </div>
+            <div class="mb-acts"><button type="button" onclick="mbForm(${b.id})">✏️ 편집</button><button type="button" onclick="mbDelete(${b.id})">🗑️</button></div>
+        </div>`;
+    };
+    root.innerHTML = `
+      <div class="mb-guide">
+        <b>✉️ 메일 하단 홍보 배너</b>
+        <ol>
+          <li>배너(이미지 + 누르면 열릴 링크)를 등록해 두고</li>
+          <li>이번 메일에 넣을 배너를 <b>눌러서 순서대로</b> 고른 뒤</li>
+          <li><b>📋 메일에 붙여넣기용 복사</b> → 메일 쓰기 화면 맨 아래에 <b>Ctrl+V</b> (Gmail·네이버웍스에서 이미지·링크 그대로 들어가요)</li>
+        </ol>
+        <p>Aside에게 맡길 때: Aside가 쓴 메일 초안을 열고 맨 아래에 붙여넣거나, <b>&lt;/&gt; HTML 코드 복사</b>를 Aside 스킬 md에 넣어 "메일 하단에 이 HTML을 넣어줘"라고 해 주세요.</p>
+      </div>
+      <div class="mb-wrap">
+        <div class="mb-left">
+          <div class="mb-left-head"><b>등록된 배너 ${_mb.list.length}개</b><span>눌러서 이번 메일에 넣기 · 숫자 = 메일에 들어갈 순서</span><div class="inq-spacer"></div><button type="button" class="btn-primary" onclick="mbForm(null)">+ 새 배너</button></div>
+          ${_mb.list.length ? `<div class="mb-grid">${_mb.list.map(card).join('')}</div>` : '<div class="mb-empty">아직 배너가 없어요. <b>+ 새 배너</b>로 홍보 이미지와 링크를 등록해 주세요.</div>'}
+        </div>
+        <div class="mb-right">
+          <div class="mb-right-head"><b>이번 메일 하단 미리보기</b><span>${picked.length}개</span></div>
+          ${picked.length ? `<div class="mb-order">${picked.map((b, i) => `<div class="mb-ord"><i>${i + 1}</i><span>${escHtml(b.title || '(이름 없음)')}</span>
+              <button type="button" ${i === 0 ? 'disabled' : ''} onclick="mbMove(${b.id},-1)" title="위로">↑</button><button type="button" ${i === picked.length - 1 ? 'disabled' : ''} onclick="mbMove(${b.id},1)" title="아래로">↓</button><button type="button" onclick="mbToggle(${b.id})" title="빼기">✕</button></div>`).join('')}</div>` : ''}
+          <div class="mb-opts">
+            <label>배너 사이 간격 <select onchange="mbOptSet('gap', this.value)">${[0, 8, 12, 20, 32].map(g => `<option value="${g}" ${Number(opt.gap) === g ? 'selected' : ''}>${g}px</option>`).join('')}</select></label>
+            <label class="mb-ck"><input type="checkbox" ${opt.divider ? 'checked' : ''} onchange="mbOptSet('divider', this.checked)"> 위에 얇은 구분선</label>
+          </div>
+          <div class="mb-mail">
+            <div class="mb-mail-body">안녕하세요, 케이엘피코리아입니다.<br>…메일 본문…<br><br>감사합니다.</div>
+            ${picked.length ? mbHtml(picked, opt) : '<div class="mb-empty sm">왼쪽에서 배너를 눌러 고르면 여기에 메일에 들어갈 모습이 보여요</div>'}
+          </div>
+          <div class="mb-btns">
+            <button type="button" class="mb-copy" ${picked.length ? '' : 'disabled'} onclick="mbCopy('rich')">📋 메일에 붙여넣기용 복사</button>
+            <button type="button" class="mb-copy2" ${picked.length ? '' : 'disabled'} onclick="mbCopy('code')">&lt;/&gt; HTML 코드 복사</button>
+          </div>
+          ${picked.length ? '<div class="mb-tip">미리보기의 배너를 눌러 링크가 맞는지 확인할 수 있어요.</div>' : ''}
+        </div>
+      </div>`;
+}
+function mbToggle(id) {
+    const a = mbSel(), i = a.indexOf(id);
+    if (i >= 0) a.splice(i, 1); else a.push(id);
+    mbSetSel(a); mbRender();
+}
+function mbMove(id, d) {
+    const a = mbSel(), i = a.indexOf(id), j = i + d;
+    if (i < 0 || j < 0 || j >= a.length) return;
+    [a[i], a[j]] = [a[j], a[i]]; mbSetSel(a); mbRender();
+}
+function mbOptSet(k, v) { const o = mbOpt(); o[k] = k === 'gap' ? Number(v) : !!v; mbSetOpt(o); mbRender(); }
+async function mbCopy(mode) {
+    const picked = mbPicked();
+    if (!picked.length) return;
+    const html = mbHtml(picked);
+    const text = picked.map(b => [b.title, mbLink(b.link_url)].filter(Boolean).join(' — ')).join('\n');
+    try {
+        if (mode === 'code') { await navigator.clipboard.writeText(html); showToast('HTML 코드를 복사했어요 — Aside 스킬 md나 서명 설정에 붙여넣으세요'); return; }
+        if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+            await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })]);
+        } else {
+            const box = document.createElement('div');
+            box.contentEditable = 'true'; box.style.cssText = 'position:fixed;left:-9999px;top:0';
+            box.innerHTML = html; document.body.appendChild(box);
+            const r = document.createRange(); r.selectNodeContents(box);
+            const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+            document.execCommand('copy'); s.removeAllRanges(); box.remove();
+        }
+        showToast(`배너 ${picked.length}개 복사 완료 — 메일 맨 아래에 Ctrl+V 하세요`);
+    } catch (e) { showToast('복사 실패: ' + e.message); }
+}
+async function mbDelete(id) {
+    const b = _mb.list.find(v => v.id === id);
+    if (!b || !confirm(`'${b.title || '배너'}'를 삭제할까요?`)) return;
+    const { error } = await sb.from('mail_banners').delete().eq('id', id);
+    if (error) { showToast('삭제 실패: ' + error.message); return; }
+    showToast('삭제했어요'); mbLoad();
+}
+// 배너 이미지 — 가로 1200px(메일 600px의 2배, 선명하게)보다 크면 줄여서 올림. GIF(움직이는 그림)는 그대로
+async function mbUploadImage(file) {
+    let blob = file, ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+    if (/^image\/(png|jpe?g|webp)$/.test(file.type)) {
+        const bmp = await createImageBitmap(file);
+        if (bmp.width > 1200) {
+            const c = document.createElement('canvas');
+            c.width = 1200; c.height = Math.round(bmp.height * 1200 / bmp.width);
+            c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+            const png = file.type === 'image/png';
+            blob = await new Promise(ok => c.toBlob(ok, png ? 'image/png' : 'image/jpeg', 0.9));
+            ext = png ? 'png' : 'jpg';
+        }
+    }
+    const path = `mail-banners/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await sb.storage.from('planning-images').upload(path, blob, { cacheControl: '31536000', upsert: false, contentType: blob.type || file.type || undefined });
+    if (error) throw error;
+    return sb.storage.from('planning-images').getPublicUrl(path).data.publicUrl;
+}
+function mbForm(id) {
+    const b = id ? _mb.list.find(v => v.id === id) : null;
+    const d = b ? Object.assign({}, b) : { title: '', image_url: '', link_url: '', alt: '', width: 600 };
+    let img = d.image_url;
+    const ov = document.createElement('div');
+    ov.className = 'mb-ov';
+    ov.innerHTML = `<div class="mb-modal">
+        <div class="mb-m-head"><b>${b ? '배너 편집' : '새 배너'}</b><button type="button" data-x>✕</button></div>
+        <div class="mb-drop" tabindex="0" data-drop>${img ? `<img src="${mbAttr(img)}" alt="">` : '<div><b>이미지를 끌어다 놓거나, 눌러서 고르거나, Ctrl+V로 붙여넣기</b><br><small>메일 폭 600px 기준 — 가로 1200px 이상 이미지면 선명해요 (큰 건 자동으로 줄여요)</small></div>'}</div>
+        <input type="file" accept="image/*" hidden data-file>
+        <label>배너 이름 <small>(관리용)</small><input class="form-input" data-f="title" value="${mbAttr(d.title)}" placeholder="예: 2026 시계 카탈로그"></label>
+        <label>누르면 열릴 링크 <small>(하이퍼링크)</small><input class="form-input" data-f="link_url" value="${mbAttr(d.link_url)}" placeholder="예: https://klpkorea.com/catalog"></label>
+        <div class="mb-m-row">
+          <label>이미지 대신 보일 글 <small>(이미지 차단 시)</small><input class="form-input" data-f="alt" value="${mbAttr(d.alt)}" placeholder="비우면 배너 이름"></label>
+          <label>메일에서 보일 폭<select class="form-input" data-f="width">${[[600, '600px (꽉 차게)'], [480, '480px'], [400, '400px'], [300, '300px (작게)']].map(([v, t]) => `<option value="${v}" ${Number(d.width) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        </div>
+        <div class="mb-m-foot"><button type="button" class="mb-cancel" data-x>취소</button><button type="button" class="btn-primary" data-save>저장</button></div>
+    </div>`;
+    document.body.appendChild(ov);
+    const drop = ov.querySelector('[data-drop]'), fileIn = ov.querySelector('[data-file]');
+    const setFile = async f => {
+        if (!f || !/^image\//.test(f.type)) { showToast('이미지 파일만 올릴 수 있어요'); return; }
+        drop.innerHTML = '<div>올리는 중…</div>';
+        try { img = await mbUploadImage(f); drop.innerHTML = `<img src="${mbAttr(img)}" alt="">`; }
+        catch (e) { drop.innerHTML = '<div>업로드 실패 — 다시 시도해 주세요</div>'; showToast('업로드 실패: ' + e.message); }
+    };
+    const close = () => { document.removeEventListener('paste', onPaste); ov.remove(); };
+    const onPaste = e => { const f = [...(e.clipboardData && e.clipboardData.files || [])].find(x => /^image\//.test(x.type)); if (f) { e.preventDefault(); setFile(f); } };
+    document.addEventListener('paste', onPaste);
+    drop.addEventListener('click', () => fileIn.click());
+    fileIn.addEventListener('change', () => setFile(fileIn.files[0]));
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); setFile(e.dataTransfer.files[0]); });
+    ov.querySelectorAll('[data-x]').forEach(x => x.addEventListener('click', close));
+    ov.querySelector('[data-save]').addEventListener('click', async e => {
+        const v = k => ov.querySelector(`[data-f="${k}"]`).value.trim();
+        if (!img) { showToast('배너 이미지를 넣어주세요'); return; }
+        const row = { title: v('title') || '배너', link_url: mbLink(v('link_url')), alt: v('alt'), width: Number(v('width')) || 600, image_url: img };
+        if (!row.link_url && !confirm('링크가 비어 있어요. 링크 없이 이미지만 저장할까요?')) return;
+        e.target.disabled = true;
+        let res;
+        if (b) res = await sb.from('mail_banners').update(row).eq('id', b.id);
+        else { row.sort = (_mb.list.reduce((m, x) => Math.max(m, x.sort || 0), 0)) + 1; row.created_by = (typeof marketingLoginName === 'function' && marketingDisplayName(marketingLoginName())) || ''; res = await sb.from('mail_banners').insert(row).select().single(); }
+        if (res.error) { e.target.disabled = false; showToast('저장 실패: ' + res.error.message); return; }
+        if (!b && res.data) { const a = mbSel(); a.push(res.data.id); mbSetSel(a); }   // 새 배너는 바로 이번 메일에 넣음
+        close(); showToast('저장했어요'); mbLoad();
+    });
+    setTimeout(() => ov.querySelector('[data-f="title"]').focus(), 50);
+}

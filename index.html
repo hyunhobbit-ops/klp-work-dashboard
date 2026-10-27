@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261027g">
+    <link rel="stylesheet" href="styles.css?v=20261027h">
     <link rel="stylesheet" href="mobile.css?v=20260507e" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -1515,7 +1515,12 @@
 
             <!-- ===== 마케팅 ===== -->
             <main class="content" id="tab-marketing">
-                <div class="content-toolbar">
+                <div class="mkt-switch">
+                    <button type="button" class="mkt-sw on" data-mkv="camp" onclick="mktSetView('camp')">📣 마케팅 캠페인</button>
+                    <button type="button" class="mkt-sw" data-mkv="banner" onclick="mktSetView('banner')">✉️ 메일 홍보 배너</button>
+                </div>
+                <div id="mailBannerRoot" style="display:none"></div>
+                <div class="content-toolbar" id="mktCampToolbar">
                     <div class="toolbar-left">
                         <div class="search-bar">
                             <svg width="16" height="16" fill="none" stroke="#999" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
@@ -1529,7 +1534,7 @@
                         </button>
                     </div>
                 </div>
-                <div class="page-section">
+                <div class="page-section" id="mktCampSection">
                     <div class="client-stats" id="marketingStats" style="padding:8px 16px;color:var(--text-secondary);font-size:14px"></div>
                     <div id="marketingGrid" class="marketing-grid"></div>
                 </div>
@@ -1964,6 +1969,6 @@
     </div>
 
     <script src="send-kit.js?v=20261001i"></script>
-    <script src="app.js?v=20261027g"></script>
+    <script src="app.js?v=20261027h"></script>
 </body>
 </html>
