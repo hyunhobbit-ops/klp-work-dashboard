@@ -28696,11 +28696,11 @@ function mbForm(id) {
         <div class="mb-m-head"><b>${b ? '배너 편집' : '새 배너'}</b><button type="button" data-x>✕</button></div>
         <div class="mb-drop" tabindex="0" data-drop>${img ? `<img src="${mbAttr(img)}" alt="">` : '<div><b>이미지를 끌어다 놓거나, 눌러서 고르거나, Ctrl+V로 붙여넣기</b><br><small>메일 폭 600px 기준 — 가로 1200px 이상 이미지면 선명해요 (큰 건 자동으로 줄여요)</small></div>'}</div>
         <input type="file" accept="image/*" hidden data-file>
-        <label>배너 이름 <small>(관리용)</small><input class="form-input" data-f="title" value="${mbAttr(d.title)}" placeholder="예: 2026 시계 카탈로그"></label>
-        <label>누르면 열릴 링크 <small>(하이퍼링크)</small><input class="form-input" data-f="link_url" value="${mbAttr(d.link_url)}" placeholder="예: https://klpkorea.com/catalog"></label>
+        <label><span>배너 이름 <small>(관리용)</small></span><input class="form-input" data-f="title" value="${mbAttr(d.title)}" placeholder="예: 2026 시계 카탈로그"></label>
+        <label><span>누르면 열릴 링크 <small>(하이퍼링크)</small></span><input class="form-input" data-f="link_url" value="${mbAttr(d.link_url)}" placeholder="예: https://klpkorea.com/catalog"></label>
         <div class="mb-m-row">
-          <label>이미지 대신 보일 글 <small>(이미지 차단 시)</small><input class="form-input" data-f="alt" value="${mbAttr(d.alt)}" placeholder="비우면 배너 이름"></label>
-          <label>메일에서 보일 폭<select class="form-input" data-f="width">${[[600, '600px (꽉 차게)'], [480, '480px'], [400, '400px'], [300, '300px (작게)']].map(([v, t]) => `<option value="${v}" ${Number(d.width) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+          <label><span>이미지 대신 보일 글 <small>(이미지 차단 시)</small></span><input class="form-input" data-f="alt" value="${mbAttr(d.alt)}" placeholder="비우면 배너 이름"></label>
+          <label><span>메일에서 보일 폭</span><select class="form-input" data-f="width">${[[600, '600px (꽉 차게)'], [480, '480px'], [400, '400px'], [300, '300px (작게)']].map(([v, t]) => `<option value="${v}" ${Number(d.width) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
         </div>
         <div class="mb-m-foot"><button type="button" class="mb-cancel" data-x>취소</button><button type="button" class="btn-primary" data-save>저장</button></div>
     </div>`;

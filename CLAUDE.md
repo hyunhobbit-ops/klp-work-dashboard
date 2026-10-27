@@ -182,6 +182,13 @@
   - 국내 상세: 매입 상세에 공급처별 줄 + `🏭 추가 공급처 발주` 카드(작업요청서 번호·열기/만들기, `xsFillDetail`). 상담 국내 진행 카드: `🏭 추가 공급처` 버튼(`xwr:id:k` → 있으면 크게 보기, 없으면 만들기)
   - 만들기 `xsOpenWr` → prefill `{type:'wr', xs:true, supplier, 품목=제품명+품목, 수량·단가·VAT}` → 문서 생성기가 디확 연동 뒤 주 매입처 값(받는 곳·단가·인쇄·포장·배송)을 비우고 이 공급처 값만 채움
 
+## ✉️ 메일 홍보 배너 (마케팅 탭 안 두 번째 화면, migration 074, 2026-10-27)
+- 마케팅 탭 위 스위치 `📣 마케팅 캠페인 | ✉️ 메일 홍보 배너`(`mktSetView`, 캠페인 쪽 = `#mktCampToolbar`·`#mktCampSection`, 배너 = `#mailBannerRoot`)
+- `mail_banners` {title, image_url, link_url, alt, width(600/480/400/300), sort, created_by} — 이미지는 `planning-images/mail-banners/`(가로 1200px 넘으면 줄여서 올림, GIF 그대로, `mbUploadImage`)
+- 배너를 눌러 이번 메일에 넣기(순서 = 고른 순서, ↑↓로 변경) — 선택·간격·구분선은 브라우저 localStorage `mb_sel`·`mb_opt`(사람마다 따로)
+- `mbHtml` = 메일용 표(table)+인라인 스타일 `<a href><img width></a>` → `📋 메일에 붙여넣기용 복사`(ClipboardItem text/html, Gmail·네이버웍스에 Ctrl+V) / `</> HTML 코드 복사`(Aside 스킬 md·서명용)
+- 받는 사람 메일은 맥미니 서버(api.klpkorea.cloud) 주소로 그림을 불러옴 → 서버가 꺼져 있으면 배너 그림이 안 보임
+
 ## 제안서 시스템
 - 사이드바 "제안서" 그룹: 상품 DB / 제안서 관리
 - **상품 DB**: 제안서에 사용할 상품 등록·관리 (productsDB 배열, 추후 Supabase 전환)
