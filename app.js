@@ -5538,7 +5538,7 @@ function xsRenderRows(P) {
             <label>수량<input class="form-input" inputmode="numeric" value="${num(s.qty)}" oninput="fmtProjectNumberInput(this);xsSet('${P}',${i},'qty',this)"></label>
             <label>단가<input class="form-input" inputmode="numeric" value="${num(s.unit_price)}" oninput="fmtProjectNumberInput(this);xsSet('${P}',${i},'unit_price',this)"></label>
             <label>VAT<select class="form-input" onchange="xsSet('${P}',${i},'vat',this)"><option ${s.vat !== 'VAT 포함' ? 'selected' : ''}>VAT 별도</option><option ${s.vat === 'VAT 포함' ? 'selected' : ''}>VAT 포함</option></select></label>
-            <label>기타 비용 <small>(배송 등 일괄)</small><input class="form-input" inputmode="numeric" value="${num(s.etc)}" oninput="fmtProjectNumberInput(this);xsSet('${P}',${i},'etc',this)"></label>
+            <label>기타 비용 <small>(일괄)</small><input class="form-input" inputmode="numeric" value="${num(s.etc)}" oninput="fmtProjectNumberInput(this);xsSet('${P}',${i},'etc',this)"></label>
             <div class="xs-sum" id="${P}XsSum${i}"></div>
         </div>
     </div>`).join('');
