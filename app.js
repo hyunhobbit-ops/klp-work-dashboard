@@ -27627,7 +27627,7 @@ function scRate(x) {
     try { const r = Number(localStorage.getItem('ovs_rate')); if (r > 0) return r; } catch (_) {}
     return 1400;
 }
-// 목표 수량에서의 단가 — 수량별 단가 중 목표 수량 이하에서 가장 큰 구간, 없으면 기본 단가
+// 예상 수량에서의 단가 — 수량별 단가 중 예상 수량 이하에서 가장 큰 구간, 없으면 기본 단가
 function scPriceAt(q, qty) {
     let price = Number(q.unit_price) || 0;
     const tiers = (Array.isArray(q.tiers) ? q.tiers : []).filter(t => Number(t.qty) > 0 && Number(t.price) > 0).sort((a, b) => a.qty - b.qty);
@@ -27700,8 +27700,7 @@ function scRenderMain() {
     const dom = x.domestic_id ? (projects.find(p => p.id === x.domestic_id) || null) : null;
     const info = [
         x.client ? `고객사 <b>${_scEsc(x.client)}</b>` : '',
-        x.target_qty ? `목표 수량 <b>${Number(x.target_qty).toLocaleString()}개</b>` : '',
-        x.target_price ? `목표 단가 <b>${_scWon(x.target_price)}</b>` : '',
+        x.target_qty ? `예상 수량 <b>${Number(x.target_qty).toLocaleString()}개</b>` : '',
         x.need_by ? `납기 <b>${_scEsc(String(x.need_by).replace(/-/g, '.'))}</b>` : '',
         x.assignee ? `담당 <b>${_scEsc(x.assignee)}</b>` : ''
     ].filter(Boolean).join('<span class="sc-dot">·</span>');
@@ -27710,7 +27709,6 @@ function scRenderMain() {
         const p = scPriceAt(q, qty);
         const L = landed[i];
         const cheap = L > 0 && L === minL && qs.length > 1;
-        const over = x.target_price > 0 && L > Number(x.target_price);
         const tiers = (q.tiers || []).filter(t => t.qty && t.price).map(t => `${Number(t.qty).toLocaleString()}개 $${t.price}`).join(' / ');
         return `<tr class="${q.chosen ? 'chosen' : ''}">
             <td class="sc-sup">
@@ -27724,7 +27722,7 @@ function scRenderMain() {
             <td class="r">${q.moq ? Number(q.moq).toLocaleString() : '-'}</td>
             <td class="r">${q.lead_days ? q.lead_days + '일' : '-'}</td>
             <td>${_scEsc(q.incoterm || '-')}${Number(q.ship_cost) ? `<div class="sc-sub">운송 ${_scUsd(q.ship_cost)}</div>` : ''}</td>
-            <td class="r ${cheap ? 'best' : ''} ${over ? 'over' : ''}"><b>${_scWon(L)}</b>${cheap ? '<div class="sc-sub">최저</div>' : ''}${over ? '<div class="sc-sub">목표 초과</div>' : ''}</td>
+            <td class="r ${cheap ? 'best' : ''}"><b>${_scWon(L)}</b>${cheap ? '<div class="sc-sub">최저</div>' : ''}</td>
             <td class="r">${Number(q.sample_price) ? _scUsd(q.sample_price) : '-'}${q.sample_days ? `<div class="sc-sub">${q.sample_days}일</div>` : ''}</td>
             <td class="sc-act">
                 <button class="pl-btn ${q.chosen ? '' : 'blue'}" onclick="scChoose(${q.id})">${q.chosen ? '결정 취소' : '이 업체로 결정'}</button>
@@ -27739,7 +27737,7 @@ function scRenderMain() {
           <div style="min-width:0">
             <div class="mn-doc-cat">해외 소싱</div>
             <h1>${_scEsc(x.title || '(이름 없음)')}</h1>
-            <div class="sc-info">${info || '<span class="mn-muted">고객사·목표 수량·목표 단가를 넣으면 비교가 쉬워져요</span>'}</div>
+            <div class="sc-info">${info || '<span class="mn-muted">고객사·예상 수량을 넣으면 그 수량 기준으로 비교해요</span>'}</div>
           </div>
           <div class="mn-doc-act">
             <select class="form-select sc-status" onchange="scItemPatch(${x.id}, {status: this.value})">${SC_STATUSES.map(s => `<option ${s === x.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
@@ -27868,22 +27866,21 @@ function scImgBind(ov) {
 const scImgsOf = ov => { try { return JSON.parse(ov.querySelector('.sc-imgs')?.dataset.imgs || '[]'); } catch (_) { return []; } };
 
 function scItemForm(id) {
-    const x = id ? _scItems.find(v => v.id === id) : { title: '', client: '', target_qty: '', target_price: '', need_by: '', assignee: (typeof inqMe === 'function' ? inqMe() : ''), spec: '', memo: '', images: [] };
+    const x = id ? _scItems.find(v => v.id === id) : { title: '', client: '', target_qty: '', need_by: '', assignee: (typeof inqMe === 'function' ? inqMe() : ''), spec: '', memo: '', images: [] };
     if (!x) return;
     const people = typeof meetingStaffList === 'function' ? meetingStaffList() : [];
     const ov = scModal(id ? '소싱 편집' : '새 소싱 — 찾는 물건', `
         <label class="sc-f wide">찾는 물건 *<input name="title" value="${_scEsc(x.title)}" placeholder="예: 스테인리스 텀블러 500ml 각인"></label>
         <label class="sc-f">고객사<input name="client" value="${_scEsc(x.client)}" placeholder="국내 프로젝트 매출처로 넘어가요" list="tempClientList"></label>
         <label class="sc-f">담당<select name="assignee"><option value="">-</option>${people.map(p => `<option ${p === x.assignee ? 'selected' : ''}>${_scEsc(p)}</option>`).join('')}</select></label>
-        <label class="sc-f">목표 수량<input name="target_qty" value="${x.target_qty || ''}" inputmode="numeric" placeholder="개"></label>
-        <label class="sc-f">목표 매입 단가 (원)<input name="target_price" value="${x.target_price ? Number(x.target_price).toLocaleString() : ''}" inputmode="numeric" placeholder="이보다 비싸면 빨갛게 표시"></label>
+        <label class="sc-f">예상 수량<input name="target_qty" value="${x.target_qty || ''}" inputmode="numeric" placeholder="개 — 이 수량 기준으로 단가 비교"></label>
         <label class="sc-f">납기<input name="need_by" type="date" value="${_scEsc(x.need_by || '')}"></label>
         <label class="sc-f wide">원하는 사양<textarea name="spec" rows="3" placeholder="재질·크기·색상·인쇄·포장 등 — 업체에 보낸 요청 내용">${_scEsc(x.spec)}</textarea></label>
         <label class="sc-f wide">메모<textarea name="memo" rows="2">${_scEsc(x.memo)}</textarea></label>
         <div class="sc-f wide">참고 사진${scImgField(x.images)}</div>`, async ov => {
         const v = n => (ov.querySelector(`[name=${n}]`)?.value || '').trim();
         if (!v('title')) { showToast('찾는 물건을 입력하세요'); return false; }
-        const row = { title: v('title'), client: v('client'), assignee: v('assignee'), target_qty: Math.round(_scNum(v('target_qty'))), target_price: _scNum(v('target_price')),
+        const row = { title: v('title'), client: v('client'), assignee: v('assignee'), target_qty: Math.round(_scNum(v('target_qty'))),
             need_by: v('need_by') || null, spec: v('spec'), memo: v('memo'), images: scImgsOf(ov) };
         if (id) { return await scItemPatch(id, row); }
         row.created_by = (typeof inqMe === 'function' ? inqMe() : '') || (currentUser && currentUser.name) || '';
@@ -27909,7 +27906,7 @@ function scQuoteForm(itemId, qid) {
         <label class="sc-f">링크<input name="url" value="${_scEsc(q.url)}" placeholder="상품·채팅 링크"></label>
         <label class="sc-f">단가 (USD) *<input name="unit_price" value="${q.unit_price || ''}" inputmode="decimal" placeholder="기본 단가"></label>
         <label class="sc-f">MOQ (최소 수량)<input name="moq" value="${q.moq || ''}" inputmode="numeric"></label>
-        <div class="sc-f wide">수량별 단가 <span class="mn-muted">— 업체가 수량마다 값을 다르게 줬으면 (목표 수량에 맞는 값으로 비교해요)</span>
+        <div class="sc-f wide">수량별 단가 <span class="mn-muted">— 업체가 수량마다 값을 다르게 줬으면 (예상 수량에 맞는 값으로 비교해요)</span>
             <div class="sc-tiers">${(q.tiers || []).map(tierRow).join('')}</div>
             <button type="button" class="pl-btn" onclick="this.previousElementSibling.insertAdjacentHTML('beforeend', ${_scEsc(JSON.stringify(tierRow(null)))})">＋ 수량 구간</button></div>
         <label class="sc-f">생산 기간 (일)<input name="lead_days" value="${q.lead_days || ''}" inputmode="numeric"></label>

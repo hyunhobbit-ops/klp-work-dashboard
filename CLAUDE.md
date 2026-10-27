@@ -138,8 +138,8 @@
 
 ## 🌏 해외 소싱 (매입매출 > 해외 소싱, 탭 id `sourcing`) — migration 070, 2026-10-27
 - **목적**: 알리바바 등에서 받은 견적을 '찾는 물건'별로 모아 비교 → 업체 결정 → 국내 프로젝트 매입처(해외 $)로 연결
-- **테이블**: `sourcing_items`(title·spec·client·target_qty·target_price(원)·need_by·status 진행 중/결정/보류/취소·assignee·images·memo·rate(원/$)·domestic_id·inquiry_id) / `sourcing_quotes`(item_id·supplier·platform·url·contact·unit_price(USD)·tiers [{qty,price}]·moq·lead_days·incoterm·ship_cost(USD 전체)·sample_price/days·images·memo·rating·chosen). 회사 스코프 RLS, realtime
-- **비교**: `scPriceAt`(목표 수량 이하 가장 큰 수량 구간 단가) · `scLanded` = (단가×수량 + 운송비) ÷ 수량 × 환율 (세금 제외, 비교용) — 최저 초록, 목표 단가 초과 빨강
+- **테이블**: `sourcing_items`(title·spec·client·target_qty(화면 이름 '예상 수량')·need_by·status 진행 중/결정/보류/취소·assignee·images·memo·rate(원/$)·domestic_id·inquiry_id) / `sourcing_quotes`(item_id·supplier·platform·url·contact·unit_price(USD)·tiers [{qty,price}]·moq·lead_days·incoterm·ship_cost(USD 전체)·sample_price/days·images·memo·rating·chosen). 회사 스코프 RLS, realtime
+- **비교**: `scPriceAt`(예상 수량 이하 가장 큰 수량 구간 단가) · `scLanded` = (단가×수량 + 운송비) ÷ 수량 × 환율 (세금 제외, 비교용) — 최저 초록 (목표 단가 칸은 현호님 요청으로 뺌, DB 칸 target_price는 남아 있음)
 - **결정 → 국내**: `scChoose`(한 건에 하나) → `scCreateDomestic`(새 projects_domestic insert) 또는 `scLinkExisting`(`domLinkPicker`) — `scSupplierPatch`가 supplier·supplier_overseas `{cur:'USD', unit, rate, extras:[국제 운송비], ivat:null, pays:[]}`·supplier_unit_price·supplier_revenue(`ovsCalc`)를 채움. 해외 거래처 DB에 없으면 추가
 - 화면은 매뉴얼 2단 틀(`.mn`) 재사용, 입력 창 `scModal`(사진 붙여넣기 `scImgBind` → planning-images)
 
