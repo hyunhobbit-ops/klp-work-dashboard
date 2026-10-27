@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261022b">
+    <link rel="stylesheet" href="styles.css?v=20261027a">
     <link rel="stylesheet" href="mobile.css?v=20260507e" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -120,6 +120,9 @@
                         </button>
                         <button class="nav-item nav-sub-item" data-tab="projects-overseas" data-tip="해외 주문 프로젝트 진행 현황">
                             <span>해외</span>
+                        </button>
+                        <button class="nav-item nav-sub-item" data-tab="sourcing" data-tip="해외 소싱 — 알리바바 등에서 받은 견적을 품목별로 모아 비교, 결정한 업체는 국내 프로젝트로">
+                            <span>해외 소싱</span>
                         </button>
                     </div>
                     <button class="nav-item" data-tab="daily" data-tip="담당자별 일일 업무 — 전체·임원·대표·개인 탭">
@@ -1159,6 +1162,10 @@
             </main>
 
             <!-- ===== 회사 매뉴얼 ===== -->
+            <main class="content" id="tab-sourcing">
+                <div id="sourcingRoot"></div>
+            </main>
+
             <main class="content" id="tab-calls">
                 <div id="callsRoot"></div>
             </main>
@@ -1957,6 +1964,6 @@
     </div>
 
     <script src="send-kit.js?v=20261001i"></script>
-    <script src="app.js?v=20261022c"></script>
+    <script src="app.js?v=20261027a"></script>
 </body>
 </html>

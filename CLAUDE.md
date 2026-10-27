@@ -136,6 +136,13 @@
   - 되돌리기(비상): 커밋 26aee72 되돌림 + Vercel Production env를 클라우드 값으로 + 클라우드 프로젝트 재개·cron 다시 켜기 + 맥미니 cron 끄기 (단, 이전 이후 맥미니에 쌓인 데이터는 클라우드로 옮겨야 함)
 - **남은 개선**: ⑧ 사진 업로드 축소 기준 올리고 목록은 썸네일 — 특히 `planning_posts select=*`(본문 base64 사진 3.7MB를 목록에서 두 번 받음)·`products select=id,image`(base64 2.1MB)가 폰에서 첫 화면을 느리게 함 → 목록은 본문 빼고, 사진은 Storage+썸네일로. 리허설 때 덮어쓴 옛 사진 사본이 Storage 볼륨에 남아 있음(백업 241→465MB) — 정리 필요
 
+## 🌏 해외 소싱 (매입매출 > 해외 소싱, 탭 id `sourcing`) — migration 070, 2026-10-27
+- **목적**: 알리바바 등에서 받은 견적을 '찾는 물건'별로 모아 비교 → 업체 결정 → 국내 프로젝트 매입처(해외 $)로 연결
+- **테이블**: `sourcing_items`(title·spec·client·target_qty·target_price(원)·need_by·status 진행 중/결정/보류/취소·assignee·images·memo·rate(원/$)·domestic_id·inquiry_id) / `sourcing_quotes`(item_id·supplier·platform·url·contact·unit_price(USD)·tiers [{qty,price}]·moq·lead_days·incoterm·ship_cost(USD 전체)·sample_price/days·images·memo·rating·chosen). 회사 스코프 RLS, realtime
+- **비교**: `scPriceAt`(목표 수량 이하 가장 큰 수량 구간 단가) · `scLanded` = (단가×수량 + 운송비) ÷ 수량 × 환율 (세금 제외, 비교용) — 최저 초록, 목표 단가 초과 빨강
+- **결정 → 국내**: `scChoose`(한 건에 하나) → `scCreateDomestic`(새 projects_domestic insert) 또는 `scLinkExisting`(`domLinkPicker`) — `scSupplierPatch`가 supplier·supplier_overseas `{cur:'USD', unit, rate, extras:[국제 운송비], ivat:null, pays:[]}`·supplier_unit_price·supplier_revenue(`ovsCalc`)를 채움. 해외 거래처 DB에 없으면 추가
+- 화면은 매뉴얼 2단 틀(`.mn`) 재사용, 입력 창 `scModal`(사진 붙여넣기 `scImgBind` → planning-images)
+
 ## 프로젝트 진행사항 (국내)
 - **매출/매입 통합 단일 행**: 매출처 정보 + 매입처 상세(작업요청서용)를 한 프로젝트 행에 함께 저장
 - 신규/편집 모달에서 매입처명 입력 시 주황색 🏭 매입처 상세 카드가 펼쳐짐 (매입 단가·VAT·인쇄비·포장비)

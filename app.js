@@ -689,7 +689,7 @@ function applyModuleGating() {
     if (!enabled) return; // 설정 없으면 전체 노출
     const tabModule = {
         'planning':'planning','planning-company':'planning','planning-personal':'planning','planning-funding':'planning',
-        'projects-temp':'projects','projects-domestic':'projects','projects-overseas':'projects',
+        'projects-temp':'projects','projects-domestic':'projects','projects-overseas':'projects','sourcing':'projects',
         'daily':'daily','timebox':'daily','meetings':'meetings','delivery':'delivery','marketing':'marketing',
         'marketdb':'marketdb','cash':'cash','product-db':'product-db','proposals':'proposals',
         'docs':'docs','manual':'manual','calls':'calls','ceo-vision':'ceo-vision','clients':'clients',
@@ -1016,6 +1016,7 @@ const pageTitles = {
     'projects-temp': '매입매출 — 상담·견적',
     'projects-domestic': '매입매출 — 국내',
     'projects-overseas': '매입매출 — 해외',
+    sourcing: '매입매출 — 해외 소싱',
     daily: '일일계획표',
     delivery: '택배 관리',
     marketing: '마케팅',
@@ -1627,6 +1628,7 @@ function switchTab(tabId, fromHistory = false) {
     if (tabId === 'timebox') { try { tbxEnter(); } catch (e) { console.error(e); } }
     if (tabId === 'manual') { try { manualEnter(); } catch (e) { console.error(e); } }
     if (tabId === 'calls') { try { callsEnter(); } catch (e) { console.error(e); } }
+    if (tabId === 'sourcing') { try { scEnter(); } catch (e) { console.error(e); } }
 
     // Close mobile sidebar
     document.getElementById('sidebar').classList.remove('open');
@@ -27579,4 +27581,438 @@ async function mInqCheck(inqId, projId, key) {
     if (!x || !row) return;
     await inqToggleProjCheck(x, row, key);
     mRender();
+}
+
+// ===================== 해외 소싱 (sourcing_items / sourcing_quotes, migration 070) =====================
+// 알리바바 등에서 받은 견적을 '찾는 물건' 별로 모아 비교 → 업체를 결정하면 국내 프로젝트(해외 매입 $)로 연결
+const SC_STATUSES = ['진행 중', '결정', '보류', '취소'];
+const SC_PLATFORMS = ['알리바바', '1688', '메이드인차이나', '글로벌소시스', '직접 연락', '기타'];
+const SC_TERMS = ['', 'EXW', 'FOB', 'CIF', 'DDP', 'DAP'];
+let _scItems = [], _scQuotes = [], _scLoaded = false, _scSel = null, _scFilter = 'active', _scQ = '', _scChan = null;
+const _scEsc = s => escHtml(String(s == null ? '' : s));
+const _scNum = v => { const n = Number(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return Number.isFinite(n) ? n : 0; };
+const _scUsd = n => n ? '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '-';
+const _scWon = n => n ? Math.round(n).toLocaleString() + '원' : '-';
+
+async function scLoad() {
+    const [a, b] = await Promise.all([
+        sb.from('sourcing_items').select('*').order('updated_at', { ascending: false }).limit(1000),
+        sb.from('sourcing_quotes').select('*').order('id').limit(5000)
+    ]);
+    if (a.error || b.error) { showToast('해외 소싱을 불러오지 못했습니다: ' + ((a.error || b.error).message)); return false; }
+    _scItems = a.data || []; _scQuotes = b.data || []; _scLoaded = true;
+    return true;
+}
+async function scEnter() {
+    const root = document.getElementById('sourcingRoot');
+    if (!root) return;
+    if (!_scLoaded) { root.innerHTML = '<div class="mn-empty big">불러오는 중…</div>'; await scLoad(); }
+    try { const v = Number(localStorage.getItem('sc_sel')); if (!_scSel && v && _scItems.some(x => x.id === v)) _scSel = v; } catch (_) {}
+    if (!_scSel && _scItems.length) _scSel = (scVisible()[0] || _scItems[0]).id;
+    scSubscribe();
+    scRender();
+}
+function scSubscribe() {
+    if (_scChan) return;
+    let t = null;
+    const reload = () => { clearTimeout(t); t = setTimeout(async () => { await scLoad(); if (!document.getElementById('scOverlay')) scRender(); }, 400); };
+    _scChan = sb.channel('sourcing_realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sourcing_items' }, reload)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sourcing_quotes' }, reload)
+        .subscribe();
+}
+function scQuotesOf(id) { return _scQuotes.filter(q => q.item_id === id); }
+function scRate(x) {
+    if (x && Number(x.rate) > 0) return Number(x.rate);
+    try { const r = Number(localStorage.getItem('ovs_rate')); if (r > 0) return r; } catch (_) {}
+    return 1400;
+}
+// 목표 수량에서의 단가 — 수량별 단가 중 목표 수량 이하에서 가장 큰 구간, 없으면 기본 단가
+function scPriceAt(q, qty) {
+    let price = Number(q.unit_price) || 0;
+    const tiers = (Array.isArray(q.tiers) ? q.tiers : []).filter(t => Number(t.qty) > 0 && Number(t.price) > 0).sort((a, b) => a.qty - b.qty);
+    if (qty > 0) tiers.forEach(t => { if (Number(t.qty) <= qty) price = Number(t.price); });
+    else if (!price && tiers.length) price = Number(tiers[0].price);
+    return price;
+}
+// 개당 도착가(원, 대략) = (단가×수량 + 운송비) ÷ 수량 × 환율. 관세·부가세는 빼고 비교용
+function scLanded(q, x) {
+    const qty = Math.max(Number(x.target_qty) || 0, Number(q.moq) || 0, 1);
+    const p = scPriceAt(q, qty);
+    if (!p) return 0;
+    return (p * qty + (Number(q.ship_cost) || 0)) / qty * scRate(x);
+}
+function scVisible() {
+    const t = _scQ.trim().toLowerCase();
+    return _scItems.filter(x => (_scFilter === 'all' || (_scFilter === 'active' ? x.status === '진행 중' : x.status === _scFilter))
+        && (!t || [x.title, x.client, x.spec, x.memo, ...scQuotesOf(x.id).map(q => q.supplier)].some(v => String(v || '').toLowerCase().includes(t))));
+}
+function scRender() {
+    const root = document.getElementById('sourcingRoot');
+    if (!root) return;
+    root.innerHTML = `
+      <div class="mn sc">
+        <aside class="mn-side">
+          <div class="mn-side-top">
+            <input class="mn-q" type="search" placeholder="물건·고객사·업체 검색" value="${_scEsc(_scQ)}" oninput="_scQ=this.value;scRenderList()">
+            <button class="btn-primary mn-new" onclick="scItemForm()">＋ 새 소싱</button>
+          </div>
+          <div class="mn-cats" id="scCats"></div>
+          <div class="mn-list" id="scList"></div>
+        </aside>
+        <section class="mn-main" id="scMain"></section>
+      </div>`;
+    scRenderList();
+    scRenderMain();
+}
+function scRenderList() {
+    const cats = document.getElementById('scCats'), list = document.getElementById('scList');
+    if (!cats || !list) return;
+    const n = f => _scItems.filter(x => f === 'all' || (f === 'active' ? x.status === '진행 중' : x.status === f)).length;
+    cats.innerHTML = [['active', '진행 중'], ['결정', '결정'], ['보류', '보류'], ['취소', '취소'], ['all', '전체']]
+        .map(([k, l]) => `<button class="${_scFilter === k ? 'on' : ''}" onclick="_scFilter='${k}';scRenderList()">${l} <b>${n(k)}</b></button>`).join('');
+    const vis = scVisible();
+    if (!vis.length) { list.innerHTML = `<div class="mn-empty">${_scItems.length ? '조건에 맞는 소싱이 없어요' : '아직 소싱이 없어요 — ＋ 새 소싱으로 찾는 물건부터 등록하세요'}</div>`; return; }
+    list.innerHTML = vis.map(x => {
+        const qs = scQuotesOf(x.id), chosen = qs.find(q => q.chosen);
+        const best = qs.map(q => scLanded(q, x)).filter(v => v > 0).sort((a, b) => a - b)[0];
+        return `<button class="mn-row${x.id === _scSel ? ' on' : ''}" onclick="scOpen(${x.id})">
+            <span class="mn-row-t"><span class="sc-st sc-st-${SC_STATUSES.indexOf(x.status)}">${_scEsc(x.status)}</span> ${_scEsc(x.title || '(이름 없음)')}</span>
+            <span class="mn-row-m">${x.client ? _scEsc(x.client) + ' · ' : ''}견적 ${qs.length}곳${chosen ? ' · ✓ ' + _scEsc(chosen.supplier) : (best ? ' · 최저 개당 ' + _scWon(best) : '')}</span>
+        </button>`;
+    }).join('');
+}
+function scOpen(id) {
+    _scSel = id;
+    try { localStorage.setItem('sc_sel', String(id)); } catch (_) {}
+    scRenderList(); scRenderMain();
+}
+function scRenderMain() {
+    const main = document.getElementById('scMain');
+    if (!main) return;
+    const x = _scItems.find(v => v.id === _scSel);
+    if (!x) { main.innerHTML = `<div class="mn-empty big">왼쪽에서 소싱을 고르거나 ＋ 새 소싱을 등록하세요<br><span class="mn-muted">한 건 = 찾는 물건 하나. 업체마다 받은 견적을 그 아래에 모아 비교해요</span></div>`; return; }
+    const rate = scRate(x);
+    const qs = scQuotesOf(x.id);
+    const landed = qs.map(q => scLanded(q, x));
+    const minL = Math.min(...landed.filter(v => v > 0));
+    const chosen = qs.find(q => q.chosen);
+    const dom = x.domestic_id ? (projects.find(p => p.id === x.domestic_id) || null) : null;
+    const info = [
+        x.client ? `고객사 <b>${_scEsc(x.client)}</b>` : '',
+        x.target_qty ? `목표 수량 <b>${Number(x.target_qty).toLocaleString()}개</b>` : '',
+        x.target_price ? `목표 단가 <b>${_scWon(x.target_price)}</b>` : '',
+        x.need_by ? `납기 <b>${_scEsc(String(x.need_by).replace(/-/g, '.'))}</b>` : '',
+        x.assignee ? `담당 <b>${_scEsc(x.assignee)}</b>` : ''
+    ].filter(Boolean).join('<span class="sc-dot">·</span>');
+    const rows = qs.map((q, i) => {
+        const qty = Math.max(Number(x.target_qty) || 0, 0);
+        const p = scPriceAt(q, qty);
+        const L = landed[i];
+        const cheap = L > 0 && L === minL && qs.length > 1;
+        const over = x.target_price > 0 && L > Number(x.target_price);
+        const tiers = (q.tiers || []).filter(t => t.qty && t.price).map(t => `${Number(t.qty).toLocaleString()}개 $${t.price}`).join(' / ');
+        return `<tr class="${q.chosen ? 'chosen' : ''}">
+            <td class="sc-sup">
+                <div class="sc-sup-n">${q.chosen ? '<span class="sc-pick">✓ 결정</span> ' : ''}${_scEsc(q.supplier || '(업체명 없음)')}</div>
+                <div class="sc-sup-m">${_scEsc(q.platform)}${q.contact ? ' · ' + _scEsc(q.contact) : ''}${q.url ? ` · <a href="${_scEsc(q.url)}" target="_blank" rel="noopener noreferrer">링크 ↗</a>` : ''}${q.rating ? ' · ' + '★'.repeat(q.rating) : ''}</div>
+                ${q.memo ? `<div class="sc-memo" title="${_scEsc(q.memo)}">${_scEsc(q.memo)}</div>` : ''}
+                ${(q.images || []).length ? `<div class="sc-thumbs">${q.images.map(u => `<img src="${_scEsc(u)}" alt="" onclick="window.open('${_scEsc(u)}','_blank')">`).join('')}</div>` : ''}
+            </td>
+            <td class="r"><b>${_scUsd(p)}</b>${tiers ? `<div class="sc-sub">${_scEsc(tiers)}</div>` : ''}</td>
+            <td class="r">${_scWon(p * rate)}</td>
+            <td class="r">${q.moq ? Number(q.moq).toLocaleString() : '-'}</td>
+            <td class="r">${q.lead_days ? q.lead_days + '일' : '-'}</td>
+            <td>${_scEsc(q.incoterm || '-')}${Number(q.ship_cost) ? `<div class="sc-sub">운송 ${_scUsd(q.ship_cost)}</div>` : ''}</td>
+            <td class="r ${cheap ? 'best' : ''} ${over ? 'over' : ''}"><b>${_scWon(L)}</b>${cheap ? '<div class="sc-sub">최저</div>' : ''}${over ? '<div class="sc-sub">목표 초과</div>' : ''}</td>
+            <td class="r">${Number(q.sample_price) ? _scUsd(q.sample_price) : '-'}${q.sample_days ? `<div class="sc-sub">${q.sample_days}일</div>` : ''}</td>
+            <td class="sc-act">
+                <button class="pl-btn ${q.chosen ? '' : 'blue'}" onclick="scChoose(${q.id})">${q.chosen ? '결정 취소' : '이 업체로 결정'}</button>
+                <button class="pl-btn" onclick="scQuoteForm(${x.id}, ${q.id})">편집</button>
+                <button class="pl-btn red" onclick="scQuoteDelete(${q.id})">삭제</button>
+            </td>
+        </tr>`;
+    }).join('');
+    main.innerHTML = `
+      <article class="mn-doc sc-doc">
+        <div class="mn-doc-head">
+          <div style="min-width:0">
+            <div class="mn-doc-cat">해외 소싱</div>
+            <h1>${_scEsc(x.title || '(이름 없음)')}</h1>
+            <div class="sc-info">${info || '<span class="mn-muted">고객사·목표 수량·목표 단가를 넣으면 비교가 쉬워져요</span>'}</div>
+          </div>
+          <div class="mn-doc-act">
+            <select class="form-select sc-status" onchange="scItemPatch(${x.id}, {status: this.value})">${SC_STATUSES.map(s => `<option ${s === x.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
+            <button class="pl-btn" onclick="scItemForm(${x.id})">✏️ 편집</button>
+            <button class="pl-btn red" onclick="scItemDelete(${x.id})">삭제</button>
+          </div>
+        </div>
+        ${x.spec || x.memo || (x.images || []).length ? `<div class="sc-spec">
+            ${x.spec ? `<div><b>원하는 사양</b><p>${_scEsc(x.spec)}</p></div>` : ''}
+            ${x.memo ? `<div><b>메모</b><p>${_scEsc(x.memo)}</p></div>` : ''}
+            ${(x.images || []).length ? `<div class="sc-thumbs big">${x.images.map(u => `<img src="${_scEsc(u)}" alt="" onclick="window.open('${_scEsc(u)}','_blank')">`).join('')}</div>` : ''}
+        </div>` : ''}
+        ${chosen ? `<div class="sc-decide">
+            <div><b>✓ 결정: ${_scEsc(chosen.supplier)}</b> — 개당 ${_scUsd(scPriceAt(chosen, Number(x.target_qty) || 0))}${x.target_qty ? ` × ${Number(x.target_qty).toLocaleString()}개` : ''}</div>
+            <div class="sc-decide-act">${x.domestic_id
+                ? `<span>국내 프로젝트 연결됨${dom ? ': <b>' + _scEsc(dom.client || '') + ' · ' + _scEsc(dom.name || '') + '</b>' : ` (#${x.domestic_id})`}</span>
+                   <button class="pl-btn blue" onclick="scOpenDomestic(${x.domestic_id})">국내 프로젝트 열기 →</button>
+                   <button class="pl-btn" onclick="scLinkExisting(${x.id})">다른 프로젝트로 바꾸기</button>`
+                : `<button class="btn-primary" onclick="scCreateDomestic(${x.id})">＋ 국내 프로젝트 새로 만들기</button>
+                   <button class="pl-btn" onclick="scLinkExisting(${x.id})">🔗 기존 국내 프로젝트에 연결</button>`}</div>
+        </div>` : ''}
+        <div class="sc-qhead">
+          <h3>업체 견적 <b>${qs.length}</b></h3>
+          <label class="sc-rate">환율 <input value="${rate}" inputmode="decimal" onchange="scItemPatch(${x.id}, {rate: _scNum(this.value)}); ovsRememberRate(_scNum(this.value))"> 원/$</label>
+          <div class="inq-spacer"></div>
+          <button class="btn-primary" onclick="scQuoteForm(${x.id})">＋ 견적 추가</button>
+        </div>
+        ${qs.length ? `<div class="sc-table-wrap"><table class="sc-table">
+            <thead><tr><th>업체</th><th class="r">단가${x.target_qty ? `<div class="sc-sub">${Number(x.target_qty).toLocaleString()}개 기준</div>` : ''}</th><th class="r">원화</th><th class="r">MOQ</th><th class="r">생산</th><th>조건·운송</th><th class="r">개당 도착가<div class="sc-sub">운송 포함·세금 제외</div></th><th class="r">샘플</th><th></th></tr></thead>
+            <tbody>${rows}</tbody></table></div>`
+          : `<div class="mn-empty">아직 견적이 없어요 — 알리바바에서 받은 견적을 ＋ 견적 추가로 넣으세요<br><span class="mn-muted">업체 메시지는 메모 칸에 그대로 붙여넣고, 채팅 캡처는 사진 칸에 붙여넣으면 돼요</span></div>`}
+      </article>`;
+}
+async function scItemPatch(id, patch) {
+    const { error } = await sb.from('sourcing_items').update(patch).eq('id', id);
+    if (error) { showToast('저장 실패: ' + error.message); return false; }
+    const x = _scItems.find(v => v.id === id); if (x) Object.assign(x, patch, { updated_at: new Date().toISOString() });
+    scRenderList(); scRenderMain();
+    return true;
+}
+async function scItemDelete(id) {
+    const x = _scItems.find(v => v.id === id); if (!x) return;
+    if (!confirm(`'${x.title}' 소싱과 견적 ${scQuotesOf(id).length}개를 지울까요?`)) return;
+    const { error } = await sb.from('sourcing_items').delete().eq('id', id);
+    if (error) { showToast('삭제 실패: ' + error.message); return; }
+    _scItems = _scItems.filter(v => v.id !== id); _scQuotes = _scQuotes.filter(q => q.item_id !== id);
+    _scSel = (scVisible()[0] || {}).id || null;
+    scRender();
+}
+async function scQuoteDelete(qid) {
+    const q = _scQuotes.find(v => v.id === qid); if (!q) return;
+    if (!confirm(`${q.supplier || '이 업체'} 견적을 지울까요?`)) return;
+    const { error } = await sb.from('sourcing_quotes').delete().eq('id', qid);
+    if (error) { showToast('삭제 실패: ' + error.message); return; }
+    _scQuotes = _scQuotes.filter(v => v.id !== qid);
+    scRenderList(); scRenderMain();
+}
+// 업체 결정 — 한 건에 하나만. 결정하면 소싱 상태도 '결정'
+async function scChoose(qid) {
+    const q = _scQuotes.find(v => v.id === qid); if (!q) return;
+    const x = _scItems.find(v => v.id === q.item_id); if (!x) return;
+    const on = !q.chosen;
+    if (on) {
+        const { error: e1 } = await sb.from('sourcing_quotes').update({ chosen: false }).eq('item_id', x.id).neq('id', qid);
+        if (e1) { showToast('저장 실패: ' + e1.message); return; }
+    }
+    const { error } = await sb.from('sourcing_quotes').update({ chosen: on }).eq('id', qid);
+    if (error) { showToast('저장 실패: ' + error.message); return; }
+    _scQuotes.forEach(v => { if (v.item_id === x.id) v.chosen = on ? v.id === qid : false; });
+    await scItemPatch(x.id, { status: on ? '결정' : (x.status === '결정' ? '진행 중' : x.status) });
+    if (on) showToast(`${q.supplier} 업체로 결정했어요 — 아래에서 국내 프로젝트로 연결하세요`);
+}
+
+// ---------- 입력 창 (소싱 건 / 견적) ----------
+function scModal(title, body, onSave) {
+    document.getElementById('scOverlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'scOverlay'; ov.className = 'sc-ov';
+    ov.innerHTML = `<div class="sc-box" role="dialog" aria-label="${_scEsc(title)}">
+        <div class="sc-box-h"><b>${_scEsc(title)}</b><button type="button" class="sc-x" data-x aria-label="닫기">✕</button></div>
+        <div class="sc-box-b">${body}</div>
+        <div class="sc-box-f"><button type="button" class="pl-btn" data-x>취소</button><button type="button" class="btn-primary" data-save>저장</button></div>
+    </div>`;
+    document.body.appendChild(ov);
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey, true); };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    document.addEventListener('keydown', onKey, true);
+    ov.addEventListener('click', async e => {
+        if (e.target.closest('[data-x]') || e.target === ov) { close(); return; }
+        if (e.target.closest('[data-save]')) {
+            const btn = e.target.closest('[data-save]');
+            btn.disabled = true;
+            try { if (await onSave(ov)) close(); } finally { btn.disabled = false; }
+        }
+    });
+    setTimeout(() => ov.querySelector('input,textarea')?.focus(), 30);
+    return ov;
+}
+// 사진 칸 — 붙여넣기·끌어다 놓기·파일 선택 → planning-images 버킷
+function scImgField(imgs) {
+    return `<div class="sc-imgs" data-imgs='${_scEsc(JSON.stringify(imgs || []))}' tabindex="0">
+        <div class="sc-imgs-list"></div>
+        <label class="sc-imgs-add">＋ 사진 (캡처 붙여넣기 Ctrl+V · 끌어다 놓기)<input type="file" accept="image/*" multiple hidden></label>
+    </div>`;
+}
+function scImgBind(ov) {
+    const box = ov.querySelector('.sc-imgs'); if (!box) return;
+    let imgs = []; try { imgs = JSON.parse(box.dataset.imgs || '[]'); } catch (_) {}
+    const draw = () => {
+        box.dataset.imgs = JSON.stringify(imgs);
+        box.querySelector('.sc-imgs-list').innerHTML = imgs.map((u, i) => `<span class="sc-img"><img src="${_scEsc(u)}" alt=""><button type="button" data-del="${i}" aria-label="사진 빼기">✕</button></span>`).join('');
+    };
+    const add = async files => {
+        for (const f of [...files].filter(f => /^image\//.test(f.type))) {
+            try { imgs.push(await uploadPlanningImage(f)); draw(); } catch (e) { showToast('사진 올리기 실패: ' + (e.message || e)); }
+        }
+    };
+    box.addEventListener('click', e => { const d = e.target.closest('[data-del]'); if (d) { imgs.splice(Number(d.dataset.del), 1); draw(); } });
+    box.querySelector('input[type=file]').addEventListener('change', e => add(e.target.files));
+    box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('drag'); });
+    box.addEventListener('dragleave', () => box.classList.remove('drag'));
+    box.addEventListener('drop', e => { e.preventDefault(); box.classList.remove('drag'); add(e.dataTransfer.files); });
+    ov.addEventListener('paste', e => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) { e.preventDefault(); add(fs); } });
+    draw();
+}
+const scImgsOf = ov => { try { return JSON.parse(ov.querySelector('.sc-imgs')?.dataset.imgs || '[]'); } catch (_) { return []; } };
+
+function scItemForm(id) {
+    const x = id ? _scItems.find(v => v.id === id) : { title: '', client: '', target_qty: '', target_price: '', need_by: '', assignee: (typeof inqMe === 'function' ? inqMe() : ''), spec: '', memo: '', images: [] };
+    if (!x) return;
+    const people = typeof meetingStaffList === 'function' ? meetingStaffList() : [];
+    const ov = scModal(id ? '소싱 편집' : '새 소싱 — 찾는 물건', `
+        <label class="sc-f wide">찾는 물건 *<input name="title" value="${_scEsc(x.title)}" placeholder="예: 스테인리스 텀블러 500ml 각인"></label>
+        <label class="sc-f">고객사<input name="client" value="${_scEsc(x.client)}" placeholder="국내 프로젝트 매출처로 넘어가요" list="tempClientList"></label>
+        <label class="sc-f">담당<select name="assignee"><option value="">-</option>${people.map(p => `<option ${p === x.assignee ? 'selected' : ''}>${_scEsc(p)}</option>`).join('')}</select></label>
+        <label class="sc-f">목표 수량<input name="target_qty" value="${x.target_qty || ''}" inputmode="numeric" placeholder="개"></label>
+        <label class="sc-f">목표 매입 단가 (원)<input name="target_price" value="${x.target_price ? Number(x.target_price).toLocaleString() : ''}" inputmode="numeric" placeholder="이보다 비싸면 빨갛게 표시"></label>
+        <label class="sc-f">납기<input name="need_by" type="date" value="${_scEsc(x.need_by || '')}"></label>
+        <label class="sc-f wide">원하는 사양<textarea name="spec" rows="3" placeholder="재질·크기·색상·인쇄·포장 등 — 업체에 보낸 요청 내용">${_scEsc(x.spec)}</textarea></label>
+        <label class="sc-f wide">메모<textarea name="memo" rows="2">${_scEsc(x.memo)}</textarea></label>
+        <div class="sc-f wide">참고 사진${scImgField(x.images)}</div>`, async ov => {
+        const v = n => (ov.querySelector(`[name=${n}]`)?.value || '').trim();
+        if (!v('title')) { showToast('찾는 물건을 입력하세요'); return false; }
+        const row = { title: v('title'), client: v('client'), assignee: v('assignee'), target_qty: Math.round(_scNum(v('target_qty'))), target_price: _scNum(v('target_price')),
+            need_by: v('need_by') || null, spec: v('spec'), memo: v('memo'), images: scImgsOf(ov) };
+        if (id) { return await scItemPatch(id, row); }
+        row.created_by = (typeof inqMe === 'function' ? inqMe() : '') || (currentUser && currentUser.name) || '';
+        row.rate = scRate(null);
+        const { data, error } = await sb.from('sourcing_items').insert(row).select().single();
+        if (error) { showToast('저장 실패: ' + error.message); return false; }
+        _scItems.unshift(data); _scSel = data.id; _scFilter = 'active';
+        try { localStorage.setItem('sc_sel', String(data.id)); } catch (_) {}
+        scRender();
+        return true;
+    });
+    scImgBind(ov);
+}
+function scQuoteForm(itemId, qid) {
+    const x = _scItems.find(v => v.id === itemId); if (!x) return;
+    const q = qid ? _scQuotes.find(v => v.id === qid) : { supplier: '', platform: '알리바바', url: '', contact: '', unit_price: '', tiers: [], moq: '', lead_days: '', incoterm: '', ship_cost: '', sample_price: '', sample_days: '', memo: '', images: [], rating: 0 };
+    if (!q) return;
+    const tierRow = t => `<div class="sc-tier"><input data-tq value="${t && t.qty ? t.qty : ''}" inputmode="numeric" placeholder="수량"><span>개 이상</span><span>$</span><input data-tp value="${t && t.price ? t.price : ''}" inputmode="decimal" placeholder="단가"><button type="button" class="sc-x" onclick="this.parentElement.remove()" aria-label="빼기">✕</button></div>`;
+    const ov = scModal((qid ? '견적 편집' : '견적 추가') + ' — ' + (x.title || ''), `
+        <label class="sc-f">업체명 *<input name="supplier" value="${_scEsc(q.supplier)}" placeholder="예: Yiwu Huayi Crafts Co., Ltd."></label>
+        <label class="sc-f">어디서<select name="platform">${SC_PLATFORMS.map(p => `<option ${p === q.platform ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
+        <label class="sc-f">담당자<input name="contact" value="${_scEsc(q.contact)}" placeholder="예: Lily"></label>
+        <label class="sc-f">링크<input name="url" value="${_scEsc(q.url)}" placeholder="상품·채팅 링크"></label>
+        <label class="sc-f">단가 (USD) *<input name="unit_price" value="${q.unit_price || ''}" inputmode="decimal" placeholder="기본 단가"></label>
+        <label class="sc-f">MOQ (최소 수량)<input name="moq" value="${q.moq || ''}" inputmode="numeric"></label>
+        <div class="sc-f wide">수량별 단가 <span class="mn-muted">— 업체가 수량마다 값을 다르게 줬으면 (목표 수량에 맞는 값으로 비교해요)</span>
+            <div class="sc-tiers">${(q.tiers || []).map(tierRow).join('')}</div>
+            <button type="button" class="pl-btn" onclick="this.previousElementSibling.insertAdjacentHTML('beforeend', ${_scEsc(JSON.stringify(tierRow(null)))})">＋ 수량 구간</button></div>
+        <label class="sc-f">생산 기간 (일)<input name="lead_days" value="${q.lead_days || ''}" inputmode="numeric"></label>
+        <label class="sc-f">거래 조건<select name="incoterm">${SC_TERMS.map(t => `<option value="${t}" ${t === (q.incoterm || '') ? 'selected' : ''}>${t || '-'}</option>`).join('')}</select></label>
+        <label class="sc-f">운송비 (USD, 전체)<input name="ship_cost" value="${q.ship_cost || ''}" inputmode="decimal" placeholder="업체가 준 운송비"></label>
+        <label class="sc-f">샘플 비용 (USD)<input name="sample_price" value="${q.sample_price || ''}" inputmode="decimal"></label>
+        <label class="sc-f">샘플 기간 (일)<input name="sample_days" value="${q.sample_days || ''}" inputmode="numeric"></label>
+        <label class="sc-f">평가<select name="rating">${[0, 1, 2, 3, 4, 5].map(r => `<option value="${r}" ${r === (q.rating || 0) ? 'selected' : ''}>${r ? '★'.repeat(r) : '-'}</option>`).join('')}</select></label>
+        <label class="sc-f wide">업체 메시지·조건 <span class="mn-muted">(알리바바 채팅 내용을 그대로 붙여넣어도 돼요)</span><textarea name="memo" rows="4">${_scEsc(q.memo)}</textarea></label>
+        <div class="sc-f wide">사진 (견적서·채팅 캡처·상품 사진)${scImgField(q.images)}</div>`, async ov => {
+        const v = n => (ov.querySelector(`[name=${n}]`)?.value || '').trim();
+        if (!v('supplier')) { showToast('업체명을 입력하세요'); return false; }
+        const tiers = [...ov.querySelectorAll('.sc-tier')].map(r => ({ qty: Math.round(_scNum(r.querySelector('[data-tq]').value)), price: _scNum(r.querySelector('[data-tp]').value) }))
+            .filter(t => t.qty > 0 && t.price > 0).sort((a, b) => a.qty - b.qty);
+        const row = { supplier: v('supplier'), platform: v('platform'), contact: v('contact'), url: v('url'), cur: 'USD',
+            unit_price: _scNum(v('unit_price')), tiers, moq: Math.round(_scNum(v('moq'))), lead_days: Math.round(_scNum(v('lead_days'))),
+            incoterm: v('incoterm'), ship_cost: _scNum(v('ship_cost')), sample_price: _scNum(v('sample_price')), sample_days: Math.round(_scNum(v('sample_days'))),
+            rating: Number(v('rating')) || 0, memo: v('memo'), images: scImgsOf(ov) };
+        if (!row.unit_price && !tiers.length) { showToast('단가(또는 수량별 단가)를 입력하세요'); return false; }
+        if (qid) {
+            const { error } = await sb.from('sourcing_quotes').update(row).eq('id', qid);
+            if (error) { showToast('저장 실패: ' + error.message); return false; }
+            Object.assign(q, row);
+        } else {
+            row.item_id = itemId;
+            row.created_by = (typeof inqMe === 'function' ? inqMe() : '') || (currentUser && currentUser.name) || '';
+            const { data, error } = await sb.from('sourcing_quotes').insert(row).select().single();
+            if (error) { showToast('저장 실패: ' + error.message); return false; }
+            _scQuotes.push(data);
+        }
+        scRenderList(); scRenderMain();
+        return true;
+    });
+    scImgBind(ov);
+}
+
+// ---------- 국내 프로젝트 연결 ----------
+// 결정한 견적 → 국내 프로젝트의 매입처 + 해외 매입($) 정보 (migration 059 supplier_overseas 형식)
+function scSupplierPatch(x, q, qty) {
+    const rate = scRate(x);
+    const d = { cur: 'USD', unit: scPriceAt(q, qty), rate, extras: Number(q.ship_cost) ? [{ name: '국제 운송비', amt: Number(q.ship_cost), cur: 'USD' }] : [], ivat: null, pays: [] };
+    const c = ovsCalc(d, qty);
+    return {
+        supplier: q.supplier || '', supplier_contact: q.contact || '', supplier_overseas: d,
+        supplier_unit_price: c.unitKrw || Math.round(d.unit * rate), supplier_unit_price_vat: 'VAT 별도', supplier_revenue: c.total,
+        supplier_print_fee: 0, supplier_packaging_fee: 0, supplier_shipping_cost_per_box: 0, supplier_shipping_boxes: 0, supplier_shipping_cost: 0
+    };
+}
+async function scAfterLink(x, domId, label) {
+    await scItemPatch(x.id, { domestic_id: domId, status: '결정' });
+    try { await loadDomesticProjectsFromDb(); } catch (_) {}
+    // 해외 거래처 DB에 없으면 추가 (다음부터 국내 프로젝트에서 해외 매입이 자동으로 켜짐)
+    const q = scQuotesOf(x.id).find(v => v.chosen);
+    if (q && q.supplier) {
+        const { data } = await sb.from('clients_overseas').select('id, company_name').limit(2000);
+        const key = clientNameKey(q.supplier);
+        if (!(data || []).some(c => clientNameKey(c.company_name) === key)) {
+            await sb.from('clients_overseas').insert({ company_name: q.supplier, items: x.title || '', contact_name: q.contact || '', location: q.platform === '1688' || q.platform === '알리바바' ? '중국' : '', biz_type: '' });
+        }
+    }
+    showToast(label);
+    scRenderMain();
+}
+async function scCreateDomestic(itemId) {
+    const x = _scItems.find(v => v.id === itemId); if (!x) return;
+    const q = scQuotesOf(x.id).find(v => v.chosen); if (!q) { showToast('먼저 업체를 결정하세요'); return; }
+    const qty = Number(x.target_qty) || Number(q.moq) || 0;
+    if (!confirm(`국내 프로젝트를 새로 만들까요?\n\n매출처: ${x.client || '(비어 있음 — 나중에 입력)'}\n품목: ${x.title} · ${qty.toLocaleString()}개\n매입처: ${q.supplier} (해외 $${scPriceAt(q, qty)})`)) return;
+    const row = Object.assign({
+        client: x.client || '', contact_person: '', title: '', manager: (currentUser && currentUser.name) || '',
+        product_name: x.title || '', quantity: qty, unit: '개', unit_price: 0, unit_price_vat: 'VAT 별도', revenue: 0,
+        delivery_date: x.need_by || null, status: '시작 전', priority: '🟢 보통', category: '국내 주문', assignees: x.assignee ? [x.assignee] : [],
+        checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
+        memo: `해외 소싱에서 연결 — ${q.platform} ${q.supplier}${q.url ? ' ' + q.url : ''}`, inquiry_id: x.inquiry_id || null
+    }, scSupplierPatch(x, q, qty));
+    const { data, error } = await sb.from('projects_domestic').insert(row).select('id').single();
+    if (error) { showToast('국내 프로젝트를 만들지 못했어요: ' + error.message); return; }
+    await scAfterLink(x, data.id, '국내 프로젝트를 만들었어요 — 매출 단가는 국내 프로젝트에서 넣으세요');
+}
+async function scLinkExisting(itemId) {
+    const x = _scItems.find(v => v.id === itemId); if (!x) return;
+    const q = scQuotesOf(x.id).find(v => v.chosen); if (!q) { showToast('먼저 업체를 결정하세요'); return; }
+    await domLinkPicker({
+        title: '국내 프로젝트에 연결', sub: `매입처를 ${q.supplier} (해외 $)로 채워요`,
+        clientKey: x.client ? clientNameKey(x.client) : '', exclude: r => r.id === x.domestic_id,
+        onPick: async rows => {
+            const r = rows[0];
+            if (rows.length > 1) showToast('첫 번째 프로젝트 하나에만 연결해요');
+            if (r.supplier && !confirm(`이 프로젝트에 이미 매입처(${r.supplier})가 있어요. ${q.supplier}로 바꿀까요?`)) return;
+            const qty = Number(r.quantity) || Number(x.target_qty) || 0;
+            const { error } = await sb.from('projects_domestic').update(scSupplierPatch(x, q, qty)).eq('id', r.id);
+            if (error) { showToast('연결 실패: ' + error.message); return; }
+            await scAfterLink(x, r.id, `${r.client || ''} 프로젝트에 매입처를 연결했어요`);
+        }
+    });
+}
+async function scOpenDomestic(id) {
+    let p = projects.find(v => v.id === id);
+    if (!p) {
+        const { data } = await sb.from('projects_domestic').select('*').eq('id', id).maybeSingle();
+        if (!data) { showToast('국내 프로젝트를 찾지 못했어요 (지워졌을 수 있어요)'); return; }
+        p = inqEnsureProject(data);
+    }
+    switchTab('projects-domestic');
+    setTimeout(() => showProjectDetail(id), 150);
 }
