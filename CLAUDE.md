@@ -176,6 +176,12 @@
     - 디자인확인서 불러오기(`poApplyDc`, 연동 창 `_linkFor='po'`) → MODEL·ORDER 수량·납기·대표 사진 + 연결된 국내 프로젝트의 매입처(TO)·담당(ATTN)·해외 매입 단가(UNIT USD). 대시보드 상담 국내 진행 카드에 해외 매입 건이면 `🌏 해외 작업요청서` 버튼(있으면 `#edit-`, 없으면 `#po-new-디확번호`)
     - 출력: PDF(전체 쪽), JPG(쪽마다), 인쇄. 보내기(메일)는 아직 없음
 
+- **추가 공급처 (migration 073, 2026-10-27)**: 디확은 하나인데 여러 곳에 발주할 때(예: 더모아 회중시계 = KODA 해외 PO + 하나케이스 패키지박스 작업요청서). `projects_domestic.extra_suppliers` jsonb `[{k,name,contact,item,qty,unit_price,vat,etc,memo}]`, 금액 = (단가×수량+기타 일괄) ×1.1(VAT 별도일 때) — `xsTotal`. **supplier_revenue = 주 매입처 + 추가 공급처 합계**(마진 그대로 계산)
+  - 편집 창 매입처 카드 안 `🏭 추가 공급처` 칸(`xsBoxHtml`/`xsRenderRows`, 상태 `_xs.editProject`) — `calcEditSupplierTotal` 끝에서 `xsApplyTotal`이 매입액·내역·마진에 더함. 새 프로젝트 창엔 없음(만든 뒤 편집에서)
+  - 작업요청서 ↔ 공급처 연결 = 문서번호 `디확번호_N` 중 받는 곳(company_name)이 공급처 이름과 같은 것(`xsFindWr`, `clientNameKey`). 주 매입처 작업요청서 찾기(`createDocFromProject` wr, `inqSavedDocNumber` wr)는 추가 공급처 이름의 문서를 뺌
+  - 국내 상세: 매입 상세에 공급처별 줄 + `🏭 추가 공급처 발주` 카드(작업요청서 번호·열기/만들기, `xsFillDetail`). 상담 국내 진행 카드: `🏭 추가 공급처` 버튼(`xwr:id:k` → 있으면 크게 보기, 없으면 만들기)
+  - 만들기 `xsOpenWr` → prefill `{type:'wr', xs:true, supplier, 품목=제품명+품목, 수량·단가·VAT}` → 문서 생성기가 디확 연동 뒤 주 매입처 값(받는 곳·단가·인쇄·포장·배송)을 비우고 이 공급처 값만 채움
+
 ## 제안서 시스템
 - 사이드바 "제안서" 그룹: 상품 DB / 제안서 관리
 - **상품 DB**: 제안서에 사용할 상품 등록·관리 (productsDB 배열, 추후 Supabase 전환)
