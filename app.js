@@ -27814,7 +27814,8 @@ function scTabCompare(p) {
         const opts = m.qs.map(q => `<div class="sc-opt">${q.option_label ? `<span>${_scEsc(q.option_label)}</span> ` : ''}<b>${_scUsd(q.unit_price_usd)}</b>${q.qty ? ` × ${Number(q.qty).toLocaleString()}` : ''}<button class="sc-mini" title="견적 고치기" onclick="scQuoteForm(${s.id}, ${q.id})">✎</button></div>`).join('');
         return `<tr class="${s.status === '선정' ? 'chosen' : ''} ${s.status === '제외' ? 'out' : ''}">
           <td class="sc-sup">
-            <div class="sc-sup-n">${_scEsc(s.company || '(업체명 없음)')}</div>
+            <div class="sc-sup-n">${_scEsc(s.company || '(업체명 없음)')}${s.biz_type ? ` <span class="sc-type ${s.biz_type === '에이전시' ? 'ag' : 'mf'}">${s.biz_type === '에이전시' ? '에이전시' : '제작업체'}</span>` : ''}</div>
+            ${s.location ? `<div class="sc-sup-m">📍 ${_scEsc(s.location)}</div>` : ''}
             <div class="sc-sup-m">${_scEsc(s.contact_name || '')}${s.contact_name ? ' · ' : ''}<span class="sc-ch ${s.channel}">${SC_CHANNELS[s.channel] || ''}${s.channel === 'form_failed' ? ' ⚠' : ''}</span></div>
             <div class="sc-sup-m"><span class="sc-sst sc-sst-${SC_SUP_STATUSES.indexOf(s.status)}">${_scEsc(s.status)}</span></div>
           </td>
@@ -28184,12 +28185,14 @@ function scGuessCompany(url) {
     return '';
 }
 function scSupplierForm(pid, sid) {
-    const s = sid ? _sc.suppliers.find(v => v.id === sid) : { company: '', contact_name: '', product_url: '', years: '', rating: '', store_reviews: '', kr_reviews: '', response_time: '', ontime_rate: '', channel: 'chat', status: '문의함', note: '' };
+    const s = sid ? _sc.suppliers.find(v => v.id === sid) : { company: '', contact_name: '', location: '', biz_type: '', product_url: '', years: '', rating: '', store_reviews: '', kr_reviews: '', response_time: '', ontime_rate: '', channel: 'chat', status: '문의함', note: '' };
     if (!s) return;
     const ov = scModal(sid ? '업체 편집' : '업체 추가', `
         <label class="sc-f wide">상품 상세 링크 * <span class="mn-muted">— 비교표 모든 행에 들어가요</span><input name="product_url" value="${_scEsc(s.product_url)}" placeholder="https://www.alibaba.com/product-detail/..." oninput="const c=this.form||this.closest('.sc-box').querySelector('[name=company]'); if(!c.value){c.value=scGuessCompany(this.value)}"></label>
         <label class="sc-f">업체명 *<input name="company" value="${_scEsc(s.company)}" placeholder="예: Dongguan Aofei Jewelry"></label>
         <label class="sc-f">담당자<input name="contact_name" value="${_scEsc(s.contact_name)}" placeholder="예: Vicky Bai"></label>
+        <label class="sc-f">위치<input name="location" value="${_scEsc(s.location || '')}" placeholder="예: 중국 광둥성 둥관" list="scLocList"><datalist id="scLocList">${[...new Set(_sc.suppliers.map(x => x.location).filter(Boolean))].map(l => `<option value="${_scEsc(l)}">`).join('')}</datalist></label>
+        <div class="sc-f">업체 유형<div class="sc-seg">${[['', '모름'], ['제작업체', '🏭 실제 제작업체'], ['에이전시', '🤝 에이전시']].map(([v, l]) => `<label><input type="radio" name="biz_type" value="${v}" ${(s.biz_type || '') === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
         <label class="sc-f">업력<input name="years" value="${_scEsc(s.years)}" placeholder="예: 10년"></label>
         <label class="sc-f">평점 <span class="mn-muted">(상품 페이지 '평점 & 리뷰')</span><input name="rating" value="${s.rating ?? ''}" inputmode="decimal" placeholder="4.8"></label>
         <label class="sc-f">스토어 리뷰 수<input name="store_reviews" value="${s.store_reviews ?? ''}" inputmode="numeric"></label>
@@ -28199,7 +28202,7 @@ function scSupplierForm(pid, sid) {
         <label class="sc-f">연락 방법<select name="channel">${Object.entries(SC_CHANNELS).map(([k, l]) => `<option value="${k}" ${k === s.channel ? 'selected' : ''}>${l}${k === 'form_failed' ? ' (조용히 실패)' : ''}</option>`).join('')}</select></label>
         <label class="sc-f">상태<select name="status">${SC_SUP_STATUSES.map(x => `<option ${x === s.status ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
         <label class="sc-f wide">메모<textarea name="note" rows="2">${_scEsc(s.note)}</textarea></label>`, async ov => {
-        const row = { product_url: scV(ov, 'product_url'), company: scV(ov, 'company'), contact_name: scV(ov, 'contact_name'), years: scV(ov, 'years'),
+        const row = { product_url: scV(ov, 'product_url'), company: scV(ov, 'company'), contact_name: scV(ov, 'contact_name'), location: scV(ov, 'location'), biz_type: (ov.querySelector('[name=biz_type]:checked') || {}).value || '', years: scV(ov, 'years'),
             rating: scV(ov, 'rating') ? _scNum(scV(ov, 'rating')) : null, store_reviews: scV(ov, 'store_reviews') ? Math.round(_scNum(scV(ov, 'store_reviews'))) : null,
             kr_reviews: scV(ov, 'kr_reviews') ? Math.round(_scNum(scV(ov, 'kr_reviews'))) : null, response_time: scV(ov, 'response_time'), ontime_rate: scV(ov, 'ontime_rate'),
             channel: scV(ov, 'channel'), status: scV(ov, 'status'), note: scV(ov, 'note') };
@@ -28317,7 +28320,7 @@ async function scAfterLink(p, domId, msg) {
     if (s && s.company) {
         const { data } = await sb.from('clients_overseas').select('id, company_name').limit(2000);
         if (!(data || []).some(c => clientNameKey(c.company_name) === clientNameKey(s.company)))
-            await sb.from('clients_overseas').insert({ company_name: s.company, items: p.title || '', contact_name: s.contact_name || '', location: '중국', biz_type: '공장' });
+            await sb.from('clients_overseas').insert({ company_name: s.company, items: p.title || '', contact_name: s.contact_name || '', location: s.location || '', biz_type: s.biz_type === '에이전시' ? '에이전시' : s.biz_type === '제작업체' ? '공장' : '' });
     }
     showToast(msg); scRender();
 }

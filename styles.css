@@ -6469,3 +6469,13 @@ button.sc-kpi{cursor:pointer}
 .sc-export-h{font-size:16px; margin-bottom:12px}
 .sc-export .sc-table{min-width:0} .sc-export .sc-table td, .sc-export .sc-table th{color:#111}
 @media (max-width: 760px){ .sc-top{grid-template-columns:repeat(2, minmax(0,1fr))} #tab-sourcing .mn.sc{height:auto} }
+/* 소싱 업체 유형·위치 (migration 072) */
+.sc-type{display:inline-block; font-size:11px; font-weight:800; padding:1px 7px; border-radius:5px; vertical-align:2px}
+.sc-type.mf{background:var(--green-light); color:#1a8a41} .sc-type.ag{background:var(--purple-light); color:var(--purple)}
+[data-theme="dark"] .sc-type.mf{color:var(--green)}
+.sc-seg{display:flex; gap:6px; flex-wrap:wrap}
+.sc-seg label{cursor:pointer}
+.sc-seg input{position:absolute; opacity:0; pointer-events:none}
+.sc-seg span{display:inline-flex; align-items:center; height:38px; padding:0 12px; border:1.5px solid var(--border, var(--gray-200)); border-radius:9px; font-size:13px; font-weight:700; color:var(--gray-600); background:var(--white)}
+.sc-seg input:checked + span{border-color:var(--blue); color:var(--blue); background:var(--blue-light)}
+.sc-seg input:focus-visible + span{outline:2px solid var(--blue); outline-offset:1px}
