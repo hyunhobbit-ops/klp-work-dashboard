@@ -2252,6 +2252,12 @@ async function applyProjectPrefillData(pf, opts){
         }
       }catch(e){console.warn('DC 자동 연동 실패',e);}
     }
+    /* 추가 공급처 작업요청서(대시보드 xsOpenWr) — 디확 연동이 채운 주 매입처 값을 비우고 이 공급처 값만 */
+    if(pf.xs){
+      ['wrCompany','wrContact','wrUnitPrice','wrPrintFee','wrPkgFee','wrShippingPerBox','wrShippingBoxes','wrShippingCost'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+      var stEl=document.getElementById('wrShippingType');if(stEl)stEl.value='';
+      try{toggleWrShipping();calcWrShipTotal();}catch(e){}
+    }
     setVal('wrCompany',pf.supplier);
     setVal('wrContact',pf.supplierContact);
     setVal('wrTitle',pf.title);

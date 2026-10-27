@@ -3914,7 +3914,9 @@ async function showProjectDetail(id) {
     const purchaseTotal = p.supplierRevenue || 0;
     const margin = revenue - purchaseTotal;
     const marginPct = revenue > 0 ? Math.round((margin / revenue) * 100) : 0;
-    const hasSupplier = !!(p.supplier && p.supplierUnitPrice);
+    const hasMainSupplier = !!(p.supplier && p.supplierUnitPrice);
+    const xsList = xsClean(p.extraSuppliers);
+    const hasSupplier = hasMainSupplier || xsList.length > 0;
     const qty = p.qty || 0;
 
     // 부가비용 환산
@@ -4067,11 +4069,13 @@ async function showProjectDetail(id) {
             <div style="background:${hasSupplier ? 'var(--orange-light)' : 'var(--gray-50)'};border:1.5px solid var(--gray-200);border-left:4px solid ${hasSupplier ? 'var(--orange)' : 'var(--gray-300)'};border-radius:10px;padding:14px 16px;color:var(--gray-900)">
                 <div style="font-size:14px;font-weight:800;color:${hasSupplier ? 'var(--orange)' : 'var(--gray-500)'};padding-bottom:8px;margin-bottom:8px;border-bottom:2px solid var(--gray-200)">🏭 매입 상세</div>
                 ${!hasSupplier ? `<div style="color:var(--gray-500);font-size:13px;padding:20px 0;text-align:center">매입처 정보 없음</div>` : `
-                    <div style="font-size:11px;color:var(--gray-500);margin-bottom:6px">매입단가 ${(p.supplierUnitPrice||0).toLocaleString()}원 × ${qty.toLocaleString()}${p.unit||''} (${supVatLabel})</div>
+                    ${hasMainSupplier ? `
+                    <div style="font-size:11px;color:var(--gray-500);margin-bottom:6px">${xsList.length ? `<b style="color:var(--gray-700)">${escFn(p.supplier)}</b> · ` : ''}매입단가 ${(p.supplierUnitPrice||0).toLocaleString()}원 × ${qty.toLocaleString()}${p.unit||''} (${supVatLabel})</div>
                     ${brLine('제품 합계', supProduct)}
                     ${brLine('＋ 매입 인쇄비', supPrint)}
                     ${brLine('＋ 매입 포장비', supPack)}
-                    ${supShip ? brLine(`＋ 매입 배송비 (${supShipLabel})`, supShip) : ''}
+                    ${supShip ? brLine(`＋ 매입 배송비 (${supShipLabel})`, supShip) : ''}` : ''}
+                    ${xsList.map(s => brLine(`＋ ${escFn(s.name)}${s.item ? ' · ' + escFn(s.item) : ''}`, xsTotal(s))).join('')}
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin-top:8px;background:var(--white);border:1px solid var(--gray-200);border-radius:8px">
                         <span style="font-weight:800;color:var(--orange);font-size:13px">매입액</span>
                         <strong style="font-size:18px;color:var(--orange)">${purchaseTotal.toLocaleString()}원</strong>
@@ -4113,6 +4117,12 @@ async function showProjectDetail(id) {
             </div>
         </div>
 
+        ${xsList.length ? `
+        <div class="xs-detail">
+            ${secTitle('🏭', '추가 공급처 발주 (작업요청서)')}
+            <div id="xsDetailList">${xsList.map(s => xsDetailRowHtml(p, s, null)).join('')}</div>
+        </div>` : ''}
+
         ${p.memo ? `
         <div style="background:var(--yellow-light);border:1px solid var(--gray-200);border-left:4px solid var(--yellow);border-radius:10px;padding:12px 16px;margin-bottom:14px;color:var(--gray-900)">
             <div style="font-size:11px;color:var(--yellow);font-weight:800;margin-bottom:4px">📝 메모</div>
@@ -4133,6 +4143,7 @@ async function showProjectDetail(id) {
 
     // DC / WR 비동기 로드
     if (isOvsProject(p)) renderProjectPoArea(p);
+    if (xsList.length) xsFillDetail(p);
     if (p.sourceDocNumber) {
         const renderDocCard = (r, kind) => {
             const titleColor = kind === 'DC' ? 'var(--blue)' : 'var(--orange)';
@@ -4291,10 +4302,11 @@ async function createDocFromProject(id, type) {
         try {
             const prefix = p.sourceDocNumber + '_';
             const { data } = await sb.from('confirmations')
-                .select('doc_number,created_at,status')
+                .select('doc_number,created_at,status,company_name')
                 .like('doc_number', prefix + '%')
                 .order('created_at', { ascending: false });
-            const wrs = (data || []).filter(d => d.doc_number && d.doc_number.startsWith(prefix) && d.status === '작업요청서');
+            const xsKeys = xsNameKeys(p.extraSuppliers);   // 추가 공급처 작업요청서는 빼고
+            const wrs = (data || []).filter(d => d.doc_number && d.doc_number.startsWith(prefix) && d.status === '작업요청서' && !xsKeys.has(clientNameKey(d.company_name || '')));
             if (wrs.length > 0) {
                 const latest = wrs[0];
                 const msg = wrs.length === 1
@@ -4672,6 +4684,7 @@ function openEditProject(id) {
                 </div>
             </div>
             </div>
+            ${xsBoxHtml('editProject', p.extraSuppliers)}
             <div class="form-group" style="margin-top:8px;padding-top:12px;border-top:2px solid #FFE0CC">
                 <label class="form-label" style="color:var(--klp-orange,#E67E22);font-weight:800">💰 매입액 (자동계산)</label>
                 <div id="editProjectSupBreakdown" style="background:var(--white);border:1px solid var(--gray-200);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:var(--gray-600)"></div>
@@ -4712,7 +4725,7 @@ function openEditProject(id) {
     const overlay = document.getElementById('modalOverlay');
     overlay.classList.add('show'); openModalHistory();
     overlay.classList.add('modal-wide');
-    setTimeout(() => { if (ovsIsOn('editProject')) ovsRenderRows('editProject'); calcEditProjectRevenue(); calcEditSupplierTotal(); }, 0);
+    setTimeout(() => { if (ovsIsOn('editProject')) ovsRenderRows('editProject'); xsRenderRows('editProject'); calcEditProjectRevenue(); calcEditSupplierTotal(); }, 0);
 }
 
 function calcEditProjectRevenue() {
@@ -4752,7 +4765,7 @@ function toggleEditSupplierSection() {
 function calcEditSupplierTotal() {
     const displayEl = document.getElementById('editProjectSupTotalDisplay');
     if (!displayEl) return;
-    if (ovsIsOn('editProject')) { ovsShowTotal('editProject', readProjectNumber('editProjectQty'), 'editProjectRevenueDisplay', 'editProjectMarginDisplay'); return; }
+    if (ovsIsOn('editProject')) { ovsShowTotal('editProject', readProjectNumber('editProjectQty'), 'editProjectRevenueDisplay', 'editProjectMarginDisplay'); xsApplyTotal('editProject'); return; }
     const price = readProjectNumber('editProjectSupUnitPrice');
     const qty = readProjectNumber('editProjectQty');
     const vatEl = document.getElementById('editProjectSupVat');
@@ -4767,6 +4780,7 @@ function calcEditSupplierTotal() {
     const bd = document.getElementById('editProjectSupBreakdown');
     if (bd) bd.innerHTML = _breakdownHtml(productTotal, printTotal, packTotal, shippingTotal);
     _renderMargin('editProjectMarginDisplay', _parseKRW('editProjectRevenueDisplay'), total);
+    xsApplyTotal('editProject');
 }
 
 async function updateProject(id) {
@@ -4829,6 +4843,9 @@ async function updateProject(id) {
         supplierPrintFee = 0; supplierPackagingFee = 0;
         ovsRememberRate(supplierOverseas.rate);
     }
+    // 추가 공급처(디확 하나에 여러 곳 발주) — 매입액에 합산
+    const extraSuppliers = xsClean(_xs.editProject || p.extraSuppliers);
+    supplierRevenue += xsSum(extraSuppliers);
 
     const newChecks = {};
     Object.keys(p.checks || {}).forEach(k => {
@@ -4877,6 +4894,7 @@ async function updateProject(id) {
         supplierPackagingFeeApply,
         supplierRevenue,
         supplierOverseas,
+        extraSuppliers,
         supplierShippingType: supplierOverseas ? '' : getVal('editProjectSupShippingType'),
         supplierShippingVat: getVal('editProjectSupShippingVat') || 'VAT 별도',
         supplierShippingCostPerBox: readProjectNumber('editProjectSupShipPerBox'),
@@ -4956,6 +4974,7 @@ async function updateProject(id) {
                 supplier_packaging_fee_apply: p.supplierPackagingFeeApply || '1개당',
                 supplier_revenue: p.supplierRevenue || 0,
                 supplier_overseas: p.supplierOverseas || null,
+                extra_suppliers: p.extraSuppliers || [],
                 supplier_shipping_type: p.supplierShippingType || '',
                 supplier_shipping_vat: p.supplierShippingVat || 'VAT 별도',
                 supplier_shipping_cost_per_box: p.supplierShippingCostPerBox || 0,
@@ -5473,6 +5492,153 @@ function _shippingComponent(typeId, vatId, costId, perBoxId, boxesId) {
     }
     if (vatExclude && cost > 0) cost = Math.round(cost * 1.1);
     return cost;
+}
+
+// ===== 추가 공급처 — 디자인확인서는 하나인데 여러 곳에 발주 (migration 073: projects_domestic.extra_suppliers) =====
+// 예) 회중시계는 KODA(주 매입처), 패키지박스는 하나케이스(추가 공급처) — 작업요청서는 디확번호_1·_2…로 공급처마다 따로
+// [{k, name, contact, item, qty, unit_price, vat:'VAT 별도'|'VAT 포함', etc(기타 비용·일괄), memo}] — 매입액(supplier_revenue)에 합산
+// 작업요청서 ↔ 공급처 연결은 문서의 받는 곳(company_name)과 공급처 이름(clientNameKey)으로 찾음
+const _xs = {};   // 편집 창 P('editProject') → 줄 배열
+function xsNum(v) { return Number(String(v == null ? '' : v).replace(/[^0-9.-]/g, '')) || 0; }
+function xsTotal(s) {
+    const sub = xsNum(s.unit_price) * xsNum(s.qty) + xsNum(s.etc);
+    return s.vat === 'VAT 포함' ? Math.round(sub) : Math.round(sub * 1.1);
+}
+function xsClean(list) {
+    return (Array.isArray(list) ? list : []).filter(s => s && String(s.name || '').trim()).map(s => ({
+        k: s.k || Math.random().toString(36).slice(2, 9), name: String(s.name).trim(), contact: String(s.contact || '').trim(),
+        item: String(s.item || '').trim(), qty: xsNum(s.qty), unit_price: xsNum(s.unit_price),
+        vat: s.vat === 'VAT 포함' ? 'VAT 포함' : 'VAT 별도', etc: xsNum(s.etc), memo: String(s.memo || '').trim()
+    }));
+}
+function xsSum(list) { return xsClean(list).reduce((a, s) => a + xsTotal(s), 0); }
+function xsNameKeys(list) { return new Set(xsClean(list).map(s => clientNameKey(s.name)).filter(Boolean)); }
+
+// 편집 창 — 매입처 카드 안 '추가 공급처' 칸
+function xsBoxHtml(P, list) {
+    _xs[P] = (Array.isArray(list) ? list : []).map(s => Object.assign({}, s));
+    return `<div class="xs-box"><div class="xs-head">🏭 추가 공급처 <em>디자인확인서는 하나인데 다른 곳에도 발주할 때 (예: 패키지박스) — 매입액에 합산돼요</em></div>
+        <div id="${P}XsRows"></div>
+        <div class="xs-foot"><button type="button" class="xs-add" onclick="xsAdd('${P}')">+ 공급처 추가</button><span id="${P}XsTotal" class="xs-total"></span></div></div>`;
+}
+function xsRenderRows(P) {
+    const el = document.getElementById(P + 'XsRows');
+    if (!el) return;
+    const list = _xs[P] || [];
+    const esc = v => escHtml(v == null ? '' : String(v));
+    const num = v => xsNum(v) ? xsNum(v).toLocaleString() : '';
+    el.innerHTML = list.map((s, i) => `<div class="xs-row">
+        <div class="xs-row-top">
+            <input class="form-input" placeholder="공급처명 (예: 하나케이스)" value="${esc(s.name)}" list="clientsListDoc" oninput="xsSet('${P}',${i},'name',this)">
+            <input class="form-input" placeholder="담당자" value="${esc(s.contact)}" oninput="xsSet('${P}',${i},'contact',this)">
+            <input class="form-input xs-item" placeholder="품목 (예: PU철판 박스)" value="${esc(s.item)}" oninput="xsSet('${P}',${i},'item',this)">
+            <button type="button" class="xs-del" title="이 공급처 빼기" onclick="xsDel('${P}',${i})">✕</button>
+        </div>
+        <div class="xs-row-bot">
+            <label>수량<input class="form-input" inputmode="numeric" value="${num(s.qty)}" oninput="fmtProjectNumberInput(this);xsSet('${P}',${i},'qty',this)"></label>
+            <label>단가<input class="form-input" inputmode="numeric" value="${num(s.unit_price)}" oninput="fmtProjectNumberInput(this);xsSet('${P}',${i},'unit_price',this)"></label>
+            <label>VAT<select class="form-input" onchange="xsSet('${P}',${i},'vat',this)"><option ${s.vat !== 'VAT 포함' ? 'selected' : ''}>VAT 별도</option><option ${s.vat === 'VAT 포함' ? 'selected' : ''}>VAT 포함</option></select></label>
+            <label>기타 비용 <small>(배송 등 일괄)</small><input class="form-input" inputmode="numeric" value="${num(s.etc)}" oninput="fmtProjectNumberInput(this);xsSet('${P}',${i},'etc',this)"></label>
+            <div class="xs-sum" id="${P}XsSum${i}"></div>
+        </div>
+    </div>`).join('');
+}
+function xsSet(P, i, key, el) {
+    const s = (_xs[P] || [])[i];
+    if (!s) return;
+    s[key] = ['qty', 'unit_price', 'etc'].includes(key) ? xsNum(el.value) : el.value;
+    ovsCalcFn(P)();
+}
+function xsAdd(P) {
+    const qty = readProjectNumber(P + 'Qty');
+    (_xs[P] = _xs[P] || []).push({ k: Math.random().toString(36).slice(2, 9), name: '', contact: '', item: '', qty: qty || '', unit_price: '', vat: 'VAT 별도', etc: '' });
+    xsRenderRows(P);
+    ovsCalcFn(P)();
+    const rows = document.querySelectorAll(`#${P}XsRows .xs-row`);
+    const last = rows[rows.length - 1];
+    if (last) last.querySelector('input').focus();
+}
+function xsDel(P, i) {
+    const s = (_xs[P] || [])[i];
+    if (s && (s.name || s.unit_price) && !confirm(`${s.name || '이 공급처'}를 뺄까요?\n(이미 만든 작업요청서는 그대로 남아요)`)) return;
+    _xs[P].splice(i, 1);
+    xsRenderRows(P);
+    ovsCalcFn(P)();
+}
+// 주 매입처 매입액이 그려진 뒤 호출 — 추가 공급처 금액을 더해 매입액·내역·마진을 다시 씀
+function xsApplyTotal(P) {
+    const list = _xs[P] || [];
+    list.forEach((s, i) => { const el = document.getElementById(P + 'XsSum' + i); if (el) el.textContent = (xsNum(s.unit_price) || xsNum(s.etc)) ? '= ' + xsTotal(s).toLocaleString() + '원' : ''; });
+    const ex = xsSum(list);
+    const tot = document.getElementById(P + 'XsTotal');
+    if (tot) tot.textContent = ex ? `추가 공급처 ${xsClean(list).length}곳 ${ex.toLocaleString()}원 (VAT 포함)` : '';
+    const disp = document.getElementById(P + 'SupTotalDisplay');
+    if (!ex || !disp) return;
+    const main = _parseKRW(P + 'SupTotalDisplay');
+    disp.textContent = (main + ex).toLocaleString() + ' 원';
+    const bd = document.getElementById(P + 'SupBreakdown');
+    if (bd) bd.insertAdjacentHTML('beforeend', xsClean(list).map(s => `<div style="display:flex;justify-content:space-between;padding:3px 0"><span>＋ 🏭 ${escHtml(s.name)}${s.item ? ' · ' + escHtml(s.item) : ''}</span><strong style="color:var(--text-primary)">${xsTotal(s).toLocaleString()}원</strong></div>`).join(''));
+    _renderMargin(P + 'MarginDisplay', _parseKRW(P + 'RevenueDisplay'), main + ex);
+}
+
+// 이 공급처의 작업요청서 (디확번호_N 중 받는 곳 이름이 같은 것, 최신) — 없으면 null
+async function xsFindWr(dc, name) {
+    if (!dc || !name) return null;
+    const key = clientNameKey(name);
+    const { data } = await sb.from('confirmations').select('doc_number, company_name, created_at, status')
+        .like('doc_number', dc + '_%').eq('status', '작업요청서').order('created_at', { ascending: false });
+    const hit = (data || []).find(d => String(d.doc_number || '').startsWith(dc + '_') && clientNameKey(d.company_name || '') === key);
+    return hit ? hit.doc_number : null;
+}
+// 국내 상세의 '추가 공급처 발주' 줄
+function xsDetailRowHtml(p, s, num) {
+    const amt = `${s.qty ? s.qty.toLocaleString() + (p.unit || '개') : ''}${s.unit_price ? ' × ' + s.unit_price.toLocaleString() + '원' : ''} = ${xsTotal(s).toLocaleString()}원`;
+    const st = num === null ? '<span class="xs-st">확인 중…</span>' : num ? `<span class="xs-st on">${escHtml(num)}</span>` : '<span class="xs-st">작업요청서 없음</span>';
+    return `<div class="xs-drow" data-xs="${escHtml(s.k)}">
+        <div class="xs-dmain"><b>${escHtml(s.name)}</b>${s.item ? `<span>${escHtml(s.item)}</span>` : ''}<em>${amt}</em></div>
+        ${st}
+        <button type="button" class="xs-dbtn" onclick="xsOpenWr(${p.id},'${escHtml(s.k)}')">${num ? '📋 작업요청서 열기' : '📋 작업요청서 만들기'}</button>
+    </div>`;
+}
+async function xsFillDetail(p) {
+    const list = xsClean(p.extraSuppliers);
+    for (const s of list) {
+        let num = '';
+        try { num = (await xsFindWr(p.sourceDocNumber, s.name)) || ''; } catch (_) {}
+        const el = document.querySelector(`#xsDetailList [data-xs="${CSS.escape(s.k)}"]`);
+        if (el) el.outerHTML = xsDetailRowHtml(p, s, num);
+    }
+}
+// 추가 공급처 작업요청서 열기·만들기 — view=true(상담 화면)면 있는 문서는 크게 보기
+async function xsOpenWr(id, k, view) {
+    const p = projects.find(x => x.id === id);
+    if (!p) return;
+    const s = xsClean(p.extraSuppliers).find(v => v.k === k);
+    if (!s) { showToast('공급처를 찾을 수 없어요 — 편집에서 다시 확인해주세요'); return; }
+    if (!p.sourceDocNumber) { showToast('디자인확인서를 먼저 만들어주세요 (작업요청서 번호가 디자인확인서 번호 뒤에 붙어요)'); return; }
+    const num = await xsFindWr(p.sourceDocNumber, s.name);
+    if (num) {
+        if (view) { await viewSavedDoc(num, '작업요청서', null); return; }
+        if (confirm(`${s.name} 작업요청서(${num})를 문서 생성기에서 열까요?`)) location.href = 'doc-generator.html#edit-' + encodeURIComponent(num);
+        return;
+    }
+    if (!confirm(`${s.name} 작업요청서를 새로 만들까요?\n(디자인확인서 ${p.sourceDocNumber} 내용 + 이 공급처의 품목·수량·단가를 불러와요 — 문서 생성기로 이동)`)) return;
+    const prefill = {
+        type: 'wr', xs: true, projectId: p.id, linkedDcDocNumber: p.sourceDocNumber,
+        client: p.client || '', contactPerson: p.contactPerson || '', title: p.title || '', manager: p.manager || '',
+        productName: s.item ? `${p.name || ''} ${s.item}`.trim() : (p.name || ''), quantity: s.qty || p.qty || '', unit: p.unit || '개',
+        unitPrice: s.unit_price || '', unitPriceVat: s.vat,
+        color: p.color || '-', printColorSize: p.printColorSize || '시안 확인', printMethod: '없음',
+        printFee: 0, printFeeVat: 'VAT 별도', printFeeApply: '1개당',
+        packaging: p.packaging || '개별박스', packagingFee: 0, packagingFeeVat: 'VAT 별도', packagingFeeApply: '1개당',
+        shippingType: '', shippingCost: 0, shippingCostPerBox: 0, shippingBoxes: 0, shippingVat: 'VAT 별도',
+        deliveryDate: p.deadline || '', recipient: p.recipient || '', phone: p.phone || '', address: p.address || '',
+        memo: s.memo || p.memo || '', startDate: p.startDate || '',
+        supplier: s.name, supplierContact: s.contact || ''
+    };
+    try { localStorage.setItem('klp_doc_prefill', JSON.stringify(prefill)); }
+    catch (e) { showToast('사전 입력 저장 실패'); return; }
+    location.href = 'doc-generator.html#wr';
 }
 
 // ===== 해외 매입 (달러) — 매입처 카드 '🌏 해외 매입' (migration 059: projects_domestic.supplier_overseas jsonb) =====
@@ -6201,6 +6367,7 @@ function _projectsDomesticRowToObj(r) {
         supplierPackagingFeeApply: r.supplier_packaging_fee_apply || '1개당',
         supplierRevenue: r.supplier_revenue || 0,
         supplierOverseas: r.supplier_overseas || null,
+        extraSuppliers: Array.isArray(r.extra_suppliers) ? r.extra_suppliers : [],
         supplierShippingType: r.supplier_shipping_type || '',
         supplierShippingVat: r.supplier_shipping_vat || 'VAT 별도',
         supplierShippingCostPerBox: r.supplier_shipping_cost_per_box || 0,
@@ -25300,6 +25467,7 @@ async function inqDealAction(x, act, btn) {
         return;
     }
     if (kind === 'open') { if (inqEnsureProject(row)) showProjectDetail(row.id); return; }
+    if (kind === 'xwr') { if (inqEnsureProject(row)) await xsOpenWr(row.id, key, true); return; }
     if (kind === 'chk') { if (btn) btn.disabled = true; await inqToggleProjCheck(x, row, key); }
 }
 
@@ -25370,6 +25538,7 @@ function inqRenderProjs(x) {
             <button class="inq-mini" data-act="open:${p.id}">국내에서 보기</button>
           </div>
           <div class="inq-pj-docs">${['dc', isOvsProject(p) ? 'po' : 'wr'].map(k => inqDocTileHtml(p, k)).join('')}</div>
+          ${xsClean(p.extra_suppliers).length ? `<div class="inq-pj-xs"><span>🏭 추가 공급처</span>${xsClean(p.extra_suppliers).map(s => `<button class="inq-mini" data-act="xwr:${p.id}:${escHtml(s.k)}" title="${escHtml(s.name)} 작업요청서 — 있으면 보기, 없으면 만들기">📋 ${escHtml(s.name)}${s.item ? ' · ' + escHtml(s.item) : ''}</button>`).join('')}</div>` : ''}
           <div class="inq-pj-checks">${CHECK_ITEMS.map(it => {
               const on = !!(p.checks && p.checks[it.key]);
               const ciK = CHECK_INFO[it.key];
@@ -25774,10 +25943,11 @@ async function inqSavedDocNumber(row, kind) {
     if (kind === 'dc') return row.source_doc_number;
     const prefix = row.source_doc_number + '_';
     const st = kind === 'ps' ? '제작진행표' : kind === 'po' ? '해외작업요청서' : '작업요청서';
-    const { data, error } = await sb.from('confirmations').select('doc_number, created_at, status')
+    const { data, error } = await sb.from('confirmations').select('doc_number, created_at, status, company_name')
         .like('doc_number', prefix + '%').order('created_at', { ascending: false });
     if (error) { showToast(st + ' 찾기 실패: ' + error.message); return null; }
-    const wr = (data || []).find(d => d.status === st && String(d.doc_number || '').startsWith(prefix));
+    const xsKeys = kind === 'wr' ? xsNameKeys(row.extra_suppliers || row.extraSuppliers) : new Set();   // 추가 공급처 작업요청서는 따로
+    const wr = (data || []).find(d => d.status === st && String(d.doc_number || '').startsWith(prefix) && !xsKeys.has(clientNameKey(d.company_name || '')));
     return wr ? wr.doc_number : null;
 }
 async function inqSendSavedDoc(row, kind, x) {
