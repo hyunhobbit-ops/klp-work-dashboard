@@ -27591,7 +27591,7 @@ const SC_SUP_STATUSES = ['문의함', '답변 대기', '견적 받음', '선정'
 const SC_CHANNELS = { chat: '채팅', form: '문의양식', form_failed: '양식 실패' };
 const SC_ORDER_STATUSES = ['결제 대기', '결제 완료', '공급업체 배송 대기', '발송', '수령'];
 const SC_DRAFT = ['', '시안 받음', '컨펌', '대기'];
-const SC_SPEC_FIELDS = [['material', '소재'], ['size', '크기'], ['thickness', '두께'], ['finish', '마감'], ['color', '색상'], ['logo', '로고 위치·방식'], ['parts', '부속 (체인·스프링바·끈·비즈)'], ['packaging', '포장'], ['due', '납기 목표'], ['etc', '기타']];
+const SC_SPEC_FIELDS = [['material', '소재'], ['size', '크기'], ['thickness', '두께'], ['finish', '마감'], ['color', '색상'], ['logo', '로고 위치·방식'], ['parts', '부속 (체인·스프링바·끈·비즈)'], ['packaging', '포장'], ['due', '필요 시기'], ['budget', '예산'], ['etc', '요청 사항·기타']];
 const SC_TABS = [['spec', '사양'], ['compare', '업체 비교'], ['log', '대화·기록'], ['sample', '샘플·결제'], ['todo', '할 일·질문']];
 const SC_DEFAULT_WHO = '김현호';
 let _sc = { projects: [], suppliers: [], quotes: [], messages: [], samples: [], todos: [], plans: [] };
@@ -27754,6 +27754,7 @@ function scRenderMain() {
           <div style="min-width:0">
             <div class="mn-doc-cat">${_scEsc([scPlanName(p.linked_project_id), p.linked_client].filter(Boolean).join(' · ') || '해외 소싱')}</div>
             <h1>${_scEsc(p.title || '(이름 없음)')}</h1>
+            ${scBasicLine(p)}
             <div class="mn-doc-meta">담당 ${_scEsc(p.assignee || SC_DEFAULT_WHO)} · 마지막 업데이트 ${_scKst(p.updated_at)}</div>
           </div>
           <div class="mn-doc-act">
@@ -28096,7 +28097,45 @@ function scFilesBind(ov, asObjects) {
 }
 const scFilesOf = ov => { try { return JSON.parse(ov.querySelector('.sc-imgs')?.dataset.files || '[]'); } catch (_) { return []; } };
 
+// 상세 머리 기본 정보 — 고객사 · 수량 · 필요 시기 · 예산
+function scBasicLine(p) {
+    const sp = p.spec || {};
+    const qty = (sp.qty_lines || []).filter(l => l.qty);
+    const items = [
+        p.linked_client ? `고객사 <b>${_scEsc(p.linked_client)}</b>` : '',
+        qty.length ? `수량 <b>${qty.map(l => (l.label ? _scEsc(l.label) + ' ' : '') + Number(l.qty).toLocaleString()).join(' / ')}</b>` : '',
+        sp.due ? `필요 시기 <b>${_scEsc(sp.due)}</b>` : '',
+        sp.budget ? `예산 <b>${_scEsc(sp.budget)}</b>` : ''
+    ].filter(Boolean);
+    return items.length ? `<div class="sc-info">${items.join('<span class="sc-dot">·</span>')}</div>` : '';
+}
+// 새 소싱 건 — 기본 정보만 간단히 (사양·업체는 나중에)
+function scNewForm() {
+    const plans = _sc.plans.filter(x => x.status !== '완료');
+    const ov = scModal('새 소싱 건', `
+        <label class="sc-f">고객사<input name="client" placeholder="예: SINSURU" list="tempClientList"></label>
+        <label class="sc-f">연결 프로젝트 <span class="mn-muted">(있으면)</span><select name="plan"><option value="">-</option>${plans.map(x => `<option value="${x.id}">${_scEsc(x.name)}</option>`).join('')}</select></label>
+        <label class="sc-f wide">어떤 상품 *<input name="title" placeholder="예: 금속 태그 (OKTAN 01), 20mm 시계 밴드"></label>
+        <label class="sc-f">얼마나 (수량)<input name="qty" inputmode="numeric" placeholder="예: 1500"></label>
+        <label class="sc-f">언제까지 필요<input name="due" placeholder="예: 11월 말, 2026-12-10"></label>
+        <label class="sc-f wide">예산 <span class="mn-muted">(있으면)</span><input name="budget" placeholder="예: 개당 $2 이하, 총 300만원"></label>
+        <label class="sc-f wide">요청 사항 <span class="mn-muted">(간단히)</span><textarea name="note" rows="3" placeholder="예: 서지컬스틸, 로고 각인, 체인 포함"></textarea></label>`, async ov => {
+        const title = scV(ov, 'title');
+        if (!title) { showToast('어떤 상품인지 입력하세요'); return false; }
+        const qty = Math.round(_scNum(scV(ov, 'qty')));
+        const spec = { qty_lines: qty ? [{ label: '', qty }] : [] };
+        [['due', 'due'], ['budget', 'budget'], ['etc', 'note']].forEach(([k, n]) => { const v = scV(ov, n); if (v) spec[k] = v; });
+        const d = await scInsert('sourcing_projects', { title, linked_client: scV(ov, 'client'), linked_project_id: Number(scV(ov, 'plan')) || null, spec,
+            status: '업체 탐색', assignee: SC_DEFAULT_WHO, created_by: _scMe(), rate: scRate(null), rate_date: getTodayStr() });
+        if (!d) return false;
+        _scSel = d.id; _scTab = 'compare'; _scFilter.status = 'active';
+        try { localStorage.setItem('sc_sel', String(d.id)); } catch (_) {}
+        return true;
+    });
+    return ov;
+}
 function scProjectForm(id, specFocus) {
+    if (!id) return scNewForm();
     const p = id ? _sc.projects.find(v => v.id === id) : { title: '', status: '업체 탐색', linked_project_id: null, linked_client: '', spec: { qty_lines: [{ label: '', qty: '' }] }, images: [], assignee: SC_DEFAULT_WHO };
     if (!p) return;
     const sp = p.spec || {};
