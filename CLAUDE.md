@@ -136,12 +136,13 @@
   - 되돌리기(비상): 커밋 26aee72 되돌림 + Vercel Production env를 클라우드 값으로 + 클라우드 프로젝트 재개·cron 다시 켜기 + 맥미니 cron 끄기 (단, 이전 이후 맥미니에 쌓인 데이터는 클라우드로 옮겨야 함)
 - **남은 개선**: ⑧ 사진 업로드 축소 기준 올리고 목록은 썸네일 — 특히 `planning_posts select=*`(본문 base64 사진 3.7MB를 목록에서 두 번 받음)·`products select=id,image`(base64 2.1MB)가 폰에서 첫 화면을 느리게 함 → 목록은 본문 빼고, 사진은 Storage+썸네일로. 리허설 때 덮어쓴 옛 사진 사본이 Storage 볼륨에 남아 있음(백업 241→465MB) — 정리 필요
 
-## 🌏 해외 소싱 (매입매출 > 해외 소싱, 탭 id `sourcing`) — migration 070, 2026-10-27
-- **목적**: 알리바바 등에서 받은 견적을 '찾는 물건'별로 모아 비교 → 업체 결정 → 국내 프로젝트 매입처(해외 $)로 연결
-- **테이블**: `sourcing_items`(title·spec·client·target_qty(화면 이름 '예상 수량')·need_by·status 진행 중/결정/보류/취소·assignee·images·memo·rate(원/$)·domestic_id·inquiry_id) / `sourcing_quotes`(item_id·supplier·platform·url·contact·unit_price(USD)·tiers [{qty,price}]·moq·lead_days·incoterm·ship_cost(USD 전체)·sample_price/days·images·memo·rating·chosen). 회사 스코프 RLS, realtime
-- **비교**: `scPriceAt`(예상 수량 이하 가장 큰 수량 구간 단가) · `scLanded` = (단가×수량 + 운송비) ÷ 수량 × 환율 (세금 제외, 비교용) — 최저 초록 (목표 단가 칸은 현호님 요청으로 뺌, DB 칸 target_price는 남아 있음)
-- **결정 → 국내**: `scChoose`(한 건에 하나) → `scCreateDomestic`(새 projects_domestic insert) 또는 `scLinkExisting`(`domLinkPicker`) — `scSupplierPatch`가 supplier·supplier_overseas `{cur:'USD', unit, rate, extras:[국제 운송비], ivat:null, pays:[]}`·supplier_unit_price·supplier_revenue(`ovsCalc`)를 채움. 해외 거래처 DB에 없으면 추가
-- 화면은 매뉴얼 2단 틀(`.mn`) 재사용, 입력 창 `scModal`(사진 붙여넣기 `scImgBind` → planning-images)
+## 🌏 해외 소싱 — 알리바바 소싱 현황 (매입매출 > 해외 소싱, 탭 id `sourcing`) — migration 071 (070 대체), 2026-10-27
+- **목적**: Aside 요구사항 md(2026-10-27) — 제품(소싱 건) → 업체 → 견적·샘플·대화·할 일을 한 화면에서 비교·추적. 결제·주문은 사람이 알리바바에서 직접, 여기선 상태만. 담당 기본 김현호. 시각은 한국시간 + 확인 시각
+- **테이블**(맥미니 DB, 회사 RLS·realtime, 하위 변경 시 `sourcing_touch_project`가 소싱 건 updated_at 갱신): `sourcing_projects`(title, status 업체 탐색/견적 수집/샘플 진행/샘플 확인/본주문/완료/보류, linked_project_id→planning_projects, linked_client, spec jsonb{qty_lines[{label,qty}], material,size,thickness,finish,color,logo,parts,packaging,due,etc}, spec_history[{at,text,by}], images, rate·rate_date, assignee, domestic_id) / `sourcing_suppliers`(company, contact_name, product_url 필수, years, rating(상품 페이지 평점&리뷰)·store_reviews·kr_reviews·rating_checked_at, response_time, ontime_rate, channel chat/form/form_failed, status 문의함/답변 대기/견적 받음/선정/제외) / `sourcing_quotes`(옵션 줄: option_label, unit_price_usd, qty, total_usd(비면 단가×수량), mold/sample fee, sample_refundable, sample_days, production_days, shipping_note, basis_note, quoted_at, images) / `sourcing_messages`(sent_at, direction in/out, original_text, summary_ko, quoted_text, attachments[{url,name,type}], read_status, checked_at) / `sourcing_samples`(description, amount_usd, order_status 결제 대기~수령, paid_at/by, promised_ship, eta, pickup, draft_status, logo_file) / `sourcing_todos`(kind question/task, asked_at, due, assignee, needs_decision, answer, done)
+- **화면**: 위 요약(답할 질문·결제 대기·이번 주 샘플 도착·진행 중) / 왼쪽 목록(대표 사진, 상태, 업체 n/견적 n, 최저 총액·업체, 선정, 빨간 질문 배지, 마지막 업데이트, 필터 상태·프로젝트·답 필요만) / 상세: 선정 → 국내 연결, `💬 채팅 붙여넣기`(원문·요약·인용·첨부, '업체 질문' 체크 시 할 일·질문에도) + 탭 ① 사양(변경 이력) ② 업체 비교(`scSupSum`: 옵션 줄 합 = 본주문 총액, 최저 초록, ⚠ basis_note, 링크 없음 빨강, 마지막 연락 3일+ 노랑, 헤더 정렬, html2canvas로 PNG 저장) ③ 대화·기록 ④ 샘플·결제 ⑤ 할 일·질문
+- **첨부**: `scUpload` → planning-images 버킷 `sourcing/` 경로(원본 그대로) — 매일 백업(사진 볼륨) 포함
+- **국내 연결**: 선정 업체 → `scCreateDomestic`/`scLinkExisting` — `scSupplierPatch`가 supplier_overseas{unit = 총액÷수량, rate, extras 금형비} + supplier_revenue(`ovsCalc`). 해외 거래처 DB에 없으면 추가
+- 참고: Aside는 10/26부터 펀딩 프로젝트 #33(옥탄) 글로도 알리바바 진행을 남김 (planning_posts 90~92)
 
 ## 프로젝트 진행사항 (국내)
 - **매출/매입 통합 단일 행**: 매출처 정보 + 매입처 상세(작업요청서용)를 한 프로젝트 행에 함께 저장

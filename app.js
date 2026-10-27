@@ -27583,81 +27583,130 @@ async function mInqCheck(inqId, projId, key) {
     mRender();
 }
 
-// ===================== 해외 소싱 (sourcing_items / sourcing_quotes, migration 070) =====================
-// 알리바바 등에서 받은 견적을 '찾는 물건' 별로 모아 비교 → 업체를 결정하면 국내 프로젝트(해외 매입 $)로 연결
-const SC_STATUSES = ['진행 중', '결정', '보류', '취소'];
-const SC_PLATFORMS = ['알리바바', '1688', '메이드인차이나', '글로벌소시스', '직접 연락', '기타'];
-const SC_TERMS = ['', 'EXW', 'FOB', 'CIF', 'DDP', 'DAP'];
-let _scItems = [], _scQuotes = [], _scLoaded = false, _scSel = null, _scFilter = 'active', _scQ = '', _scChan = null;
+// ===================== 해외 소싱 — 알리바바 소싱 현황 (migration 071) =====================
+// 소싱 건(sourcing_projects) → 업체(sourcing_suppliers) → 견적·대화·샘플(…_quotes/_messages/_samples) + 할 일·질문(sourcing_todos)
+// 결제·주문은 사람이 알리바바에서 직접 — 여기선 상태만 기록. 담당 기본 김현호. 시각은 한국시간
+const SC_STATUSES = ['업체 탐색', '견적 수집', '샘플 진행', '샘플 확인', '본주문', '완료', '보류'];
+const SC_SUP_STATUSES = ['문의함', '답변 대기', '견적 받음', '선정', '제외'];
+const SC_CHANNELS = { chat: '채팅', form: '문의양식', form_failed: '양식 실패' };
+const SC_ORDER_STATUSES = ['결제 대기', '결제 완료', '공급업체 배송 대기', '발송', '수령'];
+const SC_DRAFT = ['', '시안 받음', '컨펌', '대기'];
+const SC_SPEC_FIELDS = [['material', '소재'], ['size', '크기'], ['thickness', '두께'], ['finish', '마감'], ['color', '색상'], ['logo', '로고 위치·방식'], ['parts', '부속 (체인·스프링바·끈·비즈)'], ['packaging', '포장'], ['due', '납기 목표'], ['etc', '기타']];
+const SC_TABS = [['spec', '사양'], ['compare', '업체 비교'], ['log', '대화·기록'], ['sample', '샘플·결제'], ['todo', '할 일·질문']];
+const SC_DEFAULT_WHO = '김현호';
+let _sc = { projects: [], suppliers: [], quotes: [], messages: [], samples: [], todos: [], plans: [] };
+let _scLoaded = false, _scSel = null, _scTab = 'compare', _scFilter = { status: 'active', plan: '', needAnswer: false }, _scQ = '', _scChan = null, _scSort = { key: 'total', dir: 1 }, _scLogSup = 0;
 const _scEsc = s => escHtml(String(s == null ? '' : s));
 const _scNum = v => { const n = Number(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return Number.isFinite(n) ? n : 0; };
-const _scUsd = n => n ? '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '-';
-const _scWon = n => n ? Math.round(n).toLocaleString() + '원' : '-';
+const _scUsd = n => (n || n === 0) && Number(n) ? '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '-';
+const _scWon = n => n ? Math.round(n).toLocaleString() + '원' : '';
+const _scMe = () => (typeof inqMe === 'function' ? inqMe() : '') || (currentUser && currentUser.name) || SC_DEFAULT_WHO;
+// 한국시간 표시 / 입력 (datetime-local 값은 한국시간으로 봄)
+const _scKst = ts => ts ? new Date(ts).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+const _scKstInput = ts => { const d = ts ? new Date(ts) : new Date(); const k = new Date(d.getTime() + 9 * 3600e3); return k.toISOString().slice(0, 16); };
+const _scFromKstInput = v => v ? new Date(v + ':00+09:00').toISOString() : new Date().toISOString();
+const _scDays = ts => ts ? Math.floor((Date.now() - new Date(ts).getTime()) / 86400000) : null;
 
 async function scLoad() {
-    const [a, b] = await Promise.all([
-        sb.from('sourcing_items').select('*').order('updated_at', { ascending: false }).limit(1000),
-        sb.from('sourcing_quotes').select('*').order('id').limit(5000)
-    ]);
-    if (a.error || b.error) { showToast('해외 소싱을 불러오지 못했습니다: ' + ((a.error || b.error).message)); return false; }
-    _scItems = a.data || []; _scQuotes = b.data || []; _scLoaded = true;
+    const t = ['sourcing_projects', 'sourcing_suppliers', 'sourcing_quotes', 'sourcing_messages', 'sourcing_samples', 'sourcing_todos'];
+    const res = await Promise.all(t.map(n => sb.from(n).select('*').order('id').limit(10000)).concat([sb.from('planning_projects').select('id, name, status, access').order('id', { ascending: false }).limit(500)]));
+    const bad = res.find(r => r.error);
+    if (bad) { showToast('해외 소싱을 불러오지 못했습니다: ' + bad.error.message); return false; }
+    [_sc.projects, _sc.suppliers, _sc.quotes, _sc.messages, _sc.samples, _sc.todos, _sc.plans] = res.map(r => r.data || []);
+    _scLoaded = true;
     return true;
 }
 async function scEnter() {
     const root = document.getElementById('sourcingRoot');
     if (!root) return;
     if (!_scLoaded) { root.innerHTML = '<div class="mn-empty big">불러오는 중…</div>'; await scLoad(); }
-    try { const v = Number(localStorage.getItem('sc_sel')); if (!_scSel && v && _scItems.some(x => x.id === v)) _scSel = v; } catch (_) {}
-    if (!_scSel && _scItems.length) _scSel = (scVisible()[0] || _scItems[0]).id;
+    try { const v = Number(localStorage.getItem('sc_sel')); if (!_scSel && v && _sc.projects.some(x => x.id === v)) _scSel = v; _scTab = localStorage.getItem('sc_tab') || _scTab; } catch (_) {}
+    if (!_scSel && _sc.projects.length) _scSel = (scVisible()[0] || _sc.projects[0]).id;
     scSubscribe();
     scRender();
 }
 function scSubscribe() {
     if (_scChan) return;
     let t = null;
-    const reload = () => { clearTimeout(t); t = setTimeout(async () => { await scLoad(); if (!document.getElementById('scOverlay')) scRender(); }, 400); };
-    _scChan = sb.channel('sourcing_realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'sourcing_items' }, reload)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'sourcing_quotes' }, reload)
-        .subscribe();
+    const reload = () => { clearTimeout(t); t = setTimeout(async () => { if (document.getElementById('scOverlay') || document.activeElement?.closest?.('.sc-paste')) return; await scLoad(); scRender(); }, 500); };
+    _scChan = sb.channel('sourcing_v2');
+    ['sourcing_projects', 'sourcing_suppliers', 'sourcing_quotes', 'sourcing_messages', 'sourcing_samples', 'sourcing_todos']
+        .forEach(n => _scChan.on('postgres_changes', { event: '*', schema: 'public', table: n }, reload));
+    _scChan.subscribe();
 }
-function scQuotesOf(id) { return _scQuotes.filter(q => q.item_id === id); }
-function scRate(x) {
-    if (x && Number(x.rate) > 0) return Number(x.rate);
+
+// ---------- 계산 ----------
+const scSups = pid => _sc.suppliers.filter(s => s.project_id === pid);
+const scQuotesOf = sid => _sc.quotes.filter(q => q.supplier_id === sid);
+const scMsgsOf = sid => _sc.messages.filter(m => m.supplier_id === sid);
+const scSamplesOf = sid => _sc.samples.filter(m => m.supplier_id === sid);
+const scQTotal = q => Number(q.total_usd) || (Number(q.unit_price_usd) || 0) * (Number(q.qty) || 0);
+// 업체 한 곳의 견적 요약 — 옵션 줄(색상별 등)을 더하면 본주문 총액
+function scSupSum(s) {
+    const qs = scQuotesOf(s.id);
+    const first = k => (qs.find(q => q[k] && String(q[k]).trim()) || {})[k] || '';
+    const sq = qs.find(q => Number(q.sample_fee_usd) > 0) || {};
+    return {
+        qs, total: qs.reduce((a, q) => a + scQTotal(q), 0),
+        mold: Math.max(0, ...qs.map(q => Number(q.mold_fee_usd) || 0)),
+        sampleFee: Number(sq.sample_fee_usd) || 0, sampleDays: sq.sample_days || first('sample_days'), sampleRefund: !!sq.sample_refundable,
+        prod: first('production_days'), ship: first('shipping_note'),
+        basis: [...new Set(qs.map(q => (q.basis_note || '').trim()).filter(Boolean))].join(' / ')
+    };
+}
+function scLastContact(s) {
+    const ms = scMsgsOf(s.id).filter(m => m.direction === 'in');
+    return ms.length ? ms.reduce((a, m) => (m.sent_at > a ? m.sent_at : a), '') : null;
+}
+const scOpenQs = pid => _sc.todos.filter(t => t.project_id === pid && t.kind === 'question' && !t.done);
+function scRate(p) {
+    if (p && Number(p.rate) > 0) return Number(p.rate);
     try { const r = Number(localStorage.getItem('ovs_rate')); if (r > 0) return r; } catch (_) {}
     return 1400;
 }
-// 예상 수량에서의 단가 — 수량별 단가 중 예상 수량 이하에서 가장 큰 구간, 없으면 기본 단가
-function scPriceAt(q, qty) {
-    let price = Number(q.unit_price) || 0;
-    const tiers = (Array.isArray(q.tiers) ? q.tiers : []).filter(t => Number(t.qty) > 0 && Number(t.price) > 0).sort((a, b) => a.qty - b.qty);
-    if (qty > 0) tiers.forEach(t => { if (Number(t.qty) <= qty) price = Number(t.price); });
-    else if (!price && tiers.length) price = Number(tiers[0].price);
-    return price;
-}
-// 개당 도착가(원, 대략) = (단가×수량 + 운송비) ÷ 수량 × 환율. 관세·부가세는 빼고 비교용
-function scLanded(q, x) {
-    const qty = Math.max(Number(x.target_qty) || 0, Number(q.moq) || 0, 1);
-    const p = scPriceAt(q, qty);
-    if (!p) return 0;
-    return (p * qty + (Number(q.ship_cost) || 0)) / qty * scRate(x);
+function scProjSummary(p) {
+    const sups = scSups(p.id).filter(s => s.status !== '제외');
+    const quoted = sups.filter(s => scQuotesOf(s.id).length);
+    const totals = quoted.map(s => ({ s, t: scSupSum(s).total })).filter(x => x.t > 0).sort((a, b) => a.t - b.t);
+    return { n: scSups(p.id).length, quoted: quoted.length, min: totals[0] || null, chosen: sups.find(s => s.status === '선정') || null, openQ: scOpenQs(p.id).length };
 }
 function scVisible() {
     const t = _scQ.trim().toLowerCase();
-    return _scItems.filter(x => (_scFilter === 'all' || (_scFilter === 'active' ? x.status === '진행 중' : x.status === _scFilter))
-        && (!t || [x.title, x.client, x.spec, x.memo, ...scQuotesOf(x.id).map(q => q.supplier)].some(v => String(v || '').toLowerCase().includes(t))));
+    return _sc.projects.filter(p => {
+        if (_scFilter.status === 'active' ? ['완료', '보류'].includes(p.status) : (_scFilter.status !== 'all' && p.status !== _scFilter.status)) return false;
+        if (_scFilter.plan && String(p.linked_project_id || '') !== _scFilter.plan) return false;
+        if (_scFilter.needAnswer && !scOpenQs(p.id).length) return false;
+        return !t || [p.title, p.linked_client, scPlanName(p.linked_project_id), ...scSups(p.id).map(s => s.company)].some(v => String(v || '').toLowerCase().includes(t));
+    }).sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
 }
+const scPlanName = id => (_sc.plans.find(x => x.id === id) || {}).name || '';
+
+// ---------- 화면 ----------
 function scRender() {
     const root = document.getElementById('sourcingRoot');
     if (!root) return;
+    const qN = _sc.todos.filter(t => t.kind === 'question' && !t.done && _sc.projects.some(p => p.id === t.project_id)).length;
+    const payN = _sc.samples.filter(s => s.order_status === '결제 대기').length;
+    const today = getTodayStr(), wk = new Date(Date.now() + 7 * 86400e3).toISOString().slice(0, 10);
+    const etaN = _sc.samples.filter(s => s.eta && s.eta >= today && s.eta <= wk && s.order_status !== '수령').length;
     root.innerHTML = `
+      <div class="sc-top">
+        <button type="button" class="sc-kpi ${qN ? 'warn' : ''} ${_scFilter.needAnswer ? 'on' : ''}" onclick="_scFilter.needAnswer=!_scFilter.needAnswer;scRender()"><span>답해야 할 질문</span><b>${qN}</b></button>
+        <div class="sc-kpi ${payN ? 'caution' : ''}"><span>결제 대기 샘플</span><b>${payN}</b></div>
+        <div class="sc-kpi"><span>이번 주 샘플 도착 예정</span><b>${etaN}</b></div>
+        <div class="sc-kpi"><span>진행 중 소싱</span><b>${_sc.projects.filter(p => !['완료', '보류'].includes(p.status)).length}</b></div>
+      </div>
       <div class="mn sc">
         <aside class="mn-side">
           <div class="mn-side-top">
-            <input class="mn-q" type="search" placeholder="물건·고객사·업체 검색" value="${_scEsc(_scQ)}" oninput="_scQ=this.value;scRenderList()">
-            <button class="btn-primary mn-new" onclick="scItemForm()">＋ 새 소싱</button>
+            <input class="mn-q" type="search" placeholder="소싱 건·업체·고객사 검색" value="${_scEsc(_scQ)}" oninput="_scQ=this.value;scRenderList()">
+            <button class="btn-primary mn-new" onclick="scProjectForm()">＋ 새 소싱 건</button>
           </div>
-          <div class="mn-cats" id="scCats"></div>
+          <div class="sc-filters">
+            <select onchange="_scFilter.status=this.value;scRenderList()">${[['active', '진행 중 전체'], ...SC_STATUSES.map(s => [s, s]), ['all', '전체 (완료·보류 포함)']].map(([k, l]) => `<option value="${_scEsc(k)}" ${_scFilter.status === k ? 'selected' : ''}>${_scEsc(l)}</option>`).join('')}</select>
+            <select onchange="_scFilter.plan=this.value;scRenderList()"><option value="">모든 프로젝트</option>${[...new Set(_sc.projects.map(p => p.linked_project_id).filter(Boolean))].map(id => `<option value="${id}" ${_scFilter.plan === String(id) ? 'selected' : ''}>${_scEsc(scPlanName(id) || '#' + id)}</option>`).join('')}</select>
+            <label class="sc-chk"><input type="checkbox" ${_scFilter.needAnswer ? 'checked' : ''} onchange="_scFilter.needAnswer=this.checked;scRender()"> 답 필요한 것만</label>
+          </div>
           <div class="mn-list" id="scList"></div>
         </aside>
         <section class="mn-main" id="scMain"></section>
@@ -27666,19 +27715,21 @@ function scRender() {
     scRenderMain();
 }
 function scRenderList() {
-    const cats = document.getElementById('scCats'), list = document.getElementById('scList');
-    if (!cats || !list) return;
-    const n = f => _scItems.filter(x => f === 'all' || (f === 'active' ? x.status === '진행 중' : x.status === f)).length;
-    cats.innerHTML = [['active', '진행 중'], ['결정', '결정'], ['보류', '보류'], ['취소', '취소'], ['all', '전체']]
-        .map(([k, l]) => `<button class="${_scFilter === k ? 'on' : ''}" onclick="_scFilter='${k}';scRenderList()">${l} <b>${n(k)}</b></button>`).join('');
+    const list = document.getElementById('scList');
+    if (!list) return;
     const vis = scVisible();
-    if (!vis.length) { list.innerHTML = `<div class="mn-empty">${_scItems.length ? '조건에 맞는 소싱이 없어요' : '아직 소싱이 없어요 — ＋ 새 소싱으로 찾는 물건부터 등록하세요'}</div>`; return; }
-    list.innerHTML = vis.map(x => {
-        const qs = scQuotesOf(x.id), chosen = qs.find(q => q.chosen);
-        const best = qs.map(q => scLanded(q, x)).filter(v => v > 0).sort((a, b) => a - b)[0];
-        return `<button class="mn-row${x.id === _scSel ? ' on' : ''}" onclick="scOpen(${x.id})">
-            <span class="mn-row-t"><span class="sc-st sc-st-${SC_STATUSES.indexOf(x.status)}">${_scEsc(x.status)}</span> ${_scEsc(x.title || '(이름 없음)')}</span>
-            <span class="mn-row-m">${x.client ? _scEsc(x.client) + ' · ' : ''}견적 ${qs.length}곳${chosen ? ' · ✓ ' + _scEsc(chosen.supplier) : (best ? ' · 최저 개당 ' + _scWon(best) : '')}</span>
+    if (!vis.length) { list.innerHTML = `<div class="mn-empty">${_sc.projects.length ? '조건에 맞는 소싱 건이 없어요' : '아직 소싱 건이 없어요 — ＋ 새 소싱 건으로 시작하세요'}</div>`; return; }
+    list.innerHTML = vis.map(p => {
+        const m = scProjSummary(p), cover = (p.images || [])[0];
+        const sub = [scPlanName(p.linked_project_id), p.linked_client].filter(Boolean).join(' · ');
+        return `<button class="mn-row sc-row${p.id === _scSel ? ' on' : ''}" onclick="scOpen(${p.id})">
+            ${cover ? `<img class="sc-cover" src="${_scEsc(cover)}" alt="">` : '<span class="sc-cover none">📦</span>'}
+            <span class="sc-row-b">
+              <span class="mn-row-t">${_scEsc(p.title || '(이름 없음)')}${m.openQ ? `<i class="sc-badge" title="답해야 할 질문">${m.openQ}</i>` : ''}</span>
+              ${sub ? `<span class="mn-row-m">${_scEsc(sub)}</span>` : ''}
+              <span class="mn-row-m"><span class="sc-st">${_scEsc(p.status)}</span> 업체 ${m.n} / 견적 ${m.quoted}${m.chosen ? ` · ✓ ${_scEsc(m.chosen.company)}` : (m.min ? ` · 최저 ${_scUsd(m.min.t)} ${_scEsc(m.min.s.company)}` : '')}</span>
+              <span class="mn-row-m sc-when">${_scKst(p.updated_at)} 업데이트</span>
+            </span>
         </button>`;
     }).join('');
 }
@@ -27687,131 +27738,322 @@ function scOpen(id) {
     try { localStorage.setItem('sc_sel', String(id)); } catch (_) {}
     scRenderList(); scRenderMain();
 }
+function scSetTab(t) { _scTab = t; try { localStorage.setItem('sc_tab', t); } catch (_) {} scRenderMain(); }
+
 function scRenderMain() {
     const main = document.getElementById('scMain');
     if (!main) return;
-    const x = _scItems.find(v => v.id === _scSel);
-    if (!x) { main.innerHTML = `<div class="mn-empty big">왼쪽에서 소싱을 고르거나 ＋ 새 소싱을 등록하세요<br><span class="mn-muted">한 건 = 찾는 물건 하나. 업체마다 받은 견적을 그 아래에 모아 비교해요</span></div>`; return; }
-    const rate = scRate(x);
-    const qs = scQuotesOf(x.id);
-    const landed = qs.map(q => scLanded(q, x));
-    const minL = Math.min(...landed.filter(v => v > 0));
-    const chosen = qs.find(q => q.chosen);
-    const dom = x.domestic_id ? (projects.find(p => p.id === x.domestic_id) || null) : null;
-    const info = [
-        x.client ? `고객사 <b>${_scEsc(x.client)}</b>` : '',
-        x.target_qty ? `예상 수량 <b>${Number(x.target_qty).toLocaleString()}개</b>` : '',
-        x.need_by ? `납기 <b>${_scEsc(String(x.need_by).replace(/-/g, '.'))}</b>` : '',
-        x.assignee ? `담당 <b>${_scEsc(x.assignee)}</b>` : ''
-    ].filter(Boolean).join('<span class="sc-dot">·</span>');
-    const rows = qs.map((q, i) => {
-        const qty = Math.max(Number(x.target_qty) || 0, 0);
-        const p = scPriceAt(q, qty);
-        const L = landed[i];
-        const cheap = L > 0 && L === minL && qs.length > 1;
-        const tiers = (q.tiers || []).filter(t => t.qty && t.price).map(t => `${Number(t.qty).toLocaleString()}개 $${t.price}`).join(' / ');
-        return `<tr class="${q.chosen ? 'chosen' : ''}">
-            <td class="sc-sup">
-                <div class="sc-sup-n">${q.chosen ? '<span class="sc-pick">✓ 결정</span> ' : ''}${_scEsc(q.supplier || '(업체명 없음)')}</div>
-                <div class="sc-sup-m">${_scEsc(q.platform)}${q.contact ? ' · ' + _scEsc(q.contact) : ''}${q.url ? ` · <a href="${_scEsc(q.url)}" target="_blank" rel="noopener noreferrer">링크 ↗</a>` : ''}${q.rating ? ' · ' + '★'.repeat(q.rating) : ''}</div>
-                ${q.memo ? `<div class="sc-memo" title="${_scEsc(q.memo)}">${_scEsc(q.memo)}</div>` : ''}
-                ${(q.images || []).length ? `<div class="sc-thumbs">${q.images.map(u => `<img src="${_scEsc(u)}" alt="" onclick="window.open('${_scEsc(u)}','_blank')">`).join('')}</div>` : ''}
-            </td>
-            <td class="r"><b>${_scUsd(p)}</b>${tiers ? `<div class="sc-sub">${_scEsc(tiers)}</div>` : ''}</td>
-            <td class="r">${_scWon(p * rate)}</td>
-            <td class="r">${q.moq ? Number(q.moq).toLocaleString() : '-'}</td>
-            <td class="r">${q.lead_days ? q.lead_days + '일' : '-'}</td>
-            <td>${_scEsc(q.incoterm || '-')}${Number(q.ship_cost) ? `<div class="sc-sub">운송 ${_scUsd(q.ship_cost)}</div>` : ''}</td>
-            <td class="r ${cheap ? 'best' : ''}"><b>${_scWon(L)}</b>${cheap ? '<div class="sc-sub">최저</div>' : ''}</td>
-            <td class="r">${Number(q.sample_price) ? _scUsd(q.sample_price) : '-'}${q.sample_days ? `<div class="sc-sub">${q.sample_days}일</div>` : ''}</td>
-            <td class="sc-act">
-                <button class="pl-btn ${q.chosen ? '' : 'blue'}" onclick="scChoose(${q.id})">${q.chosen ? '결정 취소' : '이 업체로 결정'}</button>
-                <button class="pl-btn" onclick="scQuoteForm(${x.id}, ${q.id})">편집</button>
-                <button class="pl-btn red" onclick="scQuoteDelete(${q.id})">삭제</button>
-            </td>
-        </tr>`;
-    }).join('');
+    const p = _sc.projects.find(v => v.id === _scSel);
+    if (!p) { main.innerHTML = `<div class="mn-empty big">왼쪽에서 소싱 건을 고르거나 ＋ 새 소싱 건을 만드세요<br><span class="mn-muted">소싱 건 하나 = 만들 물건 하나. 그 아래에 업체·견적·대화·샘플·할 일을 모아요</span></div>`; return; }
+    const sups = scSups(p.id), m = scProjSummary(p);
+    const counts = { spec: '', compare: sups.length, log: sups.reduce((a, s) => a + scMsgsOf(s.id).length, 0), sample: sups.reduce((a, s) => a + scSamplesOf(s.id).length, 0), todo: m.openQ + _sc.todos.filter(t => t.project_id === p.id && t.kind === 'task' && !t.done).length };
+    const dom = p.domestic_id ? projects.find(x => x.id === p.domestic_id) : null;
     main.innerHTML = `
       <article class="mn-doc sc-doc">
         <div class="mn-doc-head">
           <div style="min-width:0">
-            <div class="mn-doc-cat">해외 소싱</div>
-            <h1>${_scEsc(x.title || '(이름 없음)')}</h1>
-            <div class="sc-info">${info || '<span class="mn-muted">고객사·예상 수량을 넣으면 그 수량 기준으로 비교해요</span>'}</div>
+            <div class="mn-doc-cat">${_scEsc([scPlanName(p.linked_project_id), p.linked_client].filter(Boolean).join(' · ') || '해외 소싱')}</div>
+            <h1>${_scEsc(p.title || '(이름 없음)')}</h1>
+            <div class="mn-doc-meta">담당 ${_scEsc(p.assignee || SC_DEFAULT_WHO)} · 마지막 업데이트 ${_scKst(p.updated_at)}</div>
           </div>
           <div class="mn-doc-act">
-            <select class="form-select sc-status" onchange="scItemPatch(${x.id}, {status: this.value})">${SC_STATUSES.map(s => `<option ${s === x.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
-            <button class="pl-btn" onclick="scItemForm(${x.id})">✏️ 편집</button>
-            <button class="pl-btn red" onclick="scItemDelete(${x.id})">삭제</button>
+            <select class="form-select sc-status" onchange="scPatch('sourcing_projects', ${p.id}, {status: this.value})">${SC_STATUSES.map(s => `<option ${s === p.status ? 'selected' : ''}>${s}</option>`).join('')}</select>
+            <button class="pl-btn" onclick="scProjectForm(${p.id})">✏️ 편집</button>
+            <button class="pl-btn red" onclick="scDelete('sourcing_projects', ${p.id}, '이 소싱 건과 업체·견적·기록 전부')">삭제</button>
           </div>
         </div>
-        ${x.spec || x.memo || (x.images || []).length ? `<div class="sc-spec">
-            ${x.spec ? `<div><b>원하는 사양</b><p>${_scEsc(x.spec)}</p></div>` : ''}
-            ${x.memo ? `<div><b>메모</b><p>${_scEsc(x.memo)}</p></div>` : ''}
-            ${(x.images || []).length ? `<div class="sc-thumbs big">${x.images.map(u => `<img src="${_scEsc(u)}" alt="" onclick="window.open('${_scEsc(u)}','_blank')">`).join('')}</div>` : ''}
+        ${m.chosen ? `<div class="sc-decide">
+            <div><b>✓ 선정: ${_scEsc(m.chosen.company)}</b>${scSupSum(m.chosen).total ? ` — 본주문 ${_scUsd(scSupSum(m.chosen).total)}` : ''}</div>
+            <div class="sc-decide-act">${p.domestic_id
+                ? `<span>국내 프로젝트 연결됨${dom ? ': <b>' + _scEsc(dom.client || '') + ' · ' + _scEsc(dom.name || '') + '</b>' : ''}</span><button class="pl-btn blue" onclick="scOpenDomestic(${p.domestic_id})">열기 →</button><button class="pl-btn" onclick="scLinkExisting(${p.id})">바꾸기</button>`
+                : `<button class="pl-btn blue" onclick="scCreateDomestic(${p.id})">＋ 국내 프로젝트로 만들기</button><button class="pl-btn" onclick="scLinkExisting(${p.id})">🔗 기존 국내 프로젝트에 연결</button>`}</div>
         </div>` : ''}
-        ${chosen ? `<div class="sc-decide">
-            <div><b>✓ 결정: ${_scEsc(chosen.supplier)}</b> — 개당 ${_scUsd(scPriceAt(chosen, Number(x.target_qty) || 0))}${x.target_qty ? ` × ${Number(x.target_qty).toLocaleString()}개` : ''}</div>
-            <div class="sc-decide-act">${x.domestic_id
-                ? `<span>국내 프로젝트 연결됨${dom ? ': <b>' + _scEsc(dom.client || '') + ' · ' + _scEsc(dom.name || '') + '</b>' : ` (#${x.domestic_id})`}</span>
-                   <button class="pl-btn blue" onclick="scOpenDomestic(${x.domestic_id})">국내 프로젝트 열기 →</button>
-                   <button class="pl-btn" onclick="scLinkExisting(${x.id})">다른 프로젝트로 바꾸기</button>`
-                : `<button class="btn-primary" onclick="scCreateDomestic(${x.id})">＋ 국내 프로젝트 새로 만들기</button>
-                   <button class="pl-btn" onclick="scLinkExisting(${x.id})">🔗 기존 국내 프로젝트에 연결</button>`}</div>
-        </div>` : ''}
-        <div class="sc-qhead">
-          <h3>업체 견적 <b>${qs.length}</b></h3>
-          <label class="sc-rate">환율 <input value="${rate}" inputmode="decimal" onchange="scItemPatch(${x.id}, {rate: _scNum(this.value)}); ovsRememberRate(_scNum(this.value))"> 원/$</label>
-          <div class="inq-spacer"></div>
-          <button class="btn-primary" onclick="scQuoteForm(${x.id})">＋ 견적 추가</button>
-        </div>
-        ${qs.length ? `<div class="sc-table-wrap"><table class="sc-table">
-            <thead><tr><th>업체</th><th class="r">단가${x.target_qty ? `<div class="sc-sub">${Number(x.target_qty).toLocaleString()}개 기준</div>` : ''}</th><th class="r">원화</th><th class="r">MOQ</th><th class="r">생산</th><th>조건·운송</th><th class="r">개당 도착가<div class="sc-sub">운송 포함·세금 제외</div></th><th class="r">샘플</th><th></th></tr></thead>
-            <tbody>${rows}</tbody></table></div>`
-          : `<div class="mn-empty">아직 견적이 없어요 — 알리바바에서 받은 견적을 ＋ 견적 추가로 넣으세요<br><span class="mn-muted">업체 메시지는 메모 칸에 그대로 붙여넣고, 채팅 캡처는 사진 칸에 붙여넣으면 돼요</span></div>`}
+        ${scPasteBox(p)}
+        <div class="sc-tabs" role="tablist">${SC_TABS.map(([k, l]) => `<button role="tab" class="${_scTab === k ? 'on' : ''}" onclick="scSetTab('${k}')">${l}${counts[k] ? ` <b class="${k === 'todo' && m.openQ ? 'red' : ''}">${counts[k]}</b>` : ''}</button>`).join('')}</div>
+        <div class="sc-tabbody">${({ spec: scTabSpec, compare: scTabCompare, log: scTabLog, sample: scTabSample, todo: scTabTodo })[_scTab] ? ({ spec: scTabSpec, compare: scTabCompare, log: scTabLog, sample: scTabSample, todo: scTabTodo })[_scTab](p) : scTabCompare(p)}</div>
       </article>`;
-}
-async function scItemPatch(id, patch) {
-    const { error } = await sb.from('sourcing_items').update(patch).eq('id', id);
-    if (error) { showToast('저장 실패: ' + error.message); return false; }
-    const x = _scItems.find(v => v.id === id); if (x) Object.assign(x, patch, { updated_at: new Date().toISOString() });
-    scRenderList(); scRenderMain();
-    return true;
-}
-async function scItemDelete(id) {
-    const x = _scItems.find(v => v.id === id); if (!x) return;
-    if (!confirm(`'${x.title}' 소싱과 견적 ${scQuotesOf(id).length}개를 지울까요?`)) return;
-    const { error } = await sb.from('sourcing_items').delete().eq('id', id);
-    if (error) { showToast('삭제 실패: ' + error.message); return; }
-    _scItems = _scItems.filter(v => v.id !== id); _scQuotes = _scQuotes.filter(q => q.item_id !== id);
-    _scSel = (scVisible()[0] || {}).id || null;
-    scRender();
-}
-async function scQuoteDelete(qid) {
-    const q = _scQuotes.find(v => v.id === qid); if (!q) return;
-    if (!confirm(`${q.supplier || '이 업체'} 견적을 지울까요?`)) return;
-    const { error } = await sb.from('sourcing_quotes').delete().eq('id', qid);
-    if (error) { showToast('삭제 실패: ' + error.message); return; }
-    _scQuotes = _scQuotes.filter(v => v.id !== qid);
-    scRenderList(); scRenderMain();
-}
-// 업체 결정 — 한 건에 하나만. 결정하면 소싱 상태도 '결정'
-async function scChoose(qid) {
-    const q = _scQuotes.find(v => v.id === qid); if (!q) return;
-    const x = _scItems.find(v => v.id === q.item_id); if (!x) return;
-    const on = !q.chosen;
-    if (on) {
-        const { error: e1 } = await sb.from('sourcing_quotes').update({ chosen: false }).eq('item_id', x.id).neq('id', qid);
-        if (e1) { showToast('저장 실패: ' + e1.message); return; }
-    }
-    const { error } = await sb.from('sourcing_quotes').update({ chosen: on }).eq('id', qid);
-    if (error) { showToast('저장 실패: ' + error.message); return; }
-    _scQuotes.forEach(v => { if (v.item_id === x.id) v.chosen = on ? v.id === qid : false; });
-    await scItemPatch(x.id, { status: on ? '결정' : (x.status === '결정' ? '진행 중' : x.status) });
-    if (on) showToast(`${q.supplier} 업체로 결정했어요 — 아래에서 국내 프로젝트로 연결하세요`);
+    scBindPaste(main, p);
 }
 
-// ---------- 입력 창 (소싱 건 / 견적) ----------
+// ① 사양
+function scTabSpec(p) {
+    const sp = p.spec || {};
+    const qty = (sp.qty_lines || []).filter(l => l.label || l.qty);
+    const rows = SC_SPEC_FIELDS.filter(([k]) => sp[k]).map(([k, l]) => `<tr><th>${l}</th><td>${_scEsc(sp[k])}</td></tr>`).join('');
+    return `
+      <div class="sc-bar"><button class="pl-btn blue" onclick="scProjectForm(${p.id}, true)">✏️ 사양 고치기</button></div>
+      <table class="sc-spec-t">
+        <tr><th>제품명</th><td><b>${_scEsc(p.title)}</b></td></tr>
+        <tr><th>수량</th><td>${qty.length ? qty.map(l => `${_scEsc(l.label || '')} <b>${Number(l.qty || 0).toLocaleString()}</b>`).join(' / ') + (qty.length > 1 ? ` <span class="mn-muted">(합계 ${qty.reduce((a, l) => a + (Number(l.qty) || 0), 0).toLocaleString()})</span>` : '') : '-'}</td></tr>
+        ${rows}
+      </table>
+      ${(p.images || []).length ? `<h4 class="sc-h4">레퍼런스·시안 (원본)</h4><div class="sc-thumbs big">${p.images.map(u => `<a href="${_scEsc(u)}" target="_blank" rel="noopener"><img src="${_scEsc(u)}" alt=""></a>`).join('')}</div>` : ''}
+      <h4 class="sc-h4">사양 변경 이력</h4>
+      ${(p.spec_history || []).length ? `<ul class="sc-hist">${p.spec_history.slice().reverse().map((h, i, arr) => `<li><span>${_scEsc(String(h.at || '').slice(5, 10).replace('-', '/'))}</span> ${_scEsc(h.text)} <em>${_scEsc(h.by || '')}</em><button class="sc-x" title="이력 지우기" onclick="scSpecHistDel(${p.id}, ${arr.length - 1 - i})">✕</button></li>`).join('')}</ul>` : '<div class="mn-muted">아직 없어요 — 사양을 고칠 때 "이번 변경" 칸에 적으면 남아요</div>'}`;
+}
+async function scSpecHistDel(pid, idx) {
+    const p = _sc.projects.find(v => v.id === pid); if (!p || !confirm('이 변경 이력을 지울까요?')) return;
+    const h = (p.spec_history || []).slice(); h.splice(idx, 1);
+    await scPatch('sourcing_projects', pid, { spec_history: h });
+}
+
+// ② 업체 비교 (핵심)
+function scTabCompare(p) {
+    const rate = scRate(p);
+    const sups = scSups(p.id);
+    const rows = sups.map(s => ({ s, m: scSupSum(s), last: scLastContact(s) }));
+    const live = rows.filter(r => r.s.status !== '제외' && r.m.total > 0);
+    const minT = live.length > 1 ? Math.min(...live.map(r => r.m.total)) : null;
+    const key = _scSort.key, dir = _scSort.dir;
+    const val = r => key === 'total' ? (r.m.total || Infinity) : key === 'rating' ? -(Number(r.s.rating) || 0) : key === 'years' ? -(parseFloat(r.s.years) || 0) : key === 'last' ? (_scDays(r.last) ?? 9999) : String(r.s.company || '').toLowerCase();
+    rows.sort((a, b) => (a.s.status === '제외') - (b.s.status === '제외') || (val(a) > val(b) ? dir : val(a) < val(b) ? -dir : 0));
+    const th = (k, l, cls) => `<th class="${cls || ''} sortable" onclick="_scSort={key:'${k}',dir:_scSort.key==='${k}'?-_scSort.dir:1};scRenderMain()">${l}${_scSort.key === k ? (_scSort.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`;
+    const body = rows.map(({ s, m, last }) => {
+        const d = _scDays(last), quiet = d !== null && d >= 3;
+        const opts = m.qs.map(q => `<div class="sc-opt">${q.option_label ? `<span>${_scEsc(q.option_label)}</span> ` : ''}<b>${_scUsd(q.unit_price_usd)}</b>${q.qty ? ` × ${Number(q.qty).toLocaleString()}` : ''}<button class="sc-mini" title="견적 고치기" onclick="scQuoteForm(${s.id}, ${q.id})">✎</button></div>`).join('');
+        return `<tr class="${s.status === '선정' ? 'chosen' : ''} ${s.status === '제외' ? 'out' : ''}">
+          <td class="sc-sup">
+            <div class="sc-sup-n">${_scEsc(s.company || '(업체명 없음)')}</div>
+            <div class="sc-sup-m">${_scEsc(s.contact_name || '')}${s.contact_name ? ' · ' : ''}<span class="sc-ch ${s.channel}">${SC_CHANNELS[s.channel] || ''}${s.channel === 'form_failed' ? ' ⚠' : ''}</span></div>
+            <div class="sc-sup-m"><span class="sc-sst sc-sst-${SC_SUP_STATUSES.indexOf(s.status)}">${_scEsc(s.status)}</span></div>
+          </td>
+          <td>${s.product_url ? `<a class="sc-link" href="${_scEsc(s.product_url)}" target="_blank" rel="noopener noreferrer">상품 ↗</a>` : '<span class="sc-nolink" title="비교표 모든 행에 상품 링크가 필요해요">링크 없음</span>'}</td>
+          <td class="r">${_scEsc(s.years || '-')}<div class="sc-sub">${s.rating ? '★ ' + s.rating : ''}${s.store_reviews ? ' · 리뷰 ' + Number(s.store_reviews).toLocaleString() : ''}${s.kr_reviews ? ' · 한국 ' + s.kr_reviews : ''}</div>${s.rating_checked_at ? `<div class="sc-sub">확인 ${_scKst(s.rating_checked_at)}</div>` : ''}</td>
+          <td>${_scEsc(s.response_time || '-')}<div class="sc-sub">${s.ontime_rate ? '정시 ' + _scEsc(s.ontime_rate) : ''}</div></td>
+          <td class="sc-opts">${opts || '<span class="mn-muted">견적 없음</span>'}</td>
+          <td class="r ${minT && m.total === minT ? 'best' : ''}"><b>${m.total ? _scUsd(m.total) : '-'}</b>${m.total ? `<div class="sc-sub">${_scWon(m.total * rate)}</div>` : ''}${minT && m.total === minT ? '<div class="sc-sub">최저</div>' : ''}</td>
+          <td class="r">${m.mold ? _scUsd(m.mold) : '없음'}</td>
+          <td>${m.sampleFee ? _scUsd(m.sampleFee) : '-'}<div class="sc-sub">${_scEsc(m.sampleDays || '')}${m.sampleRefund ? ' · 본주문 시 차감' : ''}</div></td>
+          <td>${_scEsc(m.prod || '-')}</td>
+          <td class="sc-wrap">${_scEsc(m.ship || '-')}</td>
+          <td class="sc-wrap">${m.basis ? `<span class="sc-warn" title="견적 기준이 달라 단순 비교 주의">⚠</span> ${_scEsc(m.basis)}` : '-'}</td>
+          <td class="r ${quiet && !['선정', '제외'].includes(s.status) ? 'quiet' : ''}">${d === null ? '-' : d === 0 ? '오늘' : d + '일 전'}</td>
+          <td class="sc-act">
+            <button class="pl-btn" onclick="scQuoteForm(${s.id})">＋견적</button>
+            <button class="pl-btn" onclick="scSupplierForm(${p.id}, ${s.id})">편집</button>
+            ${s.status === '선정' ? '' : `<button class="pl-btn blue" onclick="scChoose(${s.id})">선정</button>`}
+          </td></tr>`;
+    }).join('');
+    return `
+      <div class="sc-bar">
+        <button class="btn-primary" onclick="scSupplierForm(${p.id})">＋ 업체 추가</button>
+        <label class="sc-rate">환율 <input value="${rate}" inputmode="decimal" onchange="scPatch('sourcing_projects', ${p.id}, {rate: _scNum(this.value), rate_date: getTodayStr()}); ovsRememberRate(_scNum(this.value))"> 원/$ <span class="mn-muted">(${p.rate_date ? String(p.rate_date).replace(/-/g, '.') + ' 기준' : '기준일 없음'})</span></label>
+        <div class="inq-spacer"></div>
+        ${sups.length ? `<button class="pl-btn" onclick="scExportCompare(${p.id})">🖼 비교표 이미지로 저장</button>` : ''}
+      </div>
+      ${sups.length ? `<div class="sc-table-wrap" id="scCompareWrap"><table class="sc-table">
+        <thead><tr>${th('name', '업체 / 담당자')}<th>상품 링크</th>${th('years', '업력 · 평점 · 리뷰', 'r')}<th>응답 · 정시</th><th>단가 (옵션별)</th>${th('total', '본주문 총액', 'r')}<th class="r">금형비</th><th>샘플</th><th>생산</th><th>배송</th><th>견적 기준</th>${th('last', '마지막 연락', 'r')}<th></th></tr></thead>
+        <tbody>${body}</tbody></table></div>
+        <div class="mn-muted sc-note">옵션(색상별 등) 견적을 줄마다 넣으면 합이 본주문 총액이에요 · 원화는 보조 표시 · 3일 넘게 답이 없으면 노란색 · ⚠ = 견적 기준(두께·소재·체인 포함 등)이 달라 단순 비교 주의</div>`
+        : '<div class="mn-empty">아직 업체가 없어요 — ＋ 업체 추가로 문의한 업체를 넣으세요 (상품 링크 필수)</div>'}`;
+}
+async function scExportCompare(pid) {
+    const el = document.getElementById('scCompareWrap'); if (!el || typeof html2canvas === 'undefined') return;
+    const p = _sc.projects.find(v => v.id === pid);
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll('.sc-act, .sc-mini').forEach(n => n.remove());
+    clone.querySelectorAll('tr').forEach(tr => { const last = tr.lastElementChild; if (last && !last.textContent.trim()) last.remove(); });
+    const box = document.createElement('div');
+    box.className = 'sc-export';
+    box.innerHTML = `<div class="sc-export-h"><b>${_scEsc(p.title)}</b> 업체 견적 비교 · ${new Date().toLocaleDateString('ko-KR')}</div>`;
+    clone.style.overflow = 'visible'; box.appendChild(clone);
+    document.body.appendChild(box);
+    try {
+        const canvas = await html2canvas(box, { scale: 2, backgroundColor: '#ffffff', logging: false });
+        const a = document.createElement('a');
+        a.download = `${(p.title || '소싱').replace(/[\\/:*?"<>|]/g, '')}_업체비교.png`;
+        a.href = canvas.toDataURL('image/png'); a.click();
+    } catch (e) { showToast('이미지 저장 실패: ' + e.message); }
+    box.remove();
+}
+
+// ③ 대화·기록
+function scTabLog(p) {
+    const sups = scSups(p.id);
+    const ms = _sc.messages.filter(m => sups.some(s => s.id === m.supplier_id) && (!_scLogSup || m.supplier_id === _scLogSup)).sort((a, b) => String(a.sent_at).localeCompare(String(b.sent_at)));
+    const supName = id => (sups.find(s => s.id === id) || {}).company || '';
+    const supWho = id => (sups.find(s => s.id === id) || {}).contact_name || '';
+    return `
+      <div class="sc-bar sc-chips"><button class="${!_scLogSup ? 'on' : ''}" onclick="_scLogSup=0;scRenderMain()">전체</button>${sups.map(s => `<button class="${_scLogSup === s.id ? 'on' : ''}" onclick="_scLogSup=${s.id};scRenderMain()">${_scEsc(s.company)} <b>${scMsgsOf(s.id).length}</b></button>`).join('')}</div>
+      ${ms.length ? `<div class="sc-log">${ms.map(m => `
+        <div class="sc-msg ${m.direction}">
+          <div class="sc-msg-h"><b>${m.direction === 'out' ? '우리 → ' + _scEsc(supName(m.supplier_id)) : _scEsc(supName(m.supplier_id)) + (supWho(m.supplier_id) ? ' (' + _scEsc(supWho(m.supplier_id)) + ')' : '') + ' → 우리'}</b>
+            <span>${_scKst(m.sent_at)}</span>${m.read_status ? `<span class="sc-read ${m.read_status === '읽음' ? 'y' : 'n'}">${_scEsc(m.read_status)}</span>` : ''}
+            <span class="sc-msg-act"><button class="sc-mini" onclick="scMessageForm(${p.id}, ${m.id})" title="고치기">✎</button><button class="sc-mini" onclick="scDelete('sourcing_messages', ${m.id}, '이 기록')" title="지우기">✕</button></span></div>
+          ${m.summary_ko ? `<div class="sc-msg-sum">${_scEsc(m.summary_ko)}</div>` : ''}
+          ${m.original_text ? `<details ${m.summary_ko ? '' : 'open'}><summary>원문</summary><pre>${_scEsc(m.original_text)}</pre></details>` : ''}
+          ${m.quoted_text ? `<blockquote>${_scEsc(m.quoted_text)}</blockquote>` : ''}
+          ${(m.attachments || []).length ? `<div class="sc-att">${m.attachments.map(scAttHtml).join('')}</div>` : ''}
+          <div class="sc-msg-f">확인 ${_scKst(m.checked_at)}${m.created_by ? ' · ' + _scEsc(m.created_by) : ''}</div>
+        </div>`).join('')}</div>` : '<div class="mn-empty">아직 기록이 없어요 — 위 "채팅 붙여넣기"에 알리바바 채팅을 붙여넣으세요</div>'}`;
+}
+function scAttHtml(a) {
+    const u = typeof a === 'string' ? a : a.url, n = (typeof a === 'string' ? '' : a.name) || '파일';
+    return /\.(png|jpe?g|gif|webp)(\?|$)/i.test(u) || (a.type || '').startsWith('image/')
+        ? `<a href="${_scEsc(u)}" target="_blank" rel="noopener"><img src="${_scEsc(u)}" alt=""></a>`
+        : `<a class="sc-file" href="${_scEsc(u)}" target="_blank" rel="noopener">📎 ${_scEsc(n)}</a>`;
+}
+// 상세 맨 위 "채팅 붙여넣기" — 원문을 붙이면 대화 기록에 추가 (업체 질문이면 할 일·질문에도)
+function scPasteBox(p) {
+    const sups = scSups(p.id).filter(s => s.status !== '제외');
+    return `<details class="sc-paste" ${_scPasteOpen ? 'open' : ''} ontoggle="_scPasteOpen=this.open;try{localStorage.setItem('sc_paste',this.open?'1':'0')}catch(_){}">
+      <summary>💬 채팅 붙여넣기 <span class="mn-muted">— 알리바바 채팅 원문을 붙이면 대화·기록에 남아요</span></summary>
+      ${sups.length ? `<div class="sc-paste-b">
+        <div class="sc-paste-r">
+          <select data-p="sup">${sups.map(s => `<option value="${s.id}" ${_scLogSup === s.id ? 'selected' : ''}>${_scEsc(s.company)}${s.contact_name ? ' (' + _scEsc(s.contact_name) + ')' : ''}</option>`).join('')}</select>
+          <select data-p="dir"><option value="in">업체 → 우리</option><option value="out">우리 → 업체</option></select>
+          <input data-p="at" type="datetime-local" value="${_scKstInput()}" title="한국시간">
+          <select data-p="read"><option value="">읽음 여부</option><option>읽음</option><option>안 읽음</option></select>
+        </div>
+        <textarea data-p="text" rows="4" placeholder="채팅 원문 (영문 그대로) — 사진·PDF는 여기에 붙여넣기(Ctrl+V)"></textarea>
+        <div class="sc-paste-r">
+          <input data-p="sum" placeholder="한국어 요약 한 줄 (예: 골드 $2.0 / 실버 $1.7, 샘플 $50 본주문 시 차감)">
+          <input data-p="quoted" placeholder="회신으로 인용한 원문 (있으면)">
+        </div>
+        <div class="sc-paste-r"><div class="sc-paste-att"></div><label class="sc-chk"><input type="checkbox" data-p="q"> 업체가 물어본 질문 → 할 일·질문에 추가</label><div class="inq-spacer"></div><label class="pl-btn sc-file-btn">📎 첨부<input type="file" multiple hidden data-p="file"></label><button class="btn-primary" data-p="save">기록 추가</button></div>
+      </div>` : '<div class="mn-muted sc-paste-b">먼저 업체 비교 탭에서 업체를 추가하세요</div>'}
+    </details>`;
+}
+let _scPasteOpen = (() => { try { return localStorage.getItem('sc_paste') === '1'; } catch (_) { return false; } })();
+function scBindPaste(main, p) {
+    const box = main.querySelector('.sc-paste-b'); if (!box || !box.querySelector('[data-p=save]')) return;
+    const atts = [];
+    const drawAtt = () => { box.querySelector('.sc-paste-att').innerHTML = atts.map((a, i) => `<span class="sc-att-chip">${_scEsc(a.name)}<button type="button" data-rm="${i}">✕</button></span>`).join(''); };
+    const add = async files => { for (const f of files) { try { atts.push(await scUpload(f)); drawAtt(); } catch (e) { showToast('첨부 실패: ' + (e.message || e)); } } };
+    box.addEventListener('paste', e => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) { e.preventDefault(); add(fs); } });
+    box.addEventListener('click', e => { const r = e.target.closest('[data-rm]'); if (r) { atts.splice(Number(r.dataset.rm), 1); drawAtt(); } });
+    box.querySelector('[data-p=file]').addEventListener('change', e => add([...e.target.files]));
+    box.querySelector('[data-p=save]').addEventListener('click', async ev => {
+        const g = k => box.querySelector(`[data-p=${k}]`);
+        const text = g('text').value.trim(), sum = g('sum').value.trim();
+        if (!text && !sum && !atts.length) { showToast('채팅 원문이나 요약을 넣으세요'); return; }
+        ev.target.disabled = true;
+        const row = { supplier_id: Number(g('sup').value), direction: g('dir').value, sent_at: _scFromKstInput(g('at').value), original_text: text, summary_ko: sum,
+            quoted_text: g('quoted').value.trim(), attachments: atts.slice(), read_status: g('read').value, checked_at: new Date().toISOString(), created_by: _scMe() };
+        const { data, error } = await sb.from('sourcing_messages').insert(row).select().single();
+        if (error) { ev.target.disabled = false; showToast('저장 실패: ' + error.message); return; }
+        _sc.messages.push(data);
+        if (g('q').checked) {
+            const { data: t } = await sb.from('sourcing_todos').insert({ project_id: p.id, supplier_id: row.supplier_id, kind: 'question', text: sum || text.slice(0, 300), asked_at: row.sent_at, assignee: p.assignee || SC_DEFAULT_WHO }).select().single();
+            if (t) _sc.todos.push(t);
+        }
+        // 업체가 답을 줬으면 '답변 대기' → '견적 받음' 전 단계로 두지 않고 그대로, 첫 답이면 '답변 대기'를 풀어줌
+        const s = _sc.suppliers.find(v => v.id === row.supplier_id);
+        if (s && row.direction === 'in' && s.status === '문의함') await scPatch('sourcing_suppliers', s.id, { status: '답변 대기' }, true);
+        _scLogSup = row.supplier_id;
+        showToast('기록했어요');
+        scRenderMain();
+    });
+}
+async function scUpload(file) {
+    const ext = ((file.name || '').split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '') || 'bin';
+    const path = `sourcing/${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
+    const { error } = await sb.storage.from('planning-images').upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined });
+    if (error) throw error;
+    return { url: sb.storage.from('planning-images').getPublicUrl(path).data.publicUrl, name: file.name || path.split('/').pop(), type: file.type || '' };
+}
+
+// ④ 샘플·결제
+function scTabSample(p) {
+    const sups = scSups(p.id);
+    const list = _sc.samples.filter(x => sups.some(s => s.id === x.supplier_id));
+    const supName = id => (sups.find(s => s.id === id) || {}).company || '';
+    return `
+      <div class="sc-bar"><button class="btn-primary" onclick="scSampleForm(${p.id})" ${sups.length ? '' : 'disabled'}>＋ 샘플 기록</button><span class="mn-muted">결제·주문은 알리바바에서 직접 — 여기는 상태만 기록해요</span></div>
+      ${list.length ? `<div class="sc-table-wrap"><table class="sc-table sc-sample-t">
+        <thead><tr><th>업체</th><th>샘플 내용</th><th class="r">금액</th><th>주문 상태</th><th>결제</th><th>발송 기한</th><th>예상 완성</th><th>배송</th><th>시안</th><th>로고 파일</th><th></th></tr></thead>
+        <tbody>${list.map(x => `<tr>
+          <td><b>${_scEsc(supName(x.supplier_id))}</b></td>
+          <td class="sc-wrap">${_scEsc(x.description)}</td>
+          <td class="r"><b>${_scUsd(x.amount_usd)}</b><div class="sc-sub">${_scWon(x.amount_usd * scRate(p))}</div></td>
+          <td><select class="sc-inline" onchange="scPatch('sourcing_samples', ${x.id}, {order_status: this.value})">${SC_ORDER_STATUSES.map(s => `<option ${s === x.order_status ? 'selected' : ''}>${s}</option>`).join('')}</select></td>
+          <td>${x.paid_at ? String(x.paid_at).slice(5).replace('-', '/') : '-'}<div class="sc-sub">${_scEsc(x.paid_by || '')}</div></td>
+          <td class="sc-wrap">${_scEsc(x.promised_ship || '-')}</td>
+          <td>${x.eta ? String(x.eta).slice(5).replace('-', '/') : '-'}</td>
+          <td class="sc-wrap">${x.pickup ? '직접 픽업' : ''}${x.shipping_note ? (x.pickup ? ' · ' : '') + _scEsc(x.shipping_note) : (x.pickup ? '' : '-')}</td>
+          <td>${_scEsc(x.draft_status || '-')}</td>
+          <td class="sc-wrap">${_scEsc(x.logo_file || '-')}</td>
+          <td class="sc-act"><button class="pl-btn" onclick="scSampleForm(${p.id}, ${x.id})">편집</button></td>
+        </tr>`).join('')}</tbody></table></div>` : '<div class="mn-empty">아직 샘플 기록이 없어요</div>'}`;
+}
+
+// ⑤ 할 일·질문
+function scTabTodo(p) {
+    const sups = scSups(p.id);
+    const supName = id => (sups.find(s => s.id === id) || {}).company || '';
+    const all = _sc.todos.filter(t => t.project_id === p.id);
+    const qs = all.filter(t => t.kind === 'question').sort((a, b) => (a.done - b.done) || String(b.asked_at).localeCompare(String(a.asked_at)));
+    const ts = all.filter(t => t.kind === 'task').sort((a, b) => (a.done - b.done) || String(a.due || '9').localeCompare(String(b.due || '9')));
+    const people = typeof meetingStaffList === 'function' ? meetingStaffList() : [SC_DEFAULT_WHO];
+    return `
+      <h4 class="sc-h4">업체가 물어본 질문 <b class="${qs.filter(t => !t.done).length ? 'red' : ''}">${qs.filter(t => !t.done).length}</b></h4>
+      ${qs.length ? qs.map(t => `<div class="sc-q ${t.done ? 'done' : ''}">
+          <div class="sc-q-h"><b>${_scEsc(t.text)}</b>${t.needs_decision ? '<span class="sc-tag">판단 필요</span>' : ''}</div>
+          <div class="sc-q-m">${_scEsc(supName(t.supplier_id))}${t.asked_at ? ' · ' + _scKst(t.asked_at) : ''} · ${t.done ? '✓ 답변함' + (t.done_at ? ' ' + _scKst(t.done_at) : '') : '<span class="red">미답변</span>'}</div>
+          <div class="sc-q-a"><input value="${_scEsc(t.answer)}" placeholder="답한 내용 (메모)" onchange="scPatch('sourcing_todos', ${t.id}, {answer: this.value.trim()})">
+            <label class="sc-chk"><input type="checkbox" ${t.needs_decision ? 'checked' : ''} onchange="scPatch('sourcing_todos', ${t.id}, {needs_decision: this.checked})"> 판단 필요</label>
+            <button class="pl-btn ${t.done ? '' : 'blue'}" onclick="scPatch('sourcing_todos', ${t.id}, {done: ${!t.done}, done_at: ${t.done ? 'null' : 'new Date().toISOString()'}})">${t.done ? '미답변으로' : '답변함'}</button>
+            <button class="sc-mini" onclick="scDelete('sourcing_todos', ${t.id}, '이 질문')">✕</button></div>
+        </div>`).join('') : '<div class="mn-muted">없어요 — 채팅 붙여넣기에서 "업체가 물어본 질문"을 체크하면 여기 쌓여요</div>'}
+      <div class="sc-add">
+        <select id="scQSup">${sups.map(s => `<option value="${s.id}">${_scEsc(s.company)}</option>`).join('')}</select>
+        <input id="scQText" placeholder="질문 직접 추가 (예: 밴드 길이 몇 mm로 하나요?)">
+        <input id="scQAt" type="datetime-local" value="${_scKstInput()}">
+        <button class="pl-btn" onclick="scTodoAdd(${p.id}, 'question')">추가</button>
+      </div>
+      <h4 class="sc-h4">우리 할 일</h4>
+      ${ts.length ? ts.map(t => `<div class="sc-task ${t.done ? 'done' : ''}">
+          <input type="checkbox" ${t.done ? 'checked' : ''} onchange="scPatch('sourcing_todos', ${t.id}, {done: this.checked, done_at: this.checked ? new Date().toISOString() : null})">
+          <span class="sc-task-t">${_scEsc(t.text)}${t.supplier_id ? ` <em>${_scEsc(supName(t.supplier_id))}</em>` : ''}</span>
+          <input type="date" value="${_scEsc(t.due || '')}" onchange="scPatch('sourcing_todos', ${t.id}, {due: this.value || null})" class="${t.due && t.due < getTodayStr() && !t.done ? 'late' : ''}">
+          <select onchange="scPatch('sourcing_todos', ${t.id}, {assignee: this.value})">${people.map(n => `<option ${n === t.assignee ? 'selected' : ''}>${_scEsc(n)}</option>`).join('')}</select>
+          <button class="sc-mini" onclick="scDelete('sourcing_todos', ${t.id}, '이 할 일')">✕</button>
+        </div>`).join('') : '<div class="mn-muted">없어요</div>'}
+      <div class="sc-add">
+        <input id="scTText" placeholder="할 일 (예: Aofei 샘플 도착 확인)">
+        <input id="scTDue" type="date">
+        <select id="scTWho">${people.map(n => `<option ${n === SC_DEFAULT_WHO ? 'selected' : ''}>${_scEsc(n)}</option>`).join('')}</select>
+        <button class="pl-btn" onclick="scTodoAdd(${p.id}, 'task')">추가</button>
+      </div>`;
+}
+async function scTodoAdd(pid, kind) {
+    const v = id => (document.getElementById(id)?.value || '').trim();
+    const row = kind === 'question'
+        ? { project_id: pid, kind, supplier_id: Number(v('scQSup')) || null, text: v('scQText'), asked_at: _scFromKstInput(v('scQAt')), assignee: SC_DEFAULT_WHO }
+        : { project_id: pid, kind, text: v('scTText'), due: v('scTDue') || null, assignee: v('scTWho') || SC_DEFAULT_WHO };
+    if (!row.text) { showToast('내용을 입력하세요'); return; }
+    const { data, error } = await sb.from('sourcing_todos').insert(row).select().single();
+    if (error) { showToast('저장 실패: ' + error.message); return; }
+    _sc.todos.push(data);
+    scRender();
+}
+
+// ---------- 저장 공통 ----------
+const SC_LIST = { sourcing_projects: 'projects', sourcing_suppliers: 'suppliers', sourcing_quotes: 'quotes', sourcing_messages: 'messages', sourcing_samples: 'samples', sourcing_todos: 'todos' };
+async function scPatch(table, id, patch, silent) {
+    const { error } = await sb.from(table).update(patch).eq('id', id);
+    if (error) { showToast('저장 실패: ' + error.message); return false; }
+    const row = _sc[SC_LIST[table]].find(v => v.id === id); if (row) Object.assign(row, patch);
+    const p = _sc.projects.find(v => v.id === _scSel); if (p) p.updated_at = new Date().toISOString();
+    if (!silent) scRender();
+    return true;
+}
+async function scDelete(table, id, what) {
+    if (!confirm(`${what}을(를) 지울까요?`)) return;
+    const { error } = await sb.from(table).delete().eq('id', id);
+    if (error) { showToast('삭제 실패: ' + error.message); return; }
+    await scLoad();
+    if (table === 'sourcing_projects') _scSel = (scVisible()[0] || {}).id || null;
+    scRender();
+}
+async function scInsert(table, row) {
+    const { data, error } = await sb.from(table).insert(row).select().single();
+    if (error) { showToast('저장 실패: ' + error.message); return null; }
+    _sc[SC_LIST[table]].push(data);
+    return data;
+}
+
+// ---------- 입력 창 ----------
 function scModal(title, body, onSave) {
     document.getElementById('scOverlay')?.remove();
     const ov = document.createElement('div');
@@ -27819,7 +28061,7 @@ function scModal(title, body, onSave) {
     ov.innerHTML = `<div class="sc-box" role="dialog" aria-label="${_scEsc(title)}">
         <div class="sc-box-h"><b>${_scEsc(title)}</b><button type="button" class="sc-x" data-x aria-label="닫기">✕</button></div>
         <div class="sc-box-b">${body}</div>
-        <div class="sc-box-f"><button type="button" class="pl-btn" data-x>취소</button><button type="button" class="btn-primary" data-save>저장</button></div>
+        <div class="sc-box-f"><span class="sc-del-slot"></span><div class="inq-spacer"></div><button type="button" class="pl-btn" data-x>취소</button><button type="button" class="btn-primary" data-save>저장</button></div>
     </div>`;
     document.body.appendChild(ov);
     const close = () => { ov.remove(); document.removeEventListener('keydown', onKey, true); };
@@ -27827,188 +28069,249 @@ function scModal(title, body, onSave) {
     document.addEventListener('keydown', onKey, true);
     ov.addEventListener('click', async e => {
         if (e.target.closest('[data-x]') || e.target === ov) { close(); return; }
-        if (e.target.closest('[data-save]')) {
-            const btn = e.target.closest('[data-save]');
-            btn.disabled = true;
-            try { if (await onSave(ov)) close(); } finally { btn.disabled = false; }
-        }
+        const b = e.target.closest('[data-save]');
+        if (b) { b.disabled = true; try { if (await onSave(ov)) { close(); scRender(); } } finally { b.disabled = false; } }
     });
     setTimeout(() => ov.querySelector('input,textarea')?.focus(), 30);
     return ov;
 }
-// 사진 칸 — 붙여넣기·끌어다 놓기·파일 선택 → planning-images 버킷
-function scImgField(imgs) {
-    return `<div class="sc-imgs" data-imgs='${_scEsc(JSON.stringify(imgs || []))}' tabindex="0">
-        <div class="sc-imgs-list"></div>
-        <label class="sc-imgs-add">＋ 사진 (캡처 붙여넣기 Ctrl+V · 끌어다 놓기)<input type="file" accept="image/*" multiple hidden></label>
-    </div>`;
+const scV = (ov, n) => (ov.querySelector(`[name="${n}"]`)?.value || '').trim();
+// 사진·파일 칸 (붙여넣기·끌어다 놓기·선택) — 원본 그대로 업로드
+function scFilesField(list, label) {
+    return `<div class="sc-f wide">${label || '사진·파일'}<div class="sc-imgs" data-files='${_scEsc(JSON.stringify(list || []))}' tabindex="0"><div class="sc-imgs-list"></div><label class="sc-imgs-add">＋ 붙여넣기(Ctrl+V) · 끌어다 놓기 · 선택<input type="file" multiple hidden></label></div></div>`;
 }
-function scImgBind(ov) {
+function scFilesBind(ov, asObjects) {
     const box = ov.querySelector('.sc-imgs'); if (!box) return;
-    let imgs = []; try { imgs = JSON.parse(box.dataset.imgs || '[]'); } catch (_) {}
-    const draw = () => {
-        box.dataset.imgs = JSON.stringify(imgs);
-        box.querySelector('.sc-imgs-list').innerHTML = imgs.map((u, i) => `<span class="sc-img"><img src="${_scEsc(u)}" alt=""><button type="button" data-del="${i}" aria-label="사진 빼기">✕</button></span>`).join('');
-    };
-    const add = async files => {
-        for (const f of [...files].filter(f => /^image\//.test(f.type))) {
-            try { imgs.push(await uploadPlanningImage(f)); draw(); } catch (e) { showToast('사진 올리기 실패: ' + (e.message || e)); }
-        }
-    };
-    box.addEventListener('click', e => { const d = e.target.closest('[data-del]'); if (d) { imgs.splice(Number(d.dataset.del), 1); draw(); } });
-    box.querySelector('input[type=file]').addEventListener('change', e => add(e.target.files));
+    let files = []; try { files = JSON.parse(box.dataset.files || '[]'); } catch (_) {}
+    const url = f => typeof f === 'string' ? f : f.url;
+    const draw = () => { box.dataset.files = JSON.stringify(files); box.querySelector('.sc-imgs-list').innerHTML = files.map((f, i) => `<span class="sc-img">${/\.(png|jpe?g|gif|webp)(\?|$)/i.test(url(f)) ? `<img src="${_scEsc(url(f))}" alt="">` : `<span class="sc-file">📎 ${_scEsc(f.name || '파일')}</span>`}<button type="button" data-del="${i}">✕</button></span>`).join(''); };
+    const add = async fs => { for (const f of fs) { try { const r = await scUpload(f); files.push(asObjects ? r : r.url); draw(); } catch (e) { showToast('올리기 실패: ' + (e.message || e)); } } };
+    box.addEventListener('click', e => { const d = e.target.closest('[data-del]'); if (d) { files.splice(Number(d.dataset.del), 1); draw(); } });
+    box.querySelector('input[type=file]').addEventListener('change', e => add([...e.target.files]));
     box.addEventListener('dragover', e => { e.preventDefault(); box.classList.add('drag'); });
     box.addEventListener('dragleave', () => box.classList.remove('drag'));
-    box.addEventListener('drop', e => { e.preventDefault(); box.classList.remove('drag'); add(e.dataTransfer.files); });
+    box.addEventListener('drop', e => { e.preventDefault(); box.classList.remove('drag'); add([...e.dataTransfer.files]); });
     ov.addEventListener('paste', e => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) { e.preventDefault(); add(fs); } });
     draw();
 }
-const scImgsOf = ov => { try { return JSON.parse(ov.querySelector('.sc-imgs')?.dataset.imgs || '[]'); } catch (_) { return []; } };
+const scFilesOf = ov => { try { return JSON.parse(ov.querySelector('.sc-imgs')?.dataset.files || '[]'); } catch (_) { return []; } };
 
-function scItemForm(id) {
-    const x = id ? _scItems.find(v => v.id === id) : { title: '', client: '', target_qty: '', need_by: '', assignee: (typeof inqMe === 'function' ? inqMe() : ''), spec: '', memo: '', images: [] };
-    if (!x) return;
-    const people = typeof meetingStaffList === 'function' ? meetingStaffList() : [];
-    const ov = scModal(id ? '소싱 편집' : '새 소싱 — 찾는 물건', `
-        <label class="sc-f wide">찾는 물건 *<input name="title" value="${_scEsc(x.title)}" placeholder="예: 스테인리스 텀블러 500ml 각인"></label>
-        <label class="sc-f">고객사<input name="client" value="${_scEsc(x.client)}" placeholder="국내 프로젝트 매출처로 넘어가요" list="tempClientList"></label>
-        <label class="sc-f">담당<select name="assignee"><option value="">-</option>${people.map(p => `<option ${p === x.assignee ? 'selected' : ''}>${_scEsc(p)}</option>`).join('')}</select></label>
-        <label class="sc-f">예상 수량<input name="target_qty" value="${x.target_qty || ''}" inputmode="numeric" placeholder="개 — 이 수량 기준으로 단가 비교"></label>
-        <label class="sc-f">납기<input name="need_by" type="date" value="${_scEsc(x.need_by || '')}"></label>
-        <label class="sc-f wide">원하는 사양<textarea name="spec" rows="3" placeholder="재질·크기·색상·인쇄·포장 등 — 업체에 보낸 요청 내용">${_scEsc(x.spec)}</textarea></label>
-        <label class="sc-f wide">메모<textarea name="memo" rows="2">${_scEsc(x.memo)}</textarea></label>
-        <div class="sc-f wide">참고 사진${scImgField(x.images)}</div>`, async ov => {
-        const v = n => (ov.querySelector(`[name=${n}]`)?.value || '').trim();
-        if (!v('title')) { showToast('찾는 물건을 입력하세요'); return false; }
-        const row = { title: v('title'), client: v('client'), assignee: v('assignee'), target_qty: Math.round(_scNum(v('target_qty'))),
-            need_by: v('need_by') || null, spec: v('spec'), memo: v('memo'), images: scImgsOf(ov) };
-        if (id) { return await scItemPatch(id, row); }
-        row.created_by = (typeof inqMe === 'function' ? inqMe() : '') || (currentUser && currentUser.name) || '';
-        row.rate = scRate(null);
-        const { data, error } = await sb.from('sourcing_items').insert(row).select().single();
-        if (error) { showToast('저장 실패: ' + error.message); return false; }
-        _scItems.unshift(data); _scSel = data.id; _scFilter = 'active';
-        try { localStorage.setItem('sc_sel', String(data.id)); } catch (_) {}
-        scRender();
+function scProjectForm(id, specFocus) {
+    const p = id ? _sc.projects.find(v => v.id === id) : { title: '', status: '업체 탐색', linked_project_id: null, linked_client: '', spec: { qty_lines: [{ label: '', qty: '' }] }, images: [], assignee: SC_DEFAULT_WHO };
+    if (!p) return;
+    const sp = p.spec || {};
+    const qtyRow = l => `<div class="sc-tier"><input data-ql value="${_scEsc(l && l.label || '')}" placeholder="구분 (예: 골드)"><input data-qq value="${l && l.qty || ''}" inputmode="numeric" placeholder="수량"><span>개</span><button type="button" class="sc-x" onclick="this.parentElement.remove()">✕</button></div>`;
+    const people = typeof meetingStaffList === 'function' ? meetingStaffList() : [SC_DEFAULT_WHO];
+    const plans = _sc.plans.filter(x => x.status !== '완료' || x.id === p.linked_project_id);
+    const ov = scModal(id ? (specFocus ? '사양 고치기' : '소싱 건 편집') : '새 소싱 건', `
+        <label class="sc-f wide">소싱 건 이름 *<input name="title" value="${_scEsc(p.title)}" placeholder="예: D 금속 태그 (OKTAN 01)"></label>
+        <label class="sc-f">연결 프로젝트<select name="plan"><option value="">-</option>${plans.map(x => `<option value="${x.id}" ${x.id === p.linked_project_id ? 'selected' : ''}>${_scEsc(x.name)}</option>`).join('')}</select></label>
+        <label class="sc-f">고객사<input name="client" value="${_scEsc(p.linked_client)}" placeholder="예: SINSURU"></label>
+        <label class="sc-f">상태<select name="status">${SC_STATUSES.map(s => `<option ${s === p.status ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+        <label class="sc-f">담당<select name="assignee">${people.map(n => `<option ${n === (p.assignee || SC_DEFAULT_WHO) ? 'selected' : ''}>${_scEsc(n)}</option>`).join('')}</select></label>
+        <div class="sc-f wide">수량 <span class="mn-muted">— 색상별로 나눌 수 있어요 (예: 골드 500 / 실버 1,000)</span>
+          <div class="sc-tiers">${(sp.qty_lines && sp.qty_lines.length ? sp.qty_lines : [{}]).map(qtyRow).join('')}</div>
+          <button type="button" class="pl-btn" onclick="this.previousElementSibling.insertAdjacentHTML('beforeend', ${_scEsc(JSON.stringify(qtyRow(null)))})">＋ 수량 구분</button></div>
+        ${SC_SPEC_FIELDS.map(([k, l]) => `<label class="sc-f ${['parts', 'etc', 'logo'].includes(k) ? 'wide' : ''}">${l}<input name="sp_${k}" value="${_scEsc(sp[k] || '')}"></label>`).join('')}
+        ${id ? `<label class="sc-f wide">이번 변경 (사양 변경 이력에 남아요)<input name="change" placeholder="예: 316L → 서지컬스틸 표기로 변경"></label>` : ''}
+        ${scFilesField(p.images, '레퍼런스·시안 사진 (첫 장이 목록 대표 사진)')}`, async ov => {
+        const title = scV(ov, 'title');
+        if (!title) { showToast('소싱 건 이름을 입력하세요'); return false; }
+        const spec = { qty_lines: [...ov.querySelectorAll('.sc-tier')].map(r => ({ label: r.querySelector('[data-ql]').value.trim(), qty: Math.round(_scNum(r.querySelector('[data-qq]').value)) })).filter(l => l.label || l.qty) };
+        SC_SPEC_FIELDS.forEach(([k]) => { const v = scV(ov, 'sp_' + k); if (v) spec[k] = v; });
+        const row = { title, linked_project_id: Number(scV(ov, 'plan')) || null, linked_client: scV(ov, 'client'), status: scV(ov, 'status'), assignee: scV(ov, 'assignee') || SC_DEFAULT_WHO, spec, images: scFilesOf(ov) };
+        if (id) {
+            const ch = scV(ov, 'change');
+            if (ch) row.spec_history = (p.spec_history || []).concat([{ at: new Date().toISOString(), text: ch, by: _scMe() }]);
+            return await scPatch('sourcing_projects', id, row, true);
+        }
+        row.created_by = _scMe(); row.rate = scRate(null); row.rate_date = getTodayStr();
+        const d = await scInsert('sourcing_projects', row); if (!d) return false;
+        _scSel = d.id; _scTab = 'compare'; _scFilter.status = 'active';
+        try { localStorage.setItem('sc_sel', String(d.id)); } catch (_) {}
         return true;
     });
-    scImgBind(ov);
+    scFilesBind(ov, false);
 }
-function scQuoteForm(itemId, qid) {
-    const x = _scItems.find(v => v.id === itemId); if (!x) return;
-    const q = qid ? _scQuotes.find(v => v.id === qid) : { supplier: '', platform: '알리바바', url: '', contact: '', unit_price: '', tiers: [], moq: '', lead_days: '', incoterm: '', ship_cost: '', sample_price: '', sample_days: '', memo: '', images: [], rating: 0 };
+// 업체 추가 — 상품 링크를 넣으면 업체명 칸을 링크에서 짐작해 채움(나머지는 직접)
+function scGuessCompany(url) {
+    try {
+        const u = new URL(url);
+        const sub = u.hostname.split('.')[0];
+        if (sub && !['www', 'm', 'detail', 'offer'].includes(sub) && /alibaba|1688/.test(u.hostname)) return sub.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const m = decodeURIComponent(u.pathname).match(/product-detail\/([^_]+)/);
+        if (m) return '';
+    } catch (_) {}
+    return '';
+}
+function scSupplierForm(pid, sid) {
+    const s = sid ? _sc.suppliers.find(v => v.id === sid) : { company: '', contact_name: '', product_url: '', years: '', rating: '', store_reviews: '', kr_reviews: '', response_time: '', ontime_rate: '', channel: 'chat', status: '문의함', note: '' };
+    if (!s) return;
+    const ov = scModal(sid ? '업체 편집' : '업체 추가', `
+        <label class="sc-f wide">상품 상세 링크 * <span class="mn-muted">— 비교표 모든 행에 들어가요</span><input name="product_url" value="${_scEsc(s.product_url)}" placeholder="https://www.alibaba.com/product-detail/..." oninput="const c=this.form||this.closest('.sc-box').querySelector('[name=company]'); if(!c.value){c.value=scGuessCompany(this.value)}"></label>
+        <label class="sc-f">업체명 *<input name="company" value="${_scEsc(s.company)}" placeholder="예: Dongguan Aofei Jewelry"></label>
+        <label class="sc-f">담당자<input name="contact_name" value="${_scEsc(s.contact_name)}" placeholder="예: Vicky Bai"></label>
+        <label class="sc-f">업력<input name="years" value="${_scEsc(s.years)}" placeholder="예: 10년"></label>
+        <label class="sc-f">평점 <span class="mn-muted">(상품 페이지 '평점 & 리뷰')</span><input name="rating" value="${s.rating ?? ''}" inputmode="decimal" placeholder="4.8"></label>
+        <label class="sc-f">스토어 리뷰 수<input name="store_reviews" value="${s.store_reviews ?? ''}" inputmode="numeric"></label>
+        <label class="sc-f">한국 리뷰 수<input name="kr_reviews" value="${s.kr_reviews ?? ''}" inputmode="numeric"></label>
+        <label class="sc-f">응답 시간<input name="response_time" value="${_scEsc(s.response_time)}" placeholder="≤2h"></label>
+        <label class="sc-f">정시 납품율<input name="ontime_rate" value="${_scEsc(s.ontime_rate)}" placeholder="100%"></label>
+        <label class="sc-f">연락 방법<select name="channel">${Object.entries(SC_CHANNELS).map(([k, l]) => `<option value="${k}" ${k === s.channel ? 'selected' : ''}>${l}${k === 'form_failed' ? ' (조용히 실패)' : ''}</option>`).join('')}</select></label>
+        <label class="sc-f">상태<select name="status">${SC_SUP_STATUSES.map(x => `<option ${x === s.status ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
+        <label class="sc-f wide">메모<textarea name="note" rows="2">${_scEsc(s.note)}</textarea></label>`, async ov => {
+        const row = { product_url: scV(ov, 'product_url'), company: scV(ov, 'company'), contact_name: scV(ov, 'contact_name'), years: scV(ov, 'years'),
+            rating: scV(ov, 'rating') ? _scNum(scV(ov, 'rating')) : null, store_reviews: scV(ov, 'store_reviews') ? Math.round(_scNum(scV(ov, 'store_reviews'))) : null,
+            kr_reviews: scV(ov, 'kr_reviews') ? Math.round(_scNum(scV(ov, 'kr_reviews'))) : null, response_time: scV(ov, 'response_time'), ontime_rate: scV(ov, 'ontime_rate'),
+            channel: scV(ov, 'channel'), status: scV(ov, 'status'), note: scV(ov, 'note') };
+        if (!row.company) { showToast('업체명을 입력하세요'); return false; }
+        if (!row.product_url && !confirm('상품 링크가 없어요. 비교표에 "링크 없음"으로 표시돼요. 그래도 저장할까요?')) return false;
+        if (row.rating !== null && (!s.rating_checked_at || Number(s.rating) !== row.rating || s.store_reviews !== row.store_reviews)) row.rating_checked_at = new Date().toISOString();
+        if (sid) return await scPatch('sourcing_suppliers', sid, row, true);
+        row.project_id = pid;
+        const d = await scInsert('sourcing_suppliers', row);
+        if (d) { const p = _sc.projects.find(v => v.id === pid); if (p && p.status === '업체 탐색') await scPatch('sourcing_projects', pid, { status: '견적 수집' }, true); }
+        return !!d;
+    });
+    if (sid) { const slot = ov.querySelector('.sc-del-slot'); slot.innerHTML = `<button type="button" class="pl-btn red">업체 삭제</button>`; slot.firstChild.onclick = () => { ov.remove(); scDelete('sourcing_suppliers', sid, `${s.company} 업체와 견적·기록·샘플`); }; }
+}
+function scQuoteForm(sid, qid) {
+    const s = _sc.suppliers.find(v => v.id === sid); if (!s) return;
+    const q = qid ? _sc.quotes.find(v => v.id === qid) : { option_label: '', unit_price_usd: '', qty: '', total_usd: '', mold_fee_usd: '', sample_fee_usd: '', sample_refundable: false, sample_days: '', production_days: '', shipping_note: '', basis_note: '', quoted_at: new Date().toISOString(), images: [] };
     if (!q) return;
-    const tierRow = t => `<div class="sc-tier"><input data-tq value="${t && t.qty ? t.qty : ''}" inputmode="numeric" placeholder="수량"><span>개 이상</span><span>$</span><input data-tp value="${t && t.price ? t.price : ''}" inputmode="decimal" placeholder="단가"><button type="button" class="sc-x" onclick="this.parentElement.remove()" aria-label="빼기">✕</button></div>`;
-    const ov = scModal((qid ? '견적 편집' : '견적 추가') + ' — ' + (x.title || ''), `
-        <label class="sc-f">업체명 *<input name="supplier" value="${_scEsc(q.supplier)}" placeholder="예: Yiwu Huayi Crafts Co., Ltd."></label>
-        <label class="sc-f">어디서<select name="platform">${SC_PLATFORMS.map(p => `<option ${p === q.platform ? 'selected' : ''}>${p}</option>`).join('')}</select></label>
-        <label class="sc-f">담당자<input name="contact" value="${_scEsc(q.contact)}" placeholder="예: Lily"></label>
-        <label class="sc-f">링크<input name="url" value="${_scEsc(q.url)}" placeholder="상품·채팅 링크"></label>
-        <label class="sc-f">단가 (USD) *<input name="unit_price" value="${q.unit_price || ''}" inputmode="decimal" placeholder="기본 단가"></label>
-        <label class="sc-f">MOQ (최소 수량)<input name="moq" value="${q.moq || ''}" inputmode="numeric"></label>
-        <div class="sc-f wide">수량별 단가 <span class="mn-muted">— 업체가 수량마다 값을 다르게 줬으면 (예상 수량에 맞는 값으로 비교해요)</span>
-            <div class="sc-tiers">${(q.tiers || []).map(tierRow).join('')}</div>
-            <button type="button" class="pl-btn" onclick="this.previousElementSibling.insertAdjacentHTML('beforeend', ${_scEsc(JSON.stringify(tierRow(null)))})">＋ 수량 구간</button></div>
-        <label class="sc-f">생산 기간 (일)<input name="lead_days" value="${q.lead_days || ''}" inputmode="numeric"></label>
-        <label class="sc-f">거래 조건<select name="incoterm">${SC_TERMS.map(t => `<option value="${t}" ${t === (q.incoterm || '') ? 'selected' : ''}>${t || '-'}</option>`).join('')}</select></label>
-        <label class="sc-f">운송비 (USD, 전체)<input name="ship_cost" value="${q.ship_cost || ''}" inputmode="decimal" placeholder="업체가 준 운송비"></label>
-        <label class="sc-f">샘플 비용 (USD)<input name="sample_price" value="${q.sample_price || ''}" inputmode="decimal"></label>
-        <label class="sc-f">샘플 기간 (일)<input name="sample_days" value="${q.sample_days || ''}" inputmode="numeric"></label>
-        <label class="sc-f">평가<select name="rating">${[0, 1, 2, 3, 4, 5].map(r => `<option value="${r}" ${r === (q.rating || 0) ? 'selected' : ''}>${r ? '★'.repeat(r) : '-'}</option>`).join('')}</select></label>
-        <label class="sc-f wide">업체 메시지·조건 <span class="mn-muted">(알리바바 채팅 내용을 그대로 붙여넣어도 돼요)</span><textarea name="memo" rows="4">${_scEsc(q.memo)}</textarea></label>
-        <div class="sc-f wide">사진 (견적서·채팅 캡처·상품 사진)${scImgField(q.images)}</div>`, async ov => {
-        const v = n => (ov.querySelector(`[name=${n}]`)?.value || '').trim();
-        if (!v('supplier')) { showToast('업체명을 입력하세요'); return false; }
-        const tiers = [...ov.querySelectorAll('.sc-tier')].map(r => ({ qty: Math.round(_scNum(r.querySelector('[data-tq]').value)), price: _scNum(r.querySelector('[data-tp]').value) }))
-            .filter(t => t.qty > 0 && t.price > 0).sort((a, b) => a.qty - b.qty);
-        const row = { supplier: v('supplier'), platform: v('platform'), contact: v('contact'), url: v('url'), cur: 'USD',
-            unit_price: _scNum(v('unit_price')), tiers, moq: Math.round(_scNum(v('moq'))), lead_days: Math.round(_scNum(v('lead_days'))),
-            incoterm: v('incoterm'), ship_cost: _scNum(v('ship_cost')), sample_price: _scNum(v('sample_price')), sample_days: Math.round(_scNum(v('sample_days'))),
-            rating: Number(v('rating')) || 0, memo: v('memo'), images: scImgsOf(ov) };
-        if (!row.unit_price && !tiers.length) { showToast('단가(또는 수량별 단가)를 입력하세요'); return false; }
-        if (qid) {
-            const { error } = await sb.from('sourcing_quotes').update(row).eq('id', qid);
-            if (error) { showToast('저장 실패: ' + error.message); return false; }
-            Object.assign(q, row);
-        } else {
-            row.item_id = itemId;
-            row.created_by = (typeof inqMe === 'function' ? inqMe() : '') || (currentUser && currentUser.name) || '';
-            const { data, error } = await sb.from('sourcing_quotes').insert(row).select().single();
-            if (error) { showToast('저장 실패: ' + error.message); return false; }
-            _scQuotes.push(data);
-        }
-        scRenderList(); scRenderMain();
-        return true;
+    const p = _sc.projects.find(v => v.id === s.project_id);
+    const ql = ((p && p.spec && p.spec.qty_lines) || []).filter(l => l.label || l.qty);
+    const ov = scModal(`${qid ? '견적 고치기' : '견적 추가'} — ${s.company}`, `
+        <label class="sc-f">옵션 <span class="mn-muted">(색상별이면 한 줄씩)</span><input name="option_label" value="${_scEsc(q.option_label)}" placeholder="예: 골드 (체인 포함)" list="scQtyLabels"><datalist id="scQtyLabels">${ql.map(l => `<option value="${_scEsc(l.label)}">`).join('')}</datalist></label>
+        <label class="sc-f">견적 받은 시각 (한국)<input name="quoted_at" type="datetime-local" value="${_scKstInput(q.quoted_at)}"></label>
+        <label class="sc-f">단가 (USD) *<input name="unit_price_usd" value="${q.unit_price_usd || ''}" inputmode="decimal"></label>
+        <label class="sc-f">수량<input name="qty" value="${q.qty || (ql.length === 1 ? ql[0].qty : '')}" inputmode="numeric"></label>
+        <label class="sc-f">총액 (USD) <span class="mn-muted">— 비우면 단가×수량</span><input name="total_usd" value="${q.total_usd || ''}" inputmode="decimal"></label>
+        <label class="sc-f">금형비 (USD)<input name="mold_fee_usd" value="${q.mold_fee_usd || ''}" inputmode="decimal" placeholder="없으면 비움"></label>
+        <label class="sc-f">샘플비 (USD)<input name="sample_fee_usd" value="${q.sample_fee_usd || ''}" inputmode="decimal"></label>
+        <label class="sc-f">샘플 기간<input name="sample_days" value="${_scEsc(q.sample_days)}" placeholder="15~20일"></label>
+        <label class="sc-f sc-chk-f"><span>샘플비</span><label class="sc-chk"><input type="checkbox" name="sample_refundable" ${q.sample_refundable ? 'checked' : ''}> 본주문 시 차감·환불</label></label>
+        <label class="sc-f">생산 기간<input name="production_days" value="${_scEsc(q.production_days)}" placeholder="25~30일"></label>
+        <label class="sc-f wide">배송비<input name="shipping_note" value="${_scEsc(q.shipping_note)}" placeholder="0.5kg $21 + 0.5kg당 $5 / 직접 픽업"></label>
+        <label class="sc-f wide">견적 기준 메모 <span class="mn-muted">(두께 미기재·아연합금 기준·체인 포함 여부 등 — 비교 때 ⚠로 표시)</span><input name="basis_note" value="${_scEsc(q.basis_note)}"></label>
+        ${scFilesField(q.images, '견적서 이미지')}`, async ov => {
+        const row = { option_label: scV(ov, 'option_label'), quoted_at: _scFromKstInput(scV(ov, 'quoted_at')), unit_price_usd: _scNum(scV(ov, 'unit_price_usd')), qty: Math.round(_scNum(scV(ov, 'qty'))),
+            total_usd: _scNum(scV(ov, 'total_usd')), mold_fee_usd: _scNum(scV(ov, 'mold_fee_usd')), sample_fee_usd: _scNum(scV(ov, 'sample_fee_usd')), sample_days: scV(ov, 'sample_days'),
+            sample_refundable: !!ov.querySelector('[name=sample_refundable]').checked, production_days: scV(ov, 'production_days'), shipping_note: scV(ov, 'shipping_note'), basis_note: scV(ov, 'basis_note'), images: scFilesOf(ov) };
+        if (!row.unit_price_usd && !row.total_usd) { showToast('단가나 총액을 입력하세요'); return false; }
+        if (qid) return await scPatch('sourcing_quotes', qid, row, true);
+        row.supplier_id = sid;
+        const d = await scInsert('sourcing_quotes', row);
+        if (d && ['문의함', '답변 대기'].includes(s.status)) await scPatch('sourcing_suppliers', sid, { status: '견적 받음' }, true);
+        return !!d;
     });
-    scImgBind(ov);
+    scFilesBind(ov, false);
+    if (qid) { const slot = ov.querySelector('.sc-del-slot'); slot.innerHTML = `<button type="button" class="pl-btn red">견적 삭제</button>`; slot.firstChild.onclick = () => { ov.remove(); scDelete('sourcing_quotes', qid, '이 견적'); }; }
+}
+function scMessageForm(pid, mid) {
+    const m = _sc.messages.find(v => v.id === mid); if (!m) return;
+    const sups = scSups(pid);
+    const ov = scModal('기록 고치기', `
+        <label class="sc-f">업체<select name="sup">${sups.map(s => `<option value="${s.id}" ${s.id === m.supplier_id ? 'selected' : ''}>${_scEsc(s.company)}</option>`).join('')}</select></label>
+        <label class="sc-f">방향<select name="dir"><option value="in" ${m.direction === 'in' ? 'selected' : ''}>업체 → 우리</option><option value="out" ${m.direction === 'out' ? 'selected' : ''}>우리 → 업체</option></select></label>
+        <label class="sc-f">시각 (한국)<input name="at" type="datetime-local" value="${_scKstInput(m.sent_at)}"></label>
+        <label class="sc-f">읽음 여부<select name="read">${['', '읽음', '안 읽음'].map(x => `<option value="${x}" ${x === m.read_status ? 'selected' : ''}>${x || '-'}</option>`).join('')}</select></label>
+        <label class="sc-f wide">한국어 요약<input name="sum" value="${_scEsc(m.summary_ko)}"></label>
+        <label class="sc-f wide">원문<textarea name="text" rows="5">${_scEsc(m.original_text)}</textarea></label>
+        <label class="sc-f wide">인용한 원문<textarea name="quoted" rows="2">${_scEsc(m.quoted_text)}</textarea></label>
+        ${scFilesField(m.attachments, '첨부 (이미지·PDF)')}`, async ov => scPatch('sourcing_messages', mid, { supplier_id: Number(scV(ov, 'sup')), direction: scV(ov, 'dir'), sent_at: _scFromKstInput(scV(ov, 'at')), read_status: scV(ov, 'read'),
+            summary_ko: scV(ov, 'sum'), original_text: ov.querySelector('[name=text]').value, quoted_text: ov.querySelector('[name=quoted]').value, attachments: scFilesOf(ov) }, true));
+    scFilesBind(ov, true);
+}
+function scSampleForm(pid, xid) {
+    const sups = scSups(pid);
+    const x = xid ? _sc.samples.find(v => v.id === xid) : { supplier_id: (sups.find(s => s.status === '선정') || sups[0] || {}).id, description: '', amount_usd: '', order_status: '결제 대기', paid_at: '', paid_by: SC_DEFAULT_WHO, promised_ship: '결제 후 45일 (알리바바 기본)', eta: '', pickup: false, shipping_note: '', draft_status: '', logo_file: '' };
+    if (!x) return;
+    const ov = scModal(xid ? '샘플 기록 고치기' : '샘플 기록', `
+        <label class="sc-f">업체<select name="sup">${sups.map(s => `<option value="${s.id}" ${s.id === x.supplier_id ? 'selected' : ''}>${_scEsc(s.company)}${s.contact_name ? ' (' + _scEsc(s.contact_name) + ')' : ''}</option>`).join('')}</select></label>
+        <label class="sc-f">금액 (USD)<input name="amount" value="${x.amount_usd || ''}" inputmode="decimal"></label>
+        <label class="sc-f wide">샘플 내용<textarea name="desc" rows="2" placeholder="예: 맞춤 샘플 10개(블랙, 버클 각인+뒷면 음각) + 참고 밴드 3종">${_scEsc(x.description)}</textarea></label>
+        <label class="sc-f">알리바바 주문 상태<select name="status">${SC_ORDER_STATUSES.map(s => `<option ${s === x.order_status ? 'selected' : ''}>${s}</option>`).join('')}</select></label>
+        <label class="sc-f">결제일<input name="paid_at" type="date" value="${_scEsc(x.paid_at || '')}"></label>
+        <label class="sc-f">결제자<input name="paid_by" value="${_scEsc(x.paid_by || SC_DEFAULT_WHO)}"></label>
+        <label class="sc-f">약속 발송 기한<input name="promised" value="${_scEsc(x.promised_ship)}" placeholder="결제 후 45일 / 업체 구두 10일"></label>
+        <label class="sc-f">예상 완성일<input name="eta" type="date" value="${_scEsc(x.eta || '')}"></label>
+        <label class="sc-f sc-chk-f"><span>배송</span><label class="sc-chk"><input type="checkbox" name="pickup" ${x.pickup ? 'checked' : ''}> 직접 픽업</label></label>
+        <label class="sc-f wide">배송 메모<input name="ship" value="${_scEsc(x.shipping_note)}" placeholder="FedEx 픽업, 배송비 제외 요청함"></label>
+        <label class="sc-f">시안 확인<select name="draft">${SC_DRAFT.map(s => `<option value="${s}" ${s === (x.draft_status || '') ? 'selected' : ''}>${s || '-'}</option>`).join('')}</select></label>
+        <label class="sc-f">로고 파일 전달<input name="logo" value="${_scEsc(x.logo_file)}" placeholder="logo.ai (10/26 11:09)"></label>`, async ov => {
+        const row = { supplier_id: Number(scV(ov, 'sup')), amount_usd: _scNum(scV(ov, 'amount')), description: scV(ov, 'desc'), order_status: scV(ov, 'status'), paid_at: scV(ov, 'paid_at') || null,
+            paid_by: scV(ov, 'paid_by') || SC_DEFAULT_WHO, promised_ship: scV(ov, 'promised'), eta: scV(ov, 'eta') || null, pickup: !!ov.querySelector('[name=pickup]').checked,
+            shipping_note: scV(ov, 'ship'), draft_status: scV(ov, 'draft'), logo_file: scV(ov, 'logo') };
+        if (xid) return await scPatch('sourcing_samples', xid, row, true);
+        const d = await scInsert('sourcing_samples', row);
+        const p = _sc.projects.find(v => v.id === pid);
+        if (d && p && ['업체 탐색', '견적 수집'].includes(p.status)) await scPatch('sourcing_projects', pid, { status: '샘플 진행' }, true);
+        return !!d;
+    });
+    if (xid) { const slot = ov.querySelector('.sc-del-slot'); slot.innerHTML = `<button type="button" class="pl-btn red">샘플 기록 삭제</button>`; slot.firstChild.onclick = () => { ov.remove(); scDelete('sourcing_samples', xid, '이 샘플 기록'); }; }
+}
+// 업체 선정 — 소싱 건에 하나만
+async function scChoose(sid) {
+    const s = _sc.suppliers.find(v => v.id === sid); if (!s) return;
+    const others = scSups(s.project_id).filter(v => v.status === '선정' && v.id !== sid);
+    for (const o of others) await scPatch('sourcing_suppliers', o.id, { status: '견적 받음' }, true);
+    await scPatch('sourcing_suppliers', sid, { status: '선정' }, true);
+    showToast(`${s.company} 선정 — 위에서 국내 프로젝트로 연결할 수 있어요`);
+    scRender();
 }
 
-// ---------- 국내 프로젝트 연결 ----------
-// 결정한 견적 → 국내 프로젝트의 매입처 + 해외 매입($) 정보 (migration 059 supplier_overseas 형식)
-function scSupplierPatch(x, q, qty) {
-    const rate = scRate(x);
-    const d = { cur: 'USD', unit: scPriceAt(q, qty), rate, extras: Number(q.ship_cost) ? [{ name: '국제 운송비', amt: Number(q.ship_cost), cur: 'USD' }] : [], ivat: null, pays: [] };
-    const c = ovsCalc(d, qty);
-    return {
-        supplier: q.supplier || '', supplier_contact: q.contact || '', supplier_overseas: d,
-        supplier_unit_price: c.unitKrw || Math.round(d.unit * rate), supplier_unit_price_vat: 'VAT 별도', supplier_revenue: c.total,
-        supplier_print_fee: 0, supplier_packaging_fee: 0, supplier_shipping_cost_per_box: 0, supplier_shipping_boxes: 0, supplier_shipping_cost: 0
-    };
+// ---------- 국내 프로젝트 연결 (선정 업체 → 매입처·해외 $) ----------
+function scSupplierPatch(p, s, qty) {
+    const rate = scRate(p), m = scSupSum(s);
+    const q = qty || m.qs.reduce((a, x) => a + (Number(x.qty) || 0), 0) || 1;
+    const unit = m.total ? Math.round(m.total / q * 10000) / 10000 : 0;
+    const d = { cur: 'USD', unit, rate, extras: m.mold ? [{ name: '금형비', amt: m.mold, cur: 'USD' }] : [], ivat: null, pays: [] };
+    const c = ovsCalc(d, q);
+    return { supplier: s.company || '', supplier_contact: s.contact_name || '', supplier_overseas: d, supplier_unit_price: c.unitKrw || Math.round(unit * rate), supplier_unit_price_vat: 'VAT 별도',
+        supplier_revenue: c.total, supplier_print_fee: 0, supplier_packaging_fee: 0, supplier_shipping_cost_per_box: 0, supplier_shipping_boxes: 0, supplier_shipping_cost: 0 };
 }
-async function scAfterLink(x, domId, label) {
-    await scItemPatch(x.id, { domestic_id: domId, status: '결정' });
+async function scAfterLink(p, domId, msg) {
+    await scPatch('sourcing_projects', p.id, { domestic_id: domId, status: ['업체 탐색', '견적 수집', '샘플 진행', '샘플 확인'].includes(p.status) ? '본주문' : p.status }, true);
     try { await loadDomesticProjectsFromDb(); } catch (_) {}
-    // 해외 거래처 DB에 없으면 추가 (다음부터 국내 프로젝트에서 해외 매입이 자동으로 켜짐)
-    const q = scQuotesOf(x.id).find(v => v.chosen);
-    if (q && q.supplier) {
+    const s = scSups(p.id).find(v => v.status === '선정');
+    if (s && s.company) {
         const { data } = await sb.from('clients_overseas').select('id, company_name').limit(2000);
-        const key = clientNameKey(q.supplier);
-        if (!(data || []).some(c => clientNameKey(c.company_name) === key)) {
-            await sb.from('clients_overseas').insert({ company_name: q.supplier, items: x.title || '', contact_name: q.contact || '', location: q.platform === '1688' || q.platform === '알리바바' ? '중국' : '', biz_type: '' });
-        }
+        if (!(data || []).some(c => clientNameKey(c.company_name) === clientNameKey(s.company)))
+            await sb.from('clients_overseas').insert({ company_name: s.company, items: p.title || '', contact_name: s.contact_name || '', location: '중국', biz_type: '공장' });
     }
-    showToast(label);
-    scRenderMain();
+    showToast(msg); scRender();
 }
-async function scCreateDomestic(itemId) {
-    const x = _scItems.find(v => v.id === itemId); if (!x) return;
-    const q = scQuotesOf(x.id).find(v => v.chosen); if (!q) { showToast('먼저 업체를 결정하세요'); return; }
-    const qty = Number(x.target_qty) || Number(q.moq) || 0;
-    if (!confirm(`국내 프로젝트를 새로 만들까요?\n\n매출처: ${x.client || '(비어 있음 — 나중에 입력)'}\n품목: ${x.title} · ${qty.toLocaleString()}개\n매입처: ${q.supplier} (해외 $${scPriceAt(q, qty)})`)) return;
-    const row = Object.assign({
-        client: x.client || '', contact_person: '', title: '', manager: (currentUser && currentUser.name) || '',
-        product_name: x.title || '', quantity: qty, unit: '개', unit_price: 0, unit_price_vat: 'VAT 별도', revenue: 0,
-        delivery_date: x.need_by || null, status: '시작 전', priority: '🟢 보통', category: '국내 주문', assignees: x.assignee ? [x.assignee] : [],
+async function scCreateDomestic(pid) {
+    const p = _sc.projects.find(v => v.id === pid); const s = p && scSups(pid).find(v => v.status === '선정');
+    if (!s) { showToast('먼저 업체를 선정하세요'); return; }
+    const qty = ((p.spec || {}).qty_lines || []).reduce((a, l) => a + (Number(l.qty) || 0), 0) || scSupSum(s).qs.reduce((a, q) => a + (Number(q.qty) || 0), 0);
+    if (!confirm(`국내 프로젝트를 새로 만들까요?\n\n매출처: ${p.linked_client || '(비어 있음)'}\n품목: ${p.title} · ${qty.toLocaleString()}개\n매입처: ${s.company} (해외 ${_scUsd(scSupSum(s).total)})`)) return;
+    const row = Object.assign({ client: p.linked_client || '', contact_person: '', title: '', manager: (currentUser && currentUser.name) || '', product_name: p.title || '', quantity: qty, unit: '개',
+        unit_price: 0, unit_price_vat: 'VAT 별도', revenue: 0, status: '시작 전', priority: '🟢 보통', category: '국내 주문', assignees: [p.assignee || SC_DEFAULT_WHO],
         checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
-        memo: `해외 소싱에서 연결 — ${q.platform} ${q.supplier}${q.url ? ' ' + q.url : ''}`, inquiry_id: x.inquiry_id || null
-    }, scSupplierPatch(x, q, qty));
+        memo: `해외 소싱에서 연결 — ${s.company}${s.product_url ? ' ' + s.product_url : ''}` }, scSupplierPatch(p, s, qty));
     const { data, error } = await sb.from('projects_domestic').insert(row).select('id').single();
     if (error) { showToast('국내 프로젝트를 만들지 못했어요: ' + error.message); return; }
-    await scAfterLink(x, data.id, '국내 프로젝트를 만들었어요 — 매출 단가는 국내 프로젝트에서 넣으세요');
+    await scAfterLink(p, data.id, '국내 프로젝트를 만들었어요 — 매출 단가는 국내 프로젝트에서 넣으세요');
 }
-async function scLinkExisting(itemId) {
-    const x = _scItems.find(v => v.id === itemId); if (!x) return;
-    const q = scQuotesOf(x.id).find(v => v.chosen); if (!q) { showToast('먼저 업체를 결정하세요'); return; }
-    await domLinkPicker({
-        title: '국내 프로젝트에 연결', sub: `매입처를 ${q.supplier} (해외 $)로 채워요`,
-        clientKey: x.client ? clientNameKey(x.client) : '', exclude: r => r.id === x.domestic_id,
+async function scLinkExisting(pid) {
+    const p = _sc.projects.find(v => v.id === pid); const s = p && scSups(pid).find(v => v.status === '선정');
+    if (!s) { showToast('먼저 업체를 선정하세요'); return; }
+    await domLinkPicker({ title: '국내 프로젝트에 연결', sub: `매입처를 ${s.company} (해외 $)로 채워요`, clientKey: p.linked_client ? clientNameKey(p.linked_client) : '', exclude: r => r.id === p.domestic_id,
         onPick: async rows => {
             const r = rows[0];
-            if (rows.length > 1) showToast('첫 번째 프로젝트 하나에만 연결해요');
-            if (r.supplier && !confirm(`이 프로젝트에 이미 매입처(${r.supplier})가 있어요. ${q.supplier}로 바꿀까요?`)) return;
-            const qty = Number(r.quantity) || Number(x.target_qty) || 0;
-            const { error } = await sb.from('projects_domestic').update(scSupplierPatch(x, q, qty)).eq('id', r.id);
+            if (r.supplier && !confirm(`이 프로젝트에 이미 매입처(${r.supplier})가 있어요. ${s.company}로 바꿀까요?`)) return;
+            const { error } = await sb.from('projects_domestic').update(scSupplierPatch(p, s, Number(r.quantity) || 0)).eq('id', r.id);
             if (error) { showToast('연결 실패: ' + error.message); return; }
-            await scAfterLink(x, r.id, `${r.client || ''} 프로젝트에 매입처를 연결했어요`);
-        }
-    });
+            await scAfterLink(p, r.id, `${r.client || ''} 프로젝트에 매입처를 연결했어요`);
+        } });
 }
 async function scOpenDomestic(id) {
-    let p = projects.find(v => v.id === id);
-    if (!p) {
+    if (!projects.find(v => v.id === id)) {
         const { data } = await sb.from('projects_domestic').select('*').eq('id', id).maybeSingle();
-        if (!data) { showToast('국내 프로젝트를 찾지 못했어요 (지워졌을 수 있어요)'); return; }
-        p = inqEnsureProject(data);
+        if (!data) { showToast('국내 프로젝트를 찾지 못했어요'); return; }
+        inqEnsureProject(data);
     }
     switchTab('projects-domestic');
     setTimeout(() => showProjectDetail(id), 150);
