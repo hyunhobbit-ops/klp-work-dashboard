@@ -195,7 +195,10 @@
 - 키: `app_config` kakao_rest_key·kakao_client_secret(현호님이 직접 입력)·kakao_state_secret·kakao_send_secret(자동 생성). 토큰: `kakao_links`(profile_id, user_name=표시 이름 — daily_tasks.assignee와 같음, access/refresh 토큰·만료, talk_ok, last_sent_at, last_error) — RLS 켜고 정책 없음 → 브라우저에서 못 읽음
 - 함수 동작: start(로그인 주소, state=프로필 id HMAC) / connect(code→토큰, 동의 범위 확인, 연결 확인 메시지) / status / test / disconnect(unlink) / notify(`x-kakao-secret` 헤더, items [{name,text,url}] — 예약 발송용). 액세스 토큰 만료 1분 전이면 리프레시, 실패하면 last_error '다시 연결'. 텍스트 200자 제한, 링크는 대시보드 주소만
 - 화면: 사이드바 `💬 카카오톡 알림 연결`(`kakaoOpen` 창: 연결하기·시험 메시지·연결 끊기), 메시지 전송 동의를 빼면 버튼이 빨간 '다시 연결 필요'. 카카오에서 돌아오면 `kakao-callback.html`이 code/state를 sessionStorage `klp_kakao_cb`에 두고 `/`로 → `kakaoInit`(showApp에서 호출)이 connect
-- 발송 시각: 08:30·13:00·17:00 KST (내용은 현호님이 정리 중 — 정해지면 pg_cron → notify)
+- ⚠️ 엣지 함수 파일을 바꾼 뒤엔 `docker restart supabase-edge-functions` (워커가 옛 코드를 붙잡고 있음)
+- **정기 알림 (migration 076·077)**: pg_cron `kakao-digest-am|noon|pm` = 평일 08:30·13:00·17:00 KST → `http://api-gw:8000/functions/v1/kakao` `{action:'digest', slot}` (맥미니 안 직접 호출, `x-kakao-secret`). 주말은 함수가 건너뜀. 시험: `{dry:true, force:true, only:'이름'}` = 보내지 않고 문구만
+  - 내용 DB 함수 `kakao_digest(company, 이름, pay)`(service_role 전용): 오늘·밀린·내일 할 일(daily_tasks, 상담 할 일과 연결된 행은 뺌) / 🏢 국내 할 일(inquiry_todos, 완료는 연결된 daily_task 기준) / 📞 통화 할 일(최근 7일 calls.todos 중 담당 = 이름, 안 보낸·안 끝난 것) / 🌏 소싱 질문(sourcing_todos question, 담당 비면 김현호) / 📦 오늘·내일 납기(국내, manager 첫 단어 또는 assignees) / 💰 입금·계산서(납품 체크됐는데 잔금·계산서 미체크 — `PAY_NAMES` 이현주·김현호·대표님만, 회사 전체)
+  - 문구 `buildDigest`: 아침 2통(① 오늘·밀린·납기 ② 국내·통화·소싱·입금계산서, 비면 생략, 다 비면 '할 일 없어요') / 13시 1통(완료 수 + 남은 개수 + 지금 할 것 1개) / 17시 1통(완료·남은 것·내일). 카카오 200자 제한 → `fit`이 항목 수·글자 길이를 줄여 맞춤, 밀린 같은 할 일은 'n일째'로 한 줄
 
 ## 제안서 시스템
 - 사이드바 "제안서" 그룹: 상품 DB / 제안서 관리

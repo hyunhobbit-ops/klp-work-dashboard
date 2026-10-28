@@ -11,6 +11,7 @@
 //   test       → 나챗방으로 시험 메시지
 //   disconnect → 카카오 연결 끊기 + 저장된 토큰 삭제
 // POST { action:'notify', items:[{name, text, url?}] } — 예약 발송용, 헤더 x-kakao-secret 필요
+// POST { action:'digest', slot:'am'|'noon'|'pm', only?, dry?, force? } — 정기 알림 (pg_cron, 헤더 x-kakao-secret)
 
 const SB_URL = Deno.env.get('SUPABASE_URL') || 'http://api-gw:8000'
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -136,6 +137,110 @@ async function sendMemo(l: Link, text: string, url?: string) {
   return { ok: false, error: err }
 }
 
+// ===== 정기 알림 (평일 08:30 아침 2통 · 13:00 · 17:00) — 내용은 DB 함수 kakao_digest (migration 076) =====
+const PAY_NAMES = ['이현주', '김현호', '대표님']   // 💰 입금·계산서 칸을 받는 사람
+const LIMIT = 200                                   // 카카오 text 템플릿 글자 제한
+
+type Sec = { head: string; n: number; items: string[] }
+const cut = (t: string, n: number) => { t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t }
+// 항목 = 본문 + '\u0000' + 꼬리표(예: ' (3일째)') — 줄일 때 꼬리표는 남기고 본문만 자름
+const SUF = '\u0000'
+const cutItem = (t: string, n: number) => { const [a, b = ''] = String(t).split(SUF); return cut(a, Math.max(6, n - b.length)) + b }
+const cutMsg = (t: string) => t.length > LIMIT ? t.slice(0, LIMIT - 1) + '…' : t
+const shortClient = (c: string) => cut(String(c || '').replace(/\(사\)|\(주\)|㈜|주식회사|\(재\)/g, '').trim(), 12)
+// 일일계획표 글 — 괄호 속 주소·연락처 같은 긴 설명은 뺌
+const taskText = (t: string) => String(t || '').replace(/\s*\([^)]{12,}\)/g, '').trim()
+function daysLate(due: string | null, today: string) {
+  if (!due) return ''
+  const n = Math.round((Date.parse(today) - Date.parse(due)) / 86400000)
+  return n > 0 ? `${SUF} (${n}일 지남)` : n === 0 ? `${SUF} (오늘)` : ''
+}
+// 머리 + 칸들을 200자 안에 — 항목 수·글자 길이를 줄여 가며 맞춤, 그래도 넘치면 숫자만
+function fit(head: string, secs: Sec[], tail = ''): string {
+  const live = secs.filter(x => x.n > 0)
+  for (const [maxItems, w] of [[3, 26], [2, 24], [2, 20], [1, 22], [1, 16], [0, 0]]) {
+    const parts = [head]
+    for (const x of live) {
+      const shown = x.items.slice(0, maxItems).map(i => '· ' + cutItem(i, w))
+      const more = x.n - shown.length
+      if (shown.length && more > 0) shown[shown.length - 1] += ` 외 ${more}건`
+      parts.push([x.head.replace('{n}', String(x.n)), ...shown].join('\n'))
+    }
+    if (tail) parts.push(tail)
+    const out = parts.join('\n\n')
+    if (out.length <= LIMIT) return out
+  }
+  return cutMsg([head, ...live.map(x => x.head.replace('{n}', String(x.n)))].join('\n'))
+}
+
+type Digest = {
+  today: { task: string; done: boolean }[]; overdue: { task: string; date: string }[]; tomorrow: { task: string }[]
+  domestic: { task: string; client: string; due: string | null }[]; calls: { text: string; client: string | null }[]
+  sourcing: { text: string; title: string }[]; due_soon: { client: string; product: string; date: string }[]
+  pay: { client: string; product: string; unpaid: boolean; noinv: boolean }[]
+}
+
+function buildDigest(slot: string, name: string, g: Digest, today: string): string[] {
+  const left = g.today.filter(t => !t.done)
+  // 매일 반복돼 쌓인 같은 할 일은 한 줄로 (n일째)
+  const od = new Map<string, number>()
+  for (const t of g.overdue) { const k = taskText(t.task); od.set(k, (od.get(k) || 0) + 1) }
+  const overdue = [...od.entries()].map(([k, n]) => n > 1 ? `${k}${SUF} (${n}일째)` : k)
+  const dom = g.domestic.map(t => `[${shortClient(t.client)}] ${taskText(t.task)}${daysLate(t.due, today)}`)
+  const domLate = g.domestic.filter(t => t.due && t.due <= today)
+  const calls = g.calls.map(t => (t.client ? `[${shortClient(t.client)}] ` : '') + t.text)
+  const src = g.sourcing.map(t => `[${cut(t.title, 10)}] ${t.text}`)
+  const pay = g.pay.map(p => `[${shortClient(p.client)}]${SUF} ${p.unpaid && p.noinv ? '잔금·계산서' : p.unpaid ? '잔금 미입금' : '계산서 미발행'}`)
+  const dueSoon = g.due_soon.map(p => `[${shortClient(p.client)}] ${p.product || ''}${SUF} — ${p.date === today ? '오늘' : '내일'}`)
+  const wd = '일월화수목금토'[new Date(Date.parse(today)).getUTCDay()]   // today = KST 'YYYY-MM-DD' → UTC 자정으로 읽어도 요일 같음
+  const md = `${Number(today.slice(5, 7))}/${Number(today.slice(8, 10))}`
+  const counts = [
+    dom.length && `🏢 국내 ${dom.length}`, calls.length && `📞 통화 ${calls.length}`,
+    src.length && `🌏 소싱 ${src.length}`, pay.length && `💰 입금·계산서 ${pay.length}`,
+  ].filter(Boolean).join(' · ')
+
+  if (slot === 'am') {
+    const m1 = fit(`☀️ ${name}님, 좋은 아침이에요 (${md} ${wd})`, [
+      { head: '📋 오늘 할 일 {n}건', n: left.length, items: left.map(t => taskText(t.task)) },
+      { head: '⏰ 밀린 할 일 {n}건', n: overdue.length, items: overdue },
+      { head: '📦 오늘·내일 납기 {n}건', n: dueSoon.length, items: dueSoon },
+    ])
+    const m2secs: Sec[] = [
+      { head: '🏢 국내 할 일 {n}건', n: dom.length, items: dom },
+      { head: '📞 통화에서 나온 할 일 {n}건', n: calls.length, items: calls },
+      { head: '🌏 소싱 답할 질문 {n}건', n: src.length, items: src },
+      { head: '💰 입금·계산서 {n}건', n: pay.length, items: pay },
+    ]
+    const empty1 = !left.length && !overdue.length && !dueSoon.length
+    const out: string[] = []
+    if (!empty1) out.push(m1)
+    if (m2secs.some(x => x.n)) out.push(fit(`💼 오늘 챙길 것 (${md})`, m2secs))
+    if (!out.length) out.push(`☀️ ${name}님, 좋은 아침이에요 (${md} ${wd})\n\n오늘은 등록된 할 일이 없어요.`)
+    return out
+  }
+
+  if (slot === 'noon') {
+    if (!g.today.length && !overdue.length && !counts) return []
+    const urgent = left[0] ? taskText(left[0].task) : domLate[0] ? `[${shortClient(domLate[0].client)}] ${taskText(domLate[0].task)}${daysLate(domLate[0].due, today)}` : overdue[0] || ''
+    const lines = [`🕐 ${name}님 오후 점검`]
+    if (g.today.length) lines.push(`✅ 오늘 할 일 ${g.today.length}건 중 ${g.today.length - left.length}건 완료`)
+    const rest = [overdue.length && `⏰ 밀린 ${overdue.length}`, counts].filter(Boolean).join(' · ')
+    if (rest) lines.push(rest + ' 남음')
+    if (urgent) lines.push(`\n지금 할 것\n· ${cutItem(urgent, 40)}`)
+    return [cutMsg(lines.join('\n'))]
+  }
+
+  // pm
+  if (!g.today.length && !g.tomorrow.length && !counts) return []
+  const head = [`🌇 ${name}님 퇴근 전 확인`]
+  if (g.today.length) head.push(left.length ? `✅ 오늘 ${g.today.length}건 중 ${g.today.length - left.length}건 완료 · ${left.length}건 남음` : `✅ 오늘 할 일 모두 완료 — 수고하셨어요!`)
+  if (counts) head.push(`아직 남은 것: ${counts}`)
+  return [fit(head.join('\n'), [
+    { head: '⏳ 오늘 남은 일', n: left.length, items: left.map(t => taskText(t.task)) },
+    { head: '📅 내일 할 일 {n}건', n: g.tomorrow.length, items: g.tomorrow.map(t => taskText(t.task)) },
+  ])]
+}
+
 async function getLink(pid: number): Promise<Link | null> {
   const rows = await sb(`kakao_links?select=*&profile_id=eq.${pid}`)
   return rows && rows[0] || null
@@ -154,6 +259,31 @@ Deno.serve(async (req) => {
   try {
     const c = await cfg()
     if (!c.kakao_rest_key) return json({ error: '카카오 키가 아직 설정되지 않았어요 (관리자)' }, 503)
+
+    // ----- 정기 알림: { action:'digest', slot:'am'|'noon'|'pm', only?:이름, dry?:true, force?:true } -----
+    if (action === 'digest') {
+      const given = req.headers.get('x-kakao-secret') || ''
+      if (!c.kakao_send_secret || !safeEq(given, c.kakao_send_secret)) return json({ error: 'unauthorized' }, 401)
+      const slot = ['am', 'noon', 'pm'].includes(body.slot) ? body.slot : 'am'
+      const kst = new Date(Date.now() + 9 * 3600_000)
+      const today = kst.toISOString().slice(0, 10)
+      const dow = kst.getUTCDay()
+      if ((dow === 0 || dow === 6) && !body.force) return json({ ok: true, skipped: '주말' })
+      let links: (Link & { company_id: number })[] = await sb(`kakao_links?select=*&talk_ok=is.true`) || []
+      if (body.only) links = links.filter(l => l.user_name === body.only)
+      const out: Record<string, unknown>[] = []
+      for (const l of links) {
+        try {
+          const g: Digest = await sb('rpc/kakao_digest', { method: 'POST', body: JSON.stringify({ p_company: l.company_id, p_name: l.user_name, p_pay: PAY_NAMES.includes(l.user_name) }) })
+          const msgs = buildDigest(slot, l.user_name, g, today)
+          if (body.dry) { out.push({ name: l.user_name, msgs }); continue }
+          const res = []
+          for (const m of msgs) res.push(await sendMemo(l, m))
+          out.push({ name: l.user_name, sent: msgs.length, results: res })
+        } catch (e) { out.push({ name: l.user_name, error: (e as Error).message }) }
+      }
+      return json({ ok: true, slot, today, results: out })
+    }
 
     // ----- 예약 발송 (pg_cron 등 서버에서) -----
     if (action === 'notify') {
