@@ -189,6 +189,14 @@
 - `mbHtml` = 메일용 표(table)+인라인 스타일 `<a href><img width></a>` → `📋 메일에 붙여넣기용 복사`(ClipboardItem text/html, Gmail·네이버웍스에 Ctrl+V) / `</> HTML 코드 복사`(Aside 스킬 md·서명용)
 - 받는 사람 메일은 맥미니 서버(api.klpkorea.cloud) 주소로 그림을 불러옴 → 서버가 꺼져 있으면 배너 그림이 안 보임
 
+## 💬 카카오톡 나에게 보내기 알림 (migration 075, 2026-10-28)
+- 직원마다 자기 카카오 계정의 '나와의 채팅'으로 할 일 알림. 카카오 앱 `KLP 업무 대시보드`(앱 ID 1625793, 카카오 로그인 ON, talk_message 선택 동의 + 닉네임 필수, 리다이렉트 `https://klp-work-dashboard.vercel.app/kakao-callback.html`)
+- 서버 = **맥미니 엣지 함수** `https://api.klpkorea.cloud/functions/v1/kakao` (Vercel 함수 12개 제한 + 키를 맥미니 밖으로 안 내보냄). 원본 `edge/kakao/index.ts` → 고친 뒤 `cp edge/kakao/index.ts ~/Desktop/hyunho-server/supabase/volumes/functions/kakao/index.ts` (재시작 불필요). `edge/`는 `.vercelignore`로 배포 제외
+- 키: `app_config` kakao_rest_key·kakao_client_secret(현호님이 직접 입력)·kakao_state_secret·kakao_send_secret(자동 생성). 토큰: `kakao_links`(profile_id, user_name=표시 이름 — daily_tasks.assignee와 같음, access/refresh 토큰·만료, talk_ok, last_sent_at, last_error) — RLS 켜고 정책 없음 → 브라우저에서 못 읽음
+- 함수 동작: start(로그인 주소, state=프로필 id HMAC) / connect(code→토큰, 동의 범위 확인, 연결 확인 메시지) / status / test / disconnect(unlink) / notify(`x-kakao-secret` 헤더, items [{name,text,url}] — 예약 발송용). 액세스 토큰 만료 1분 전이면 리프레시, 실패하면 last_error '다시 연결'. 텍스트 200자 제한, 링크는 대시보드 주소만
+- 화면: 사이드바 `💬 카카오톡 알림 연결`(`kakaoOpen` 창: 연결하기·시험 메시지·연결 끊기), 메시지 전송 동의를 빼면 버튼이 빨간 '다시 연결 필요'. 카카오에서 돌아오면 `kakao-callback.html`이 code/state를 sessionStorage `klp_kakao_cb`에 두고 `/`로 → `kakaoInit`(showApp에서 호출)이 connect
+- 발송 시각: 08:30·13:00·17:00 KST (내용은 현호님이 정리 중 — 정해지면 pg_cron → notify)
+
 ## 제안서 시스템
 - 사이드바 "제안서" 그룹: 상품 DB / 제안서 관리
 - **상품 DB**: 제안서에 사용할 상품 등록·관리 (productsDB 배열, 추후 Supabase 전환)

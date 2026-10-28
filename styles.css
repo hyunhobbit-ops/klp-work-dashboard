@@ -6583,3 +6583,18 @@ button.sc-kpi{cursor:pointer}
 [data-theme="dark"] .mb-mail{border-color:var(--gray-300)}
 [data-theme="dark"] .mb-drop.over{background:rgba(59,130,246,.12)}
 [data-theme="dark"] .mb-copy2{color:var(--gray-800);border-color:var(--gray-300)}
+
+/* 💬 카카오톡 알림 연결 창 (kakaoOpen) */
+.kk-modal{width:min(440px,100%)}
+.kk-body{display:flex;flex-direction:column;gap:12px}
+.kk-body h3{margin:0;font-size:18px}
+.kk-desc{margin:0;font-size:13.5px;color:var(--gray-600);line-height:1.5}
+.kk-steps{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--gray-700);background:var(--gray-50);border-radius:10px;padding:12px 14px}
+.kk-state{display:flex;flex-direction:column;gap:4px;border-radius:10px;padding:12px 14px;font-size:13px}
+.kk-state.ok{background:rgba(16,185,129,.1);color:var(--gray-800)}
+.kk-state.warn{background:rgba(239,68,68,.1);color:var(--gray-800)}
+.kk-state span{color:var(--gray-600);font-size:12.5px}
+.kk-state em{font-style:normal;color:#dc2626;font-size:12.5px}
+.kk-main{border:none;border-radius:10px;padding:12px;font-size:14.5px;font-weight:700;cursor:pointer;background:#FEE500;color:#191919;font-family:inherit}
+.kk-sub{border:1px solid var(--gray-200);border-radius:10px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--gray-700);font-family:inherit}
+.kk-main:disabled,.kk-sub:disabled{opacity:.5;cursor:default}

@@ -872,6 +872,7 @@ async function showApp(goHome = false) {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
     try { mInit(); } catch (e) { console.warn('폰 화면 준비 실패', e); }
+    try { kakaoInit(); } catch (e) { console.warn('카카오 연결 확인 실패', e); }
 
     // 🚀 1) 캐시 즉시 복원 + 렌더 — 이전 방문이 있으면 100ms 안에 화면 표시
     const hadCache = hydrateAllFromCache();
@@ -28735,4 +28736,123 @@ function mbForm(id) {
         close(); showToast('저장했어요'); mbLoad();
     });
     setTimeout(() => ov.querySelector('[data-f="title"]').focus(), 50);
+}
+
+// =====================================
+// 💬 카카오톡 나에게 보내기 알림 연결 (migration 075, 맥미니 엣지 함수 functions/v1/kakao)
+// 사이드바 '카카오톡 알림 연결' → 카카오 로그인 → kakao-callback.html → 여기(kakaoInit)에서 연결 마무리
+// 토큰은 브라우저에 안 둠 — 상태만 함수에서 받아 표시
+// =====================================
+const KAKAO_FN = SUPABASE_URL + '/functions/v1/kakao';
+let _kakaoSt = null;   // 마지막 상태 { connected, talk_ok, nickname, last_sent_at, last_error }
+
+async function kakaoCall(action, extra) {
+    const { data } = await sb.auth.getSession();
+    const token = data && data.session && data.session.access_token;
+    if (!token) throw new Error('로그인이 필요해요');
+    const r = await fetch(KAKAO_FN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + token },
+        body: JSON.stringify(Object.assign({ action }, extra || {})),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || ('카카오 연결 서버 오류 ' + r.status));
+    return j;
+}
+
+function kakaoPaintBtn() {
+    const lbl = document.getElementById('kakaoBtnLabel');
+    const btn = document.getElementById('kakaoBtn');
+    if (!lbl || !btn) return;
+    const s = _kakaoSt;
+    const warn = s && s.connected && (!s.talk_ok || s.last_error);
+    lbl.textContent = !s || !s.connected ? '카카오톡 알림 연결' : warn ? '카카오톡 다시 연결 필요' : '카카오톡 알림 켜짐';
+    btn.style.color = warn ? '#dc2626' : '';
+    btn.style.borderColor = warn ? '#fca5a5' : '';
+    btn.style.opacity = s && s.connected && !warn ? '0.75' : '1';
+}
+
+async function kakaoRefresh() {
+    try { _kakaoSt = await kakaoCall('status'); } catch (e) { console.warn('카카오 상태 확인 실패', e); }
+    kakaoPaintBtn();
+    return _kakaoSt;
+}
+
+// 로그인 뒤 한 번: 카카오에서 돌아온 거면 연결 마무리, 아니면 상태만
+async function kakaoInit() {
+    let cb = null;
+    try { cb = JSON.parse(sessionStorage.getItem('klp_kakao_cb') || 'null'); sessionStorage.removeItem('klp_kakao_cb'); } catch (_) {}
+    if (cb && cb.error) {
+        showToast(cb.error === 'access_denied' ? '카카오톡 연결을 취소했어요' : '카카오 연결 실패: ' + (cb.desc || cb.error));
+    } else if (cb && cb.code) {
+        try {
+            const j = await kakaoCall('connect', { code: cb.code, state: cb.state });
+            showToast(j.talk_ok ? '💬 카카오톡이 연결됐어요 — 나와의 채팅을 확인해 보세요' : '연결은 됐지만 "카카오톡 메시지 전송" 동의가 빠졌어요 — 다시 연결해 주세요');
+            await kakaoRefresh();
+            if (!j.talk_ok) kakaoOpen();
+            return;
+        } catch (e) {
+            console.error('카카오 연결 실패', e);
+            showToast('카카오 연결 실패: ' + e.message);
+        }
+    }
+    const s = await kakaoRefresh();
+    if (s && s.connected && !s.talk_ok) showToast('💬 카카오톡 알림을 받으려면 다시 연결이 필요해요 (사이드바 버튼)');
+}
+
+async function kakaoStart() {
+    try {
+        const j = await kakaoCall('start');
+        location.href = j.url;
+    } catch (e) { showToast('카카오 연결 시작 실패: ' + e.message); }
+}
+
+async function kakaoOpen() {
+    document.querySelector('.kk-ov')?.remove();
+    const ov = document.createElement('div');
+    ov.className = 'mb-ov kk-ov';
+    ov.innerHTML = `<div class="mb-modal kk-modal"><div class="kk-body">확인 중…</div></div>`;
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    document.body.appendChild(ov);
+    const s = await kakaoRefresh() || { connected: false };
+    const fmt = t => t ? new Date(t).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+    const warn = s.connected && (!s.talk_ok || s.last_error);
+    const body = ov.querySelector('.kk-body');
+    body.innerHTML = `
+        <h3>💬 카카오톡 알림</h3>
+        <p class="kk-desc">내 할 일 알림을 <b>카카오톡 '나와의 채팅'</b>으로 받아요. 하루 3번 (아침 8:30 · 13:00 · 17:00)</p>
+        ${!s.connected ? `
+            <div class="kk-steps">
+                <div>1. 아래 버튼을 누르면 카카오 로그인 화면이 열려요</div>
+                <div>2. <b>"카카오톡 메시지 전송"</b>에 꼭 체크하고 동의해 주세요</div>
+                <div>3. 대시보드로 돌아오면 나와의 채팅에 확인 메시지가 와요</div>
+            </div>
+            <button class="kk-main" data-k="start">카카오톡 연결하기</button>`
+        : `
+            <div class="kk-state ${warn ? 'warn' : 'ok'}">
+                <b>${warn ? '⚠️ 다시 연결이 필요해요' : '✅ 연결됨'}</b>
+                <span>카카오 계정: ${escHtml(s.nickname || '-')} · 마지막 발송: ${fmt(s.last_sent_at)}</span>
+                ${s.last_error ? `<em>${escHtml(s.last_error)}</em>` : ''}
+            </div>
+            ${warn ? `<button class="kk-main" data-k="start">다시 연결하기</button>` : `<button class="kk-main" data-k="test">시험 메시지 보내기</button>`}
+            <button class="kk-sub" data-k="disconnect">연결 끊기</button>`}
+        <button class="kk-sub" data-k="close">닫기</button>`;
+    body.addEventListener('click', async e => {
+        const k = e.target.closest('[data-k]')?.dataset.k;
+        if (!k) return;
+        if (k === 'close') { ov.remove(); return; }
+        if (k === 'start') { kakaoStart(); return; }
+        e.target.disabled = true;
+        try {
+            if (k === 'test') {
+                const j = await kakaoCall('test');
+                showToast(j.ok ? '📨 보냈어요 — 카카오톡 나와의 채팅을 확인해 보세요' : (j.error || '보내기 실패'));
+            } else if (k === 'disconnect') {
+                if (!confirm('카카오톡 알림 연결을 끊을까요?')) { e.target.disabled = false; return; }
+                await kakaoCall('disconnect');
+                showToast('카카오톡 연결을 끊었어요');
+            }
+        } catch (err) { showToast(err.message); }
+        kakaoOpen();
+    });
 }
