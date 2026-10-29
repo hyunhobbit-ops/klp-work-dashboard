@@ -14551,7 +14551,10 @@ function clEsc(s) { return planningEsc(String(s == null ? '' : s)); }
 function clMe() { return (typeof inqMe === 'function' ? inqMe() : '') || (currentUser && currentUser.name) || ''; }
 function clLine(c) { return _clLines.find(l => l.id === c.line_id) || null; }
 function clLineName(c) { const l = clLine(c); return l ? l.label : (c.line_number || '자리 미지정'); }
-function clOther(c) { return [c.client_name, c.contact_name].filter(Boolean).join(' ') || c.other_number || '번호 없음'; }   // 회사명 + 담당자 (둘 중 하나만 있어도)
+function clOther(c) {   // 회사명 + 담당자 + 직함 (직함은 회사명이나 담당자가 있을 때만)
+    const n = [c.client_name, c.contact_name].filter(Boolean).join(' ');
+    return n ? [n, c.contact_title].filter(Boolean).join(' ') : (c.other_number || '번호 없음');
+}
 function clDur(sec) { sec = sec || 0; const m = Math.floor(sec / 60), s = sec % 60; return m ? `${m}분 ${s}초` : `${s}초`; }
 function clTodosLeft(c) { return (Array.isArray(c.todos) ? c.todos : []).filter(t => !t.done).length; }
 function clDay(ts) {
@@ -14733,7 +14736,7 @@ async function callsRenderMain() {
         <div class="mn-doc-head">
           <div>
             <div class="mn-doc-cat">${c.answered ? (c.direction === 'out' ? '↗ 발신' : '↙ 수신') : '✕ 부재중'} · ${clEsc(l ? l.label : clLineName(c))}${l && l.number ? ` (${clEsc(l.number)})` : ''}</div>
-            <h1>${clEsc(clOther(c))}${c.contact_name && c.contact_title ? ` <span class="cl-h-who">${clEsc(c.contact_title)}</span>` : ''}</h1>
+            <h1>${clEsc(clOther(c))}</h1>
             <div class="mn-doc-meta">${clDay(c.started_at)} ${clTime(c.started_at)}${c.answered ? ' · ' + clDur(c.duration_sec) : ''}${c.other_number ? ' · ' + clEsc(c.other_number) : ''}${c.topic ? ' · ' + clEsc(c.topic) : ''}</div>
           </div>
           <div class="mn-doc-act">
