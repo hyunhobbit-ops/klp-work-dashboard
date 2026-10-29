@@ -14551,7 +14551,7 @@ function clEsc(s) { return planningEsc(String(s == null ? '' : s)); }
 function clMe() { return (typeof inqMe === 'function' ? inqMe() : '') || (currentUser && currentUser.name) || ''; }
 function clLine(c) { return _clLines.find(l => l.id === c.line_id) || null; }
 function clLineName(c) { const l = clLine(c); return l ? l.label : (c.line_number || '자리 미지정'); }
-function clOther(c) { return c.client_name || c.other_number || '번호 없음'; }
+function clOther(c) { return [c.client_name, c.contact_name].filter(Boolean).join(' ') || c.other_number || '번호 없음'; }   // 회사명 + 담당자 (둘 중 하나만 있어도)
 function clDur(sec) { sec = sec || 0; const m = Math.floor(sec / 60), s = sec % 60; return m ? `${m}분 ${s}초` : `${s}초`; }
 function clTodosLeft(c) { return (Array.isArray(c.todos) ? c.todos : []).filter(t => !t.done).length; }
 function clDay(ts) {
@@ -14617,7 +14617,7 @@ function callsVisible() {
         if (_clFilter === 'todo' && !clTodosLeft(c)) return false;
         if (_clFilter === 'missed' && c.answered) return false;
         if (q) {
-            const hay = [c.client_name, c.other_number, c.summary, c.topic, c.memo, clLineName(c)].join(' ').toLowerCase();
+            const hay = [c.client_name, c.contact_name, c.other_number, c.summary, c.topic, c.memo, clLineName(c)].join(' ').toLowerCase();
             const qd = q.replace(/\D/g, '');
             if (!hay.includes(q) && !(qd.length >= 3 && String(c.other_number || '').replace(/\D/g, '').includes(qd))) return false;
         }
@@ -14733,7 +14733,7 @@ async function callsRenderMain() {
         <div class="mn-doc-head">
           <div>
             <div class="mn-doc-cat">${c.answered ? (c.direction === 'out' ? '↗ 발신' : '↙ 수신') : '✕ 부재중'} · ${clEsc(l ? l.label : clLineName(c))}${l && l.number ? ` (${clEsc(l.number)})` : ''}</div>
-            <h1>${clEsc(clOther(c))}${c.contact_name ? ` <span class="cl-h-who">${clEsc(c.contact_name)}${c.contact_title ? ' ' + clEsc(c.contact_title) : ''}</span>` : ''}</h1>
+            <h1>${clEsc(clOther(c))}${c.contact_name && c.contact_title ? ` <span class="cl-h-who">${clEsc(c.contact_title)}</span>` : ''}</h1>
             <div class="mn-doc-meta">${clDay(c.started_at)} ${clTime(c.started_at)}${c.answered ? ' · ' + clDur(c.duration_sec) : ''}${c.other_number ? ' · ' + clEsc(c.other_number) : ''}${c.topic ? ' · ' + clEsc(c.topic) : ''}</div>
           </div>
           <div class="mn-doc-act">
@@ -14808,12 +14808,29 @@ async function callsSaveField(id, f, v) {
     v = String(v || '').trim();
     if (f === 'contact_phone') v = inqNormPhone(v);
     if (!(await callsPatch(id, { [f]: v }))) return;
+    if (CL_BOOK_FIELDS.includes(f)) await callsSaveBook(id);
     callsRenderList();
     if (f === 'client_name' || f === 'contact_phone') {           // 회사·연락처가 바뀌면 관련 상담을 다시 찾음
         const c = _clList.find(x => x.id === id);
         delete _clInq[id];
         if (c) { await callsLoadInq(c); callsRenderInqCard(c); }
     }
+}
+
+// 회사명·담당자·직함을 적으면 번호부(call_contacts)에 기억 → 같은 번호의 다른 통화에도 바로 적용, 다음 통화는 맥미니가 자동으로 채움
+const CL_BOOK_FIELDS = ['client_name', 'contact_name', 'contact_title'];
+async function callsSaveBook(id) {
+    const c = _clList.find(x => x.id === id);
+    const key = String(c && c.other_number || '').replace(/\D/g, '');
+    if (!c || key.length < 7) return;
+    const book = { client_name: c.client_name || '', contact_name: c.contact_name || '', contact_title: c.contact_title || '' };
+    const { error } = await sb.from('call_contacts')
+        .upsert({ number_key: key, ...book, updated_by: clMe(), updated_at: new Date().toISOString() }, { onConflict: 'company_id,number_key' });
+    if (error) { console.error('번호부 저장 실패', error); return; }
+    const { data, error: e2 } = await sb.from('calls').update(book).eq('other_number', c.other_number).neq('id', id).select('id');
+    if (e2) { console.error('같은 번호 통화 갱신 실패', e2); return; }
+    _clList.forEach(x => { if (x.other_number === c.other_number) Object.assign(x, book); });
+    if (data && data.length) showToast(`같은 번호 통화 ${data.length}건에도 적용했어요`);
 }
 
 // ---------- 상담 연결 ----------
