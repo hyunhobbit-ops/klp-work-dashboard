@@ -49,7 +49,9 @@
 - **2단 메뉴**: `.sidebar` = `.rail`(큰 메뉴, `data-grp`) + `.sidebar-panel`(세부 메뉴). 사이드바의 `.nav-group[data-rail="work|sale|prop|lib|tool|link|set"]` 중 `.rail-on`만 보임. `railSet(grp)`, 탭을 열면 `switchTab` → `railSyncTab`이 그 묶음으로, `railRefresh`는 모듈·권한으로 다 숨은 묶음의 큰 메뉴 버튼을 숨김. 새 메뉴는 알맞은 `data-rail` 묶음 안에 `.nav-item[data-tab]`으로 추가 (아이콘은 CSS로 숨김, 큰 메뉴 이름은 `RAIL_GROUPS`)
 - 알림 받기·카톡 연결·비밀번호·이름·로그아웃은 `.nav-my`(설정 묶음), 아바타(`#userAvatar`)는 큰 메뉴 맨 아래
 - **홈** (`renderHome` + `hm*`): 숫자 4칸(`hmRenderProjectsKpi`·`hmRenderOverKpi`·`hmRenderPayKpi` — 입금·계산서는 `cashCanAccess()`만, 다른 직원은 긴급 항목) / 상담 흐름(`hmLoadFlow`: 진행 단계 7칸·최근 통화, 1분에 한 번만 조회, 금액·마진은 자금확인 권한자만) / 오늘 할 일(체크 → `toggleTask`) / 이번 주 납기(`hmRenderWeekDue`, 왼쪽 메뉴 아래 `#navWeekTip`도 같은 숫자) / 그 아래 기존 마감 카드·내 프로젝트·매입매출 현황·긴급 항목. 경영목표 배너·바로가기 카드는 뺌(메뉴에 있음)
-- **남은 단계**: 다른 화면을 차례로 같은 모양으로(남은 그라데이션 포함 — 견적·제안서 미리보기, 마진계산기 등), 국내 프로젝트 보드·자금확인 카드 화면(가안에 있음)
+- **2단계 완료**: 국내 프로젝트 보드(`pdRenderBoard`, `#pdBoard`, 보드/목록 전환 localStorage `pd_view`, 4칸은 `pdColOf` = 체크 기준: 디확·작지 전 / 제작 중 / 납품·정산 대기 / 정산 끝(최근 `PD_DONE_MAX`건), 카드 7칸 막대 = `toggleProjectCheck`) · 자금확인 카드(`.cash-tiles`·`.cash-sec`) · 화면 그라데이션 제거
+- **그라데이션을 일부러 남긴 곳**: 고객에게 나가는 문서·시안 — 견적서 PDF(`app.js` 견적서 머리·합계), 제안서 미리보기 `.pp-cta`, AI 광고 시안(사진 위 어둡게 까는 층). 바꿀지는 현호님 결정 대기
+- **남은 단계**: 다른 화면(일일계획표·상담·통화·프로젝트 등)의 표·카드 모양을 차례로 맞추기
 
 ## UI/UX 규칙
 - 한국어 UI, Toss 스타일 디자인

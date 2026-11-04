@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261104a">
+    <link rel="stylesheet" href="styles.css?v=20261104b">
     <link rel="stylesheet" href="mobile.css?v=20261104a" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -784,7 +784,7 @@
             </div>
 
             <!-- ===== 국내 프로젝트 ===== -->
-            <main class="content" id="tab-projects-domestic">
+            <main class="content" id="tab-projects-domestic" data-view="board">
                 <div class="content-toolbar">
                     <div class="filter-bar" id="domesticFilterBar">
                         <button class="filter-chip active" data-dfilter="all">전체</button>
@@ -793,11 +793,23 @@
                         <button class="filter-chip" data-dfilter="완료">완료</button>
                         <button class="filter-chip" data-dfilter="취소">취소</button>
                     </div>
+                    <div class="pd-tools">
+                        <div class="pd-seg-group" id="pdScope" role="group" aria-label="보드 범위">
+                            <button type="button" data-scope="all" aria-pressed="true">전체</button>
+                            <button type="button" data-scope="me" aria-pressed="false">내 담당</button>
+                            <button type="button" data-scope="urgent" aria-pressed="false">긴급</button>
+                        </div>
+                        <div class="pd-seg-group" id="pdView" role="group" aria-label="보기 방식">
+                            <button type="button" data-view="board" aria-pressed="true">보드</button>
+                            <button type="button" data-view="list" aria-pressed="false">목록</button>
+                        </div>
+                    </div>
                     <button class="btn-primary" onclick="openModal('project-domestic')" title="F2">
                         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
                         새 프로젝트 (F2)
                     </button>
                 </div>
+                <div class="pd-board" id="pdBoard"></div>
                 <div class="table-wrap">
                     <table class="data-table" id="domesticProjectTable">
                         <thead>
@@ -1568,8 +1580,8 @@
                         </button>
                     </div>
                 </div>
-                <div id="cashSummaryPanel" style="display:flex;flex-wrap:wrap;gap:12px;padding:16px 20px;background:var(--white);border-bottom:1px solid var(--gray-100)"></div>
-                <div id="cashSections" style="padding:20px;display:flex;flex-direction:column;gap:24px"></div>
+                <div id="cashSummaryPanel" class="cash-tiles"></div>
+                <div id="cashSections" class="cash-sections"></div>
             </main>
 
             <!-- 자금확인 — 잔액 업데이트 모달 -->
@@ -1898,6 +1910,6 @@
     </div>
 
     <script src="send-kit.js?v=20261001i"></script>
-    <script src="app.js?v=20261104a"></script>
+    <script src="app.js?v=20261104b"></script>
 </body>
 </html>

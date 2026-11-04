@@ -1014,6 +1014,7 @@ let currentDeliveryMonth = String(new Date().getMonth() + 1).padStart(2, '0');
 // ===== Page Titles =====
 const pageTitles = {
     home: '홈',
+    cash: '자금확인',
     timebox: '내 하루 (타임박스)',
     'admin-add': '고객사 추가',
     'admin-manage': '고객사 관리',
@@ -2305,7 +2306,7 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
             // ===== 테이블 헤더 =====
             const tableHeader = active
-                ? `<div style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#1F85FF,#0F6CD9);color:#fff;font-weight:800;font-size:16px;padding:13px 20px;border-radius:10px;box-shadow:0 4px 14px rgba(31,133,255,.35)"><span style="letter-spacing:.3px">▶ 진행 중</span><span style="background:rgba(255,255,255,.25);color:#fff;font-weight:800;border-radius:999px;padding:2px 13px;font-size:15px">${group.length}</span><span style="font-size:12px;font-weight:600;color:rgba(255,255,255,.85);margin-left:auto">지금 작업 중인 건</span></div>`
+                ? `<div style="display:flex;align-items:center;gap:12px;background:var(--blue);color:#fff;font-weight:800;font-size:16px;padding:13px 20px;border-radius:10px;box-shadow:0 4px 14px rgba(31,133,255,.35)"><span style="letter-spacing:.3px">▶ 진행 중</span><span style="background:rgba(255,255,255,.25);color:#fff;font-weight:800;border-radius:999px;padding:2px 13px;font-size:15px">${group.length}</span><span style="font-size:12px;font-weight:600;color:rgba(255,255,255,.85);margin-left:auto">지금 작업 중인 건</span></div>`
                 : `<div style="display:inline-flex;align-items:center;gap:10px;background:${sec.bg};color:${sec.color};font-weight:700;font-size:14px;padding:8px 16px;border-radius:8px;border:1px solid ${sec.color}55"><span>${sec.key}</span><span style="color:${sec.color};opacity:.8;font-weight:700">${group.length}</span></div>`;
             tableHtml += `<tr class="section-divider"><td colspan="${colspan}" style="padding:${active ? '20px 0 9px 0' : '14px 0 6px 0'};border:none;background:var(--white)">${tableHeader}</td></tr>`;
             if (group.length === 0) {
@@ -2321,7 +2322,7 @@ function renderProjectList(dataArr, filter, tableBodyId, cardGridId) {
 
             // ===== 카드(모바일) 헤더 =====
             const cardHeader = active
-                ? `<div style="display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,#1F85FF,#0F6CD9);color:#fff;font-weight:800;font-size:15px;padding:12px 18px;border-radius:10px;box-shadow:0 4px 14px rgba(31,133,255,.35)"><span>▶ 진행 중</span><span style="background:rgba(255,255,255,.25);border-radius:999px;padding:2px 12px">${group.length}</span></div>`
+                ? `<div style="display:flex;align-items:center;gap:10px;background:var(--blue);color:#fff;font-weight:800;font-size:15px;padding:12px 18px;border-radius:10px;box-shadow:0 4px 14px rgba(31,133,255,.35)"><span>▶ 진행 중</span><span style="background:rgba(255,255,255,.25);border-radius:999px;padding:2px 12px">${group.length}</span></div>`
                 : `<div style="display:inline-flex;align-items:center;gap:10px;background:${sec.bg};color:${sec.color};font-weight:700;font-size:14px;padding:8px 16px;border-radius:8px;border:1px solid ${sec.color}55"><span>${sec.key}</span><span style="color:${sec.color};opacity:.8">${group.length}</span></div>`;
             cardHtml += `<div class="card-section-header" style="grid-column:1/-1;margin-top:${active ? '16px' : '10px'}">${cardHeader}</div>`;
             if (group.length === 0) {
@@ -2512,6 +2513,7 @@ function renderDomesticProjects() {
         _rebuildDomesticProjectsFromPagination();
         renderDomesticProjects();
     });
+    pdRenderBoard();
 }
 
 function renderOverseasProjects() {
@@ -5359,8 +5361,8 @@ function openModal(type) {
         body.innerHTML = `
             <div style="margin-bottom:14px">
                 <div style="display:flex;gap:8px">
-                    <button type="button" id="delImgBtn" class="form-submit" style="background:linear-gradient(135deg,#6b3fd4,#8b5cf6);flex:1" onclick="document.getElementById('delImgFile').click()">📷 이미지 선택</button>
-                    <button type="button" id="delPasteBtn" class="form-submit" style="background:linear-gradient(135deg,#3b82f6,#2563eb);flex:1" onclick="pasteDeliveryImage()">📋 붙여넣기</button>
+                    <button type="button" id="delImgBtn" class="form-submit" style="background:#6b3fd4;flex:1" onclick="document.getElementById('delImgFile').click()">📷 이미지 선택</button>
+                    <button type="button" id="delPasteBtn" class="form-submit" style="background:#3b82f6;flex:1" onclick="pasteDeliveryImage()">📋 붙여넣기</button>
                 </div>
                 <input type="file" id="delImgFile" accept="image/*" style="display:none" onchange="analyzeDeliveryImage(this)">
                 <div style="font-size:11px;color:var(--gray-500);margin-top:5px;line-height:1.5">번개장터·당근 주문 캡처 등을 <b>파일 선택</b>하거나, 캡처를 복사한 뒤 <b>Ctrl+V(붙여넣기)</b> 또는 <b>📋 붙여넣기</b> 버튼을 누르면 <b>받는이·연락처·우편번호·주소·품목·종류·판매가</b>를 자동으로 채웁니다. (확인 후 저장)</div>
@@ -18194,7 +18196,7 @@ function openQuoteModal(id) {
             <div id="qEstBody"></div>
         </div>
 
-        <button class="form-submit" onclick="saveQuoteAndPreview()" style="background:linear-gradient(135deg,#16A34A,#15803D)">💰 ${isEdit ? '견적서 수정' : '견적서 만들기'}</button>
+        <button class="form-submit" onclick="saveQuoteAndPreview()" style="background:#16A34A">💰 ${isEdit ? '견적서 수정' : '견적서 만들기'}</button>
     `;
 
     document.getElementById('modalOverlay').classList.add('show', 'modal-wide');
@@ -19953,68 +19955,52 @@ function renderCashDashboard() {
     const sections = document.getElementById('cashSections');
     if (!summary || !sections) return;
 
-    // 요약: 카테고리별 합계 카드
+    // 요약: 카테고리별 합계 칸 (예금 칸만 파란 면)
     summary.innerHTML = CASH_CATEGORIES.map(cat => {
         const totals = _categoryTotal(cat.id);
         const display = Object.keys(totals).length
             ? Object.entries(totals).map(([cur, v]) => _fmtCurrency(v, cur)).join(' / ')
-            : '<span style="color:var(--text-tertiary)">데이터 없음</span>';
+            : '<span class="cash-none">데이터 없음</span>';
         const isNeg = Object.values(totals).some(v => v < 0);
         let extra = '';
         if (cat.id === 'loan') {
             const rooms = cashAccounts.map(_loanRoom).filter(Boolean);
             if (rooms.length) {
                 const room = rooms.reduce((t, r) => t + r.room, 0), limit = rooms.reduce((t, r) => t + r.limit, 0);
-                extra = `<div style="font-size:12px;font-weight:700;color:${room > 0 ? '#12B76A' : '#E03131'};margin-top:4px">남은 한도 ${_fmtCurrency(room, 'KRW')}<span style="color:var(--text-tertiary);font-weight:500"> / 한도 ${_fmtCurrency(limit, 'KRW')}</span></div>`;
+                extra = `<small class="${room > 0 ? '' : 'bad'}">남은 한도 ${_fmtCurrency(room, 'KRW')} / ${_fmtCurrency(limit, 'KRW')}</small>`;
             }
         }
-        return `<div style="flex:1;min-width:180px;padding:14px 16px;background:var(--gray-50);border-radius:12px;border:1px solid var(--gray-100)">
-            <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:4px">${cat.icon} ${cat.label}</div>
-            <div style="font-size:16px;font-weight:800;color:${isNeg ? '#E03131' : 'var(--text-primary)'};letter-spacing:-.3px">${display}</div>${extra}
+        return `<div class="cash-tile ${cat.id === 'deposit' ? 'top' : ''}" title="${escHtml(cat.hint)}">
+            <span>${cat.label}</span>
+            <b class="${isNeg ? 'bad' : ''}">${display}</b>${extra}
         </div>`;
     }).join('');
 
-    // 섹션: 카테고리별 계좌 카드 그리드
+    // 섹션: 카테고리별 계좌 목록
     sections.innerHTML = CASH_CATEGORIES.map(cat => {
         const list = cashAccounts.filter(a => a.category === cat.id);
-        if (!list.length) {
-            return `<div style="background:var(--white);border-radius:14px;border:1px solid var(--gray-100);padding:18px 20px">
-                <div style="font-size:15px;font-weight:800;margin-bottom:4px">${cat.icon} ${cat.label}</div>
-                <div style="color:var(--text-tertiary);font-size:13px">등록된 계좌가 없습니다</div>
-            </div>`;
-        }
+        const head = `<div class="cash-sec-head"><b>${cat.label}</b><span>${cat.hint}</span></div>`;
+        if (!list.length) return `<section class="cash-sec">${head}<div class="cash-none">등록된 계좌가 없습니다</div></section>`;
         const rows = list.map(a => {
             const latest = cashLatestByAccount[a.id];
             const bal = latest ? _displayBalance(a.category, latest.balance) : 0;
-            const balStr = _fmtCurrency(bal, a.currency);
             const dateStr = latest ? (latest.snapshot_date || '').slice(0, 10) : '미등록';
-            const isNeg = bal < 0;
             const sourceBadge = latest && latest.source === 'image'
                 ? '<span style="display:inline-block;padding:2px 6px;border-radius:4px;background:#E8F4FD;color:#1B64DA;font-size:10px;font-weight:700;margin-left:6px">📷 이미지</span>'
                 : '';
-            const nick = a.nickname ? `<span style="color:var(--text-tertiary);font-size:12px;margin-left:6px">${escHtml(a.nickname)}</span>` : '';
-            return `<div onclick="openCashHistoryModal(${a.id})" style="cursor:pointer;padding:14px 16px;background:var(--white);border:1px solid var(--gray-100);border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:12px;transition:border-color .15s" onmouseover="this.style.borderColor='var(--blue)'" onmouseout="this.style.borderColor='var(--gray-100)'">
-                <div style="min-width:0;flex:1">
-                    <div style="font-size:14px;font-weight:700;color:var(--text-primary)">${escHtml(a.label)}${nick}</div>
-                    <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">${escHtml(a.account_number || '계좌번호 없음')} · 최근 ${dateStr}${sourceBadge}</div>
-                    ${(r => r ? `<div style="margin-top:8px;max-width:420px">
-                        <div style="height:6px;border-radius:3px;background:var(--gray-100);overflow:hidden"><div style="height:100%;width:${r.pct}%;background:${r.room > 0 ? '#F59E0B' : '#E03131'}"></div></div>
-                        <div style="display:flex;justify-content:space-between;gap:8px;margin-top:4px;font-size:12px;font-weight:700">
-                            <span style="color:${r.room > 0 ? '#12B76A' : '#E03131'}">남은 한도 ${_fmtCurrency(r.room, 'KRW')}</span>
-                            <span style="color:var(--text-tertiary);font-weight:500">한도 ${_fmtCurrency(r.limit, 'KRW')} 중 ${r.pct}% 사용</span>
-                        </div></div>` : '')(_loanRoom(a))}
+            const nick = a.nickname ? `<span class="cash-nick">${escHtml(a.nickname)}</span>` : '';
+            const r = _loanRoom(a);
+            return `<div class="cash-row" role="button" tabindex="0" onclick="openCashHistoryModal(${a.id})">
+                <div class="g">
+                    <b>${escHtml(a.label)}${nick}</b>
+                    <span>${escHtml(a.account_number || '계좌번호 없음')} · 최근 ${dateStr}${sourceBadge}</span>
+                    ${r ? `<div class="cash-loan"><i><u class="${r.room > 0 ? '' : 'bad'}" style="width:${r.pct}%"></u></i>
+                        <em><span class="${r.room > 0 ? '' : 'bad'}">남은 한도 ${_fmtCurrency(r.room, 'KRW')}</span><span>한도 ${_fmtCurrency(r.limit, 'KRW')} 중 ${r.pct}% 사용</span></em></div>` : ''}
                 </div>
-                <div style="font-size:16px;font-weight:800;color:${isNeg ? '#E03131' : 'var(--text-primary)'};letter-spacing:-.3px;white-space:nowrap">${balStr}</div>
+                <div class="amt ${bal < 0 ? 'bad' : ''}">${_fmtCurrency(bal, a.currency)}</div>
             </div>`;
         }).join('');
-
-        return `<div>
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-                <div style="font-size:16px;font-weight:800">${cat.icon} ${cat.label}</div>
-                <div style="font-size:12px;color:var(--text-tertiary)">${cat.hint}</div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:8px">${rows}</div>
-        </div>`;
+        return `<section class="cash-sec">${head}${rows}</section>`;
     }).join('');
 }
 
@@ -29043,3 +29029,81 @@ function hmRenderFlow() {
         ? `<button class="hm-live" onclick="switchTab('calls')"><i>통화</i><span>${escHtml(clOther(c))} · ${escHtml((c.summary || '').slice(0, 40))}</span></button>`
         : '<span class="hm-live"></span>') + stats;
 }
+
+// =====================================
+// 국내 프로젝트 보드 (2026-11 리뉴얼) — 체크 7개 기준으로 4칸. 목록은 그대로 두고 보드/목록 전환
+// =====================================
+const PD_COLS = [
+    { key: 'pre', label: '디확·작지 전', cls: 'c1' },
+    { key: 'make', label: '제작 중', cls: 'c2' },
+    { key: 'pay', label: '납품·정산 대기', cls: 'c3' },
+    { key: 'done', label: '정산 끝', cls: 'c4' }
+];
+const PD_DONE_MAX = 12;   // 정산 끝은 최근 것만 (전체는 목록에서)
+let _pdView = 'board', _pdScope = 'all';
+try { _pdView = localStorage.getItem('pd_view') === 'list' ? 'list' : 'board'; } catch (_) {}
+function pdColOf(p) {
+    const c = p.checks || {};
+    if (p.status === '완료' || CHECK_ITEMS.every(i => c[i.key])) return 'done';
+    if (c.delivered) return 'pay';
+    return c.design && c.workOrder ? 'make' : 'pre';
+}
+function pdIsMine(p) {
+    const me = currentUser ? currentUser.name : '';
+    return (p.manager || '').split(' ')[0] === me || (p.assignees || []).includes(me);
+}
+function pdRenderBoard() {
+    const tab = document.getElementById('tab-projects-domestic');
+    const box = document.getElementById('pdBoard');
+    if (!tab || !box) return;
+    tab.dataset.view = _pdView;
+    document.querySelectorAll('#pdView button').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === _pdView));
+    document.querySelectorAll('#pdScope button').forEach(b => b.setAttribute('aria-pressed', b.dataset.scope === _pdScope));
+    if (_pdView !== 'board') { box.innerHTML = ''; return; }
+    const list = domesticProjects.filter(p => {
+        if (currentDomesticFilter === 'all' ? p.status === '취소' : p.status !== currentDomesticFilter) return false;
+        if (_pdScope === 'me') return pdIsMine(p);
+        if (_pdScope === 'urgent') return (p.priority || '').includes('긴급');
+        return true;
+    });
+    const today = fmtDate(new Date());
+    const byDate = (x, y) => (x.deadline || '9999').localeCompare(y.deadline || '9999');
+    const card = (p, col) => {
+        const c = p.checks || {};
+        const n = CHECK_ITEMS.filter(i => c[i.key]).length;
+        const next = CHECK_ITEMS.find(i => !c[i.key]);
+        const margin = (p.revenue || 0) - (p.supplierRevenue || 0);
+        const late = p.deadline && p.deadline < today && !c.delivered;
+        const owner = (p.manager || (p.assignees || [])[0] || '').split(' ')[0];
+        return `<article class="pd-card" onclick="showProjectDetail(${Number(p.id)})">
+            <div class="pd-tags">${(p.priority || '').includes('긴급') ? '<i class="hm-pill red">긴급</i>' : ''}${p.status === '취소' ? '<i class="hm-pill warn">취소</i>' : ''}
+                ${p.supplierRevenue ? `<span class="pd-margin ${margin < 0 ? 'bad' : ''}">마진 ${margin < 0 ? '−' : ''}${hmWon(Math.abs(margin))}</span>` : ''}</div>
+            <div class="pd-title">${escHtml(p.client ? p.client + ' ' + p.name : p.name)}</div>
+            <div class="pd-bar">${CHECK_ITEMS.map(i => `<button type="button" class="${c[i.key] ? 'on' : ''}" title="${i.label}: ${c[i.key] ? '완료' : '아직'} (눌러서 바꾸기)" aria-label="${i.label}" aria-pressed="${!!c[i.key]}" onclick="event.stopPropagation();toggleProjectCheck(${Number(p.id)},'${i.key}')"></button>`).join('')}<span>${n}/${CHECK_ITEMS.length}</span></div>
+            <div class="pd-next">${next ? '다음: ' + next.label : '모두 완료'}</div>
+            <div class="pd-foot"><span class="${late ? 'late' : ''}">${p.deadline ? fmtDisplay(p.deadline) : '납기 미정'}${late ? ' · 지남' : ''}</span>
+                <span class="pd-right"><button type="button" class="pd-edit" onclick="event.stopPropagation();openEditProject(${Number(p.id)})">편집</button>${owner ? `<i class="pd-who" title="${escHtml(owner)}">${escHtml(owner.slice(-2))}</i>` : ''}</span></div>
+        </article>`;
+    };
+    box.innerHTML = PD_COLS.map(col => {
+        let rows = list.filter(p => pdColOf(p) === col.key).sort(byDate);
+        const total = rows.length;
+        if (col.key === 'done') rows = rows.reverse().slice(0, PD_DONE_MAX);
+        return `<div class="pd-col ${col.cls}">
+            <div class="pd-col-h">${col.label} <em>${total}</em></div>
+            ${rows.map(p => card(p, col)).join('') || '<div class="hm-empty">없음</div>'}
+            ${total > rows.length ? `<button type="button" class="pd-more" onclick="pdSetView('list')">최근 ${rows.length}건만 표시 · 전체는 목록에서</button>` : ''}
+        </div>`;
+    }).join('');
+}
+function pdSetView(v) {
+    _pdView = v;
+    try { localStorage.setItem('pd_view', v); } catch (_) {}
+    pdRenderBoard();
+}
+document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('#pdView button, #pdScope button');
+    if (!b) return;
+    if (b.dataset.view) pdSetView(b.dataset.view);
+    else { _pdScope = b.dataset.scope; pdRenderBoard(); }
+});
