@@ -23706,7 +23706,7 @@ async function inqRenderDetail() {
           <select class="inq-h-status ${INQ_STATUS_CLS[x.status] || ''}" id="inqFStatus">${inqOpt(INQ_STATUSES, x.status)}</select>
           <select class="inq-h-grade g-${escHtml(x.grade || 'none')}" id="inqFGrade" title="거래처 등급 — 바꾸면 거래처 DB 등급도 같이 바뀌어요">${clientGradeOptions(x.grade || '')}</select>
           <input class="inq-h-title" id="inqFTitle" value="${escHtml(x.title || '')}" placeholder="무엇을 문의했나요? 예) 손목시계 300개 각인 견적">
-          <button class="inq-send-btn" id="inqFSend" type="button">📤 보내기</button>
+          <button class="inq-send-btn" id="inqFSend" type="button">보내기</button>
           <button class="inq-icon-btn" id="inqFDelete" title="상담 삭제">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
           </button>

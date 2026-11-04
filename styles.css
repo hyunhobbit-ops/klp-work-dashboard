@@ -6816,3 +6816,63 @@ button.sc-kpi{cursor:pointer}
 [data-theme="dark"] .label-client{background:var(--yellow-light); color:#F2CF6B}
 [data-theme="dark"] .label-marketing{background:var(--rose-light); color:#F9A8C9}
 [data-theme="dark"] .daily-carry-badge{background:var(--orange-light) !important; color:#FDBA74 !important}
+
+/* 리뉴얼 C안 4단계 — 상담·견적 (구성은 그대로, 색·강조만) */
+/* 상태: 진행은 파랑 계열, 수주만 진한 파랑, 납품·정산·마감은 초록, 대기·보류는 회색, 실패만 빨강 */
+.s-new,.s-talk,.s-pre,.s-quote,.s-make{background:var(--blue-light); color:var(--blue-dark)}
+[data-theme="dark"] .s-pre,[data-theme="dark"] .s-make{background:var(--blue-light); color:var(--blue-dark)}
+.s-won{background:var(--blue); color:#fff}
+[data-theme="dark"] .s-won{color:#fff}
+.s-deliv,.s-done,.s-close{background:var(--green-light); color:#0B8F63}
+[data-theme="dark"] .s-deliv,[data-theme="dark"] .s-done,[data-theme="dark"] .s-close{background:var(--green-light); color:#3FD3A0}
+.s-wait,.s-hold{background:var(--gray-100); color:var(--gray-600)}
+[data-theme="dark"] .s-wait{color:var(--gray-600)}
+.inq-st{font-weight:700; border-radius:99px}
+.tp-switch button.on{color:var(--blue); font-weight:700}
+.inq-next{background:var(--blue-light); color:var(--blue-dark); font-weight:600; max-width:100%}
+.inq-next.late{background:var(--red-light); color:var(--red)}
+
+/* 한눈에 */
+.inqb-who button.on{background:var(--blue); border-color:var(--blue); color:#fff}
+.inqb-who button.on b{color:#DCEBFF}
+.inqb-who button{height:30px; padding:0 12px}
+.inqb-tile{border:0; border-radius:13px; box-shadow:var(--shadow-sm); background:var(--white)}
+.inqb-tile.on{border:0; box-shadow:0 0 0 2px var(--blue)}
+.inqb-end{background:var(--white)}
+.inqb-col{border:0; border-radius:13px; background:#E9EEF6}
+[data-theme="dark"] .inqb-col{background:var(--gray-100)}
+.inqb-card{border:0; box-shadow:0 1px 3px rgba(20,50,100,.08)}
+.inqb-card:hover{border:0; box-shadow:0 5px 12px rgba(20,50,100,.14)}
+.inqb-card.late{border-left:3px solid var(--red)}
+.inqb-c-top em{color:var(--blue-dark)}
+
+/* 상담 */
+.inq-list-col,.inq-detail{border:0; border-radius:14px; box-shadow:var(--shadow-sm)}
+.inq-chip.on{background:var(--blue); border-color:var(--blue); color:#fff}
+.inq-chip.on b{color:#DCEBFF}
+.inq-item.on{border-color:transparent}
+.inq-client{font-size:15px; font-weight:700}
+.inq-send-btn{background:var(--blue)}
+.inq-stage-bar{gap:3px}
+.inq-stg i{height:6px; background:var(--gray-100)}
+.inq-stg b{font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.inq-stg.done i{background:var(--blue)}
+.inq-stg.done b{color:var(--gray-600)}
+.inq-stg.cur i{background:var(--blue); outline:2px solid var(--blue-light); outline-offset:1px}
+.inq-stg.cur b,.inq-stg.cur span{color:var(--blue-dark); font-weight:800}
+/* 지금 할 일: 파란 칸으로 가장 먼저 보이게 (끝남·멈춤은 제외) */
+.inq-now:not(.done):not(.stopped){background:var(--blue); border:0; border-radius:14px; padding:12px 15px}
+.inq-now:not(.done):not(.stopped) .inq-now-lab{color:#DCEBFF}
+.inq-now:not(.done):not(.stopped) .inq-now-msg{color:#fff; font-size:14px}
+.inq-now:not(.done):not(.stopped) .inq-mini{background:rgba(255,255,255,.17); border:0; color:#fff}
+.inq-now:not(.done):not(.stopped) .inq-mini:hover{background:rgba(255,255,255,.28)}
+.inq-now:not(.done):not(.stopped) .inq-mini.primary{background:#fff; border:0; color:#0E66DD}
+[data-theme="dark"] .inq-now:not(.done):not(.stopped){background:#1B5FB8; border:0}
+.inq-side .inq-card{border:0; border-radius:14px; box-shadow:var(--shadow-xs)}
+.inq-msg.d-out{background:var(--blue-light); border-color:transparent}
+.inq-msg.d-out .inq-msg-meta b{color:var(--blue-dark)}
+.inq-msg.d-in{border-color:transparent}
+[data-theme="dark"] .inq-msg.d-in{background:var(--gray-100)}
+[data-theme="dark"] .inq-msg.d-memo{background:#3A3015; border-color:transparent}
+.inq-dir{flex:none}
+.inq-dir button{white-space:nowrap}
