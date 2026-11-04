@@ -17,7 +17,7 @@
     --gray-700: #4e5968;
     --gray-800: #333d4b;
     --gray-900: #191f28;
-    --blue: #3182f6;
+    --blue: #1472E8;
     --blue-light: #e8f3ff;
     --blue-dark: #1b64da;
     --red: #f04452;
@@ -96,7 +96,7 @@ body {
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    background: linear-gradient(135deg, #f0f4ff 0%, #e8f3ff 50%, #f7f8fa 100%);
+    background: #F2F6FC;
     padding: 20px;
 }
 
@@ -1382,7 +1382,7 @@ body {
     letter-spacing: 0.5px;
 }
 .pp-card-badge.best { background: #f43f5e; color: #fff; }
-.pp-card-badge.new { background: #3182f6; color: #fff; }
+.pp-card-badge.new { background: #1472E8; color: #fff; }
 .pp-card-body { padding: 18px 20px; }
 .pp-card-name { font-size: 14px; font-weight: 500; color: var(--gray-900); line-height: 1.4; }
 .pp-card-desc { font-size: 11px; color: var(--gray-500); margin-top: 4px; line-height: 1.4; }
@@ -6598,3 +6598,119 @@ button.sc-kpi{cursor:pointer}
 .kk-main{border:none;border-radius:10px;padding:12px;font-size:14.5px;font-weight:700;cursor:pointer;background:#FEE500;color:#191919;font-family:inherit}
 .kk-sub{border:1px solid var(--gray-200);border-radius:10px;padding:10px;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--gray-700);font-family:inherit}
 .kk-main:disabled,.kk-sub:disabled{opacity:.5;cursor:default}
+
+/* ============================================================
+   리뉴얼 C안 (2026-11) — 왼쪽 2단 메뉴 + KLP 로고 파랑, 그라데이션 없음
+   로고색 #1F85FF는 흰 글씨가 약해서 면 색은 조금 진한 #1472E8
+   ============================================================ */
+:root{
+    --blue:#1472E8; --blue-dark:#0E66DD; --blue-light:#E6F1FF;
+    --sidebar-w:298px;
+    --rail-bg:var(--blue);
+    --hm-flow:#0B3F8C;
+}
+[data-theme="dark"]{ --blue:#2F86F0; --blue-dark:#4A9DFF; --blue-light:#16304F; --rail-bg:#12263F; --hm-flow:#133A70; }
+@media (max-width:1280px){ :root{ --sidebar-w:262px; } }
+
+.sidebar{flex-direction:row}
+.sidebar-panel{flex:1; min-width:0; display:flex; flex-direction:column}
+.rail{width:70px; flex:none; background:var(--rail-bg); display:flex; flex-direction:column; align-items:center; gap:5px; padding:14px 0; overflow-y:auto}
+.rail-mark{width:44px; height:44px; border-radius:13px; background:#fff; color:#1472E8; display:grid; place-items:center; font-weight:800; font-size:13.5px; letter-spacing:-.03em; margin-bottom:12px; flex:none}
+.rail-btn{width:56px; border:0; background:none; border-radius:12px; padding:7px 0 5px; color:#E8F2FF; display:flex; flex-direction:column; align-items:center; gap:2px; font-family:inherit; font-size:11.5px; font-weight:600; line-height:1.3; cursor:pointer; flex:none}
+.rail-btn svg{width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
+.rail-btn:hover{background:rgba(255,255,255,.14)}
+.rail-btn.active{background:#fff; color:#1472E8}
+.rail-sp{flex:1}
+.rail-user{border:0; background:none; padding:0; cursor:pointer; margin-top:4px; flex:none}
+.rail-user .user-avatar{background:#fff; color:#1472E8; font-size:12px}
+
+.sidebar-top{padding:15px 16px 12px}
+.logo-klp{background:url("logo.png") left center/132px auto no-repeat; width:132px; height:34px}
+.logo-klp .logo-icon,.logo-klp .logo-text{display:none !important}
+.rail-area{padding:4px 18px 8px}
+.rail-area small{display:block; font-size:12px; font-weight:600; color:var(--gray-400)}
+.rail-area b{font-size:19px; letter-spacing:-.02em; color:var(--gray-900)}
+.nav-group[data-rail]:not(.rail-on){display:none !important}
+.nav-group-label{display:none}
+#urlShortcutsGroup .nav-group-label,#navAdminGroup .nav-group-label{display:flex}
+.sidebar-nav > .nav-group{display:flex; flex-direction:column; gap:2px}
+.sidebar-nav .nav-item > svg:not(.external-icon){display:none}
+.sidebar-nav .nav-sub-label > svg:not(.nav-caret){display:none}
+.nav-item{padding:8px 11px; font-size:13.5px}
+.nav-item.active{box-shadow:none; font-weight:700}
+.nav-sub-label{padding:8px 11px 3px; font-size:12px; color:var(--gray-400)}
+.nav-sub-item{padding-left:20px !important; font-size:13.5px !important; font-weight:600 !important}
+.nav-my{gap:8px !important; padding-top:6px}
+.nav-my .sidebar-user{padding:2px 4px 8px; justify-content:space-between}
+.nav-tip{display:block; width:auto; text-align:left; margin:10px 12px 14px; padding:12px 13px; border:0; border-radius:13px; background:var(--blue-light); color:var(--gray-800); cursor:pointer; font-family:inherit}
+.nav-tip[hidden]{display:none}
+.nav-tip b{display:block; font-size:13px}
+.nav-tip span{display:block; font-size:12px; color:var(--gray-500); margin:2px 0 7px}
+.nav-tip i{display:block; height:5px; border-radius:3px; background:var(--gray-200); overflow:hidden}
+.nav-tip u{display:block; height:100%; background:var(--blue)}
+
+@media (max-width:1023px){
+    :root{ --sidebar-w:0px; }
+    .sidebar{transform:translateX(-310px); width:300px}
+    .sidebar.open{transform:translateX(0)}
+    .rail-area{padding-top:0}
+}
+
+/* 홈 */
+.hm-greet-right{display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+.hm-greet-right .greeting-date{display:none}   /* 날짜는 위 제목줄에 이미 있음 */
+.hm-cta{height:38px; padding:0 15px; border:0; border-radius:11px; background:var(--blue); color:#fff; font-family:inherit; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap}
+.hm-cta:hover{background:var(--blue-dark)}
+.hm-kpis{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin-bottom:14px}
+.hm-kpi{border:0; text-align:left; border-radius:16px; padding:15px 17px; background:var(--white); box-shadow:var(--shadow-sm); display:flex; flex-direction:column; gap:3px; cursor:pointer; font-family:inherit; color:var(--gray-900); min-width:0}
+.hm-kpi:hover{box-shadow:var(--shadow-md)}
+.hm-kpi .h{display:flex; justify-content:space-between; align-items:center; gap:6px; font-weight:600; font-size:13px}
+.hm-kpi b{font-size:32px; font-weight:800; letter-spacing:-.03em; line-height:1.15; font-variant-numeric:tabular-nums}
+.hm-kpi .s{font-size:12.5px; color:var(--gray-500)}
+.hm-kpi.main{background:var(--blue); color:#fff}
+.hm-kpi.main .s{color:#DCEBFF}
+.hm-kpi.main .hm-pill{background:#fff; color:#1472E8}
+.hm-pill{display:inline-block; font-style:normal; padding:2px 8px; border-radius:99px; font-size:12px; font-weight:600; white-space:nowrap}
+.hm-pill.blue{background:var(--blue-light); color:var(--blue)}
+.hm-pill.red{background:var(--red-light); color:var(--red)}
+.hm-pill.warn{background:var(--orange-light); color:var(--orange)}
+.hm-pill.good{background:var(--green-light); color:#0B8F63}
+[data-theme="dark"] .hm-pill.blue{color:#7DB8FF}
+[data-theme="dark"] .hm-pill.good{color:#3FD3A0}
+.hm-grid{display:grid; grid-template-columns:minmax(0,1.85fr) minmax(280px,1fr); gap:14px; margin-bottom:16px}
+.hm-flow{background:var(--hm-flow); border-radius:18px; color:#fff; padding:22px; display:flex; flex-direction:column; gap:16px; min-width:0}
+.hm-flow-head small{display:block; font-size:12px; font-weight:700; color:#9CCBFF}
+.hm-flow-head h3{font-size:20px; font-weight:700; letter-spacing:-.02em; color:#fff; margin:0}
+.hm-flow-head span{font-size:12.5px; color:#BDD6F5}
+.hm-fun{display:flex; gap:6px; flex-wrap:wrap}
+.hm-fn{flex:1 1 90px; min-width:84px; border:0; border-radius:13px; padding:11px 12px; background:rgba(255,255,255,.1); text-align:left; color:#fff; display:flex; flex-direction:column; gap:1px; cursor:pointer; font-family:inherit}
+.hm-fn:hover{background:rgba(255,255,255,.18)}
+.hm-fn[aria-pressed=true]{background:#fff; color:#0B3F8C}
+.hm-fn span{font-size:12.5px; font-weight:600}
+.hm-fn b{font-size:24px; font-weight:800; letter-spacing:-.02em; line-height:1.15; font-variant-numeric:tabular-nums}
+.hm-fn small{font-size:12px; opacity:.8}
+.hm-deals{background:rgba(255,255,255,.08); border-radius:13px; padding:5px 14px; flex:1; min-height:120px}
+.hm-row{display:flex; align-items:center; gap:11px; padding:9px 0; border-top:1px solid var(--gray-100); cursor:pointer}
+.hm-row:first-child{border-top:0}
+.hm-row .g{flex:1; min-width:0}
+.hm-row .g b{display:block; font-weight:600; font-size:13.5px}
+.hm-row .g span{display:block; color:var(--gray-500); font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.hm-row .r{white-space:nowrap; font-size:13px; font-weight:600}
+.hm-deals .hm-row{border-color:rgba(255,255,255,.13)}
+.hm-deals .hm-row .g span{color:#BDD6F5}
+.hm-empty{padding:14px 0; font-size:13px; color:var(--gray-500); text-align:center}
+.hm-deals .hm-empty{color:#BDD6F5}
+.hm-strip{display:flex; gap:18px; flex-wrap:wrap; background:rgba(0,0,0,.2); border-radius:13px; padding:11px 15px; align-items:center}
+.hm-strip small{display:block; font-size:12px; color:#BDD6F5}
+.hm-strip b{font-size:17px; font-variant-numeric:tabular-nums}
+.hm-live{margin-right:auto; flex:1 1 220px; min-width:0; border:0; background:none; color:#fff; font-family:inherit; font-size:13px; display:flex; gap:7px; align-items:center; text-align:left; cursor:pointer; padding:0}
+.hm-live i{font-style:normal; background:#fff; color:#0B3F8C; font-size:11.5px; font-weight:700; border-radius:6px; padding:1px 6px; white-space:nowrap}
+.hm-live span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.hm-side{display:flex; flex-direction:column; gap:14px; min-width:0}
+.hm-today{max-height:300px; overflow-y:auto}
+.hm-today .dash-task-check{cursor:pointer}
+.hm-today .dash-task-check.done{background:var(--blue); border-color:var(--blue)}
+.hm-today .dash-task-person{display:none}
+.hm-more{display:grid; grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:14px; margin-top:16px}
+@media (max-width:1240px){ .hm-grid{grid-template-columns:1fr} }
+@media (max-width:1100px){ .hm-kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .hm-more{grid-template-columns:1fr} }

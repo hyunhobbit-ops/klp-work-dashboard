@@ -43,6 +43,14 @@
 - 연도별, 월별 필터링 지원
 - **이미지 자동입력** (`analyzeDeliveryImageFile` → `api/analyze-delivery.js`): 2026-10 Sonnet 4.6(사진 1568px 한계) 인식률 문제로 **Claude Sonnet 5.5 + 고해상도**로 교체. 클라이언트가 긴 변 2576px·JPEG 0.92로 보냄. 서버는 구조화 출력(`output_config.format` json_schema, 강제 tool_choice는 5.5에서 400) + effort `high` + `fallbacks: "default"`(beta `server-side-fallback-2026-07-01`), 이름·전화·우편번호를 한 글자씩 대조하라는 지시. 요청이 400이면 예전 방식(Sonnet 4.6 + 도구)으로 한 번 재시도. 응답 `engine`에 실제 모델. Vercel 환경변수 `ANTHROPIC_DELIVERY_MODEL`(예: claude-opus-5-5)·`ANTHROPIC_DELIVERY_EFFORT`로 코드 수정 없이 변경. 대략 장당 20~40원(Opus 5.5는 45~85원)
 
+## 🎨 리뉴얼 C안 (2026-11, 현호님 결정) — 단계별 진행 중
+- **원칙**: 기능·데이터는 그대로, 겉모습과 메뉴 위치만. **그라데이션 쓰지 않음**(현호님 요청, 단색만). 색 = KLP 로고 파랑(#1F85FF, 면 색은 흰 글씨가 읽히게 조금 진한 `--blue` #1472E8). 빨강·주황·초록은 상태 표시에만. 폰 전용 화면(`mRoot`)은 구조 유지
+- **1단계 완료**: 왼쪽 2단 메뉴 + 색 + 홈. 가안 원본: `~/Desktop/hyunho-server/dashboard-redesign-draft/` (저장소 밖)
+- **2단 메뉴**: `.sidebar` = `.rail`(큰 메뉴, `data-grp`) + `.sidebar-panel`(세부 메뉴). 사이드바의 `.nav-group[data-rail="work|sale|prop|lib|tool|link|set"]` 중 `.rail-on`만 보임. `railSet(grp)`, 탭을 열면 `switchTab` → `railSyncTab`이 그 묶음으로, `railRefresh`는 모듈·권한으로 다 숨은 묶음의 큰 메뉴 버튼을 숨김. 새 메뉴는 알맞은 `data-rail` 묶음 안에 `.nav-item[data-tab]`으로 추가 (아이콘은 CSS로 숨김, 큰 메뉴 이름은 `RAIL_GROUPS`)
+- 알림 받기·카톡 연결·비밀번호·이름·로그아웃은 `.nav-my`(설정 묶음), 아바타(`#userAvatar`)는 큰 메뉴 맨 아래
+- **홈** (`renderHome` + `hm*`): 숫자 4칸(`hmRenderProjectsKpi`·`hmRenderOverKpi`·`hmRenderPayKpi` — 입금·계산서는 `cashCanAccess()`만, 다른 직원은 긴급 항목) / 상담 흐름(`hmLoadFlow`: 진행 단계 7칸·최근 통화, 1분에 한 번만 조회, 금액·마진은 자금확인 권한자만) / 오늘 할 일(체크 → `toggleTask`) / 이번 주 납기(`hmRenderWeekDue`, 왼쪽 메뉴 아래 `#navWeekTip`도 같은 숫자) / 그 아래 기존 마감 카드·내 프로젝트·매입매출 현황·긴급 항목. 경영목표 배너·바로가기 카드는 뺌(메뉴에 있음)
+- **남은 단계**: 다른 화면을 차례로 같은 모양으로(남은 그라데이션 포함 — 견적·제안서 미리보기, 마진계산기 등), 국내 프로젝트 보드·자금확인 카드 화면(가안에 있음)
+
 ## UI/UX 규칙
 - 한국어 UI, Toss 스타일 디자인
 - Pretendard 폰트 사용

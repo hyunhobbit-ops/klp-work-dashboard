@@ -475,7 +475,7 @@ async function renderCompanySettings() {
     const nameEl = document.getElementById('csBrandName');
     const colorEl = document.getElementById('csPrimaryColor');
     if (nameEl) nameEl.value = s.brandName || (currentCompany && currentCompany.name) || '';
-    if (colorEl) colorEl.value = s.primaryColor || '#3182f6';
+    if (colorEl) colorEl.value = s.primaryColor || '#1472E8';
     // 로고: 저장된 이미지 미리보기, 편집중 임시상태 초기화
     _pendingLogo = undefined;
     const prev = document.getElementById('csLogoPreview');
@@ -680,6 +680,10 @@ function applyCompanyBranding() {
         if (logo) { logo.style.display = 'none'; logo.removeAttribute('src'); }
         if (icon) icon.style.display = '';
     }
+    // 큰 메뉴 맨 위 글자 + KLP는 왼쪽 위에 실제 로고
+    const railMark = document.getElementById('railMark');
+    if (railMark) railMark.textContent = _isKlpCompany() ? 'KLP' : (brand.trim()[0] || 'K').toUpperCase();
+    document.querySelector('.sidebar .logo')?.classList.toggle('logo-klp', _isKlpCompany() && !validLogo);
 }
 
 // 회사가 켠 모듈만 사이드바에 노출. 설정 없으면(=KLP 기본) 전체 노출. 권한 기반 숨김과는 독립(모듈 꺼진 것만 추가로 숨김).
@@ -719,6 +723,7 @@ function applyModuleGating() {
         const items = g.querySelectorAll('.nav-item');
         if (items.length && !Array.from(items).some(i => i.style.display !== 'none')) g.style.display = 'none';
     });
+    railRefresh();
 }
 
 async function handleLogin() {
@@ -1610,6 +1615,7 @@ function switchTab(tabId, fromHistory = false) {
     document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
     const navBtn = document.querySelector(`[data-tab="${tabId}"]`);
     if (navBtn) navBtn.classList.add('active');
+    railSyncTab(navBtn);
 
     // Update content
     document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
@@ -1989,9 +1995,7 @@ function renderHome() {
     }
 
     // Summary cards (이번 달 택배 카드는 HTML에서 제거됨)
-    document.getElementById('activeProjects').textContent = activeCount;
-    document.getElementById('todayTasks').textContent = myTodayItems.length;
-    document.getElementById('completionRate').textContent = rate + '%';
+    hmRenderProjectsKpi(myTodayItems.length, myTodayDone, rate);
 
     // 프로젝트 섹션 집계 — 홈에서 보여주는 planning 데이터 (비동기 로드)
     renderPlanningHomeSection();
@@ -2091,6 +2095,7 @@ function renderHome() {
     renderDeadlineCard(overdueItems, 'overdueList', 'overdueCount', 'overdue');
     renderDeadlineCard(soonItems, 'soonList', 'soonCount', 'soon');
     renderDeadlineCard(weekItems, 'weekList', 'weekCount', 'week');
+    hmRenderOverKpi(overdueItems.length, soonItems.length, weekItems.length);
 
     // Urgent — 본인 담당 + 전체(공통)만
     const me = myName || '';
@@ -2107,6 +2112,9 @@ function renderHome() {
         return t.assignee === me || t.assignee === '전체';
     });
     document.getElementById('urgentCount').textContent = urgentProjects.length + urgentTasks.length;
+    hmRenderPayKpi(urgentProjects.length + urgentTasks.length);
+    hmRenderWeekDue();
+    hmLoadFlow();
 
     let urgentHtml = '';
     urgentProjects.forEach(p => {
@@ -2146,7 +2154,7 @@ function renderHome() {
         else if (t.done) when = '<span class="dash-task-when muted">완료</span>';
         else if (t.startMin != null) when = `<span class="dash-task-when tbx-mono">${tbxFmt(t.startMin)}</span>`;
         taskHtml += `<div class="dash-task-item ${t.done ? 'completed' : ''}" ${late > 0 ? 'data-late="1"' : ''}>
-            <div class="dash-task-check ${t.done ? 'done' : ''}"></div>
+            <div class="dash-task-check ${t.done ? 'done' : ''}" role="checkbox" aria-checked="${!!t.done}" title="완료 체크" onclick="toggleTask(${Number(t.id)})"></div>
             <span class="dash-task-name">${t.big3Rank != null ? '⭐ ' : ''}${escHtml(t.task)}</span>
             ${when}
             <span class="dash-task-person">${escHtml(t.assignee)}</span>
@@ -28875,4 +28883,163 @@ async function kakaoOpen() {
         } catch (err) { showToast(err.message); }
         kakaoOpen();
     });
+}
+
+// =====================================
+// 왼쪽 2단 메뉴 (2026-11 리뉴얼) — 큰 메뉴를 고르면 옆 패널이 그 묶음만 보여줌
+// =====================================
+const RAIL_GROUPS = {
+    work: ['업무', '자주 쓰는 일'], sale: ['매입매출', '주문과 돈'], prop: ['제안서', '영업 자료'], lib: ['자료실', '회사 자료'],
+    tool: ['편의성', '바로 쓰는 도구'], link: ['바로가기', '자주 여는 사이트'], set: ['설정', '내 계정·회사']
+};
+function railSet(grp) {
+    if (!RAIL_GROUPS[grp]) return;
+    document.querySelectorAll('.nav-group[data-rail]').forEach(g => g.classList.toggle('rail-on', g.dataset.rail === grp));
+    document.querySelectorAll('.rail-btn[data-grp]').forEach(b => b.classList.toggle('active', b.dataset.grp === grp));
+    document.getElementById('railTitle').textContent = RAIL_GROUPS[grp][0];
+    document.getElementById('railSub').textContent = RAIL_GROUPS[grp][1];
+}
+function railSyncTab(navBtn) {
+    const box = navBtn && navBtn.closest('[data-rail]');
+    railSet(box ? box.dataset.rail : 'work');
+}
+// 권한·모듈로 다 숨은 묶음은 큰 메뉴 버튼도 숨김
+function railRefresh() {
+    document.querySelectorAll('.rail-btn[data-grp]').forEach(b => {
+        const grp = b.dataset.grp;
+        if (grp === 'set') return;
+        const live = Array.from(document.querySelectorAll(`.nav-group[data-rail="${grp}"]`)).some(g => g.style.display !== 'none');
+        b.style.display = live ? '' : 'none';
+    });
+}
+document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('.rail [data-grp]');
+    if (b) railSet(b.dataset.grp);
+});
+
+// =====================================
+// 홈 화면 (2026-11 리뉴얼)
+// =====================================
+function hmSet(id, text) { const el = document.getElementById(id); if (el) el.textContent = text; }
+function hmNewInquiry() { switchTab('projects-temp'); inqShortcutNew(); }
+function hmIsLive(p) { return p.status !== '완료' && p.status !== '취소'; }
+function hmDateStr(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function hmWon(n) {
+    const man = Math.round((n || 0) / 10000);
+    const eok = Math.floor(man / 10000), rest = man % 10000;
+    return (eok ? eok + '억' + (rest ? ' ' : '') : '') + (rest || !eok ? rest.toLocaleString('ko-KR') + '만' : '');
+}
+function hmRenderProjectsKpi(total, done, rate) {
+    hmSet('hmTodayN', total - done);
+    hmSet('hmTodayP', rate + '%');
+    hmSet('hmTodayS', `${total}건 중 ${done}건 완료`);
+    const live = list => list.filter(p => p.status === '진행 중').length;
+    const dom = live(domesticProjects), ovs = live(overseasProjects);
+    hmSet('hmProjN', dom + ovs);
+    hmSet('hmProjP', `국내 ${dom} · 해외 ${ovs}`);
+    const weekAgo = hmDateStr(new Date(Date.now() - 6 * 86400000));
+    hmSet('hmProjS', `최근 7일 시작 ${projects.filter(p => (p.startDate || '') >= weekAgo).length}건`);
+}
+function hmRenderOverKpi(over, soon, week) {
+    hmSet('hmOverN', over);
+    hmSet('hmOverS', `3일 안 ${soon}건 · 7일 안 ${week}건`);
+    const pill = document.getElementById('hmOverP');
+    if (pill) pill.style.display = over ? '' : 'none';
+}
+// 입금·계산서는 자금확인 권한자에게만(카톡 알림과 같은 기준), 다른 직원은 긴급 항목
+function hmRenderPayKpi(urgent) {
+    const card = document.getElementById('hmPayCard');
+    if (!card) return;
+    if (cashCanAccess()) {
+        const list = projects.filter(p => p.status !== '취소' && p.checks && p.checks.delivered && (!p.checks.finalPayment || !p.checks.invoice));
+        hmSet('hmPayL', '입금·계산서');
+        hmSet('hmPayN', list.length);
+        hmSet('hmPayS', `잔금 미입금 ${list.filter(p => !p.checks.finalPayment).length}건 · 계산서 미발행 ${list.filter(p => !p.checks.invoice).length}건`);
+        hmSet('hmPayP', '미완료');
+        document.getElementById('hmPayP').style.display = list.length ? '' : 'none';
+        card.onclick = () => switchTab('projects-domestic');
+    } else {
+        hmSet('hmPayL', '긴급 항목');
+        hmSet('hmPayN', urgent);
+        hmSet('hmPayS', '내 담당 + 전체 공통');
+        document.getElementById('hmPayP').style.display = 'none';
+        card.onclick = () => document.getElementById('urgentList').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+// 이번 주(월~일) 납기: 납품 전 건만. 작지·디확 상태 표시. 왼쪽 메뉴 아래 작은 칸도 같은 숫자
+function hmRenderWeekDue() {
+    const now = new Date(currentDate || Date.now());
+    const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    const from = hmDateStr(mon), to = hmDateStr(sun);
+    const list = domesticProjects
+        .filter(p => hmIsLive(p) && p.deadline && p.deadline >= from && p.deadline <= to && !(p.checks && p.checks.delivered))
+        .sort((a, b) => a.deadline.localeCompare(b.deadline));
+    const ready = p => p.checks && p.checks.design && p.checks.workOrder;
+    const box = document.getElementById('hmWeekDue');
+    if (box) {
+        box.innerHTML = list.slice(0, 5).map(p => {
+            const c = p.checks || {};
+            const st = !c.design ? ['디확 대기', 'warn'] : !c.workOrder ? ['작지 미발송', 'red'] : ['준비 끝', 'good'];
+            return `<div class="hm-row" role="button" tabindex="0" onclick="showProjectDetail(${Number(p.id)})">
+                <div class="g"><b>${escHtml(p.client ? p.client + ' ' + p.name : p.name)}</b><span>${fmtDisplay(p.deadline)}</span></div>
+                <i class="hm-pill ${st[1]}">${st[0]}</i></div>`;
+        }).join('') || '<div class="hm-empty">이번 주 납기가 없어요</div>';
+    }
+    const tip = document.getElementById('navWeekTip');
+    if (tip) {
+        tip.hidden = !list.length;
+        const n = list.filter(ready).length;
+        tip.innerHTML = `<b>이번 주 납기</b><span>${list.length}건 중 ${n}건 준비 끝</span><i><u style="width:${list.length ? Math.round(n / list.length * 100) : 0}%"></u></i>`;
+    }
+}
+// 상담 흐름: 진행 중 상담을 단계별로. 화면을 다시 그릴 때마다 조회하지 않게 1분에 한 번만
+const HM_STAGES = ['신규', '상담중', '가견적', '견적발송', '수주', '제작중', '납품완료'];
+let _hmFlow = { at: 0, inq: [], call: null, stage: '견적발송', busy: false };
+async function hmLoadFlow() {
+    if (!document.getElementById('hmFun')) return;
+    hmRenderFlow();
+    if (_hmFlow.busy || Date.now() - _hmFlow.at < 60000) return;
+    _hmFlow.busy = true;
+    try {
+        const [iq, cl] = await Promise.all([
+            sb.from('inquiries').select('id, client, title, status, last_contact_at').in('status', HM_STAGES).order('last_contact_at', { ascending: false }).limit(500),
+            sb.from('calls').select('id, client_name, contact_name, contact_title, other_number, started_at, summary').eq('status', 'done').not('summary', 'eq', '').order('started_at', { ascending: false }).limit(1)
+        ]);
+        if (iq.error) console.error('상담 흐름 불러오기 실패', iq.error);
+        if (cl.error) console.error('최근 통화 불러오기 실패', cl.error);
+        _hmFlow.inq = iq.data || [];
+        _hmFlow.call = (cl.data && cl.data[0]) || null;
+        _hmFlow.at = Date.now();
+    } finally { _hmFlow.busy = false; }
+    hmRenderFlow();
+}
+function hmAgo(ts) {
+    if (!ts) return '';
+    const days = Math.floor((Date.now() - new Date(ts).getTime()) / 86400000);
+    return days <= 0 ? '오늘 연락' : `${days}일 전 연락`;
+}
+function hmRenderFlow() {
+    const fun = document.getElementById('hmFun');
+    if (!fun) return;
+    const by = st => _hmFlow.inq.filter(x => x.status === st);
+    fun.innerHTML = HM_STAGES.map(st => `<button class="hm-fn" aria-pressed="${st === _hmFlow.stage}" data-st="${st}"><span>${st}</span><b>${by(st).length}</b><small>건</small></button>`).join('');
+    fun.querySelectorAll('.hm-fn').forEach(b => { b.onclick = () => { _hmFlow.stage = b.dataset.st; hmRenderFlow(); }; });
+    const rows = by(_hmFlow.stage).slice(0, 5);
+    document.getElementById('hmDeals').innerHTML = rows.map(x => `<div class="hm-row" role="button" tabindex="0" data-id="${Number(x.id)}">
+        <div class="g"><b>${escHtml(x.client || '(거래처 없음)')}</b><span>${escHtml(x.title || '')}</span></div><div class="r">${hmAgo(x.last_contact_at)}</div></div>`).join('')
+        || `<div class="hm-empty">${_hmFlow.at ? _hmFlow.stage + ' 단계 상담이 없어요' : '불러오는 중…'}</div>`;
+    document.querySelectorAll('#hmDeals .hm-row').forEach(r => { r.onclick = () => { switchTab('projects-temp'); inqOpenFromQuote(Number(r.dataset.id)); }; });
+    // 아래 줄: 최근 통화 요약 + 이번 달 수주(금액·마진은 자금확인 권한자에게만)
+    const month = hmDateStr(new Date()).slice(0, 7);
+    const won = domesticProjects.filter(p => p.status !== '취소' && (p.startDate || '').startsWith(month));
+    const rev = won.reduce((s, p) => s + (p.revenue || 0), 0);
+    const sup = won.reduce((s, p) => s + (p.supplierRevenue || 0), 0);
+    const c = _hmFlow.call;
+    const stats = cashCanAccess()
+        ? `<div><small>이번 달 수주</small><b>${hmWon(rev)}</b></div><div><small>견적 대기</small><b>${by('견적발송').length}건</b></div><div><small>평균 마진</small><b>${rev ? Math.round((rev - sup) / rev * 100) : 0}%</b></div>`
+        : `<div><small>이번 달 수주</small><b>${won.length}건</b></div><div><small>견적 대기</small><b>${by('견적발송').length}건</b></div>`;
+    document.getElementById('hmStrip').innerHTML = (c
+        ? `<button class="hm-live" onclick="switchTab('calls')"><i>통화</i><span>${escHtml(clOther(c))} · ${escHtml((c.summary || '').slice(0, 40))}</span></button>`
+        : '<span class="hm-live"></span>') + stats;
 }

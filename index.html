@@ -16,8 +16,8 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261028a">
-    <link rel="stylesheet" href="mobile.css?v=20260507e" media="(max-width: 1023px)">
+    <link rel="stylesheet" href="styles.css?v=20261104a">
+    <link rel="stylesheet" href="mobile.css?v=20261104a" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -72,6 +72,20 @@
         <button id="mBackSimple" class="m-back-simple" hidden onclick="mSetFull(false)">📱 간단 화면</button>
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
+            <!-- 왼쪽 큰 메뉴 (railSet이 옆 패널의 data-rail 묶음을 바꿔 보여줌) -->
+            <nav class="rail" id="rail" aria-label="큰 메뉴">
+                <div class="rail-mark" id="railMark">KLP</div>
+                <button class="rail-btn active" data-grp="work"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>업무</button>
+                <button class="rail-btn" data-grp="sale"><svg viewBox="0 0 24 24"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>매입매출</button>
+                <button class="rail-btn" data-grp="prop"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/></svg>제안서</button>
+                <button class="rail-btn" data-grp="lib"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>자료실</button>
+                <button class="rail-btn" data-grp="tool"><svg viewBox="0 0 24 24"><path d="M14 6a4 4 0 0 0 5 5l-9 9-4-4 9-9z"/></svg>편의성</button>
+                <button class="rail-btn" data-grp="link"><svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/></svg>바로가기</button>
+                <span class="rail-sp"></span>
+                <button class="rail-btn" data-grp="set"><svg viewBox="0 0 24 24"><path d="M5 8h9M18 8h1M5 16h1M10 16h9"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg>설정</button>
+                <button class="rail-user" data-grp="set" title="내 계정"><span class="user-avatar" id="userAvatar">--</span></button>
+            </nav>
+            <div class="sidebar-panel">
             <div class="sidebar-top">
                 <div class="logo">
                     <img id="sidebarLogo" alt="" style="display:none;width:32px;height:32px;object-fit:contain;border-radius:8px">
@@ -82,16 +96,15 @@
                     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
+            <div class="rail-area"><small id="railSub">자주 쓰는 일</small><b id="railTitle">업무</b></div>
             <nav class="sidebar-nav">
-                <!-- Home -->
-                <button class="nav-item active" data-tab="home" data-tip="대시보드 홈 — 오늘의 요약과 빠른 이동 카드">
+                <!-- 업무 그룹 -->
+                <div class="nav-group rail-on" data-rail="work">
+                    <div class="nav-group-label">업무</div>
+                    <button class="nav-item active" data-tab="home" data-tip="대시보드 홈 — 오늘의 요약과 빠른 이동 카드">
                     <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z"/></svg>
                     <span>홈</span>
-                </button>
-
-                <!-- 업무 그룹 -->
-                <div class="nav-group">
-                    <div class="nav-group-label">업무</div>
+                    </button>
                     <div class="nav-sub-group" id="navPlanningGroup">
                         <div class="nav-sub-label" data-tip="협업 프로젝트 — 회사·펀딩·개인 구분">
                             <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
@@ -105,24 +118,6 @@
                         </button>
                         <button class="nav-item nav-sub-item" data-tab="planning-funding" id="navPlanningFunding" data-tip="크라우드펀딩 프로젝트 (관리자 전용)" style="display:none">
                             <span>펀딩</span>
-                        </button>
-                    </div>
-                    <div class="nav-sub-group">
-                        <div class="nav-sub-label" data-tip="매입·매출 프로젝트 관리">
-                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                            <span>매입매출</span>
-                        </div>
-                        <button class="nav-item nav-sub-item" data-tab="projects-temp" data-tip="상담·견적 — 고객 상담 기록부터 견적서 출력까지">
-                            <span>상담·견적</span>
-                        </button>
-                        <button class="nav-item nav-sub-item" data-tab="projects-domestic" data-tip="국내 주문 프로젝트 진행 현황 (매출+매입 통합)">
-                            <span>국내</span>
-                        </button>
-                        <button class="nav-item nav-sub-item" data-tab="projects-overseas" data-tip="해외 주문 프로젝트 진행 현황">
-                            <span>해외</span>
-                        </button>
-                        <button class="nav-item nav-sub-item" data-tab="sourcing" data-tip="해외 소싱 — 알리바바 등에서 받은 견적을 품목별로 모아 비교, 결정한 업체는 국내 프로젝트로">
-                            <span>해외 소싱</span>
                         </button>
                     </div>
                     <button class="nav-item" data-tab="daily" data-tip="담당자별 일일 업무 — 전체·임원·대표·개인 탭">
@@ -149,18 +144,35 @@
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
                         <span>마케팅</span>
                     </button>
-                    <button class="nav-item" data-tab="marketdb" id="navMarketdb" data-tip="중고 상품 업로드 현황 (관리자 전용)" style="display:none">
-                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"/></svg>
-                        <span>중고마켓DB</span>
+                </div>
+
+                <!-- 매입매출 그룹 -->
+                <div class="nav-group" data-rail="sale">
+                    <div class="nav-group-label">매입매출</div>
+                    <button class="nav-item" data-tab="projects-temp" data-tip="상담·견적 — 고객 상담 기록부터 견적서 출력까지">
+                        <span>상담·견적</span>
+                    </button>
+                    <button class="nav-item" data-tab="projects-domestic" data-tip="국내 주문 프로젝트 진행 현황 (매출+매입 통합)">
+                        <span>국내</span>
+                    </button>
+                    <button class="nav-item" data-tab="projects-overseas" data-tip="해외 주문 프로젝트 진행 현황">
+                        <span>해외</span>
+                    </button>
+                    <button class="nav-item" data-tab="sourcing" data-tip="해외 소싱 — 알리바바 등에서 받은 견적을 품목별로 모아 비교, 결정한 업체는 국내 프로젝트로">
+                        <span>해외 소싱</span>
                     </button>
                     <button class="nav-item" data-tab="cash" id="navCash" data-tip="자금확인 — 예금·대출·외화·퇴직연금·페이오니아·쇼피파이·미수금 (관리자 전용)" style="display:none">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span>자금확인</span>
                     </button>
+                    <button class="nav-item" data-tab="marketdb" id="navMarketdb" data-tip="중고 상품 업로드 현황 (관리자 전용)" style="display:none">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        <span>중고마켓DB</span>
+                    </button>
                 </div>
 
                 <!-- 제안서 그룹 -->
-                <div class="nav-group">
+                <div class="nav-group" data-rail="prop">
                     <div class="nav-group-label">제안서</div>
                     <button class="nav-item" data-tab="product-db" data-tip="제안서 작성용 상품 카탈로그 (카테고리별 등록)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"/></svg>
@@ -173,7 +185,7 @@
                 </div>
 
                 <!-- 자료실 그룹 -->
-                <div class="nav-group">
+                <div class="nav-group" data-rail="lib">
                     <div class="nav-group-label">자료실</div>
                     <button class="nav-item" data-tab="docs" data-tip="회사 양식·규정·계약서 (준비 중)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
@@ -198,7 +210,7 @@
                 </div>
 
                 <!-- 편의성 그룹 -->
-                <div class="nav-group">
+                <div class="nav-group" data-rail="tool">
                     <div class="nav-group-label">편의성</div>
                     <button class="nav-item" data-tab="quotes" data-tip="단독 견적서 빠른 작성 (DC 없이 견적만 발행)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1L14 8M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1L10 16m11-4a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -225,7 +237,7 @@
                 </div>
 
                 <!-- URL 바로가기 그룹 -->
-                <div class="nav-group" id="urlShortcutsGroup">
+                <div class="nav-group" id="urlShortcutsGroup" data-rail="link">
                     <div class="nav-group-label">
                         <span>URL 바로가기</span>
                         <span class="nav-group-line"></span>
@@ -313,7 +325,7 @@
                 </div>
 
                 <!-- 회사 설정 (회사 관리자 전용) -->
-                <div class="nav-group" id="navCompanySettingsGroup" style="display:none">
+                <div class="nav-group" id="navCompanySettingsGroup" data-rail="set" style="display:none">
                     <div class="nav-group-label">설정</div>
                     <button class="nav-item" data-tab="company-settings" id="navCompanySettings" data-tip="직원 추가·회사명/색·메뉴 설정 (관리자)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -322,7 +334,7 @@
                 </div>
 
                 <!-- 운영자(슈퍼관리자) 전용 — 고객사 관리 -->
-                <div class="nav-group" id="navAdminGroup" style="display:none">
+                <div class="nav-group" id="navAdminGroup" data-rail="set" style="display:none">
                     <div class="nav-group-label">고객사 관리</div>
                     <button class="nav-item" data-tab="admin-add" id="navAdminAdd" data-tip="새 고객사 + 관리자 계정 생성 (운영자 전용)">
                         <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>
@@ -333,13 +345,9 @@
                         <span>고객사 관리</span>
                     </button>
                 </div>
-            </nav>
-            <div class="sidebar-footer">
-                <button id="pushToggleBtn" onclick="enablePushNotifications()" title="이 기기로 업무 알림 받기" style="display:none;width:100%;align-items:center;gap:8px;padding:9px 12px;margin-bottom:10px;border:1px solid var(--border,#e5e7eb);border-radius:10px;background:transparent;color:var(--text-secondary,#4b5563);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">🔔 <span id="pushToggleLabel">알림 켜기</span></button>
-                <button id="kakaoBtn" onclick="kakaoOpen()" title="내 할 일 알림을 카카오톡 나와의 채팅으로 받기" style="width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;margin-bottom:10px;border:1px solid var(--border,#e5e7eb);border-radius:10px;background:transparent;color:var(--text-secondary,#4b5563);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">💬 <span id="kakaoBtnLabel">카카오톡 알림 연결</span></button>
-                <button onclick="openPasswordChangeModal(false)" title="비밀번호 변경" style="width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;margin-bottom:10px;border:1px solid var(--border,#e5e7eb);border-radius:10px;background:transparent;color:var(--text-secondary,#4b5563);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">🔒 <span>비밀번호 변경</span></button>
-                <div class="sidebar-user">
-                    <div class="user-avatar" id="userAvatar">--</div>
+                <!-- 내 계정 -->
+                <div class="nav-group nav-my" data-rail="set">
+                    <div class="sidebar-user">
                     <div class="user-info">
                         <span class="user-name" id="userName">로딩중...</span>
                         <span class="user-role" id="userRole">-</span>
@@ -347,7 +355,13 @@
                     <button class="logout-btn" onclick="handleLogout()" title="로그아웃">
                         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
                     </button>
+                    </div>
+                <button id="pushToggleBtn" onclick="enablePushNotifications()" title="이 기기로 업무 알림 받기" style="display:none;width:100%;align-items:center;gap:8px;padding:9px 12px;margin-bottom:10px;border:1px solid var(--border,#e5e7eb);border-radius:10px;background:transparent;color:var(--text-secondary,#4b5563);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">🔔 <span id="pushToggleLabel">알림 켜기</span></button>
+                <button id="kakaoBtn" onclick="kakaoOpen()" title="내 할 일 알림을 카카오톡 나와의 채팅으로 받기" style="width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;margin-bottom:10px;border:1px solid var(--border,#e5e7eb);border-radius:10px;background:transparent;color:var(--text-secondary,#4b5563);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">💬 <span id="kakaoBtnLabel">카카오톡 알림 연결</span></button>
+                <button onclick="openPasswordChangeModal(false)" title="비밀번호 변경" style="width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;margin-bottom:10px;border:1px solid var(--border,#e5e7eb);border-radius:10px;background:transparent;color:var(--text-secondary,#4b5563);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">🔒 <span>비밀번호 변경</span></button>
                 </div>
+            </nav>
+            <button class="nav-tip" id="navWeekTip" hidden onclick="switchTab('projects-domestic')"></button>
             </div>
         </aside>
 
@@ -549,23 +563,43 @@
                         <h2 class="greeting-title" id="greetingTitle">안녕하세요</h2>
                         <p class="greeting-sub" id="greetingSub">오늘도 좋은 하루 되세요</p>
                     </div>
-                    <div class="greeting-date" id="greetingDate"></div>
+                    <div class="hm-greet-right">
+                        <div class="greeting-date" id="greetingDate"></div>
+                        <button class="hm-cta" onclick="hmNewInquiry()">＋ 새 상담</button>
+                    </div>
                 </div>
 
-                <!-- 한 줄 히어로 배너 -->
-                <div class="hero-banner">
-                    <div class="hero-banner-left">
-                        <div class="hero-banner-logo">K</div>
-                        <div class="hero-banner-text">
-                            <span class="hero-banner-label">2026 경영목표</span>
-                            <span class="hero-banner-title">국내 시계 브랜드 인지도 1위</span>
-                        </div>
+                <!-- 숫자 4칸 (renderHome → hmRenderKpis) -->
+                <div class="hm-kpis">
+                    <button class="hm-kpi main" onclick="switchTab('daily')"><span class="h">오늘 내 할 일 <i class="hm-pill" id="hmTodayP">0%</i></span><b id="hmTodayN">0</b><span class="s" id="hmTodayS"></span></button>
+                    <button class="hm-kpi" onclick="switchTab('projects-domestic')"><span class="h">진행 프로젝트 <i class="hm-pill blue" id="hmProjP"></i></span><b id="hmProjN">0</b><span class="s" id="hmProjS"></span></button>
+                    <button class="hm-kpi" onclick="document.querySelector('.deadline-cards').scrollIntoView({behavior:'smooth',block:'start'})"><span class="h">마감 지남 <i class="hm-pill red" id="hmOverP">확인 필요</i></span><b id="hmOverN">0</b><span class="s" id="hmOverS"></span></button>
+                    <button class="hm-kpi" id="hmPayCard"><span class="h"><span id="hmPayL">입금·계산서</span> <i class="hm-pill warn" id="hmPayP">미완료</i></span><b id="hmPayN">0</b><span class="s" id="hmPayS"></span></button>
+                </div>
+
+                <div class="hm-grid">
+                    <!-- 상담 흐름 (hmLoadFlow) -->
+                    <div class="hm-flow">
+                        <div class="hm-flow-head"><small>상담 흐름</small><h3>상담에서 납품까지</h3><span>단계를 누르면 그 단계의 거래처가 아래에 나와요</span></div>
+                        <div class="hm-fun" id="hmFun"></div>
+                        <div class="hm-deals" id="hmDeals"></div>
+                        <div class="hm-strip" id="hmStrip"></div>
                     </div>
-                    <div class="hero-banner-goals">
-                        <div class="hero-goal" title="자체 브랜드 확장"><span class="hero-goal-num">01</span><span class="hero-goal-text">브랜드 확장</span></div>
-                        <div class="hero-goal" title="콘텐츠 리더십"><span class="hero-goal-num">02</span><span class="hero-goal-text">콘텐츠 리더십</span></div>
-                        <div class="hero-goal" title="IP 콜라보 사업 확대"><span class="hero-goal-num">03</span><span class="hero-goal-text">IP 콜라보</span></div>
-                        <div class="hero-goal" title="시계 문화 보급"><span class="hero-goal-num">04</span><span class="hero-goal-text">시계 문화</span></div>
+                    <div class="hm-side">
+                        <div class="dash-panel">
+                            <div class="panel-header">
+                                <h2 class="panel-title">오늘의 할 일</h2>
+                                <button class="panel-link" onclick="switchTab('daily')">전체보기 &rarr;</button>
+                            </div>
+                            <div class="panel-body hm-today" id="todaySchedule"></div>
+                        </div>
+                        <div class="dash-panel">
+                            <div class="panel-header">
+                                <h2 class="panel-title">이번 주 납기</h2>
+                                <button class="panel-link" onclick="switchTab('projects-domestic')">전체보기 &rarr;</button>
+                            </div>
+                            <div class="panel-body" id="hmWeekDue"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -597,63 +631,6 @@
                     </div>
                 </div>
 
-                <!-- KPI 스트립 (업무 3 + 프로젝트 3) -->
-                <div class="summary-row kpi-strip">
-                    <div class="summary-card">
-                        <div class="summary-icon blue">
-                            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                        </div>
-                        <div class="summary-info">
-                            <span class="summary-label">진행 중 매입매출</span>
-                            <span class="summary-value" id="activeProjects">0</span>
-                        </div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="summary-icon orange">
-                            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        </div>
-                        <div class="summary-info">
-                            <span class="summary-label">오늘 할 일</span>
-                            <span class="summary-value" id="todayTasks">0</span>
-                        </div>
-                    </div>
-                    <div class="summary-card">
-                        <div class="summary-icon green">
-                            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        </div>
-                        <div class="summary-info">
-                            <span class="summary-label">오늘 완료율</span>
-                            <span class="summary-value" id="completionRate">0%</span>
-                        </div>
-                    </div>
-                    <div class="summary-card kpi-planning">
-                        <div class="summary-icon blue">
-                            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                        </div>
-                        <div class="summary-info">
-                            <span class="summary-label">전체 프로젝트</span>
-                            <span class="summary-value" id="planningTotalCount">0</span>
-                        </div>
-                    </div>
-                    <div class="summary-card kpi-planning">
-                        <div class="summary-icon orange">
-                            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        </div>
-                        <div class="summary-info">
-                            <span class="summary-label">내 할 일 카드</span>
-                            <span class="summary-value" id="planningMyTodo">0</span>
-                        </div>
-                    </div>
-                    <div class="summary-card kpi-planning">
-                        <div class="summary-icon green">
-                            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        </div>
-                        <div class="summary-info">
-                            <span class="summary-label">이번 주 마감</span>
-                            <span class="summary-value" id="planningWeekDue">0</span>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- 프로젝트 섹션 -->
                 <div id="homePlanningSection" style="display:none">
@@ -666,69 +643,20 @@
                 </div>
                 </div><!-- /homePlanningSection -->
 
-                <!-- 업무 현황 (비대칭 1.4fr 1fr) -->
-                <div class="home-section-title" style="margin-top:24px">업무 현황</div>
-                <div class="dash-grid-async">
-                    <!-- 좌측 (넓음): 오늘의 할 일 + 긴급 항목 -->
-                    <div class="dash-col-left">
-                        <div class="dash-panel">
-                            <div class="panel-header">
-                                <h2 class="panel-title">오늘의 할 일</h2>
-                                <button class="panel-link" onclick="switchTab('daily')">전체보기 &rarr;</button>
-                            </div>
-                            <div class="panel-body" id="todaySchedule"></div>
+                <div class="hm-more">
+                    <div class="dash-panel">
+                        <div class="panel-header">
+                            <h2 class="panel-title">매입매출 현황</h2>
+                            <button class="panel-link" onclick="switchTab('projects-domestic')">전체보기 &rarr;</button>
                         </div>
+                        <div class="panel-body" id="dashProjects"></div>
                     </div>
-                    <!-- 가운데: 매입매출 현황 + 긴급 항목 -->
-                    <div class="dash-col-mid">
-                        <div class="dash-panel">
-                            <div class="panel-header">
-                                <h2 class="panel-title">매입매출 현황</h2>
-                                <button class="panel-link" onclick="switchTab('projects-domestic')">전체보기 &rarr;</button>
-                            </div>
-                            <div class="panel-body" id="dashProjects"></div>
+                    <div class="dash-panel">
+                        <div class="panel-header">
+                            <h2 class="panel-title">긴급 항목</h2>
+                            <span class="panel-badge red" id="urgentCount">0</span>
                         </div>
-                        <div class="dash-panel">
-                            <div class="panel-header">
-                                <h2 class="panel-title">긴급 항목</h2>
-                                <span class="panel-badge red" id="urgentCount">0</span>
-                            </div>
-                            <div class="panel-body" id="urgentList"></div>
-                        </div>
-                    </div>
-                    <!-- 우측 (좁음): 바로가기 -->
-                    <div class="dash-col-right">
-                        <div class="dash-panel">
-                            <div class="panel-header">
-                                <h2 class="panel-title">바로가기</h2>
-                            </div>
-                            <div class="quick-mini">
-                                <div class="quick-mini-card" onclick="switchTab('projects-domestic')">
-                                    <div class="quick-mini-icon blue"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg></div>
-                                    <div class="quick-mini-text"><span class="quick-mini-label">매입매출</span><span class="quick-mini-sub" id="qProjects">0건 진행</span></div>
-                                </div>
-                                <div class="quick-mini-card" onclick="switchTab('daily')">
-                                    <div class="quick-mini-icon orange"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-                                    <div class="quick-mini-text"><span class="quick-mini-label">일일계획표</span><span class="quick-mini-sub" id="qDaily">오늘 0건</span></div>
-                                </div>
-                                <div class="quick-mini-card" onclick="switchTab('delivery')">
-                                    <div class="quick-mini-icon green"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7l-8 8-4-4M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
-                                    <div class="quick-mini-text"><span class="quick-mini-label">택배 관리</span><span class="quick-mini-sub" id="qDelivery">이번달 0건</span></div>
-                                </div>
-                                <div class="quick-mini-card" onclick="switchTab('docs')">
-                                    <div class="quick-mini-icon purple"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div>
-                                    <div class="quick-mini-text"><span class="quick-mini-label">회사 문서</span><span class="quick-mini-sub">자료실</span></div>
-                                </div>
-                                <div class="quick-mini-card" onclick="switchTab('clients')">
-                                    <div class="quick-mini-icon teal"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
-                                    <div class="quick-mini-text"><span class="quick-mini-label">국내 거래처</span><span class="quick-mini-sub">자료실</span></div>
-                                </div>
-                                <a class="quick-mini-card" href="https://klp-document-generator.vercel.app" target="_blank" rel="noopener">
-                                    <div class="quick-mini-icon rose"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></div>
-                                    <div class="quick-mini-text"><span class="quick-mini-label">문서생성기</span><span class="quick-mini-sub">외부 ↗</span></div>
-                                </a>
-                            </div>
-                        </div>
+                        <div class="panel-body" id="urgentList"></div>
                     </div>
                 </div>
             </main>
@@ -1970,6 +1898,6 @@
     </div>
 
     <script src="send-kit.js?v=20261001i"></script>
-    <script src="app.js?v=20261029b"></script>
+    <script src="app.js?v=20261104a"></script>
 </body>
 </html>
