@@ -2513,7 +2513,6 @@ function renderDomesticProjects() {
         _rebuildDomesticProjectsFromPagination();
         renderDomesticProjects();
     });
-    pdRenderBoard();
 }
 
 function renderOverseasProjects() {
@@ -2716,7 +2715,7 @@ function renderDaily() {
             const tagClass = (t.priority||'').includes('긴급') ? 'tag-urgent' : (t.priority||'').includes('낮음') ? 'tag-low' : 'tag-normal';
             const tagLabel = (t.priority||'').includes('긴급') ? '긴급' : (t.priority||'').includes('낮음') ? '낮음' : '보통';
             const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
-            const clientStr = t.client ? `<span class="daily-client">📌 ${t.client}</span>` : '';
+            const clientStr = t.client ? `<span class="daily-client">${escHtml(t.client)}</span>` : '';
             const dObj = new Date(t.date + 'T00:00:00');
             const days = Math.max(1, Math.round((today0 - dObj) / MS));
             itemsHtml += `<div class="daily-item overdue-item" onclick="openEditTask(${t.id})" style="cursor:pointer">
@@ -2735,7 +2734,7 @@ function renderDaily() {
         });
         return `<div class="daily-column overdue-column">
             <div class="daily-col-header">
-                <span class="daily-col-title">🔴 미완료 (${person})</span>
+                <span class="daily-col-title">미완료 (${person})</span>
                 <div class="daily-col-actions">
                     <span class="daily-col-count">${overdue.length}</span>
                 </div>
@@ -2754,7 +2753,7 @@ function renderDaily() {
             const deadlineStr = t.deadline ? `마감 ${fmtDisplay(t.deadline)}` : '';
             const ddayStr = t.deadline ? getDday(t.deadline) : '';
             const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
-            const clientStr = t.client ? `<span class="daily-client">📌 ${t.client}</span>` : '';
+            const clientStr = t.client ? `<span class="daily-client">${escHtml(t.client)}</span>` : '';
             const ddayClass = ddayStr.includes('D+') ? 'dday-over' : ddayStr.includes('D-Day') ? 'dday-today' : 'dday-left';
             const isDeadline = t.isDeadlineCopy;
             const isCarry = isOverdueOpen(t);
@@ -2771,7 +2770,7 @@ function renderDaily() {
                         ${noteBadge(t)}
                     </div>
                 </div>
-                ${isDeadline ? `<div class="deadline-badge-wrap"><span class="deadline-badge-lg">🔥 마감일</span></div>`
+                ${isDeadline ? `<div class="deadline-badge-wrap"><span class="deadline-badge-lg">마감일</span></div>`
                 : t.deadline ? `<div class="daily-dday-wrap">
                     <span class="daily-dday ${ddayClass}">${ddayStr}</span>
                     <span class="daily-dday-date">${fmtDisplay(t.deadline)}</span>
@@ -2789,6 +2788,7 @@ function renderDaily() {
                     <button class="daily-add-btn" onclick="openQuickTask('${assignee}')"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg> 새 할 일</button>
                 </div>
             </div>
+            <div class="daily-col-prog"><i style="width:${tasks.length ? Math.round(doneCount / tasks.length * 100) : 0}%"></i></div>
             <div class="daily-col-addbar">
                 <input type="text" class="daily-inline-input" placeholder="할 일 입력 후 Enter" data-assignee="${assignee}">
             </div>
@@ -2817,14 +2817,14 @@ function renderDaily() {
             const tagClass = (t.priority || '').includes('긴급') ? 'tag-urgent' : (t.priority || '').includes('낮음') ? 'tag-low' : 'tag-normal';
             const tagLabel = (t.priority || '').includes('긴급') ? '긴급' : (t.priority || '').includes('낮음') ? '낮음' : '보통';
             const labelStr = t.label ? `<span class="daily-label label-${getLabelClass(t.label)}">${t.label}</span>` : '';
-            const clientStr = t.client ? `<span class="daily-client">📌 ${t.client}</span>` : '';
+            const clientStr = t.client ? `<span class="daily-client">${escHtml(t.client)}</span>` : '';
             const isCarry = isOverdueOpen(t);
             const carryBadge = isCarry ? `<span class="daily-carry-badge" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;color:#E8590C;background:#FFF0E6;border-radius:4px;padding:1px 6px">⏮ 이월 ${fmtDisplay(t.date)}</span>` : '';
             const ddayStr = t.deadline ? getDday(t.deadline) : '';
             const ddayClass = ddayStr.includes('D+') ? 'dday-over' : ddayStr.includes('D-Day') ? 'dday-today' : 'dday-left';
             const isDeadline = t.isDeadlineCopy;
             const ddayHtml = isDeadline
-                ? `<span class="deadline-badge-lg">🔥 마감일</span>`
+                ? `<span class="deadline-badge-lg">마감일</span>`
                 : t.deadline ? `<span class="daily-dday ${ddayClass}">${ddayStr}</span>` : '';
             return `<div class="daily-item daily-common-item ${t.done ? 'completed' : ''} ${isDeadline ? 'deadline-item' : ''}" onclick="openEditTask(${t.id})" style="cursor:pointer;${isCarry ? 'box-shadow:inset 3px 0 0 #E8590C;' : ''}">
                 <div class="daily-checkbox ${t.done ? 'checked' : ''}" onclick="event.stopPropagation();toggleTask(${t.id})">${checkSvg}</div>
@@ -2846,7 +2846,7 @@ function renderDaily() {
             : '';
         return `<div class="daily-common-bar">
             <div class="daily-common-bar-header">
-                <span class="daily-common-bar-title">📢 전체 (공통)</span>
+                <span class="daily-common-bar-title">전체 (공통)</span>
                 <div class="daily-col-actions">
                     <span class="daily-col-count">${doneCount}/${sorted.length}</span>
                     <button class="daily-add-btn" onclick="openQuickTask('전체')"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg> 새 할 일</button>
@@ -3009,7 +3009,7 @@ function renderWeeklyKanban(person) {
                     <span class="wk-common-label ${cssClass === 'wk-task-exec' ? 'wk-exec-label' : ''}">${labelText}</span>
                     <span class="daily-tag ${tagClass}">${tagLabel}</span>
                     ${labelStr}
-                    ${wkIsDeadline ? `<span class="deadline-badge-lg wk-deadline-right">🔥 마감일</span>` : ''}
+                    ${wkIsDeadline ? `<span class="deadline-badge-lg wk-deadline-right">마감일</span>` : ''}
                 </div>
             </div>`;
         }
@@ -3036,7 +3036,7 @@ function renderWeeklyKanban(person) {
                 <div class="wk-task-tags">
                     <span class="daily-tag ${tagClass}">${tagLabel}</span>
                     ${labelStr}
-                    ${wkIsDeadline ? `<span class="deadline-badge-lg wk-deadline-right">🔥 마감일</span>` : ''}
+                    ${wkIsDeadline ? `<span class="deadline-badge-lg wk-deadline-right">마감일</span>` : ''}
                 </div>
             </div>`;
         });
@@ -3219,7 +3219,7 @@ function renderMonthlyCalendar(person) {
                 <div class="${checkClass}" onclick="event.stopPropagation();toggleTask(${t.id})"><svg width="8" height="8" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
                 <span class="mc-common-label ${cssClass === 'mc-task-exec' ? 'mc-exec-label' : ''}">${labelText}</span>
                 <span class="mc-task-text">${t.big3Rank != null ? '⭐ ' : ''}${t.task.replace(/\s*\(마감일\)\s*$/, '')}</span>
-                ${isDeadline ? '<span class="mc-deadline-badge">🔥 마감일</span>' : ''}
+                ${isDeadline ? '<span class="mc-deadline-badge">마감일</span>' : ''}
             </div>`;
         }
 
@@ -3239,7 +3239,7 @@ function renderMonthlyCalendar(person) {
             tasksHtml += `<div class="mc-task ${t.done ? 'mc-task-done' : ''} ${isDeadline ? 'mc-task-deadline' : ''}" onclick="event.stopPropagation();openEditTask(${t.id})">
                 <div class="${checkClass}" onclick="event.stopPropagation();toggleTask(${t.id})"><svg width="8" height="8" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
                 <span class="mc-task-text">${t.big3Rank != null ? '⭐ ' : ''}${t.task.replace(/\s*\(마감일\)\s*$/, '')}</span>
-                ${isDeadline ? '<span class="mc-deadline-badge">🔥 마감일</span>' : ''}
+                ${isDeadline ? '<span class="mc-deadline-badge">마감일</span>' : ''}
             </div>`;
         });
 
@@ -29029,81 +29029,3 @@ function hmRenderFlow() {
         ? `<button class="hm-live" onclick="switchTab('calls')"><i>통화</i><span>${escHtml(clOther(c))} · ${escHtml((c.summary || '').slice(0, 40))}</span></button>`
         : '<span class="hm-live"></span>') + stats;
 }
-
-// =====================================
-// 국내 프로젝트 보드 (2026-11 리뉴얼) — 체크 7개 기준으로 4칸. 목록은 그대로 두고 보드/목록 전환
-// =====================================
-const PD_COLS = [
-    { key: 'pre', label: '디확·작지 전', cls: 'c1' },
-    { key: 'make', label: '제작 중', cls: 'c2' },
-    { key: 'pay', label: '납품·정산 대기', cls: 'c3' },
-    { key: 'done', label: '정산 끝', cls: 'c4' }
-];
-const PD_DONE_MAX = 12;   // 정산 끝은 최근 것만 (전체는 목록에서)
-let _pdView = 'board', _pdScope = 'all';
-try { _pdView = localStorage.getItem('pd_view') === 'list' ? 'list' : 'board'; } catch (_) {}
-function pdColOf(p) {
-    const c = p.checks || {};
-    if (p.status === '완료' || CHECK_ITEMS.every(i => c[i.key])) return 'done';
-    if (c.delivered) return 'pay';
-    return c.design && c.workOrder ? 'make' : 'pre';
-}
-function pdIsMine(p) {
-    const me = currentUser ? currentUser.name : '';
-    return (p.manager || '').split(' ')[0] === me || (p.assignees || []).includes(me);
-}
-function pdRenderBoard() {
-    const tab = document.getElementById('tab-projects-domestic');
-    const box = document.getElementById('pdBoard');
-    if (!tab || !box) return;
-    tab.dataset.view = _pdView;
-    document.querySelectorAll('#pdView button').forEach(b => b.setAttribute('aria-pressed', b.dataset.view === _pdView));
-    document.querySelectorAll('#pdScope button').forEach(b => b.setAttribute('aria-pressed', b.dataset.scope === _pdScope));
-    if (_pdView !== 'board') { box.innerHTML = ''; return; }
-    const list = domesticProjects.filter(p => {
-        if (currentDomesticFilter === 'all' ? p.status === '취소' : p.status !== currentDomesticFilter) return false;
-        if (_pdScope === 'me') return pdIsMine(p);
-        if (_pdScope === 'urgent') return (p.priority || '').includes('긴급');
-        return true;
-    });
-    const today = fmtDate(new Date());
-    const byDate = (x, y) => (x.deadline || '9999').localeCompare(y.deadline || '9999');
-    const card = (p, col) => {
-        const c = p.checks || {};
-        const n = CHECK_ITEMS.filter(i => c[i.key]).length;
-        const next = CHECK_ITEMS.find(i => !c[i.key]);
-        const margin = (p.revenue || 0) - (p.supplierRevenue || 0);
-        const late = p.deadline && p.deadline < today && !c.delivered;
-        const owner = (p.manager || (p.assignees || [])[0] || '').split(' ')[0];
-        return `<article class="pd-card" onclick="showProjectDetail(${Number(p.id)})">
-            <div class="pd-tags">${(p.priority || '').includes('긴급') ? '<i class="hm-pill red">긴급</i>' : ''}${p.status === '취소' ? '<i class="hm-pill warn">취소</i>' : ''}
-                ${p.supplierRevenue ? `<span class="pd-margin ${margin < 0 ? 'bad' : ''}">마진 ${margin < 0 ? '−' : ''}${hmWon(Math.abs(margin))}</span>` : ''}</div>
-            <div class="pd-title">${escHtml(p.client ? p.client + ' ' + p.name : p.name)}</div>
-            <div class="pd-bar">${CHECK_ITEMS.map(i => `<button type="button" class="${c[i.key] ? 'on' : ''}" title="${i.label}: ${c[i.key] ? '완료' : '아직'} (눌러서 바꾸기)" aria-label="${i.label}" aria-pressed="${!!c[i.key]}" onclick="event.stopPropagation();toggleProjectCheck(${Number(p.id)},'${i.key}')"></button>`).join('')}<span>${n}/${CHECK_ITEMS.length}</span></div>
-            <div class="pd-next">${next ? '다음: ' + next.label : '모두 완료'}</div>
-            <div class="pd-foot"><span class="${late ? 'late' : ''}">${p.deadline ? fmtDisplay(p.deadline) : '납기 미정'}${late ? ' · 지남' : ''}</span>
-                <span class="pd-right"><button type="button" class="pd-edit" onclick="event.stopPropagation();openEditProject(${Number(p.id)})">편집</button>${owner ? `<i class="pd-who" title="${escHtml(owner)}">${escHtml(owner.slice(-2))}</i>` : ''}</span></div>
-        </article>`;
-    };
-    box.innerHTML = PD_COLS.map(col => {
-        let rows = list.filter(p => pdColOf(p) === col.key).sort(byDate);
-        const total = rows.length;
-        if (col.key === 'done') rows = rows.reverse().slice(0, PD_DONE_MAX);
-        return `<div class="pd-col ${col.cls}">
-            <div class="pd-col-h">${col.label} <em>${total}</em></div>
-            ${rows.map(p => card(p, col)).join('') || '<div class="hm-empty">없음</div>'}
-            ${total > rows.length ? `<button type="button" class="pd-more" onclick="pdSetView('list')">최근 ${rows.length}건만 표시 · 전체는 목록에서</button>` : ''}
-        </div>`;
-    }).join('');
-}
-function pdSetView(v) {
-    _pdView = v;
-    try { localStorage.setItem('pd_view', v); } catch (_) {}
-    pdRenderBoard();
-}
-document.addEventListener('click', e => {
-    const b = e.target.closest && e.target.closest('#pdView button, #pdScope button');
-    if (!b) return;
-    if (b.dataset.view) pdSetView(b.dataset.view);
-    else { _pdScope = b.dataset.scope; pdRenderBoard(); }
-});

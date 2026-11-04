@@ -6715,51 +6715,11 @@ button.sc-kpi{cursor:pointer}
 @media (max-width:1240px){ .hm-grid{grid-template-columns:1fr} }
 @media (max-width:1100px){ .hm-kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .hm-more{grid-template-columns:1fr} }
 
-/* 리뉴얼 C안 2단계 — 공통 색, 국내 프로젝트 보드, 자금확인 */
-:root{ --bg:#F2F6FC; --pd1:#EFF3F9; --pd2:#E4F0FF; --pd3:#FFF4DA; --pd4:#E3F6EE; --pd-warn:#B76E00; --pd-good:#0B8F63; }
-[data-theme="dark"]{ --bg:#0f141b; --pd1:#1A2535; --pd2:#16293F; --pd3:#2C2616; --pd4:#14302A; --pd-warn:#F2BC5B; --pd-good:#3FD3A0; }
+/* 리뉴얼 C안 2단계 — 공통 색, 자금확인 */
+:root{ --bg:#F2F6FC; }
+[data-theme="dark"]{ --bg:#0f141b; }
 .filter-chip.active{background:var(--blue); color:#fff; border-color:var(--blue)}
 
-.pd-tools{display:flex; gap:8px; margin-left:auto; flex-wrap:wrap}
-#tab-projects-domestic > .content-toolbar{flex-wrap:wrap; gap:10px}
-.pd-seg-group{display:inline-flex; padding:3px; border-radius:10px; background:var(--gray-100); gap:2px}
-.pd-seg-group button{border:0; background:none; padding:5px 11px; border-radius:8px; font-family:inherit; font-size:12.5px; font-weight:600; color:var(--gray-600); cursor:pointer}
-.pd-seg-group button[aria-pressed=true]{background:var(--white); color:var(--gray-900); box-shadow:var(--shadow-xs)}
-#tab-projects-domestic[data-view="board"] .table-wrap,
-#tab-projects-domestic[data-view="board"] .card-grid{display:none !important}
-#tab-projects-domestic[data-view="list"] .pd-board,
-#tab-projects-domestic[data-view="list"] #pdScope{display:none}
-.pd-board{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; align-items:start; margin-top:4px}
-.pd-col{border-radius:16px; padding:12px; display:flex; flex-direction:column; gap:10px; min-height:420px; --c:var(--gray-500)}
-.pd-col.c1{background:var(--pd1)}
-.pd-col.c2{background:var(--pd2); --c:var(--blue)}
-.pd-col.c3{background:var(--pd3); --c:var(--pd-warn)}
-.pd-col.c4{background:var(--pd4); --c:var(--pd-good)}
-.pd-col-h{display:flex; align-items:center; gap:8px; font-weight:700; font-size:14.5px; color:var(--gray-900)}
-.pd-col-h em{font-style:normal; background:var(--white); border-radius:99px; font-size:12.5px; padding:0 8px; font-weight:600}
-.pd-card{background:var(--white); border-radius:12px; padding:12px 13px; box-shadow:0 2px 8px rgba(20,50,100,.07); display:flex; flex-direction:column; gap:7px; cursor:pointer; min-width:0}
-.pd-card:hover{box-shadow:var(--shadow-md)}
-.pd-tags{display:flex; gap:5px; align-items:center; min-height:20px}
-.pd-margin{margin-left:auto; font-size:12px; color:var(--gray-500); white-space:nowrap}
-.pd-margin.bad{color:var(--red)}
-.pd-title{font-weight:600; font-size:13.5px; color:var(--gray-900); overflow-wrap:anywhere}
-.pd-bar{display:flex; align-items:center; gap:3px}
-.pd-bar button{flex:1; height:12px; border:0; background:none; padding:3px 0; cursor:pointer; position:relative}
-.pd-bar button::before{content:""; display:block; height:6px; border-radius:3px; background:var(--gray-200)}
-.pd-bar button.on::before{background:var(--c)}
-.pd-bar button:hover::before{outline:1.5px solid var(--c)}
-.pd-bar span{font-size:12px; color:var(--gray-500); margin-left:5px; font-variant-numeric:tabular-nums}
-.pd-next{font-size:12.5px; color:var(--gray-500)}
-.pd-foot{display:flex; align-items:center; justify-content:space-between; gap:7px; font-size:12.5px; color:var(--gray-600)}
-.pd-foot .late{color:var(--red); font-weight:700}
-.pd-right{display:flex; align-items:center; gap:6px}
-.pd-edit{border:0; background:none; font-family:inherit; font-size:12px; color:var(--gray-500); cursor:pointer; padding:2px 4px; opacity:0}
-.pd-card:hover .pd-edit,.pd-edit:focus-visible{opacity:1}
-.pd-edit:hover{color:var(--blue)}
-.pd-who{width:25px; height:25px; border-radius:50%; display:grid; place-items:center; font-size:10.5px; font-weight:700; font-style:normal; color:#fff; background:var(--blue)}
-.pd-more{border:0; background:none; font-family:inherit; font-size:12.5px; color:var(--gray-600); cursor:pointer; padding:4px; text-decoration:underline}
-@media (max-width:1400px){ .pd-board{grid-template-columns:repeat(2,minmax(0,1fr))} .pd-col{min-height:0} }
-@media (max-width:1023px){ .pd-board{grid-template-columns:minmax(0,1fr)} .pd-edit{opacity:1} }
 
 .cash-tiles{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:16px}
 .cash-tile{border-radius:14px; padding:15px; background:var(--white); box-shadow:var(--shadow-sm); min-height:104px; display:flex; flex-direction:column; gap:3px; min-width:0}
@@ -6791,3 +6751,68 @@ button.sc-kpi{cursor:pointer}
 .cash-loan em{display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; font-style:normal; font-size:12px; margin-top:4px; color:var(--gray-500)}
 .cash-loan em .bad{color:var(--red); font-weight:700}
 @media (max-width:760px){ .cash-sections{grid-template-columns:minmax(0,1fr)} }
+
+/* 리뉴얼 C안 3단계 — 일일계획표 (칸은 카드, 할 일은 줄로) */
+.date-selector{background:var(--white); border-radius:12px; padding:4px 6px; box-shadow:var(--shadow-xs); gap:4px}
+.date-arrow{width:30px; height:30px; border:0; border-radius:9px; background:none}
+.date-arrow:hover{background:var(--gray-100)}
+.date-display{font-size:14px; min-width:158px}
+#tab-daily .toolbar-left{display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+.daily-columns{gap:14px}
+.daily-column,.daily-common-bar{border-radius:16px; box-shadow:var(--shadow-sm); border:0; overflow:hidden}
+.daily-col-header{padding:15px 18px 11px; border-bottom:0}
+.daily-col-title{font-size:15px}
+.daily-col-count{background:var(--gray-100); color:var(--gray-600); font-variant-numeric:tabular-nums}
+.daily-add-btn{height:30px; padding:0 11px; border-radius:9px}
+.daily-add-btn:hover{background:var(--blue-dark)}
+.daily-col-prog{height:4px; margin:0 18px; border-radius:2px; background:var(--gray-100); overflow:hidden}
+.daily-col-prog i{display:block; height:100%; background:var(--blue); transition:width .2s}
+.daily-col-addbar{padding:10px 18px 6px; border-bottom:0; background:none}
+.daily-inline-input{height:38px; border-radius:10px}
+.daily-col-body{padding:2px 18px 12px; gap:0}
+.daily-item{padding:10px 6px; border-radius:0; border-top:1px solid var(--gray-100); gap:10px}
+.daily-col-body > .daily-item:first-child{border-top:0}
+.daily-item:hover{background:var(--gray-50); border-radius:8px}
+.daily-checkbox{width:20px; height:20px; border-radius:7px; border-width:1.8px}
+.daily-checkbox svg{width:12px; height:12px}
+.daily-title{font-weight:500; font-size:14px}
+.daily-tag.tag-normal{display:none}   /* '보통'은 표시 안 함, 긴급·낮음만 */
+.daily-tag,.daily-label{border-radius:99px; padding:2px 8px; font-size:11.5px}
+.daily-client{font-size:12px; color:var(--gray-500)}
+.deadline-item{border-left:0; background:none}
+.deadline-item:hover{background:var(--red-light); filter:none}
+.deadline-badge-lg{font-size:12px; padding:2px 8px; border-radius:99px; background:var(--red-light); color:var(--red); white-space:nowrap}
+.daily-common-bar-header{background:var(--blue-light); padding:12px 18px}
+.daily-common-bar-title{font-size:15px}
+.daily-common-bar-body{padding:12px 18px 14px}
+.daily-common-bar-body .daily-item.daily-common-item{border:1px solid var(--gray-100); border-radius:10px}
+/* 미완료 칸: 분홍 면 대신 흰 카드 + 빨간 글씨 */
+.daily-column.overdue-column{background:var(--white); border:0}
+.daily-column.overdue-column .daily-col-header{background:none; padding-bottom:8px}
+.daily-column.overdue-column .daily-col-title{color:var(--red)}
+.daily-column.overdue-column .daily-col-count{background:var(--red-light); color:var(--red)}
+.daily-item.overdue-item{background:none; border-left:0}
+.overdue-date-badge{background:var(--red-light); color:var(--red)}
+.overdue-days{color:var(--red)}
+[data-theme="dark"] .daily-column.overdue-column{background:var(--white)}
+[data-theme="dark"] .daily-column.overdue-column .daily-col-header{background:none}
+[data-theme="dark"] .daily-column.overdue-column .daily-col-title{color:var(--red)}
+/* 주간 칸반·월간 달력 */
+.wk-day-col{border-radius:14px; box-shadow:var(--shadow-sm)}
+.wk-day-col.wk-today{box-shadow:0 0 0 2px var(--blue),var(--shadow-sm)}
+.wk-task{border-radius:10px}
+.wk-task.deadline-item{border-left:0; background:var(--red-light)}
+.weekly-kanban-title{font-size:15px}
+
+/* 국내·해외 표: 왼쪽 메뉴가 넓어져 줄어든 폭 — 거래처·담당 이름과 체크 7칸이 줄바꿈되지 않게 */
+#domesticProjectTable th,#domesticProjectTable td,#overseasProjectTable th,#overseasProjectTable td{padding-left:8px; padding-right:8px}
+#domesticProjectTable td:nth-child(2),#domesticProjectTable td:nth-child(5),
+#overseasProjectTable td:nth-child(2),#overseasProjectTable td:nth-child(5){white-space:nowrap}
+#domesticProjectTable .checks-row,#overseasProjectTable .checks-row{flex-wrap:nowrap; gap:4px}
+
+/* 다크모드: 분류·이월 표시가 밝게 튀던 것 */
+[data-theme="dark"] .label-personal{background:var(--green-light); color:#6EE7A8}
+[data-theme="dark"] .label-company{background:var(--blue-light); color:#8FC2FF}
+[data-theme="dark"] .label-client{background:var(--yellow-light); color:#F2CF6B}
+[data-theme="dark"] .label-marketing{background:var(--rose-light); color:#F9A8C9}
+[data-theme="dark"] .daily-carry-badge{background:var(--orange-light) !important; color:#FDBA74 !important}
