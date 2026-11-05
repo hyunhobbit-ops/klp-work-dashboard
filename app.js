@@ -14773,8 +14773,8 @@ async function callsRenderMain() {
           <section class="cl-card" id="clInqCard">${callsInqCardHtml(c)}</section>
         </div>
         <section class="cl-card">
-          <h3>할 일 <span class="mn-muted">${todos.length ? `${todos.length - clTodosLeft(c)}/${todos.length} 완료 · 담당자를 고르고 📤 보내면 그 사람 일일계획표에 등록` : ''}</span>
-            ${todos.some(t => !t.sent_at && !t.done) ? `<button class="pl-btn cl-sendall" onclick="callsSendAllTodos(${c.id})">📤 남은 할 일 모두 보내기</button>` : ''}</h3>
+          <h3>할 일 <span class="mn-muted">${todos.length ? `${todos.length - clTodosLeft(c)}/${todos.length} 완료 · 담당자를 고르고 보내면 그 사람 일일계획표에 등록` : ''}</span>
+            ${todos.some(t => !t.sent_at && !t.done) ? `<button class="pl-btn cl-sendall" onclick="callsSendAllTodos(${c.id})">남은 할 일 모두 보내기</button>` : ''}</h3>
           <div class="cl-todos">
             ${todos.map((t, i) => callsTodoRowHtml(c, t, i)).join('') || '<span class="mn-muted">통화에서 나온 할 일이 없어요</span>'}
           </div>
@@ -14998,7 +14998,7 @@ function callsTodoRowHtml(c, t, i) {
                  <option value="">담당자</option>${opts.map(n => `<option ${n === who ? 'selected' : ''}>${clEsc(n)}</option>`).join('')}
                </select>
                <input type="date" class="form-input cl-due" value="${clEsc(t.due || '')}" onchange="callsTodoSet(${c.id}, ${i}, 'due', this.value)">
-               ${t.done ? '' : `<button class="pl-btn cl-send" onclick="callsSendTodo(${c.id}, ${i})">📤 보내기</button>`}`}
+               ${t.done ? '' : `<button class="pl-btn cl-send" onclick="callsSendTodo(${c.id}, ${i})">보내기</button>`}`}
       </div>`;
 }
 function callsTodosCopy(c) { return (Array.isArray(c.todos) ? c.todos : []).map(t => Object.assign({}, t)); }

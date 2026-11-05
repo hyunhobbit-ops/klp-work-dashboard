@@ -6876,3 +6876,27 @@ button.sc-kpi{cursor:pointer}
 [data-theme="dark"] .inq-msg.d-memo{background:#3A3015; border-color:transparent}
 .inq-dir{flex:none}
 .inq-dir button{white-space:nowrap}
+
+/* 리뉴얼 C안 5단계 — 통화 기록 (구성은 그대로, 색·강조만) */
+.cl-stat{border:0; border-radius:13px; box-shadow:var(--shadow-sm)}
+.cl-stat.on{border:0; box-shadow:0 0 0 2px var(--blue)}
+.cl-stat.orange b{color:#A66300}
+[data-theme="dark"] .cl-stat.orange b{color:#F2BC5B}
+.cl-side,.mn-main{border:0; border-radius:14px; box-shadow:var(--shadow-sm)}
+.mn-cats button.on{background:var(--blue); border-color:var(--blue); color:#fff}
+.cl-filters button.on{background:var(--blue-light); color:var(--blue-dark)}
+.cl-row.on{border-color:transparent}
+.cl-row-t{font-weight:700}
+/* 방향: 받은 전화 파랑, 건 전화 회색, 부재중 빨강 */
+.cl-dir.out{background:var(--gray-100); color:var(--gray-600)}
+.cl-topic{border-radius:99px; padding:1px 7px}
+.cl-left{color:#A66300}
+[data-theme="dark"] .cl-left{color:#F2BC5B}
+.cl-card{border:0; background:var(--gray-50); border-radius:14px}
+.cl-card h3{color:var(--gray-700)}
+.cl-summary{font-size:15px; line-height:1.65}
+.cl-todo input[type=checkbox]{accent-color:var(--blue)}
+.cl-say.me .cl-bub{background:var(--blue-light); color:var(--gray-900)}
+.cl-say.me .cl-bub b{color:var(--blue-dark)}
+.cl-inq{background:var(--white)}
+.mn-cats button.on b{color:#fff}
