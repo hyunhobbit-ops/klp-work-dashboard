@@ -29165,7 +29165,7 @@ async function taxLoad() {
         const rows = [];
         for (let off = 0; ; off += 1000) {   // PostgREST 1,000줄 제한 → 끝까지
             const { data, error } = await sb.from('tax_ledger')
-                .select('id,txn_date,side,kind,e_kind,partner,detail,supply,vat,source')
+                .select('id,txn_date,side,kind,e_kind,partner,detail,supply,vat,source,account,card_name,post_status')
                 .gte('txn_date', from).lte('txn_date', to)
                 .order('txn_date').order('id').range(off, off + 999);
             if (error) throw error;
@@ -29191,7 +29191,7 @@ async function taxLoad() {
 }
 
 async function taxLoadJobs() {
-    const { data, error } = await sb.from('aside_jobs').select('*').order('id', { ascending: false }).limit(5);
+    const { data, error } = await sb.from('aside_jobs').select('*').order('id', { ascending: false }).limit(8);
     if (error) { console.error('Aside 작업 불러오기 실패:', error); return; }
     _taxJobs = data || [];
 }
@@ -29203,7 +29203,7 @@ function taxSubscribe() {
             const was = payload.old && payload.old.status, now = payload.new && payload.new.status;
             await taxLoadJobs();
             if (now === 'done' && was !== 'done') {
-                showToast('이카운트 매입·매출을 새로 가져왔어요');
+                showToast(`이카운트 ${TAX_JOB_NAMES[payload.new.kind] || ''}을(를) 새로 가져왔어요`);
                 await taxLoad();
             } else {
                 if (now === 'error' && was !== 'error') showToast('Aside 작업이 실패했어요 — 화면 위 안내를 확인하세요');
@@ -29221,17 +29221,25 @@ function taxFixedFor(year, month) {   // 그 달 고정비 합계와 항목
     const items = _taxFixed.filter(f => f.start_month <= m && (!f.end_month || f.end_month >= m));
     return { total: items.reduce((a, f) => a + Number(f.monthly_amount || 0), 0), items };
 }
-function taxMonthly(year) {   // [1..12] → {sales, salesVat, purch, purchVat, n}
-    const out = Array.from({ length: 13 }, () => ({ sales: 0, salesVat: 0, purch: 0, purchVat: 0, n: 0 }));
+// 카드(source 'card')는 매입과 따로 셈. 이카운트에서 회계반영돼 매입/매출장에 '카드' 유형으로 잡힌 금액(purchCard)만큼은
+// 이미 매입에 들어 있으므로, 이익 계산 때는 카드 중 그 나머지(cardExtra)만 뺀다 — 두 번 빼지 않게
+function taxMonthly(year) {   // [1..12] → {sales, salesVat, purch, purchVat, purchCard, card, cardVat, cardExtra, n}
+    const out = Array.from({ length: 13 }, () => ({ sales: 0, salesVat: 0, purch: 0, purchVat: 0, purchCard: 0, card: 0, cardVat: 0, cardExtra: 0, n: 0 }));
     for (const r of _taxRows) {
         if (Number(r.txn_date.slice(0, 4)) !== year) continue;
         const o = out[Number(r.txn_date.slice(5, 7))];
-        if (r.side === 'sales') { o.sales += Number(r.supply); o.salesVat += Number(r.vat); }
-        else { o.purch += Number(r.supply); o.purchVat += Number(r.vat); }
+        if (r.source === 'card') { o.card += Number(r.supply); o.cardVat += Number(r.vat); }
+        else if (r.side === 'sales') { o.sales += Number(r.supply); o.salesVat += Number(r.vat); }
+        else {
+            o.purch += Number(r.supply); o.purchVat += Number(r.vat);
+            if (/카드/.test(r.kind || '')) o.purchCard += Number(r.supply);
+        }
         o.n++;
     }
+    for (const o of out) o.cardExtra = Math.max(0, o.card - o.purchCard);
     return out;
 }
+function taxIsCard(r) { return r.source === 'card'; }
 function taxRowsIn(year, m1, m2) {
     return _taxRows.filter(r => {
         const y = Number(r.txn_date.slice(0, 4)), m = Number(r.txn_date.slice(5, 7));
@@ -29241,15 +29249,17 @@ function taxRowsIn(year, m1, m2) {
 function taxVatPeriod(year, p) {
     const rows = taxRowsIn(year, p.m[0], p.m[1]);
     const byKind = {};
-    let outVat = 0, inVat = 0, sales = 0, purch = 0;
+    let outVat = 0, inVat = 0, sales = 0, purch = 0, cardVat = 0, card = 0;
     for (const r of rows) {
+        // 회계반영된 카드는 이미 매입/매출장(카드과세 등)에 들어 있으니 미반영분만 '공제 확인' 후보로
+        if (taxIsCard(r)) { if (!/회계반영/.test(r.post_status || '')) { cardVat += +r.vat; card += +r.supply; } continue; }
         const k = r.kind || '기타';
         byKind[k] ??= { sales: 0, salesVat: 0, purch: 0, purchVat: 0 };
         if (r.side === 'sales') { byKind[k].sales += +r.supply; byKind[k].salesVat += +r.vat; outVat += +r.vat; sales += +r.supply; }
         else { byKind[k].purch += +r.supply; byKind[k].purchVat += +r.vat; inVat += +r.vat; purch += +r.supply; }
     }
     const due = taxShiftWeekend(new Date(year + (p.nextYear ? 1 : 0), p.due[0] - 1, p.due[1]));
-    return { ...p, rows, byKind, outVat, inVat, sales, purch, net: outVat - inVat, due };
+    return { ...p, rows, byKind, outVat, inVat, sales, purch, cardVat, card, net: outVat - inVat, due };
 }
 function taxCalendar() {   // 오늘부터 다가오는 세무 일정
     const t = new Date(); t.setHours(0, 0, 0, 0);
@@ -29293,36 +29303,48 @@ function taxRender() {
     if (src) src.innerHTML = s.ecount_imported_at
         ? `이카운트 매입/매출장 · 마지막 가져오기 ${escHtml(new Date(s.ecount_imported_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }))} (${Number(s.ecount_imported_rows || 0).toLocaleString('ko-KR')}건)`
         : '아직 가져온 장부가 없어요 — 오른쪽 위 버튼을 눌러 주세요';
+    if (src && s.card_imported_at) src.innerHTML += ` · 카드 ${escHtml(new Date(s.card_imported_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }))} (${Number(s.card_imported_rows || 0).toLocaleString('ko-KR')}건)`;
     taxRenderJob();
     taxRenderTiles();
     taxRenderBody();
 }
 
+const TAX_JOB_NAMES = { ecount_ledger_import: '매입/매출장', ecount_card_import: '카드 사용 내역' };
 function taxRenderJob() {
     const el = document.getElementById('taxJob');
     if (!el) return;
-    const j = _taxJobs[0];
     const btn = document.getElementById('taxPullBtn');
-    const live = j && (j.status === 'queued' || j.status === 'running');
-    if (btn) { btn.disabled = !!live; btn.textContent = live ? 'Aside 작업 중…' : '이카운트에서 가져오기'; }
-    if (!j) { el.innerHTML = ''; return; }
+    const liveAny = _taxJobs.some(j => j.status === 'queued' || j.status === 'running');
+    if (btn) { btn.disabled = liveAny; btn.textContent = liveAny ? 'Aside 작업 중…' : '이카운트에서 가져오기'; }
     const ago = ts => {
         if (!ts) return '';
         const m = Math.round((Date.now() - new Date(ts)) / 60000);
         return m < 1 ? '방금' : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.round(m / 60)}시간 전` : `${Math.round(m / 1440)}일 전`;
     };
-    const who = j.auto ? '매일 자동' : escHtml(j.requested_by || '');
-    if (live) {
-        el.innerHTML = `<div class="tax-job run"><i></i><div><b>${j.status === 'queued' ? '차례를 기다리는 중' : escHtml(j.progress || 'Aside가 이카운트에서 작업 중')}</b>
-            <span>#${j.id} · ${who} · ${ago(j.started_at || j.created_at)} 시작 · 보통 1~5분 걸려요</span></div>
-            <button class="btn-ghost" onclick="taxCancelJob(${j.id})">취소</button></div>`;
-    } else if (j.status === 'error' && Date.now() - new Date(j.finished_at || j.created_at) < 3 * 86400000) {
-        el.innerHTML = `<div class="tax-job bad"><div><b>마지막 Aside 작업이 실패했어요</b>
-            <span>#${j.id} · ${who} · ${ago(j.finished_at)} · ${escHtml((j.error || '').slice(0, 220))}</span></div>
-            <button class="btn-ghost" onclick="taxQueueImport()">다시 가져오기</button></div>`;
-    } else if (j.status === 'done' && Date.now() - new Date(j.finished_at) < 86400000) {
-        el.innerHTML = `<div class="tax-job ok"><div><b>${escHtml(j.result_text || '가져오기 완료')}</b><span>#${j.id} · ${who} · ${ago(j.finished_at)}</span></div></div>`;
-    } else el.innerHTML = '';
+    // 종류마다 가장 최근 작업 1개 (진행 중·최근 하루 완료·3일 안 실패만)
+    const seen = new Set(), show = [];
+    for (const j of _taxJobs) {
+        if (seen.has(j.kind)) continue;
+        seen.add(j.kind);
+        const live = j.status === 'queued' || j.status === 'running';
+        const age = Date.now() - new Date(j.finished_at || j.created_at);
+        if (live || (j.status === 'done' && age < 86400000) || (j.status === 'error' && age < 3 * 86400000)) show.push(j);
+    }
+    el.innerHTML = show.map(j => {
+        const who = j.auto ? '매일 자동' : escHtml(j.requested_by || '');
+        const name = TAX_JOB_NAMES[j.kind] || j.kind;
+        if (j.status === 'queued' || j.status === 'running') {
+            return `<div class="tax-job run"><i></i><div><b>${name} · ${j.status === 'queued' ? '차례를 기다리는 중' : escHtml(j.progress || 'Aside가 이카운트에서 작업 중')}</b>
+                <span>#${j.id} · ${who} · ${ago(j.started_at || j.created_at)} ${j.status === 'queued' ? '요청' : '시작'} · 보통 1~5분</span></div>
+                <button class="btn-ghost" onclick="taxCancelJob(${j.id})">취소</button></div>`;
+        }
+        if (j.status === 'error') {
+            return `<div class="tax-job bad"><div><b>${name} 가져오기가 실패했어요</b>
+                <span>#${j.id} · ${who} · ${ago(j.finished_at)} · ${escHtml((j.error || '').slice(0, 220))}</span></div>
+                <button class="btn-ghost" onclick="taxQueueImport()">다시 가져오기</button></div>`;
+        }
+        return `<div class="tax-job ok"><div><b>${escHtml(j.result_text || name + ' 가져오기 완료')}</b><span>#${j.id} · ${who} · ${ago(j.finished_at)}</span></div></div>`;
+    }).join('');
 }
 
 function taxRenderTiles() {
@@ -29332,11 +29354,12 @@ function taxRenderTiles() {
     const thisYear = y === now.getFullYear();
     const lastM = thisYear ? now.getMonth() + 1 : 12;
     const md = thisYear ? taxYmd(now).slice(5) : '12-31';   // 올해는 오늘 날짜까지, 작년도 같은 날짜까지 비교
-    const ytd = (year, side) => _taxRows.reduce((a, r) => a + (r.side === side && Number(r.txn_date.slice(0, 4)) === year && r.txn_date.slice(5) <= md ? Number(r.supply) : 0), 0);
+    const ytd = (year, side) => _taxRows.reduce((a, r) => a + (r.side === side && !taxIsCard(r) && Number(r.txn_date.slice(0, 4)) === year && r.txn_date.slice(5) <= md ? Number(r.supply) : 0), 0);
     const sales = ytd(y, 'sales'), purch = ytd(y, 'purchase');
     const pSales = ytd(y - 1, 'sales'), pPurch = ytd(y - 1, 'purchase');
     let fixed = 0;
     for (let m = 1; m <= lastM; m++) fixed += taxFixedFor(y, m).total;
+    const cardExtra = taxMonthly(y).slice(1, lastM + 1).reduce((a, o) => a + o.cardExtra, 0);
     const vp = taxCurrentPeriod();
     const cal = taxCalendar()[0];
     const range = thisYear ? `~${Number(md.slice(0, 2))}/${Number(md.slice(3))}` : `${y}년`;
@@ -29348,8 +29371,8 @@ function taxRenderTiles() {
             <small>작년 같은 기간 ${taxWon(pSales)} ${pSales ? '· ' + taxPct(sales, pSales) : ''}</small></div>
         <div class="cash-tile"><span>매입 (${range}, 공급가)</span><b>${taxWon(purch)}</b>
             <small>작년 같은 기간 ${taxWon(pPurch)} ${pPurch ? '· ' + taxPct(purch, pPurch) : ''}</small></div>
-        <div class="cash-tile"><span>매출 − 매입 − 고정비</span><b class="${sales - purch - fixed < 0 ? 'bad' : ''}">${taxWon(sales - purch - fixed)}</b>
-            <small>${_taxFixed.length ? '고정비 ' + taxWon(fixed) + ' 포함' : '고정비를 넣으면 더 정확해요'} · 재고 변화 미반영</small></div>
+        <div class="cash-tile"><span>매출 − 매입·카드 − 고정비</span><b class="${sales - purch - cardExtra - fixed < 0 ? 'bad' : ''}">${taxWon(sales - purch - cardExtra - fixed)}</b>
+            <small>${cardExtra ? '카드 ' + taxWon(cardExtra) + ' · ' : ''}${_taxFixed.length ? '고정비 ' + taxWon(fixed) + ' 포함' : '고정비를 넣으면 더 정확해요'} · 재고 변화 미반영</small></div>
         <div class="cash-tile"><span>다음 세무 일정</span><b>${cal ? taxDday(cal.date) : '-'}</b>
             <small>${cal ? `${cal.date.getMonth() + 1}/${cal.date.getDate()} ${escHtml(cal.what)}` : ''}</small></div>`;
 }
@@ -29357,7 +29380,7 @@ function taxRenderTiles() {
 function taxRenderBody() {
     const el = document.getElementById('taxRoot');
     if (!el) return;
-    el.innerHTML = taxMonthlyHtml() + taxChecksHtml() + taxCalendarHtml() + taxVatHtml() + taxPartnersHtml() + taxBaselineHtml();
+    el.innerHTML = taxMonthlyHtml() + taxChecksHtml() + taxCalendarHtml() + taxVatHtml() + taxCardHtml() + taxPartnersHtml() + taxBaselineHtml();
 }
 
 function taxSec(title, sub, body, cls = '') {
@@ -29367,29 +29390,30 @@ function taxSec(title, sub, body, cls = '') {
 function taxMonthlyHtml() {
     const y = _taxYear, cur = taxMonthly(y), prev = taxMonthly(y - 1);
     const now = new Date();
-    let tot = { sales: 0, purch: 0, fixed: 0, vat: 0, prev: 0 };
+    let tot = { sales: 0, purch: 0, card: 0, cardExtra: 0, fixed: 0, vat: 0, prev: 0 };
     const rows = [];
     for (let m = 1; m <= 12; m++) {
         const c = cur[m], f = taxFixedFor(y, m).total;
         const future = y === now.getFullYear() && m > now.getMonth() + 1;
-        const profit = c.sales - c.purch - f;
+        const profit = c.sales - c.purch - c.cardExtra - f;
         const vat = c.salesVat - c.purchVat;
-        if (!future) { tot.sales += c.sales; tot.purch += c.purch; tot.fixed += f; tot.vat += vat; tot.prev += prev[m].sales; }
+        if (!future) { tot.sales += c.sales; tot.purch += c.purch; tot.card += c.card; tot.cardExtra += c.cardExtra; tot.fixed += f; tot.vat += vat; tot.prev += prev[m].sales; }
         rows.push(`<tr class="${future ? 'fut' : ''}"><td>${m}월</td>
             <td>${future && !c.n ? '' : taxWon(c.sales)}</td><td>${future && !c.n ? '' : taxWon(c.purch)}</td>
             <td class="${c.sales - c.purch < 0 ? 'bad' : ''}">${future && !c.n ? '' : taxWon(c.sales - c.purch)}</td>
+            <td>${c.card ? taxWon(c.card) : ''}</td>
             <td>${f ? taxWon(f) : ''}</td>
             <td class="${profit < 0 ? 'bad' : ''}">${future && !c.n ? '' : taxWon(profit)}</td>
             <td class="sub">${prev[m].sales ? taxWon(prev[m].sales) : ''}</td>
             <td class="sub ${vat < 0 ? 'ok' : ''}">${future && !c.n ? '' : taxWon(vat)}</td></tr>`);
     }
     const body = `<div class="tax-scroll"><table class="tax-table">
-        <thead><tr><th>월</th><th>매출</th><th>매입</th><th>매출−매입</th><th>고정비</th><th>대략 이익</th><th>작년 매출</th><th>부가세 차액</th></tr></thead>
+        <thead><tr><th>월</th><th>매출</th><th>매입</th><th>매출−매입</th><th>카드</th><th>고정비</th><th>대략 이익</th><th>작년 매출</th><th>부가세 차액</th></tr></thead>
         <tbody>${rows.join('')}</tbody>
-        <tfoot><tr><td>합계</td><td>${taxWon(tot.sales)}</td><td>${taxWon(tot.purch)}</td><td>${taxWon(tot.sales - tot.purch)}</td>
-            <td>${taxWon(tot.fixed)}</td><td class="${tot.sales - tot.purch - tot.fixed < 0 ? 'bad' : ''}">${taxWon(tot.sales - tot.purch - tot.fixed)}</td>
+        <tfoot><tr><td>합계</td><td>${taxWon(tot.sales)}</td><td>${taxWon(tot.purch)}</td><td>${taxWon(tot.sales - tot.purch)}</td><td>${taxWon(tot.card)}</td>
+            <td>${taxWon(tot.fixed)}</td><td class="${tot.sales - tot.purch - tot.cardExtra - tot.fixed < 0 ? 'bad' : ''}">${taxWon(tot.sales - tot.purch - tot.cardExtra - tot.fixed)}</td>
             <td class="sub">${taxWon(tot.prev)}</td><td class="sub">${taxWon(tot.vat)}</td></tr></tfoot></table></div>
-        <p class="tax-note">공급가 기준(부가세 뺀 금액). '부가세 차액' = 매출세액 − 매입세액(음수면 환급 쪽). 사 온 물건이 아직 창고에 있으면 실제 이익은 이보다 커요 — 재고는 연말 결산 때 반영됩니다.</p>`;
+        <p class="tax-note">공급가 기준(부가세 뺀 금액). '카드'는 이카운트에 수집된 카드 사용액(부가세 뺀 금액) — 이미 매입에 잡힌 카드 전표는 이익에서 두 번 빼지 않아요. '부가세 차액' = 매출세액 − 매입세액(카드 부가세 제외, 음수면 환급 쪽). 사 온 물건이 아직 창고에 있으면 실제 이익은 이보다 커요 — 재고는 연말 결산 때 반영됩니다.</p>`;
     return taxSec(`${y}년 월별 매입·매출`, '이카운트 매입/매출장 기준 · 고정비는 직접 넣은 값', body, 'wide');
 }
 
@@ -29410,7 +29434,8 @@ function taxVatHtml() {
             <div class="tax-vat-n ${v.net < 0 ? 'ok' : ''}">${v.rows.length ? (v.net >= 0 ? '납부 ' + taxWon(v.net) : '환급 ' + taxWon(-v.net)) : '자료 없음'}</div>
             <div class="tax-kv"><span>매출세액</span><em>${taxWon(v.outVat)}</em></div>
             <div class="tax-kv"><span>매입세액</span><em>${taxWon(v.inVat)}</em></div>
-            ${lines}</div>`;
+            ${lines}
+            ${v.cardVat ? `<div class="tax-kv sub" title="장부에 아직 안 들어간 카드 사용분의 부가세 — 업무용이고 접대비가 아니면 회계반영해서 공제받을 수 있어요. 위 납부액에는 아직 안 뺐어요"><span>미반영 카드 부가세</span><em>${taxWon(v.cardVat)}</em></div>` : ''}</div>`;
     }).join('');
     return taxSec(`${y}년 부가세 미리 보기`, '장부상 매출세액 − 매입세액 (불공제 매입·이카운트 밖 매출은 빠져 있어 실제 신고액과 달라요)', `<div class="tax-vats">${cards}</div>`, 'wide');
 }
@@ -29422,11 +29447,33 @@ function taxCalendarHtml() {
     return taxSec('세무 달력', '12월 결산 법인 기준 · 주말이면 다음 월요일 (공휴일은 직접 확인)', list);
 }
 
+function taxCardHtml() {
+    const y = _taxYear;
+    const rows = _taxRows.filter(r => taxIsCard(r) && Number(r.txn_date.slice(0, 4)) === y);
+    const st = (_taxSettings && _taxSettings.settings) || {};
+    if (!rows.length) {
+        return taxSec(`${y}년 카드 사용`, '이카운트 카드매입조회에서 가져옴', `<div class="cash-none">${st.card_imported_at
+            ? '아직 수집된 카드 내역이 없어요. BC카드는 연동 등록 다음 날부터 전날 사용분이 들어와요.'
+            : '아직 카드 내역을 가져온 적이 없어요. 위 \'이카운트에서 가져오기\'를 누르면 같이 가져와요.'}</div>`);
+    }
+    const group = key => {
+        const m = {};
+        for (const r of rows) { const k = r[key] || '(미분류)'; m[k] = (m[k] || 0) + Number(r.supply) + Number(r.vat); }
+        return Object.entries(m).sort((a, b) => b[1] - a[1]);
+    };
+    const total = rows.reduce((a, r) => a + Number(r.supply) + Number(r.vat), 0);
+    const un = rows.filter(r => (r.post_status || '').includes('미반영')).length;
+    const kv = arr => arr.slice(0, 6).map(([n, v]) => `<div class="tax-kv"><span>${escHtml(n)}</span><em>${taxWon(v)}</em></div>`).join('');
+    return taxSec(`${y}년 카드 사용 ${taxWon(total)}`, `${rows.length}건 · 부가세 포함 · 장부 미반영 ${un}건`,
+        `<div class="tax-two"><div><div class="tax-mini">카드별</div>${kv(group('card_name'))}</div><div><div class="tax-mini">계정별 (이카운트 상대계정)</div>${kv(group('account'))}</div></div>
+         <div class="tax-mini" style="margin-top:12px">많이 쓴 곳</div>${kv(group('partner'))}`);
+}
+
 function taxPartnersHtml() {
     const y = _taxYear;
     const top = side => {
         const m = {};
-        for (const r of _taxRows) if (r.side === side && Number(r.txn_date.slice(0, 4)) === y) m[r.partner || '(이름 없음)'] = (m[r.partner || '(이름 없음)'] || 0) + Number(r.supply);
+        for (const r of _taxRows) if (r.side === side && !taxIsCard(r) && Number(r.txn_date.slice(0, 4)) === y) m[r.partner || '(이름 없음)'] = (m[r.partner || '(이름 없음)'] || 0) + Number(r.supply);
         return Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 5);
     };
     const col = (title, arr) => `<div><div class="tax-mini">${title}</div>${arr.length ? arr.map(([n, v]) =>
@@ -29452,7 +29499,7 @@ function taxChecksHtml() {
     const y = _taxYear, now = new Date();
     if (y !== now.getFullYear()) return '';
     const md = taxYmd(now).slice(5);   // 작년도 오늘 날짜까지만
-    const ytd = (year, side) => _taxRows.reduce((a, r) => a + (r.side === side && Number(r.txn_date.slice(0, 4)) === year && r.txn_date.slice(5) <= md ? Number(r.supply) : 0), 0);
+    const ytd = (year, side) => _taxRows.reduce((a, r) => a + (r.side === side && !taxIsCard(r) && Number(r.txn_date.slice(0, 4)) === year && r.txn_date.slice(5) <= md ? Number(r.supply) : 0), 0);
     const s = ytd(y, 'sales'), p = ytd(y, 'purchase'), ps = ytd(y - 1, 'sales'), pp = ytd(y - 1, 'purchase');
     const items = [];
     const st = (_taxSettings && _taxSettings.settings) || {};
@@ -29470,6 +29517,9 @@ function taxChecksHtml() {
                    : `신고일까지 ${taxWon(vp.net)} 정도를 남겨 두세요. 남은 달 매출이 늘면 더 커져요.`]);
     const err = _taxRows.filter(r => Number(r.txn_date.slice(0, 4)) === y && /착오|해제|이중/.test(r.e_kind || ''));
     if (err.length) items.push(['warn', `올해 수정 계산서 ${err.length}건`, '착오·계약해제로 다시 발행한 계산서예요. 원래 계산서와 짝이 맞는지 신고 전에 확인하세요.']);
+    const unposted = _taxRows.filter(r => taxIsCard(r) && Number(r.txn_date.slice(0, 4)) === y && (r.post_status || '').includes('미반영'));
+    if (unposted.length) items.push(['warn', `장부에 안 들어간 카드 사용 ${unposted.length}건 (${taxWon(unposted.reduce((a, r) => a + Number(r.supply) + Number(r.vat), 0))})`,
+        '이카운트 카드매입조회 미반영 탭에 있어요. 회계반영(전표)해야 비용·부가세 공제로 잡혀요. 접대비·개인 사용은 따로 구분하세요.']);
     if (!_taxFixed.length) items.push(['warn', '고정비가 비어 있어요', '급여·이자·감가상각·관리비를 넣으면 월별 이익과 연말 법인세 추정이 정확해져요. (작년 판관비 3.65억, 이자 1,736만)']);
     if (now.getMonth() >= 9) items.push(['warn', '연말 전에 챙길 것', '퇴직연금 납입(올해 비용 처리), 재고 실사 준비, 대표·직원 개인카드로 쓴 회사 경비 증빙 정리.']);
     if (!items.length) return '';
@@ -29484,11 +29534,11 @@ async function taxQueueImport() {
     if (live) { showToast('이미 진행 중인 작업이 있어요'); return; }
     const today = taxYmd(new Date());
     const from = `${new Date().getFullYear() - 1}-01-01`;
-    if (!confirm(`맥미니의 Aside가 이카운트에서 매입/매출장(${from} ~ ${today})을 내려받아 장부를 새로 채워요.\n1~5분 걸리고, 이카운트에는 아무것도 저장하지 않아요. 진행할까요?`)) return;
-    const { error } = await sb.from('aside_jobs').insert({
-        kind: 'ecount_ledger_import', payload: { from, to: today },
-        requested_by: currentUser ? (currentUser.loginName || currentUser.name) : ''
-    });
+    if (!confirm(`맥미니의 Aside가 이카운트에서 매입/매출장과 카드 사용 내역(${from} ~ ${today})을 내려받아 장부를 새로 채워요.\n5~10분 걸리고, 이카운트에는 아무것도 저장하지 않아요. 진행할까요?`)) return;
+    const who = currentUser ? (currentUser.loginName || currentUser.name) : '';
+    const { error } = await sb.from('aside_jobs').insert(['ecount_ledger_import', 'ecount_card_import'].map(kind => ({
+        kind, payload: { from, to: today }, requested_by: who
+    })));
     if (error) { console.error(error); showToast('작업 요청 실패: ' + error.message); return; }
     showToast('Aside에게 요청했어요 — 끝나면 화면이 바뀌어요');
     await taxLoadJobs(); taxRenderJob();
