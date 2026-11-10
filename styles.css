@@ -6919,3 +6919,8 @@ button.sc-kpi{cursor:pointer}
 .sc-rv-warn:empty{display:none}
 [data-theme="dark"] .sc-rv-badge.warn,[data-theme="dark"] .sc-rv-alert.warn{background:rgba(240,140,0,.15); color:#ffb35c; border-color:rgba(240,140,0,.35)}
 [data-theme="dark"] .sc-rv-badge.bad,[data-theme="dark"] .sc-rv-alert.bad{background:rgba(224,49,49,.15); color:#ff8787; border-color:rgba(224,49,49,.35)}
+
+/* 거래 제외 업체 = 주의 업체 → 옅은 빨강 바탕 (글자만 흐리게, 바탕은 그대로 보이게 tr에) */
+.sc-table tr.out{background:#fff1f0; box-shadow:inset 3px 0 0 #f03e3e}
+.sc-table tr.out td{opacity:.6}
+[data-theme="dark"] .sc-table tr.out{background:rgba(224,49,49,.12)}
