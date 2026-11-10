@@ -28414,7 +28414,7 @@ function scReviewForm(sid, rid) {
     const r = rid ? _sc.reviews.find(v => v.id === rid) : null;
     const others = scReviewsOf(s.company).filter(x => x.id !== rid);
     const cur = r ? r.verdict : (s.status === '제외' ? '주의' : '보통');
-    scModal(`업체 평가 — ${s.company}`, `
+    const ov = scModal(`업체 평가 — ${s.company}`, `
         <div class="sc-f wide">평가<div class="sc-seg">${SC_VERDICTS.map(([k, l]) => `<label><input type="radio" name="verdict" value="${k}" ${k === cur ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
         <label class="sc-f wide">무엇이 좋았고 무엇이 별로였나요? * <span class="mn-muted">— 다음에 이 업체를 다시 넣으면 바로 보여요</span>
           <textarea name="body" rows="5" placeholder="예: 견적은 제일 쌌는데 샘플 사진과 실물 색이 달랐음. 답장이 3~4일씩 늦고, 결제 후 일정을 두 번 미룸 → 급한 건엔 쓰지 말 것">${_scEsc(r ? r.body : '')}</textarea></label>
@@ -28426,6 +28426,7 @@ function scReviewForm(sid, rid) {
         return !!(await scInsert('sourcing_reviews', { company: String(s.company || '').replace(/\s*\([^)]*\)\s*$/, '').trim(), company_key: scCoKey(s.company), verdict, body,
             project_id: s.project_id, supplier_id: s.id, author: _scMe() }));
     });
+    ov.classList.add('sc-rv-modal');
 }
 async function scReviewDelete(rid, sid) {
     if (!confirm('이 평가를 지울까요?')) return;
