@@ -6900,3 +6900,22 @@ button.sc-kpi{cursor:pointer}
 .cl-say.me .cl-bub b{color:var(--blue-dark)}
 .cl-inq{background:var(--white)}
 .mn-cats button.on b{color:#fff}
+
+/* ===== 해외 소싱 업체 평가 (migration 080) ===== */
+.sc-rv-badge{border:1px solid transparent; border-radius:6px; padding:2px 8px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; margin-top:2px}
+.sc-rv-badge.good{background:var(--green-light,#e7f8ee); color:#1a8a41}
+.sc-rv-badge.mid{background:var(--bg-secondary,#f2f4f6); color:var(--text-secondary,#4e5968)}
+.sc-rv-badge.warn{background:#fff4e5; color:#c25e00; border-color:#ffd8a8}
+.sc-rv-badge.bad{background:#ffeceb; color:#d22d2d; border-color:#ffc9c9}
+.sc-rv{border:1px solid var(--border,#e5e8eb); border-left-width:3px; border-radius:8px; padding:8px 10px; margin-top:6px; background:var(--bg-card,#fff)}
+.sc-rv.good{border-left-color:#22a75a} .sc-rv.mid{border-left-color:#adb5bd} .sc-rv.warn{border-left-color:#f08c00} .sc-rv.bad{border-left-color:#e03131}
+.sc-rv-h{display:flex; align-items:center; gap:8px; font-size:12px}
+.sc-rv-v{font-weight:800}
+.sc-rv-b{font-size:13.5px; line-height:1.55; margin-top:4px; white-space:normal; word-break:break-word}
+.sc-rv-alert{border-radius:10px; padding:10px 12px; font-size:13px}
+.sc-rv-alert.warn,.sc-rv-alert.bad{background:#fff4e5; border:1px solid #ffd8a8}
+.sc-rv-alert.bad{background:#ffeceb; border-color:#ffc9c9}
+.sc-rv-alert.good,.sc-rv-alert.mid{background:var(--bg-secondary,#f2f4f6)}
+.sc-rv-warn:empty{display:none}
+[data-theme="dark"] .sc-rv-badge.warn,[data-theme="dark"] .sc-rv-alert.warn{background:rgba(240,140,0,.15); color:#ffb35c; border-color:rgba(240,140,0,.35)}
+[data-theme="dark"] .sc-rv-badge.bad,[data-theme="dark"] .sc-rv-alert.bad{background:rgba(224,49,49,.15); color:#ff8787; border-color:rgba(224,49,49,.35)}

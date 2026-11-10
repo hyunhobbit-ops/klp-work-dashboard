@@ -158,6 +158,7 @@
 - **화면**: 위 요약(답할 질문·결제 대기·이번 주 샘플 도착·진행 중) / 왼쪽 목록(대표 사진, 상태, 업체 n/견적 n, 최저 총액·업체, 선정, 빨간 질문 배지, 마지막 업데이트, 필터 상태·프로젝트·답 필요만) / 상세: 선정 → 국내 연결, `💬 채팅 붙여넣기`(원문·요약·인용·첨부, '업체 질문' 체크 시 할 일·질문에도) + 탭 ① 사양(변경 이력) ② 업체 비교(`scSupSum`: 옵션 줄 합 = 본주문 총액, 최저 초록, ⚠ basis_note, 링크 없음 빨강, 마지막 연락 3일+ 노랑, 헤더 정렬, html2canvas로 PNG 저장) ③ 대화·기록 ④ 샘플·결제 ⑤ 할 일·질문
 - **첨부**: `scUpload` → planning-images 버킷 `sourcing/` 경로(원본 그대로) — 매일 백업(사진 볼륨) 포함
 - **국내 연결**: 선정 업체 → `scCreateDomestic`/`scLinkExisting` — `scSupplierPatch`가 supplier_overseas{unit = 총액÷수량, rate, extras 금형비} + supplier_revenue(`ovsCalc`). 해외 거래처 DB에 없으면 추가
+- **업체 평가 (migration 080, 2026-11-10)**: `sourcing_reviews`(company·`company_key`·verdict 추천/보통/주의/거래 안 함·body 글·project_id·supplier_id·author). 소싱 건마다 업체 행이 따로라 **업체 이름 기준**으로 모음(`scCoKey`: 괄호·Co.,Ltd·기호 제거, 소문자). 업체 비교표 행에 `평가` 버튼 + 평가가 있으면 이름 아래 배지(가장 나쁜 평가 색, `scReviewBadge`) → `scReviewForm`(쓰기·고치기·지우기, 다른 평가 목록). 업체 추가·편집 창에서 업체명을 적으면 예전 평가를 바로 보여 줌(`scReviewWarnHtml`). 업체를 '제외'로 바꾸면 평가 남길지 물어봄
 - 참고: Aside는 10/26부터 펀딩 프로젝트 #33(옥탄) 글로도 알리바바 진행을 남김 (planning_posts 90~92)
 
 ## 프로젝트 진행사항 (국내)

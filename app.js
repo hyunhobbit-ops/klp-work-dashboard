@@ -27779,7 +27779,7 @@ const SC_DRAFT = ['', '시안 받음', '컨펌', '대기'];
 const SC_SPEC_FIELDS = [['material', '소재'], ['size', '크기'], ['thickness', '두께'], ['finish', '마감'], ['color', '색상'], ['logo', '로고 위치·방식'], ['parts', '부속 (체인·스프링바·끈·비즈)'], ['packaging', '포장'], ['due', '필요 시기'], ['budget', '예산'], ['etc', '요청 사항·기타']];
 const SC_TABS = [['spec', '사양'], ['compare', '업체 비교'], ['log', '대화·기록'], ['sample', '샘플·결제'], ['todo', '할 일·질문']];
 const SC_DEFAULT_WHO = '김현호';
-let _sc = { projects: [], suppliers: [], quotes: [], messages: [], samples: [], todos: [], plans: [] };
+let _sc = { projects: [], suppliers: [], quotes: [], messages: [], samples: [], todos: [], plans: [], reviews: [] };
 let _scLoaded = false, _scSel = null, _scTab = 'compare', _scFilter = { status: 'active', plan: '', needAnswer: false }, _scQ = '', _scChan = null, _scSort = { key: 'total', dir: 1 }, _scLogSup = 0;
 const _scEsc = s => escHtml(String(s == null ? '' : s));
 const _scNum = v => { const n = Number(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return Number.isFinite(n) ? n : 0; };
@@ -27793,11 +27793,11 @@ const _scFromKstInput = v => v ? new Date(v + ':00+09:00').toISOString() : new D
 const _scDays = ts => ts ? Math.floor((Date.now() - new Date(ts).getTime()) / 86400000) : null;
 
 async function scLoad() {
-    const t = ['sourcing_projects', 'sourcing_suppliers', 'sourcing_quotes', 'sourcing_messages', 'sourcing_samples', 'sourcing_todos'];
+    const t = ['sourcing_projects', 'sourcing_suppliers', 'sourcing_quotes', 'sourcing_messages', 'sourcing_samples', 'sourcing_todos', 'sourcing_reviews'];
     const res = await Promise.all(t.map(n => sb.from(n).select('*').order('id').limit(10000)).concat([sb.from('planning_projects').select('id, name, status, access').order('id', { ascending: false }).limit(500)]));
     const bad = res.find(r => r.error);
     if (bad) { showToast('해외 소싱을 불러오지 못했습니다: ' + bad.error.message); return false; }
-    [_sc.projects, _sc.suppliers, _sc.quotes, _sc.messages, _sc.samples, _sc.todos, _sc.plans] = res.map(r => r.data || []);
+    [_sc.projects, _sc.suppliers, _sc.quotes, _sc.messages, _sc.samples, _sc.todos, _sc.reviews, _sc.plans] = res.map(r => r.data || []);
     _scLoaded = true;
     return true;
 }
@@ -27815,7 +27815,7 @@ function scSubscribe() {
     let t = null;
     const reload = () => { clearTimeout(t); t = setTimeout(async () => { if (document.getElementById('scOverlay') || document.activeElement?.closest?.('.sc-paste')) return; await scLoad(); scRender(); }, 500); };
     _scChan = sb.channel('sourcing_v2');
-    ['sourcing_projects', 'sourcing_suppliers', 'sourcing_quotes', 'sourcing_messages', 'sourcing_samples', 'sourcing_todos']
+    ['sourcing_projects', 'sourcing_suppliers', 'sourcing_quotes', 'sourcing_messages', 'sourcing_samples', 'sourcing_todos', 'sourcing_reviews']
         .forEach(n => _scChan.on('postgres_changes', { event: '*', schema: 'public', table: n }, reload));
     _scChan.subscribe();
 }
@@ -28000,6 +28000,7 @@ function scTabCompare(p) {
         return `<tr class="${s.status === '선정' ? 'chosen' : ''} ${s.status === '제외' ? 'out' : ''}">
           <td class="sc-sup">
             <div class="sc-sup-n">${_scEsc(s.company || '(업체명 없음)')}${s.biz_type ? ` <span class="sc-type ${s.biz_type === '에이전시' ? 'ag' : 'mf'}">${s.biz_type === '에이전시' ? '에이전시' : '제작업체'}</span>` : ''}</div>
+            ${scReviewBadge(s)}
             ${s.location ? `<div class="sc-sup-m">📍 ${_scEsc(s.location)}</div>` : ''}
             <div class="sc-sup-m">${_scEsc(s.contact_name || '')}${s.contact_name ? ' · ' : ''}<span class="sc-ch ${s.channel}">${SC_CHANNELS[s.channel] || ''}${s.channel === 'form_failed' ? ' ⚠' : ''}</span></div>
             <div class="sc-sup-m"><span class="sc-sst sc-sst-${SC_SUP_STATUSES.indexOf(s.status)}">${_scEsc(s.status)}</span></div>
@@ -28018,6 +28019,7 @@ function scTabCompare(p) {
           <td class="sc-act">
             <button class="pl-btn" onclick="scQuoteForm(${s.id})">＋견적</button>
             <button class="pl-btn" onclick="scSupplierForm(${p.id}, ${s.id})">편집</button>
+            <button class="pl-btn" onclick="scReviewForm(${s.id})" title="다음 소싱 때 참고할 업체 평가">평가</button>
             ${s.status === '선정' ? '' : `<button class="pl-btn blue" onclick="scChoose(${s.id})">선정</button>`}
           </td></tr>`;
     }).join('');
@@ -28216,7 +28218,7 @@ async function scTodoAdd(pid, kind) {
 }
 
 // ---------- 저장 공통 ----------
-const SC_LIST = { sourcing_projects: 'projects', sourcing_suppliers: 'suppliers', sourcing_quotes: 'quotes', sourcing_messages: 'messages', sourcing_samples: 'samples', sourcing_todos: 'todos' };
+const SC_LIST = { sourcing_projects: 'projects', sourcing_suppliers: 'suppliers', sourcing_quotes: 'quotes', sourcing_messages: 'messages', sourcing_samples: 'samples', sourcing_todos: 'todos', sourcing_reviews: 'reviews' };
 async function scPatch(table, id, patch, silent) {
     const { error } = await sb.from(table).update(patch).eq('id', id);
     if (error) { showToast('저장 실패: ' + error.message); return false; }
@@ -28369,12 +28371,77 @@ function scGuessCompany(url) {
     } catch (_) {}
     return '';
 }
+// ---------- 업체 평가 (migration 080) — 업체 이름 기준으로 소싱 건을 넘어 모아 봄 ----------
+const SC_VERDICTS = [['추천', '👍 추천', 'good'], ['보통', '보통', 'mid'], ['주의', '⚠ 주의', 'warn'], ['거래 안 함', '⛔ 거래 안 함', 'bad']];
+// 'Yiwu Saiyii Trading Co., Ltd. (빗 키링)' 과 'Yiwu Saiyii Trading Co.,Ltd' 를 같은 업체로
+function scCoKey(name) {
+    return String(name || '').toLowerCase().replace(/\([^)]*\)|（[^）]*）/g, '').replace(/[^a-z0-9가-힣一-鿿]/g, '')
+        .replace(/(co)?(ltd|limited|inc|corp|corporation|llc)$/, '').replace(/co$/, '').replace(/(주식회사|유한회사|\(주\)|㈜)/g, '');
+}
+const scReviewsOf = name => { const k = scCoKey(name); return k ? _sc.reviews.filter(r => r.company_key === k).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))) : []; };
+const scVerdict = v => SC_VERDICTS.find(x => x[0] === v) || SC_VERDICTS[2];
+// 가장 나쁜 평가를 대표로 (거래 안 함 > 주의 > 보통 > 추천)
+function scWorstVerdict(list) { return list.reduce((w, r) => SC_VERDICTS.findIndex(x => x[0] === r.verdict) > SC_VERDICTS.findIndex(x => x[0] === w) ? r.verdict : w, '추천'); }
+function scReviewBadge(s) {
+    const list = scReviewsOf(s.company);
+    if (!list.length) return '';
+    const v = scVerdict(scWorstVerdict(list));
+    const tip = list.slice(0, 3).map(r => `[${r.verdict}] ${r.body}`).join('\n');
+    return `<div class="sc-sup-m"><button class="sc-rv-badge ${v[2]}" title="${_scEsc(tip)}" onclick="scReviewForm(${s.id})">${v[1]} · 평가 ${list.length}</button></div>`;
+}
+function scReviewItemsHtml(list, sid, editable) {
+    return list.map(r => {
+        const v = scVerdict(r.verdict), proj = _sc.projects.find(p => p.id === r.project_id);
+        return `<div class="sc-rv ${v[2]}"><div class="sc-rv-h"><span class="sc-rv-v">${v[1]}</span><span class="mn-muted">${_scEsc(r.author || '')} · ${_scKst(r.created_at)}${proj ? ' · ' + _scEsc(proj.title) : ''}</span>
+            ${editable ? `<span class="inq-spacer"></span><button type="button" class="sc-mini" onclick="scReviewForm(${sid}, ${r.id})" title="고치기">✎</button><button type="button" class="sc-mini" onclick="scReviewDelete(${r.id}, ${sid})" title="지우기">✕</button>` : ''}</div>
+            <div class="sc-rv-b">${_scEsc(r.body).replace(/\n/g, '<br>')}</div></div>`;
+    }).join('');
+}
+// 업체 추가·편집 창: 이름을 적으면 예전 평가를 바로 보여 줌
+function scReviewWarnHtml(name, sid) {
+    const list = scReviewsOf(name);
+    if (!list.length) return '';
+    const v = scVerdict(scWorstVerdict(list));
+    return `<div class="sc-rv-alert ${v[2]}"><b>${v[2] === 'good' || v[2] === 'mid' ? '📝' : '⚠️'} 예전에 남긴 이 업체 평가 ${list.length}건</b>${scReviewItemsHtml(list.slice(0, 3), sid, false)}</div>`;
+}
+function scReviewWarn(inp) {
+    const box = inp.closest('.sc-box')?.querySelector('[data-rv-warn]');
+    if (box) box.innerHTML = scReviewWarnHtml(inp.value);
+}
+function scReviewForm(sid, rid) {
+    const s = _sc.suppliers.find(v => v.id === sid);
+    if (!s) return;
+    const r = rid ? _sc.reviews.find(v => v.id === rid) : null;
+    const others = scReviewsOf(s.company).filter(x => x.id !== rid);
+    const cur = r ? r.verdict : (s.status === '제외' ? '주의' : '보통');
+    scModal(`업체 평가 — ${s.company}`, `
+        <div class="sc-f wide">평가<div class="sc-seg">${SC_VERDICTS.map(([k, l]) => `<label><input type="radio" name="verdict" value="${k}" ${k === cur ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
+        <label class="sc-f wide">무엇이 좋았고 무엇이 별로였나요? * <span class="mn-muted">— 다음에 이 업체를 다시 넣으면 바로 보여요</span>
+          <textarea name="body" rows="5" placeholder="예: 견적은 제일 쌌는데 샘플 사진과 실물 색이 달랐음. 답장이 3~4일씩 늦고, 결제 후 일정을 두 번 미룸 → 급한 건엔 쓰지 말 것">${_scEsc(r ? r.body : '')}</textarea></label>
+        ${others.length ? `<div class="sc-f wide">이 업체의 다른 평가 ${others.length}건${scReviewItemsHtml(others, sid, true)}</div>` : ''}`, async ov => {
+        const body = scV(ov, 'body');
+        if (!body) { showToast('평가 내용을 적어 주세요'); return false; }
+        const verdict = (ov.querySelector('[name=verdict]:checked') || {}).value || '주의';
+        if (rid) return await scPatch('sourcing_reviews', rid, { body, verdict }, true);
+        return !!(await scInsert('sourcing_reviews', { company: String(s.company || '').replace(/\s*\([^)]*\)\s*$/, '').trim(), company_key: scCoKey(s.company), verdict, body,
+            project_id: s.project_id, supplier_id: s.id, author: _scMe() }));
+    });
+}
+async function scReviewDelete(rid, sid) {
+    if (!confirm('이 평가를 지울까요?')) return;
+    const { error } = await sb.from('sourcing_reviews').delete().eq('id', rid);
+    if (error) { showToast('삭제 실패: ' + error.message); return; }
+    _sc.reviews = _sc.reviews.filter(v => v.id !== rid);
+    scRender();
+    scReviewForm(sid);
+}
 function scSupplierForm(pid, sid) {
     const s = sid ? _sc.suppliers.find(v => v.id === sid) : { company: '', contact_name: '', location: '', biz_type: '', product_url: '', years: '', rating: '', store_reviews: '', kr_reviews: '', response_time: '', ontime_rate: '', channel: 'chat', status: '문의함', note: '' };
     if (!s) return;
     const ov = scModal(sid ? '업체 편집' : '업체 추가', `
         <label class="sc-f wide">상품 상세 링크 * <span class="mn-muted">— 비교표 모든 행에 들어가요</span><input name="product_url" value="${_scEsc(s.product_url)}" placeholder="https://www.alibaba.com/product-detail/..." oninput="const c=this.form||this.closest('.sc-box').querySelector('[name=company]'); if(!c.value){c.value=scGuessCompany(this.value)}"></label>
-        <label class="sc-f">업체명 *<input name="company" value="${_scEsc(s.company)}" placeholder="예: Dongguan Aofei Jewelry"></label>
+        <label class="sc-f">업체명 *<input name="company" value="${_scEsc(s.company)}" placeholder="예: Dongguan Aofei Jewelry" oninput="scReviewWarn(this)"></label>
+        <div class="sc-f wide sc-rv-warn" data-rv-warn>${scReviewWarnHtml(s.company, sid)}</div>
         <label class="sc-f">담당자<input name="contact_name" value="${_scEsc(s.contact_name)}" placeholder="예: Vicky Bai"></label>
         <label class="sc-f">위치<input name="location" value="${_scEsc(s.location || '')}" placeholder="예: 중국 광둥성 둥관" list="scLocList"><datalist id="scLocList">${[...new Set(_sc.suppliers.map(x => x.location).filter(Boolean))].map(l => `<option value="${_scEsc(l)}">`).join('')}</datalist></label>
         <div class="sc-f">업체 유형<div class="sc-seg">${[['', '모름'], ['제작업체', '🏭 실제 제작업체'], ['에이전시', '🤝 에이전시']].map(([v, l]) => `<label><input type="radio" name="biz_type" value="${v}" ${(s.biz_type || '') === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
@@ -28394,7 +28461,12 @@ function scSupplierForm(pid, sid) {
         if (!row.company) { showToast('업체명을 입력하세요'); return false; }
         if (!row.product_url && !confirm('상품 링크가 없어요. 비교표에 "링크 없음"으로 표시돼요. 그래도 저장할까요?')) return false;
         if (row.rating !== null && (!s.rating_checked_at || Number(s.rating) !== row.rating || s.store_reviews !== row.store_reviews)) row.rating_checked_at = new Date().toISOString();
-        if (sid) return await scPatch('sourcing_suppliers', sid, row, true);
+        if (sid) {
+            const ok = await scPatch('sourcing_suppliers', sid, row, true);
+            if (ok && row.status === '제외' && s.status !== '제외' && !scReviewsOf(row.company).some(r => r.supplier_id === sid))
+                setTimeout(() => { if (confirm('제외한 업체예요. 다음에 같은 실수를 안 하게 업체 평가를 남길까요?')) scReviewForm(sid); }, 50);
+            return ok;
+        }
         row.project_id = pid;
         const d = await scInsert('sourcing_suppliers', row);
         if (d) { const p = _sc.projects.find(v => v.id === pid); if (p && p.status === '업체 탐색') await scPatch('sourcing_projects', pid, { status: '견적 수집' }, true); }
