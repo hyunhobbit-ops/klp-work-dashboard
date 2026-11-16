@@ -15529,7 +15529,7 @@ const FUNDING_SPEC_STATUS = [
 function fundingSpecList(p) {
     const m = (p && p.fundingMeta) || {};
     const saved = Array.isArray(m.checklist) ? m.checklist : null;
-    const norm = x => ({ key: x.key, label: x.label || '', value: x.value || '', status: x.status || '', note: x.note || '', images: Array.isArray(x.images) ? x.images.filter(Boolean) : [], custom: !!x.custom, hidden: !!x.hidden });
+    const norm = x => ({ key: x.key, label: x.label || '', value: x.value || '', status: x.status || '', note: x.note || '', cost: x.cost == null ? '' : String(x.cost), cur: x.cur === 'USD' ? 'USD' : 'KRW', qty: x.qty == null ? '' : String(x.qty), images: Array.isArray(x.images) ? x.images.filter(Boolean) : [], custom: !!x.custom, hidden: !!x.hidden });
     // 기본 항목은 항상 FUNDING_SPEC_DEFAULT 순서·이름으로 (나중에 추가된 기본 항목도 예전 프로젝트에 끼워짐) + 저장된 내용 붙이기, 직접 추가한 항목은 뒤에
     const byKey = {};
     (saved || []).forEach(x => { if (x && x.key) byKey[x.key] = x; });
@@ -15567,11 +15567,12 @@ function fundingSpecHtml(p) {
             </div>`
             : upload('fsc-photo fsc-photo-empty', '<span class="fsc-ph-ic">📷</span><span>사진 추가</span><small>클릭해서 여러 장 올리기 · 원본 화질</small>');
         return `
-        <div class="fsc${x.status === 'done' ? ' done' : ''}${x.status === 'na' ? ' na' : ''}">
+        <div class="fsc${x.status === 'done' ? ' done' : ''}${x.status === 'na' ? ' na' : ''}" data-fsi="${p.id}_${i}">
             ${photo}
             <div class="fsc-body">
                 <div class="fsc-top">
-                    ${x.custom ? `<input class="fsc-name-in" value="${esc(x.label)}" placeholder="항목 이름" onchange="fundingSpecSet(${p.id},${i},'label',this.value)">` : `<div class="fsc-name">${esc(x.label)}</div>`}
+                    ${x.custom ? `<input class="fsc-name-in" value="${esc(x.label)}" placeholder="항목 이름" onchange="fundingSpecSet(${p.id},${i},'label',this.value)">` : `<div class="fsc-name fsc-name-btn" title="크게 보기" onclick="fundingSpecOpen(${p.id},${i})">${esc(x.label)}</div>`}
+                    <button class="fs-big" title="크게 보기" onclick="fundingSpecOpen(${p.id},${i})">⤢</button>
                     ${empty ? '<span class="fs-warn" title="아직 정해지지 않음">●</span>' : ''}
                     <select class="fs-st" style="color:${st[2]};border-color:${st[2]}" onchange="fundingSpecSet(${p.id},${i},'status',this.value)">
                         ${FUNDING_SPEC_STATUS.map(z => `<option value="${z[0]}" ${z[0] === (x.status || '') ? 'selected' : ''}>${z[1]}</option>`).join('')}
@@ -15580,6 +15581,7 @@ function fundingSpecHtml(p) {
                 </div>
                 <label class="fsc-lbl">사양 내용</label>
                 <textarea class="fsc-val" rows="3" placeholder="${esc(d ? d.ph : '사양 내용')}" onchange="fundingSpecSet(${p.id},${i},'value',this.value)">${esc(x.value)}</textarea>
+                ${fundingSpecCostHtml(p.id, i, x)}
                 <label class="fsc-lbl">메모</label>
                 <textarea class="fsc-note" rows="2" placeholder="확인할 것·담당·근거 자료" onchange="fundingSpecSet(${p.id},${i},'note',this.value)">${esc(x.note)}</textarea>
             </div>
@@ -15592,6 +15594,7 @@ function fundingSpecHtml(p) {
                 <div class="fs-title">🧾 시계 사양 체크리스트</div>
                 <div class="fs-sub">빠뜨린 사양이 없는지 확인하는 표 — <b>확정</b> 또는 <b>해당 없음</b>이면 완료로 셉니다. 칸을 벗어나면 자동 저장</div>
             </div>
+            <div class="fs-total" data-ftotal="${p.id}">${fundingSpecTotalText(list)}</div>
             <div class="fs-prog"><div class="fs-prog-bar"><i style="width:${pct}%"></i></div><span><b>${pr.done}/${pr.total}</b> 완료${pr.left ? ` · 남음 ${pr.left}` : ' · 모두 확인 ✅'}</span></div>
         </div>
         <div class="fsc-grid">
@@ -15601,10 +15604,148 @@ function fundingSpecHtml(p) {
         ${list.some(x => x.hidden) ? `<div class="fs-hidden"><span>숨긴 항목</span>${list.map((x, i) => x.hidden ? `<button onclick="fundingSpecUnhide(${p.id},${i})" title="다시 꺼내기 (적어 둔 내용·사진 그대로)">＋ ${esc(x.label)}${x.images.length ? ` 📷${x.images.length}` : ''}</button>` : '').join('')}</div>` : ''}
     </div>`;
 }
+// 매입가·수량 — 항목마다 단가(원 또는 $) × 수량 = 합계, 위에 전체 합계
+function fundingSpecNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : 0; }
+function fundingSpecMoney(n, cur) { return cur === 'USD' ? '$' + (Math.round(n * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) : Math.round(n).toLocaleString('ko-KR') + '원'; }
+function fundingSpecSumText(x) {
+    const c = fundingSpecNum(x.cost), q = fundingSpecNum(x.qty);
+    if (!c) return '';
+    return q ? `= ${fundingSpecMoney(c * q, x.cur)}` : '';
+}
+function fundingSpecTotalText(list) {
+    const t = { KRW: 0, USD: 0 };
+    list.forEach(x => { if (x.hidden || x.status === 'na') return; const c = fundingSpecNum(x.cost), q = fundingSpecNum(x.qty) || 0; if (c && q) t[x.cur === 'USD' ? 'USD' : 'KRW'] += c * q; });
+    const parts = [];
+    if (t.KRW) parts.push(fundingSpecMoney(t.KRW, 'KRW'));
+    if (t.USD) parts.push(fundingSpecMoney(t.USD, 'USD'));
+    return parts.length ? `매입가 합계 <b>${parts.join(' + ')}</b>` : '';
+}
+function fundingSpecCostHtml(id, i, x) {
+    const esc = s => planningEsc(String(s == null ? '' : s));
+    const costShow = x.cost ? (x.cur === 'USD' ? x.cost : fundingSpecNum(x.cost).toLocaleString('ko-KR')) : '';
+    return `
+    <div class="fsc-cost">
+        <label class="fsc-cf"><span class="fsc-lbl">매입가 (1개)</span>
+            <span class="fsc-cin"><input inputmode="decimal" placeholder="0" value="${esc(costShow)}" onchange="fundingSpecSetCost(${id},${i},'cost',this)">
+            <select onchange="fundingSpecSetCost(${id},${i},'cur',this)"><option value="KRW" ${x.cur !== 'USD' ? 'selected' : ''}>원</option><option value="USD" ${x.cur === 'USD' ? 'selected' : ''}>$</option></select></span></label>
+        <label class="fsc-cf fsc-cq"><span class="fsc-lbl">수량</span>
+            <span class="fsc-cin"><input inputmode="numeric" placeholder="0" value="${esc(x.qty ? fundingSpecNum(x.qty).toLocaleString('ko-KR') : '')}" onchange="fundingSpecSetCost(${id},${i},'qty',this)"><em>개</em></span></label>
+        <div class="fsc-sum" data-fsum="${id}_${i}">${fundingSpecSumText(x)}</div>
+    </div>`;
+}
+async function fundingSpecSetCost(id, i, field, el) {
+    const p = planningProjects.find(x => x.id === id);
+    if (!p) return;
+    const list = fundingSpecList(p);
+    const x = list[i];
+    if (!x) return;
+    if (field === 'cur') x.cur = el.value === 'USD' ? 'USD' : 'KRW';
+    else {
+        const raw = String(el.value || '').trim();
+        const n = fundingSpecNum(raw);
+        x[field] = raw && n ? String(n) : '';
+        el.value = !x[field] ? '' : (field === 'cost' && x.cur === 'USD' ? x[field] : n.toLocaleString('ko-KR'));
+    }
+    await fundingSpecSave(id, list);
+    // 다시 그리지 않고 합계만 바꿈 (입력 중인 칸 포커스 유지)
+    document.querySelectorAll(`[data-fsum="${id}_${i}"]`).forEach(e => { e.textContent = fundingSpecSumText(x); });
+    document.querySelectorAll(`[data-ftotal="${id}"]`).forEach(e => { e.innerHTML = fundingSpecTotalText(list); });
+    // 큰 화면과 카드가 같은 값을 보이게
+    document.querySelectorAll(`[data-fsi="${id}_${i}"] .fsc-cost`).forEach(box => { if (!box.contains(el)) box.outerHTML = fundingSpecCostHtml(id, i, x); });
+}
+
+// 사양 항목 크게 보기 — 사진 크게 + 사양 내용·메모·매입가를 큰 글씨로 보고 고침. ‹ › 로 다른 항목
+let _fsBig = null;   // { id, i }
+function fundingSpecOpen(id, i) {
+    _fsBig = { id, i };
+    let ov = document.getElementById('fsBig');
+    if (!ov) {
+        ov = document.createElement('div');
+        ov.id = 'fsBig';
+        ov.className = 'fsb-ov';
+        ov.addEventListener('mousedown', e => { if (e.target === ov) fundingSpecClose(); });
+        document.body.appendChild(ov);
+    }
+    ov.style.display = 'flex';
+    document.addEventListener('keydown', _fsBigKey, true);
+    _fsBigRender();
+}
+function _fsBigIdxs(p) { return fundingSpecList(p).map((x, k) => x.hidden ? -1 : k).filter(k => k >= 0); }
+function _fsBigRender() {
+    const ov = document.getElementById('fsBig');
+    if (!ov || !_fsBig) return;
+    const { id, i } = _fsBig;
+    const p = planningProjects.find(x => x.id === id);
+    const list = p ? fundingSpecList(p) : [];
+    const x = list[i];
+    if (!x) { fundingSpecClose(); return; }
+    const esc = s => planningEsc(String(s == null ? '' : s));
+    const d = FUNDING_SPEC_DEFAULT.find(z => z.key === x.key);
+    const st = FUNDING_SPEC_STATUS.find(z => z[0] === x.status) || FUNDING_SPEC_STATUS[0];
+    const idxs = _fsBigIdxs(p), pos = idxs.indexOf(i);
+    const imgs = x.images || [];
+    const upload = `<label class="fsb-add" title="사진 추가 (여러 장)">＋ 사진<input type="file" accept="image/*" multiple hidden onchange="fundingSpecAddImages(${id},${i},this)"></label>`;
+    ov.innerHTML = `
+    <div class="fsb" data-fsi="${id}_${i}">
+        <div class="fsb-head">
+            <button class="fsb-nav" ${pos <= 0 ? 'disabled' : ''} onclick="fundingSpecOpenStep(-1)" title="이전 항목">‹</button>
+            <div class="fsb-title">${esc(x.label || '(이름 없음)')}<span>${pos + 1} / ${idxs.length}</span></div>
+            <button class="fsb-nav" ${pos >= idxs.length - 1 ? 'disabled' : ''} onclick="fundingSpecOpenStep(1)" title="다음 항목">›</button>
+            <select class="fs-st fsb-st" style="color:${st[2]};border-color:${st[2]}" onchange="fundingSpecSet(${id},${i},'status',this.value)">
+                ${FUNDING_SPEC_STATUS.map(z => `<option value="${z[0]}" ${z[0] === (x.status || '') ? 'selected' : ''}>${z[1]}</option>`).join('')}
+            </select>
+            <button class="fsb-close" onclick="fundingSpecClose()" title="닫기 (Esc)">✕</button>
+        </div>
+        <div class="fsb-body">
+            <div class="fsb-photos">
+                ${imgs.length ? `
+                    <a class="fsb-main" href="${esc(imgs[0])}" target="_blank" rel="noopener" onclick="if(!(event.metaKey||event.ctrlKey||event.shiftKey)){event.preventDefault();fundingSpecView(${id},${i},0)}"><img src="${esc(fundingSpecThumb(imgs[0], 1400))}" alt=""></a>
+                    <div class="fsb-strip">${imgs.map((u, j) => `<div class="fsc-th fsb-th"><a href="${esc(u)}" target="_blank" rel="noopener" onclick="if(!(event.metaKey||event.ctrlKey||event.shiftKey)){event.preventDefault();fundingSpecView(${id},${i},${j})}"><img src="${esc(fundingSpecThumb(u, 240))}" alt=""></a><button class="fsc-x" title="사진 빼기" onclick="fundingSpecRemoveImage(${id},${i},${j})">✕</button></div>`).join('')}${upload}</div>`
+                : `<label class="fsb-empty">📷<span>사진 추가</span><small>클릭해서 여러 장 올리기 · 원본 화질</small><input type="file" accept="image/*" multiple hidden onchange="fundingSpecAddImages(${id},${i},this)"></label>`}
+            </div>
+            <div class="fsb-fields">
+                <label class="fsb-lbl">사양 내용</label>
+                <textarea class="fsb-val" rows="7" placeholder="${esc(d ? d.ph : '사양 내용')}" onchange="fundingSpecSet(${id},${i},'value',this.value)">${esc(x.value)}</textarea>
+                ${fundingSpecCostHtml(id, i, x)}
+                <label class="fsb-lbl">메모</label>
+                <textarea class="fsb-note" rows="5" placeholder="확인할 것·담당·근거 자료" onchange="fundingSpecSet(${id},${i},'note',this.value)">${esc(x.note)}</textarea>
+                <div class="fsb-foot">칸을 벗어나면 자동 저장 · Esc 닫기</div>
+            </div>
+        </div>
+    </div>`;
+}
+function fundingSpecOpenStep(dir) {
+    if (!_fsBig) return;
+    const p = planningProjects.find(x => x.id === _fsBig.id);
+    if (!p) return;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();   // 고치던 칸 먼저 저장
+    const idxs = _fsBigIdxs(p), pos = idxs.indexOf(_fsBig.i);
+    const n = idxs[pos + dir];
+    if (n == null) return;
+    _fsBig.i = n;
+    setTimeout(_fsBigRender, 0);
+}
+function fundingSpecClose() {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    const ov = document.getElementById('fsBig');
+    if (ov) { ov.style.display = 'none'; ov.innerHTML = ''; }
+    document.removeEventListener('keydown', _fsBigKey, true);
+    if (_fsBig) { _fsBig = null; setTimeout(() => renderPlanning({ skipLoad: true }), 0); }
+}
+function _fsBigKey(e) {
+    const v = document.getElementById('fsViewer');
+    if (v && v.style.display === 'flex') return;   // 사진 보기 창이 위에 떠 있으면 그쪽이 처리
+    const t = e.target, typing = t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || t.tagName === 'SELECT');
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fundingSpecClose(); }
+    else if (!typing && e.key === 'ArrowLeft') { e.preventDefault(); fundingSpecOpenStep(-1); }
+    else if (!typing && e.key === 'ArrowRight') { e.preventDefault(); fundingSpecOpenStep(1); }
+}
+function _fsBigRefresh() { if (_fsBig) _fsBigRender(); }
+
 async function fundingSpecSave(id, list) {
     const p = planningProjects.find(x => x.id === id);
     if (!p) return;
-    const meta = Object.assign({}, p.fundingMeta || {}, { checklist: list.map(x => ({ key: x.key, label: x.label, value: x.value, status: x.status, note: x.note, ...(x.images && x.images.length ? { images: x.images } : {}), ...(x.custom ? { custom: true } : {}), ...(x.hidden ? { hidden: true } : {}) })) });
+    const meta = Object.assign({}, p.fundingMeta || {}, { checklist: list.map(x => ({ key: x.key, label: x.label, value: x.value, status: x.status, note: x.note, ...(x.cost ? { cost: x.cost, cur: x.cur || 'KRW' } : {}), ...(x.qty ? { qty: x.qty } : {}), ...(x.images && x.images.length ? { images: x.images } : {}), ...(x.custom ? { custom: true } : {}), ...(x.hidden ? { hidden: true } : {}) })) });
     try {
         const { error } = await sb.from('planning_projects').update({ funding_meta: meta, updated_at: new Date().toISOString() }).eq('id', id);
         if (error) throw error;
@@ -15621,7 +15762,10 @@ async function fundingSpecSet(id, i, field, val) {
     if (!list[i]) return;
     list[i][field] = String(val == null ? '' : val).trim();
     await fundingSpecSave(id, list);
-    if (field === 'status') renderPlanning({ skipLoad: true });   // 색·진행률 갱신 (글자 칸은 입력 중 깜빡임 방지로 다시 그리지 않음)
+    if (field === 'status') { renderPlanning({ skipLoad: true }); _fsBigRefresh(); }
+    else if (field === 'value' || field === 'note') {   // 큰 화면에서 고친 글을 뒤 카드에도
+        document.querySelectorAll(`[data-fsi="${id}_${i}"] .fsc-${field === 'value' ? 'val' : 'note'}`).forEach(e => { if (e !== document.activeElement) e.value = list[i][field]; });
+    }   // 색·진행률 갱신 (글자 칸은 입력 중 깜빡임 방지로 다시 그리지 않음)
 }
 // 표에는 서버 썸네일(작게), 누르면 원본
 function fundingSpecThumb(u, w) {
@@ -15700,7 +15844,7 @@ async function fundingSpecAddImages(id, i, input) {
     if (!list[i]) return;
     list[i].images = (list[i].images || []).concat(urls);
     await fundingSpecSave(id, list);
-    renderPlanning({ skipLoad: true });
+    renderPlanning({ skipLoad: true }); _fsBigRefresh();
     showToast(`사진 ${urls.length}장 첨부했습니다`);
 }
 async function fundingSpecRemoveImage(id, i, j) {
@@ -15711,7 +15855,7 @@ async function fundingSpecRemoveImage(id, i, j) {
     if (!confirm('이 사진을 항목에서 뺄까요?')) return;
     list[i].images.splice(j, 1);
     await fundingSpecSave(id, list);
-    renderPlanning({ skipLoad: true });
+    renderPlanning({ skipLoad: true }); _fsBigRefresh();
 }
 async function fundingSpecAdd(id) {
     const p = planningProjects.find(x => x.id === id);

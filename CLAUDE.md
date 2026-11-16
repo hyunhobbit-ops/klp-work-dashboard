@@ -43,6 +43,10 @@
 - 연도별, 월별 필터링 지원
 - **이미지 자동입력** (`analyzeDeliveryImageFile` → `api/analyze-delivery.js`): 2026-10 Sonnet 4.6(사진 1568px 한계) 인식률 문제로 **Claude Sonnet 5.5 + 고해상도**로 교체. 클라이언트가 긴 변 2576px·JPEG 0.92로 보냄. 서버는 구조화 출력(`output_config.format` json_schema, 강제 tool_choice는 5.5에서 400) + effort `high` + `fallbacks: "default"`(beta `server-side-fallback-2026-07-01`), 이름·전화·우편번호를 한 글자씩 대조하라는 지시. 요청이 400이면 예전 방식(Sonnet 4.6 + 도구)으로 한 번 재시도. 응답 `engine`에 실제 모델. Vercel 환경변수 `ANTHROPIC_DELIVERY_MODEL`(예: claude-opus-5-5)·`ANTHROPIC_DELIVERY_EFFORT`로 코드 수정 없이 변경. 대략 장당 20~40원(Opus 5.5는 45~85원)
 
+## 🧾 펀딩 사양 체크 (프로젝트 > 펀딩, `fundingSpecHtml`) — 2026-11-16
+- `funding_meta.checklist` 항목에 `cost`(1개 매입가, 숫자 문자열)·`cur`('KRW'|'USD')·`qty`(수량) 추가 — 카드에 매입가·원/$·수량 칸(`fundingSpecCostHtml`), 합계 = 단가×수량, 위에 전체 합계(숨김·해당 없음 제외, 원·$ 따로). 바꿔도 다시 그리지 않고 합계만 갱신(`fundingSpecSetCost`)
+- 항목 이름·⤢ 버튼 → 크게 보기 창(`fundingSpecOpen`, `#fsBig`): 큰 사진·사진 띠, 사양 내용 18px·메모 16.5px·매입가 큰 칸, ‹ › / ←→로 다른 항목, Esc 닫기. 닫으면 카드 다시 그림
+
 ## 🎨 리뉴얼 C안 (2026-11, 현호님 결정) — 단계별 진행 중
 - **원칙**: 기능·데이터는 그대로, 겉모습과 메뉴 위치만. **그라데이션 쓰지 않음**(현호님 요청, 단색만). 색 = KLP 로고 파랑(#1F85FF, 면 색은 흰 글씨가 읽히게 조금 진한 `--blue` #1472E8). 빨강·주황·초록은 상태 표시에만. 폰 전용 화면(`mRoot`)은 구조 유지
 - **1단계 완료**: 왼쪽 2단 메뉴 + 색 + 홈. 가안 원본: `~/Desktop/hyunho-server/dashboard-redesign-draft/` (저장소 밖)
