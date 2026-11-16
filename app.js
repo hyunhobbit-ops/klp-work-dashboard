@@ -8732,7 +8732,7 @@ function exportLozen() {
     XLSX.utils.book_append_sheet(wb, ws, '택배주소');
 
     const today = new Date();
-    const fname = `로젠택배_${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}.xlsx`;
+    const fname = `로젠택배_${String(today.getFullYear()).slice(2)}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}.xlsx`;
     XLSX.writeFile(wb, fname);
 
     // 체크 해제
@@ -13487,7 +13487,7 @@ async function dlTempQuote(type) {
     try {
         if (!fitTempQuoteDoc()) showToast('⚠️ 한 장에 다 들어가지 않아 아래쪽이 잘린 채로 저장됩니다');
         const canvas = await html2canvas(el, { scale: 3, useCORS: true, backgroundColor: '#fff', logging: false, width: 794, height: 1123, windowWidth: 794, windowHeight: 1123 });
-        const dateP = (_tempQuoteGroup.date || '').replace(/-/g, '');
+        const dateP = (_tempQuoteGroup.date || '').replace(/-/g, '').substring(2);   // 파일 이름 날짜 = YYMMDD
         const fname = dateP + '_케이엘피코리아_' + fileCo(_tempQuoteGroup.client) + '_견적서';
         if (type === 'jpg') {
             const a = document.createElement('a');
@@ -13560,7 +13560,7 @@ async function sendTempQuote() {
     const first = items[0] || {};
     const itemLabel = (first.item || '') + (items.length > 1 ? ` 외 ${items.length - 1}건` : '');
     const qtyLabel = first.qty ? Number(first.qty).toLocaleString() + '개' + (items.length > 1 ? ' 외' : '') : '';
-    const dateP = (g.date || '').replace(/-/g, '');
+    const dateP = (g.date || '').replace(/-/g, '').substring(2);   // 파일 이름 날짜 = YYMMDD
     SendKit.open({
         docType: 'quote',
         title: `${g.client || '업체'} · ${itemLabel || '견적서'}`,
@@ -20763,7 +20763,7 @@ async function composeAdImage() {
 function adDownloadImage() {
     if (!_adResults || !_adResults.composed) { showToast('아직 미리보기가 준비되지 않았어요'); return; }
     const a = document.createElement('a');
-    a.download = 'KLP_광고_' + _adFormat + '_' + getTodayStr() + '.png';
+    a.download = 'KLP_광고_' + _adFormat + '_' + getTodayStr().replace(/-/g, '').substring(2) + '.png';
     a.href = _adResults.composed;
     a.click();
 }
@@ -23282,7 +23282,7 @@ async function exportClientsToExcel(mode) {
     });
 
     const d = new Date();
-    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const stamp = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
     const suffix = mode === 'bycat' ? '구분별' : (sheets[0] ? sheets[0].name : '전체');
     XLSX.writeFile(wb, `국내거래처_${suffix}_${stamp}.xlsx`);
     showToast(`${total}곳을 엑셀로 내보냈습니다`);

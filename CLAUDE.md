@@ -387,6 +387,7 @@
   - 대시보드: 상담 국내 진행 카드 `🕐 제작진행표` 버튼(`inqDealAction` 'ps') — 있으면 `viewSavedDoc` 크게 보기(보내기 버튼 대신 '내부 문서' 표시), 없으면 `doc-generator.html#ps-new-디확번호`로 이동해 디확 내용 불러옴. `inqSavedDocNumber(row,'ps')`
 
 ## 코드 스타일
+- **내려받는 파일 이름의 날짜는 YYMMDD**(예: 261116, 현호님 결정 2026-11-16) — `20261116`처럼 연도 4자리 쓰지 않기. doc-generator는 `getYYMMDD`
 - 에러 발생 시 디버깅용 상세 메시지 유지 (console.error + 화면 표시)
 - 새 기능 추가 시 기존 패턴 따름 (renderXxx, openModal, openEditXxx 등)
 - CDN으로 외부 라이브러리 로드 (Supabase, SheetJS)
