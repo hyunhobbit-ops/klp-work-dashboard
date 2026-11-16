@@ -15548,8 +15548,9 @@ function fundingSpecHtml(p) {
     const pr = fundingSpecProgress(p);
     const pct = pr.total ? Math.round(pr.done / pr.total * 100) : 0;
     const esc = s => planningEsc(String(s == null ? '' : s));
-    const cards = list.map((x, i) => {
+    const cards = _fsViewMode === 'table' ? '' : list.map((x, i) => {
         if (x.hidden) return '';
+        if (_fsOnlyMiss && (x.status === 'done' || x.status === 'na')) return '';
         const d = FUNDING_SPEC_DEFAULT.find(z => z.key === x.key);
         const st = FUNDING_SPEC_STATUS.find(z => z[0] === x.status) || FUNDING_SPEC_STATUS[0];
         const empty = x.status !== 'na' && !x.value.trim();
@@ -15597,13 +15598,59 @@ function fundingSpecHtml(p) {
             <div class="fs-total" data-ftotal="${p.id}">${fundingSpecTotalText(list)}</div>
             <div class="fs-prog"><div class="fs-prog-bar"><i style="width:${pct}%"></i></div><span><b>${pr.done}/${pr.total}</b> 완료${pr.left ? ` · 남음 ${pr.left}` : ' · 모두 확인 ✅'}</span></div>
         </div>
+        <div class="fs-viewbar">
+            <div class="fs-vt"><button class="${_fsViewMode === 'table' ? 'on' : ''}" onclick="fundingSpecSetView('table')">☰ 표</button><button class="${_fsViewMode === 'card' ? 'on' : ''}" onclick="fundingSpecSetView('card')">▦ 카드</button></div>
+            ${(() => { const miss = list.filter(x => !x.hidden && x.status !== 'done' && x.status !== 'na').length; return miss ? `<button class="fs-missbtn${_fsOnlyMiss ? ' on' : ''}" onclick="fundingSpecToggleMiss()">● 아직 안 정한 것만 <b>${miss}</b></button>` : ''; })()}
+        </div>
+        ${_fsViewMode === 'table' ? fundingSpecTableHtml(p, list) : `
         <div class="fsc-grid">
             ${cards}
             <button class="fsc fsc-addcard" onclick="fundingSpecAdd(${p.id})"><span>＋</span>항목 추가<small>사용설명서·인증서·각인·여분 줄 …</small></button>
-        </div>
+        </div>`}
         ${list.some(x => x.hidden) ? `<div class="fs-hidden"><span>숨긴 항목</span>${list.map((x, i) => x.hidden ? `<button onclick="fundingSpecUnhide(${p.id},${i})" title="다시 꺼내기 (적어 둔 내용·사진 그대로)">＋ ${esc(x.label)}${x.images.length ? ` 📷${x.images.length}` : ''}</button>` : '').join('')}</div>` : ''}
     </div>`;
 }
+// 표 보기 (기본) — 한 줄에 한 항목, 사진은 작게. 아직 안 정한 줄은 노랗게
+let _fsViewMode = (() => { try { return localStorage.getItem('fs_view') === 'card' ? 'card' : 'table'; } catch (_) { return 'table'; } })();
+let _fsOnlyMiss = false;
+function fundingSpecSetView(v) { _fsViewMode = v === 'card' ? 'card' : 'table'; try { localStorage.setItem('fs_view', _fsViewMode); } catch (_) {} renderPlanning({ skipLoad: true }); }
+function fundingSpecToggleMiss() { _fsOnlyMiss = !_fsOnlyMiss; renderPlanning({ skipLoad: true }); }
+function fundingSpecTableHtml(p, list) {
+    const esc = s => planningEsc(String(s == null ? '' : s));
+    const id = p.id;
+    const rows = list.map((x, i) => {
+        if (x.hidden) return '';
+        if (_fsOnlyMiss && (x.status === 'done' || x.status === 'na')) return '';
+        const d = FUNDING_SPEC_DEFAULT.find(z => z.key === x.key);
+        const st = FUNDING_SPEC_STATUS.find(z => z[0] === x.status) || FUNDING_SPEC_STATUS[0];
+        const empty = x.status !== 'na' && !x.value.trim();
+        const imgs = x.images || [];
+        const costShow = x.cost ? (x.cur === 'USD' ? x.cost : fundingSpecNum(x.cost).toLocaleString('ko-KR')) : '';
+        const cls = x.status === 'done' ? 'done' : x.status === 'na' ? 'na' : empty ? 'miss' : '';
+        return `
+        <tr class="${cls}" data-fsi="${id}_${i}">
+            <td class="fst-img">${imgs.length
+                ? `<button class="fst-th" title="크게 보기" onclick="fundingSpecOpen(${id},${i})"><img src="${esc(fundingSpecThumb(imgs[0], 160))}" loading="lazy" alt="">${imgs.length > 1 ? `<span>${imgs.length}</span>` : ''}</button>`
+                : `<label class="fst-th fst-th-add" title="사진 추가">📷<input type="file" accept="image/*" multiple hidden onchange="fundingSpecAddImages(${id},${i},this)"></label>`}</td>
+            <td class="fst-name">${x.custom ? `<input class="fst-name-in" value="${esc(x.label)}" placeholder="항목 이름" onchange="fundingSpecSet(${id},${i},'label',this.value)">` : `<button class="fst-name-btn" title="크게 보기" onclick="fundingSpecOpen(${id},${i})">${esc(x.label)}</button>`}${empty ? '<span class="fst-miss">내용 없음</span>' : ''}</td>
+            <td class="fst-st"><select class="fs-st" style="color:${st[2]};border-color:${st[2]}" onchange="fundingSpecSet(${id},${i},'status',this.value)">${FUNDING_SPEC_STATUS.map(z => `<option value="${z[0]}" ${z[0] === (x.status || '') ? 'selected' : ''}>${z[1]}</option>`).join('')}</select></td>
+            <td><textarea class="fst-val" rows="2" placeholder="${esc(d ? d.ph : '사양 내용')}" onchange="fundingSpecSet(${id},${i},'value',this.value)">${esc(x.value)}</textarea></td>
+            <td class="fst-cost"><span class="fsc-cin"><input inputmode="decimal" placeholder="0" value="${esc(costShow)}" onchange="fundingSpecSetCost(${id},${i},'cost',this)"><select onchange="fundingSpecSetCost(${id},${i},'cur',this)"><option value="KRW" ${x.cur !== 'USD' ? 'selected' : ''}>원</option><option value="USD" ${x.cur === 'USD' ? 'selected' : ''}>$</option></select></span></td>
+            <td class="fst-qty"><span class="fsc-cin"><input inputmode="numeric" placeholder="0" value="${esc(x.qty ? fundingSpecNum(x.qty).toLocaleString('ko-KR') : '')}" onchange="fundingSpecSetCost(${id},${i},'qty',this)"></span></td>
+            <td class="fst-sum" data-fsum="${id}_${i}">${fundingSpecSumText(x).replace(/^= /, '')}</td>
+            <td><textarea class="fst-note" rows="2" placeholder="확인할 것·담당" onchange="fundingSpecSet(${id},${i},'note',this.value)">${esc(x.note)}</textarea></td>
+            <td class="fst-act"><button class="fs-big" title="크게 보기" onclick="fundingSpecOpen(${id},${i})">⤢</button><button class="fs-del" title="${x.custom ? '항목 삭제' : '이 프로젝트에서 빼기'}" onclick="fundingSpecRemove(${id},${i})">✕</button></td>
+        </tr>`;
+    }).join('');
+    return `
+    <div class="fst-wrap"><table class="fst">
+        <colgroup><col style="width:64px"><col style="width:150px"><col style="width:112px"><col><col style="width:150px"><col style="width:90px"><col style="width:110px"><col style="width:22%"><col style="width:72px"></colgroup>
+        <thead><tr><th>사진</th><th>항목</th><th>상태</th><th>사양 내용</th><th>매입가 (1개)</th><th>수량</th><th>합계</th><th>메모</th><th></th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="9" class="fst-none">아직 안 정한 항목이 없어요 ✅</td></tr>`}</tbody>
+    </table></div>
+    <button class="fst-add" onclick="fundingSpecAdd(${id})">＋ 항목 추가 <small>사용설명서·인증서·각인·여분 줄 …</small></button>`;
+}
+
 // 매입가·수량 — 항목마다 단가(원 또는 $) × 수량 = 합계, 위에 전체 합계
 function fundingSpecNum(v) { const n = parseFloat(String(v == null ? '' : v).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : 0; }
 function fundingSpecMoney(n, cur) { return cur === 'USD' ? '$' + (Math.round(n * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) : Math.round(n).toLocaleString('ko-KR') + '원'; }
@@ -15648,7 +15695,7 @@ async function fundingSpecSetCost(id, i, field, el) {
     }
     await fundingSpecSave(id, list);
     // 다시 그리지 않고 합계만 바꿈 (입력 중인 칸 포커스 유지)
-    document.querySelectorAll(`[data-fsum="${id}_${i}"]`).forEach(e => { e.textContent = fundingSpecSumText(x); });
+    document.querySelectorAll(`[data-fsum="${id}_${i}"]`).forEach(e => { e.textContent = e.tagName === 'TD' ? fundingSpecSumText(x).replace(/^= /, '') : fundingSpecSumText(x); });
     document.querySelectorAll(`[data-ftotal="${id}"]`).forEach(e => { e.innerHTML = fundingSpecTotalText(list); });
     // 큰 화면과 카드가 같은 값을 보이게
     document.querySelectorAll(`[data-fsi="${id}_${i}"] .fsc-cost`).forEach(box => { if (!box.contains(el)) box.outerHTML = fundingSpecCostHtml(id, i, x); });
@@ -15764,7 +15811,7 @@ async function fundingSpecSet(id, i, field, val) {
     await fundingSpecSave(id, list);
     if (field === 'status') { renderPlanning({ skipLoad: true }); _fsBigRefresh(); }
     else if (field === 'value' || field === 'note') {   // 큰 화면에서 고친 글을 뒤 카드에도
-        document.querySelectorAll(`[data-fsi="${id}_${i}"] .fsc-${field === 'value' ? 'val' : 'note'}`).forEach(e => { if (e !== document.activeElement) e.value = list[i][field]; });
+        document.querySelectorAll(`[data-fsi="${id}_${i}"] .fsc-${field === 'value' ? 'val' : 'note'}, [data-fsi="${id}_${i}"] .fst-${field === 'value' ? 'val' : 'note'}`).forEach(e => { if (e !== document.activeElement) e.value = list[i][field]; });
     }   // 색·진행률 갱신 (글자 칸은 입력 중 깜빡임 방지로 다시 그리지 않음)
 }
 // 표에는 서버 썸네일(작게), 누르면 원본
@@ -15864,7 +15911,7 @@ async function fundingSpecAdd(id) {
     list.push({ key: 'c' + Date.now().toString(36), label: '', value: '', status: '', note: '', images: [], custom: true });
     await fundingSpecSave(id, list);
     renderPlanning({ skipLoad: true });
-    setTimeout(() => { const els = document.querySelectorAll('.fsc-name-in'); if (els.length) els[els.length - 1].focus(); }, 50);
+    setTimeout(() => { const els = document.querySelectorAll('.fsc-name-in, .fst-name-in'); if (els.length) els[els.length - 1].focus(); }, 50);
 }
 async function fundingSpecRemove(id, i) {
     const p = planningProjects.find(x => x.id === id);

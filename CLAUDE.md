@@ -45,6 +45,7 @@
 
 ## 🧾 펀딩 사양 체크 (프로젝트 > 펀딩, `fundingSpecHtml`) — 2026-11-16
 - `funding_meta.checklist` 항목에 `cost`(1개 매입가, 숫자 문자열)·`cur`('KRW'|'USD')·`qty`(수량) 추가 — 카드에 매입가·원/$·수량 칸(`fundingSpecCostHtml`), 합계 = 단가×수량, 위에 전체 합계(숨김·해당 없음 제외, 원·$ 따로). 바꿔도 다시 그리지 않고 합계만 갱신(`fundingSpecSetCost`)
+- **표 보기가 기본**(`fundingSpecTableHtml`, `☰ 표 | ▦ 카드` — localStorage `fs_view`): 한 줄 = 작은 사진(48px)·항목·상태·사양 내용·매입가·수량·합계·메모. 내용 없는 줄은 노란 바탕 + '내용 없음', 확정은 초록 줄. `● 아직 안 정한 것만 n`(`_fsOnlyMiss`) = 확정·해당 없음 아닌 것만
 - 항목 이름·⤢ 버튼 → 크게 보기 창(`fundingSpecOpen`, `#fsBig`): 큰 사진·사진 띠, 사양 내용 18px·메모 16.5px·매입가 큰 칸, ‹ › / ←→로 다른 항목, Esc 닫기. 닫으면 카드 다시 그림
 
 ## 🎨 리뉴얼 C안 (2026-11, 현호님 결정) — 단계별 진행 중

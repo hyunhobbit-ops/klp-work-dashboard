@@ -7072,3 +7072,47 @@ button.sc-kpi{cursor:pointer}
   .fsb-photos{border-right:none; border-bottom:1px solid var(--gray-200); min-height:300px}
   .fsb-fields{overflow:visible}
 }
+
+/* 펀딩 사양 체크 — 표 보기 (2026-11-16) */
+.fs-viewbar{display:flex; align-items:center; gap:10px; margin:-4px 0 12px}
+.fs-vt{display:inline-flex; background:var(--gray-100); border-radius:9px; padding:3px}
+.fs-vt button{height:30px; padding:0 14px; border:none; background:transparent; border-radius:7px; font:inherit; font-size:13px; font-weight:700; color:var(--gray-500); cursor:pointer}
+.fs-vt button.on{background:var(--white); color:var(--gray-900); box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.fs-missbtn{height:32px; padding:0 12px; border:1px solid #FCD34D; background:#FFFBEB; color:#B45309; border-radius:16px; font:inherit; font-size:13px; font-weight:700; cursor:pointer}
+.fs-missbtn.on{background:#F59E0B; border-color:#F59E0B; color:#fff}
+.fst-wrap{overflow-x:auto; border:1px solid var(--gray-200); border-radius:12px}
+.fst{width:100%; min-width:1080px; border-collapse:collapse; table-layout:fixed; font-size:14px}
+.fst th{position:sticky; top:0; background:var(--gray-50); color:var(--gray-500); font-size:12.5px; font-weight:800; text-align:left; padding:9px 8px; border-bottom:1px solid var(--gray-200); white-space:nowrap}
+.fst td{padding:6px 8px; border-bottom:1px solid var(--gray-100); vertical-align:middle}
+.fst tbody tr:last-child td{border-bottom:none}
+.fst tr.done{background:rgba(5,150,105,.05)}
+.fst tr.done td:first-child{box-shadow:inset 3px 0 0 #059669}
+.fst tr.miss{background:#FFFBEB}
+.fst tr.miss td:first-child{box-shadow:inset 3px 0 0 #F59E0B}
+.fst tr.na td{opacity:.5}
+.fst-th{position:relative; width:48px; height:48px; padding:0; border:1px solid var(--gray-200); border-radius:8px; background:var(--gray-50); overflow:hidden; display:flex; align-items:center; justify-content:center; cursor:pointer}
+.fst-th img{width:100%; height:100%; object-fit:cover; display:block}
+.fst-th span{position:absolute; right:2px; bottom:2px; background:rgba(0,0,0,.6); color:#fff; font-size:10px; font-weight:700; padding:0 5px; border-radius:8px}
+.fst-th-add{border-style:dashed; font-size:18px; color:var(--gray-400,#9CA3AF)}
+.fst-th:hover{border-color:var(--blue)}
+.fst-name-btn{border:none; background:none; padding:0; font:inherit; font-size:15px; font-weight:800; color:var(--gray-900); text-align:left; cursor:pointer}
+.fst-name-btn:hover{color:var(--blue)}
+.fst-name-in{width:100%; height:32px; border:1px dashed var(--gray-300); border-radius:7px; padding:0 8px; font:inherit; font-size:14px; font-weight:800; background:var(--white); color:var(--gray-900); box-sizing:border-box}
+.fst-miss{display:block; margin-top:3px; font-size:11.5px; font-weight:700; color:#D97706}
+.fst-st .fs-st{width:100%}
+.fst-val,.fst-note{display:block; width:100%; box-sizing:border-box; border:1px solid transparent; border-radius:7px; padding:6px 8px; font:inherit; font-size:14px; line-height:1.45; resize:vertical; background:transparent; color:var(--gray-900); min-height:36px}
+.fst-note{font-size:13px; color:var(--gray-600)}
+.fst-val:hover,.fst-note:hover{border-color:var(--gray-200); background:var(--white)}
+.fst-val:focus,.fst-note:focus{outline:none; border-color:var(--blue); background:var(--white)}
+.fst-val::placeholder,.fst-note::placeholder{color:var(--gray-400,#9CA3AF)}
+.fst .fsc-cin{height:34px}
+.fst-sum{font-weight:800; color:var(--blue); text-align:right; white-space:nowrap}
+.fst-act{white-space:nowrap; text-align:right}
+.fst-act .fs-big{margin-right:2px}
+.fst-none{text-align:center; padding:28px !important; color:var(--gray-500)}
+.fst-add{margin-top:10px; height:38px; padding:0 16px; border:1.5px dashed var(--gray-300); border-radius:10px; background:transparent; color:var(--gray-600); font:inherit; font-size:14px; font-weight:700; cursor:pointer}
+.fst-add small{font-weight:500; color:var(--gray-400,#9CA3AF); margin-left:6px}
+.fst-add:hover{border-color:var(--blue); color:var(--blue)}
+[data-theme="dark"] .fst tr.miss, body.dark .fst tr.miss{background:rgba(245,158,11,.1)}
+[data-theme="dark"] .fs-missbtn:not(.on), body.dark .fs-missbtn:not(.on){background:rgba(245,158,11,.12)}
+.fsc-cin input::placeholder{color:var(--gray-300); font-weight:500}
