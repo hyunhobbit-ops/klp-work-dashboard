@@ -1641,6 +1641,7 @@ function switchTab(tabId, fromHistory = false) {
     // 내 하루(타임박스) 탭 진입 시 로드+렌더
     if (tabId === 'timebox') { try { tbxEnter(); } catch (e) { console.error(e); } }
     if (tabId === 'manual') { try { manualEnter(); } catch (e) { console.error(e); } }
+    if (tabId === 'docs') { try { docsEnter(); } catch (e) { console.error(e); } }
     if (tabId === 'calls') { try { callsEnter(); } catch (e) { console.error(e); } }
     if (tabId === 'sourcing') { try { scEnter(); } catch (e) { console.error(e); } }
 
@@ -29887,4 +29888,409 @@ async function taxDeleteFixed(id) {
     if (error) { showToast('삭제 실패: ' + error.message); return; }
     _taxFixed = _taxFixed.filter(x => x.id !== id);
     taxRenderFixed();
+}
+
+// ===================== 자료실 > 회사 문서 (migration 083, 2026-11-19) =====================
+// 회사 양식·규정·계약서 등 파일을 올려 두고 썸네일로 한눈에 미리 보기. 파일은 비공개 버킷 company-docs
+// 썸네일은 올릴 때 브라우저에서 만듦: PDF 첫 장(pdf.js) · 사진 · 엑셀 첫 시트 · 워드(mammoth) · PPT/한글(파일 안 미리보기 그림)
+const DOC_CATS = ['회사 양식', '규정·정책', '계약서', '회사 소개', '증명·서류', '기타'];
+const DOC_BUCKET = 'company-docs';
+let _docs = [], _docsLoaded = false, _docsChan = null, _docsCat = 'all', _docsQ = '', _docsUp = [];
+const _docsUrl = {};   // 경로 → { url, exp }
+const _docsLib = {};
+function docsEsc(s) { return escHtml(String(s == null ? '' : s)); }
+function docsLoadLib(name, src) {
+    if (!_docsLib[name]) _docsLib[name] = new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = src; s.onload = () => res(); s.onerror = () => { delete _docsLib[name]; rej(new Error(name + ' 불러오기 실패')); };
+        document.head.appendChild(s);
+    });
+    return _docsLib[name];
+}
+async function docsPdfLib() {
+    await docsLoadLib('pdf', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    return window.pdfjsLib;
+}
+const docsZipLib = () => docsLoadLib('zip', 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js').then(() => window.JSZip);
+const docsMammothLib = () => docsLoadLib('mammoth', 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js').then(() => window.mammoth);
+
+function docsExt(name) { const m = /\.([a-z0-9]+)$/i.exec(name || ''); return m ? m[1].toLowerCase() : ''; }
+function docsKind(ext) {
+    if (ext === 'pdf') return 'pdf';
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) return 'img';
+    if (['xlsx', 'xls', 'xlsm', 'csv'].includes(ext)) return 'xls';
+    if (['docx', 'doc'].includes(ext)) return 'doc';
+    if (['pptx', 'ppt'].includes(ext)) return 'ppt';
+    if (['hwp', 'hwpx'].includes(ext)) return 'hwp';
+    if (['ai', 'psd', 'eps'].includes(ext)) return 'design';
+    if (['zip', '7z', 'rar'].includes(ext)) return 'zip';
+    return 'etc';
+}
+const DOC_KIND_UI = { pdf: ['PDF', '#E03131'], img: ['사진', '#1C7ED6'], xls: ['엑셀', '#2F9E44'], doc: ['워드', '#1971C2'], ppt: ['PPT', '#E8590C'], hwp: ['한글', '#1098AD'], design: ['디자인', '#AE3EC9'], zip: ['압축', '#868E96'], etc: ['파일', '#868E96'] };
+function docsSize(n) { n = Number(n) || 0; return n >= 1048576 ? (n / 1048576).toFixed(1) + 'MB' : n >= 1024 ? Math.round(n / 1024) + 'KB' : n + 'B'; }
+function docsDate(s) { const d = new Date(s); return isNaN(d) ? '' : `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`; }
+
+async function docsEnter() {
+    const root = document.getElementById('docsRoot');
+    if (!root) return;
+    if (!_docsLoaded) { root.innerHTML = '<div class="dc-empty">불러오는 중…</div>'; await docsLoad(); }
+    docsSubscribe();
+    docsRender();
+}
+async function docsLoad() {
+    const { data, error } = await sb.from('company_docs').select('*').order('pinned', { ascending: false }).order('updated_at', { ascending: false }).limit(2000);
+    if (error) { console.error(error); showToast('회사 문서 불러오기 실패: ' + error.message); return; }
+    _docs = data || []; _docsLoaded = true;
+}
+function docsSubscribe() {
+    if (_docsChan) return;
+    let t = null;
+    _docsChan = sb.channel('company_docs_rt')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'company_docs' }, () => {
+            clearTimeout(t);
+            t = setTimeout(async () => { await docsLoad(); if (document.getElementById('docsRoot')?.offsetParent) docsRender(); }, 400);
+        }).subscribe();
+}
+async function docsSigned(paths, opts) {
+    const now = Date.now(), need = paths.filter(p => p && !(opts && opts.download) && !(_docsUrl[p] && _docsUrl[p].exp > now));
+    if (need.length) {
+        const { data, error } = await sb.storage.from(DOC_BUCKET).createSignedUrls(need, 3600);
+        if (error) console.error(error);
+        (data || []).forEach(r => { if (r.signedUrl) _docsUrl[r.path] = { url: r.signedUrl, exp: now + 50 * 60000 }; });
+    }
+    return paths.map(p => (_docsUrl[p] || {}).url || '');
+}
+function docsVisible() {
+    const q = _docsQ.trim().toLowerCase();
+    return _docs.filter(d => (_docsCat === 'all' || d.category === _docsCat) &&
+        (!q || [d.title, d.memo, d.file_name, d.category].join(' ').toLowerCase().includes(q)));
+}
+function docsRender() {
+    const root = document.getElementById('docsRoot');
+    if (!root) return;
+    const list = docsVisible();
+    const cnt = c => _docs.filter(d => d.category === c).length;
+    const prevQ = document.getElementById('dcSearch');
+    const hadFocus = prevQ && document.activeElement === prevQ;
+    root.innerHTML = `
+    <div class="dc-wrap" id="dcDrop">
+        <div class="dc-head">
+            <div><h2 class="dc-title">회사 문서</h2><div class="dc-sub">회사 양식·규정·계약서 등을 올려 두고 썸네일로 미리 봐요 · 파일을 이 화면에 끌어다 놓아도 올라가요 (한 파일 50MB까지)</div></div>
+            <div class="dc-tools">
+                <input id="dcSearch" class="dc-search" placeholder="🔍 문서 이름·메모 검색" value="${docsEsc(_docsQ)}" oninput="_docsQ=this.value;docsRender()">
+                <label class="pl-btn blue dc-upbtn">＋ 문서 올리기<input type="file" multiple hidden onchange="docsUpload(this.files);this.value=''"></label>
+            </div>
+        </div>
+        <div class="dc-cats">
+            <button class="${_docsCat === 'all' ? 'on' : ''}" onclick="_docsCat='all';docsRender()">전체 <b>${_docs.length}</b></button>
+            ${DOC_CATS.map(c => `<button class="${_docsCat === c ? 'on' : ''}" onclick="_docsCat='${c}';docsRender()">${c} <b>${cnt(c)}</b></button>`).join('')}
+        </div>
+        ${_docsUp.length ? `<div class="dc-uploading">${_docsUp.map(u => `<span>${u.done ? '✅' : '⏳'} ${docsEsc(u.name)}</span>`).join('')}</div>` : ''}
+        ${list.length ? `<div class="dc-grid">${list.map(docsCardHtml).join('')}</div>`
+            : `<div class="dc-empty">${_docs.length ? '찾는 문서가 없어요' : '아직 올린 문서가 없어요 — 오른쪽 위 <b>＋ 문서 올리기</b> 또는 파일을 끌어다 놓으세요'}</div>`}
+    </div>`;
+    if (hadFocus) { const s = document.getElementById('dcSearch'); s.focus(); s.setSelectionRange(s.value.length, s.value.length); }
+    const drop = document.getElementById('dcDrop');
+    drop.ondragover = e => { if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) { e.preventDefault(); drop.classList.add('drag'); } };
+    drop.ondragleave = e => { if (!drop.contains(e.relatedTarget)) drop.classList.remove('drag'); };
+    drop.ondrop = e => { e.preventDefault(); drop.classList.remove('drag'); if (e.dataTransfer.files.length) docsUpload(e.dataTransfer.files); };
+    docsFillThumbs(list);
+}
+function docsCardHtml(d) {
+    const k = docsKind(d.ext), ui = DOC_KIND_UI[k];
+    return `
+    <div class="dc-card" onclick="docsOpen(${d.id})" title="${docsEsc(d.file_name)}">
+        <div class="dc-thumb" data-thumb="${docsEsc(d.thumb_path || '')}">
+            <div class="dc-ic" style="--c:${ui[1]}"><span>${docsEsc((d.ext || '?').toUpperCase())}</span></div>
+            <em class="dc-kind" style="background:${ui[1]}">${ui[0]}</em>
+            ${d.pinned ? '<i class="dc-pin" title="고정">📌</i>' : ''}
+        </div>
+        <div class="dc-info">
+            <div class="dc-name">${docsEsc(d.title || d.file_name)}</div>
+            <div class="dc-meta"><span>${docsEsc(d.category)}</span><span>${docsDate(d.updated_at)}</span><span>${docsSize(d.size)}</span></div>
+            ${d.memo ? `<div class="dc-memo">${docsEsc(d.memo)}</div>` : ''}
+        </div>
+    </div>`;
+}
+async function docsFillThumbs(list) {
+    const paths = list.map(d => d.thumb_path).filter(Boolean);
+    if (!paths.length) return;
+    const urls = await docsSigned(paths);
+    const map = {}; paths.forEach((p, i) => { map[p] = urls[i]; });
+    document.querySelectorAll('#docsRoot .dc-thumb[data-thumb]').forEach(el => {
+        const u = map[el.dataset.thumb];
+        if (!u || el.querySelector('img')) return;
+        const img = new Image();
+        img.alt = ''; img.loading = 'lazy';
+        img.onload = () => el.classList.add('has');
+        img.src = u;
+        el.prepend(img);
+    });
+}
+
+// ---- 올리기 ----
+async function docsUpload(files) {
+    files = Array.from(files || []);
+    if (!files.length) return;
+    const big = files.filter(f => f.size > 50 * 1024 * 1024);
+    if (big.length) showToast('50MB 넘는 파일은 뺐어요: ' + big.map(f => f.name).join(', '));
+    files = files.filter(f => f.size <= 50 * 1024 * 1024);
+    if (!files.length) return;
+    const cid = (currentCompany && currentCompany.id) || 1;
+    const me = (currentUser && currentUser.name) || '';
+    const cat = _docsCat === 'all' ? '기타' : _docsCat;
+    _docsUp = files.map(f => ({ name: f.name, done: false }));
+    docsRender();
+    let ok = 0;
+    for (let i = 0; i < files.length; i++) {
+        const f = files[i], ext = docsExt(f.name);
+        try {
+            const key = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+            const path = `${cid}/${new Date().getFullYear()}/${key}${ext ? '.' + ext : ''}`;
+            const up = await sb.storage.from(DOC_BUCKET).upload(path, f, { upsert: false, contentType: f.type || 'application/octet-stream' });
+            if (up.error) throw up.error;
+            let thumb_path = null;
+            try {
+                const blob = await docsMakeThumb(f, ext);
+                if (blob) {
+                    const tp = `${cid}/thumbs/${key}.jpg`;
+                    const tu = await sb.storage.from(DOC_BUCKET).upload(tp, blob, { upsert: true, contentType: 'image/jpeg' });
+                    if (!tu.error) thumb_path = tp;
+                }
+            } catch (e) { console.warn('썸네일 실패', f.name, e); }
+            const row = { title: f.name.replace(/\.[^.]+$/, ''), category: cat, file_path: path, file_name: f.name, mime: f.type || '', size: f.size, ext, thumb_path, created_by: me, updated_by: me };
+            const { error } = await sb.from('company_docs').insert(row);
+            if (error) { await sb.storage.from(DOC_BUCKET).remove([path].concat(thumb_path ? [thumb_path] : [])); throw error; }
+            ok++;
+        } catch (err) {
+            console.error(err);
+            showToast(`'${f.name}' 올리기 실패: ` + (err.message || err));
+        }
+        _docsUp[i].done = true;
+        docsRender();
+    }
+    _docsUp = [];
+    await docsLoad();
+    docsRender();
+    if (ok) showToast(`문서 ${ok}개 올렸어요${cat === '기타' && _docsCat === 'all' ? ' — 분류는 문서를 눌러 바꿀 수 있어요' : ''}`);
+}
+
+// ---- 썸네일 만들기 (가로 480px JPEG) ----
+function docsCanvasToJpeg(cv, w) {
+    const W = w || 480, s = W / cv.width;
+    const out = document.createElement('canvas');
+    out.width = W; out.height = Math.max(1, Math.round(cv.height * s));
+    const g = out.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, out.width, out.height);
+    g.drawImage(cv, 0, 0, out.width, out.height);
+    return new Promise(r => out.toBlob(b => r(b), 'image/jpeg', 0.82));
+}
+function docsImgToJpeg(src) {
+    return new Promise((res, rej) => {
+        const img = new Image();
+        img.onload = () => {
+            const cv = document.createElement('canvas');
+            cv.width = img.naturalWidth || 480; cv.height = img.naturalHeight || 360;
+            cv.getContext('2d').drawImage(img, 0, 0);
+            docsCanvasToJpeg(cv).then(res, rej);
+        };
+        img.onerror = () => rej(new Error('그림을 읽지 못함'));
+        img.src = src;
+    });
+}
+async function docsHtmlToJpeg(html, w, h) {
+    const box = document.createElement('div');
+    box.className = 'dc-render';
+    box.style.cssText = `position:fixed;left:-10000px;top:0;width:${w}px;height:${h}px;overflow:hidden;background:#fff;color:#111;padding:36px 40px;box-sizing:border-box;font-family:Pretendard,sans-serif;font-size:14px;line-height:1.55`;
+    box.innerHTML = html;
+    document.body.appendChild(box);
+    try {
+        const cv = await html2canvas(box, { scale: 1, backgroundColor: '#fff', logging: false, width: w, height: h });
+        return await docsCanvasToJpeg(cv);
+    } finally { box.remove(); }
+}
+async function docsZipImage(buf, names) {
+    const JSZip = await docsZipLib();
+    const zip = await JSZip.loadAsync(buf);
+    for (const n of names) {
+        const f = zip.file(n) || zip.file(new RegExp('^' + n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i'))[0];
+        if (f) {
+            const b = await f.async('blob');
+            const url = URL.createObjectURL(b);
+            try { return await docsImgToJpeg(url); } finally { URL.revokeObjectURL(url); }
+        }
+    }
+    return null;
+}
+async function docsMakeThumb(file, ext) {
+    const k = docsKind(ext);
+    if (k === 'img') {
+        const url = URL.createObjectURL(file);
+        try { return await docsImgToJpeg(url); } finally { URL.revokeObjectURL(url); }
+    }
+    if (k === 'pdf') {
+        const pdfjs = await docsPdfLib();
+        const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+        const page = await pdf.getPage(1);
+        const v0 = page.getViewport({ scale: 1 });
+        const vp = page.getViewport({ scale: 960 / v0.width });
+        const cv = document.createElement('canvas');
+        cv.width = vp.width; cv.height = vp.height;
+        await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+        return docsCanvasToJpeg(cv);
+    }
+    if (ext === 'xlsx' || ext === 'xls' || ext === 'xlsm' || ext === 'csv') {
+        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', sheetRows: 60 });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const html = XLSX.utils.sheet_to_html(ws, { header: '', footer: '' });
+        return docsHtmlToJpeg(`<style>.dc-render table{border-collapse:collapse;font-size:12px}.dc-render td{border:1px solid #ccc;padding:3px 6px;white-space:nowrap;max-width:260px;overflow:hidden}</style>${html}`, 1000, 1300);
+    }
+    if (ext === 'docx') {
+        const buf = await file.arrayBuffer();
+        const t = await docsZipImage(buf, ['docProps/thumbnail.jpeg', 'docProps/thumbnail.png']).catch(() => null);
+        if (t) return t;
+        const mammoth = await docsMammothLib();
+        const r = await mammoth.convertToHtml({ arrayBuffer: buf });
+        return docsHtmlToJpeg(`<style>.dc-render img{max-width:100%}.dc-render table{border-collapse:collapse}.dc-render td{border:1px solid #ccc;padding:3px 6px}</style>${planningSanitizeHtml(r.value || '')}`, 794, 1123);
+    }
+    if (ext === 'pptx' || ext === 'xlsx') return docsZipImage(await file.arrayBuffer(), ['docProps/thumbnail.jpeg', 'docProps/thumbnail.png']);
+    if (ext === 'hwpx') return docsZipImage(await file.arrayBuffer(), ['Preview/PrvImage.png', 'Preview/PrvImage.jpg', 'Preview/PrvImage.bmp']);
+    if (ext === 'hwp' || ext === 'ppt' || ext === 'doc' || ext === 'xls') {
+        // 옛 오피스·한글(OLE 파일): 한글은 PrvImage 스트림에 미리보기 그림이 있음
+        const cfb = XLSX.CFB.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' });
+        const e = XLSX.CFB.find(cfb, 'PrvImage');
+        if (e && e.content && e.content.length) {
+            const u8 = e.content instanceof Uint8Array ? e.content : new Uint8Array(e.content);
+            const type = u8[0] === 0x89 ? 'image/png' : u8[0] === 0x47 ? 'image/gif' : u8[0] === 0x42 ? 'image/bmp' : 'image/jpeg';
+            const url = URL.createObjectURL(new Blob([u8], { type }));
+            try { return await docsImgToJpeg(url); } finally { URL.revokeObjectURL(url); }
+        }
+    }
+    return null;
+}
+
+// ---- 크게 보기 ----
+let _docsOpenId = null;
+async function docsOpen(id) {
+    const d = _docs.find(x => x.id === id);
+    if (!d) return;
+    _docsOpenId = id;
+    let ov = document.getElementById('dcView');
+    if (!ov) {
+        ov = document.createElement('div');
+        ov.id = 'dcView'; ov.className = 'dcv-ov';
+        ov.addEventListener('mousedown', e => { if (e.target === ov) docsClose(); });
+        document.body.appendChild(ov);
+    }
+    const k = docsKind(d.ext), ui = DOC_KIND_UI[k];
+    ov.innerHTML = `
+    <div class="dcv">
+        <div class="dcv-head">
+            <em class="dc-kind" style="background:${ui[1]};position:static">${ui[0]}</em>
+            <div class="dcv-title">${docsEsc(d.title || d.file_name)}<small>${docsEsc(d.file_name)} · ${docsSize(d.size)} · ${docsEsc(d.created_by)} ${docsDate(d.created_at)}</small></div>
+            <button class="pl-btn" onclick="docsDownload(${d.id})">⬇ 내려받기</button>
+            <button class="dcv-x" onclick="docsClose()" title="닫기 (Esc)">✕</button>
+        </div>
+        <div class="dcv-body">
+            <div class="dcv-view" id="dcvView"><div class="dc-empty">불러오는 중…</div></div>
+            <div class="dcv-side">
+                <label>문서 이름<input id="dcvTitle" value="${docsEsc(d.title)}" onchange="docsPatch(${d.id},{title:this.value.trim()})"></label>
+                <label>분류<select onchange="docsPatch(${d.id},{category:this.value})">${DOC_CATS.map(c => `<option ${c === d.category ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
+                <label>메모<textarea rows="5" placeholder="언제 쓰는 문서인지, 최신본 여부 등" onchange="docsPatch(${d.id},{memo:this.value.trim()})">${docsEsc(d.memo)}</textarea></label>
+                <label class="dcv-chk"><input type="checkbox" ${d.pinned ? 'checked' : ''} onchange="docsPatch(${d.id},{pinned:this.checked})"> 📌 맨 앞에 고정</label>
+                <label class="pl-btn dcv-rep">🔄 새 파일로 바꾸기<input type="file" hidden onchange="docsReplace(${d.id}, this.files[0]);this.value=''"></label>
+                <button class="dcv-del" onclick="docsDelete(${d.id})">🗑 문서 삭제</button>
+                <div class="dcv-hint">수정은 칸을 벗어나면 저장돼요</div>
+            </div>
+        </div>
+    </div>`;
+    ov.style.display = 'flex';
+    document.addEventListener('keydown', _docsKey, true);
+    docsRenderView(d).catch(err => { console.error(err); const v = document.getElementById('dcvView'); if (v) v.innerHTML = `<div class="dc-empty">미리 보기를 못 만들었어요 — 내려받아 열어 주세요<br><small>${docsEsc(err.message || err)}</small></div>`; });
+}
+async function docsRenderView(d) {
+    const v = () => document.getElementById('dcvView');
+    const [url] = await docsSigned([d.file_path]);
+    if (!url) throw new Error('파일 주소를 못 받음');
+    const k = docsKind(d.ext);
+    const set = html => { if (_docsOpenId === d.id && v()) v().innerHTML = html; };
+    if (k === 'pdf') return set(`<iframe src="${docsEsc(url)}#view=FitH" title="미리 보기"></iframe>`);
+    if (k === 'img') return set(`<div class="dcv-img"><img src="${docsEsc(url)}" alt=""></div>`);
+    if (['mp4', 'webm', 'mov'].includes(d.ext)) return set(`<video src="${docsEsc(url)}" controls style="max-width:100%;max-height:100%"></video>`);
+    if (['txt', 'md'].includes(d.ext)) { const t = await (await fetch(url)).text(); return set(`<pre class="dcv-text">${docsEsc(t)}</pre>`); }
+    if (['xlsx', 'xls', 'xlsm', 'csv', 'docx'].includes(d.ext)) {
+        const buf = await (await fetch(url)).arrayBuffer();
+        if (d.ext === 'docx') {
+            const mammoth = await docsMammothLib();
+            const r = await mammoth.convertToHtml({ arrayBuffer: buf });
+            return set(`<div class="dcv-doc"><div class="dcv-page">${planningSanitizeHtml(r.value || '')}</div></div>`);
+        }
+        const wb = XLSX.read(buf, { type: 'array' });
+        window._dcvWb = wb;
+        set(`<div class="dcv-xls"><div class="dcv-sheets">${wb.SheetNames.map((n, i) => `<button class="${i ? '' : 'on'}" onclick="docsSheet(${i},this)">${docsEsc(n)}</button>`).join('')}</div><div class="dcv-sheet" id="dcvSheet"></div></div>`);
+        return docsSheet(0);
+    }
+    // 그 밖(PPT·한글·디자인 파일 등)은 썸네일 크게 + 내려받기
+    const [t] = d.thumb_path ? await docsSigned([d.thumb_path]) : [''];
+    set(`<div class="dcv-img">${t ? `<img src="${docsEsc(t)}" alt="">` : ''}<div class="dcv-note">이 형식(${docsEsc((d.ext || '').toUpperCase())})은 화면에서 첫 장 미리보기만 보여요 — 전체는 <b>⬇ 내려받기</b>로 열어 주세요</div></div>`);
+}
+function docsSheet(i, btn) {
+    const wb = window._dcvWb, el = document.getElementById('dcvSheet');
+    if (!wb || !el) return;
+    el.innerHTML = XLSX.utils.sheet_to_html(wb.Sheets[wb.SheetNames[i]], { header: '', footer: '' });
+    if (btn) btn.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === btn));
+}
+function docsClose() {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    const ov = document.getElementById('dcView');
+    if (ov) { ov.style.display = 'none'; ov.innerHTML = ''; }
+    _docsOpenId = null; window._dcvWb = null;
+    document.removeEventListener('keydown', _docsKey, true);
+}
+function _docsKey(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); docsClose(); } }
+async function docsDownload(id) {
+    const d = _docs.find(x => x.id === id);
+    if (!d) return;
+    const { data, error } = await sb.storage.from(DOC_BUCKET).createSignedUrl(d.file_path, 600, { download: d.file_name || true });
+    if (error) { showToast('내려받기 실패: ' + error.message); return; }
+    const a = document.createElement('a'); a.href = data.signedUrl; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove();
+}
+async function docsPatch(id, patch) {
+    patch.updated_by = (currentUser && currentUser.name) || '';
+    patch.updated_at = new Date().toISOString();
+    const { error } = await sb.from('company_docs').update(patch).eq('id', id);
+    if (error) { showToast('저장 실패: ' + error.message); return; }
+    const d = _docs.find(x => x.id === id); if (d) Object.assign(d, patch);
+    docsRender();
+}
+async function docsReplace(id, file) {
+    const d = _docs.find(x => x.id === id);
+    if (!d || !file) return;
+    if (file.size > 50 * 1024 * 1024) { showToast('50MB 넘는 파일은 올릴 수 없어요'); return; }
+    if (!confirm(`'${d.file_name}'을(를) '${file.name}'(으)로 바꿀까요? 예전 파일은 지워져요.`)) return;
+    const cid = (currentCompany && currentCompany.id) || 1, ext = docsExt(file.name);
+    const key = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+    const path = `${cid}/${new Date().getFullYear()}/${key}${ext ? '.' + ext : ''}`;
+    showToast('바꾸는 중…');
+    const up = await sb.storage.from(DOC_BUCKET).upload(path, file, { contentType: file.type || 'application/octet-stream' });
+    if (up.error) { showToast('올리기 실패: ' + up.error.message); return; }
+    let thumb_path = null;
+    try { const b = await docsMakeThumb(file, ext); if (b) { const tp = `${cid}/thumbs/${key}.jpg`; const r = await sb.storage.from(DOC_BUCKET).upload(tp, b, { upsert: true, contentType: 'image/jpeg' }); if (!r.error) thumb_path = tp; } } catch (e) { console.warn(e); }
+    const old = [d.file_path].concat(d.thumb_path ? [d.thumb_path] : []);
+    await docsPatch(id, { file_path: path, file_name: file.name, mime: file.type || '', size: file.size, ext, thumb_path });
+    await sb.storage.from(DOC_BUCKET).remove(old);
+    showToast('새 파일로 바꿨어요');
+    docsOpen(id);
+}
+async function docsDelete(id) {
+    const d = _docs.find(x => x.id === id);
+    if (!d) return;
+    if (!confirm(`'${d.title || d.file_name}' 문서를 삭제할까요? 파일도 함께 지워지고 되돌릴 수 없어요.`)) return;
+    const { error } = await sb.from('company_docs').delete().eq('id', id);
+    if (error) { showToast('삭제 실패: ' + error.message); return; }
+    await sb.storage.from(DOC_BUCKET).remove([d.file_path].concat(d.thumb_path ? [d.thumb_path] : []));
+    _docs = _docs.filter(x => x.id !== id);
+    docsClose(); docsRender();
+    showToast('삭제했어요');
 }
