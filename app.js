@@ -30144,7 +30144,7 @@ async function docsMakeThumb(file, ext) {
         const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', sheetRows: 60 });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const html = XLSX.utils.sheet_to_html(ws, { header: '', footer: '' });
-        return docsHtmlToJpeg(`<style>.dc-render table{border-collapse:collapse;font-size:12px}.dc-render td{border:1px solid #ccc;padding:3px 6px;white-space:nowrap;max-width:260px;overflow:hidden}</style>${html}`, 1000, 1300);
+        return docsHtmlToJpeg(`<style>.dc-render{padding:20px !important}.dc-render table{border-collapse:collapse;font-size:17px}.dc-render td{border:1px solid #bbb;padding:5px 9px;white-space:nowrap;max-width:300px;overflow:hidden}.dc-render tr:first-child td{background:#f1f3f5;font-weight:700}</style>${html}`, 720, 960);
     }
     if (ext === 'docx') {
         const buf = await file.arrayBuffer();
@@ -30154,7 +30154,12 @@ async function docsMakeThumb(file, ext) {
         const r = await mammoth.convertToHtml({ arrayBuffer: buf });
         return docsHtmlToJpeg(`<style>.dc-render img{max-width:100%}.dc-render table{border-collapse:collapse}.dc-render td{border:1px solid #ccc;padding:3px 6px}</style>${planningSanitizeHtml(r.value || '')}`, 794, 1123);
     }
-    if (ext === 'pptx' || ext === 'xlsx') return docsZipImage(await file.arrayBuffer(), ['docProps/thumbnail.jpeg', 'docProps/thumbnail.png']);
+    if (ext === 'pptx') {
+        const buf = await file.arrayBuffer();
+        const slides = await docsPptxRender(buf, 1, 960).catch(e => { console.warn(e); return []; });
+        if (slides[0]) return docsCanvasToJpeg(slides[0]);
+        return docsZipImage(buf, ['docProps/thumbnail.jpeg', 'docProps/thumbnail.png']);
+    }
     if (ext === 'hwpx') return docsZipImage(await file.arrayBuffer(), ['Preview/PrvImage.png', 'Preview/PrvImage.jpg', 'Preview/PrvImage.bmp']);
     if (ext === 'hwp' || ext === 'ppt' || ext === 'doc' || ext === 'xls') {
         // 옛 오피스·한글(OLE 파일): 한글은 PrvImage 스트림에 미리보기 그림이 있음
@@ -30168,6 +30173,132 @@ async function docsMakeThumb(file, ext) {
         }
     }
     return null;
+}
+
+// ---- PPT(pptx) 슬라이드 간단히 그리기 — 위치·크기대로 사진·도형 색·글자 (애니메이션·도표·특수 효과는 빠짐) ----
+async function docsPptxRender(buf, max, width) {
+    const JSZip = await docsZipLib();
+    const zip = await JSZip.loadAsync(buf);
+    const xml = async p => { const f = zip.file(p); return f ? new DOMParser().parseFromString(await f.async('text'), 'application/xml') : null; };
+    const all = (el, n) => el ? Array.from(el.getElementsByTagNameNS('*', n)) : [];
+    const one = (el, n) => all(el, n)[0] || null;
+    const kids = (el, n) => el ? Array.from(el.children).filter(c => !n || c.localName === n) : [];
+    const rels = async p => {
+        const dir = p.replace(/[^/]+$/, ''), r = await xml(dir + '_rels/' + p.split('/').pop() + '.rels'), m = {};
+        all(r, 'Relationship').forEach(x => {
+            let t = x.getAttribute('Target') || '';
+            if (!t.startsWith('/')) { const parts = (dir + t).split('/'), out = []; parts.forEach(q => { if (q === '..') out.pop(); else if (q && q !== '.') out.push(q); }); t = out.join('/'); } else t = t.slice(1);
+            m[x.getAttribute('Id')] = t;
+        });
+        return m;
+    };
+    const pres = await xml('ppt/presentation.xml');
+    if (!pres) return [];
+    const sz = one(pres, 'sldSz');
+    const W = Number(sz && sz.getAttribute('cx')) || 12192000, H = Number(sz && sz.getAttribute('cy')) || 6858000;
+    const prel = await rels('ppt/presentation.xml');
+    const ids = all(pres, 'sldId').map(x => prel[x.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id') || x.getAttribute('r:id')]).filter(Boolean);
+    const sc = width / W, out = [];
+    const color = el => { const c = el && (one(el, 'srgbClr')); return c ? '#' + c.getAttribute('val') : null; };
+    const xf = sp => { const x = one(kids(sp).find(k => /spPr|grpSpPr/.test(k.localName)), 'xfrm'); if (!x) return null; const o = one(x, 'off'), e = one(x, 'ext'); return o && e ? { x: +o.getAttribute('x'), y: +o.getAttribute('y'), w: +e.getAttribute('cx'), h: +e.getAttribute('cy') } : null; };
+    const phKey = sp => { const ph = one(sp, 'ph'); return ph ? [ph.getAttribute('type') || 'body', ph.getAttribute('idx') || ''] : null; };
+    const imgCache = {};
+    const loadImg = async path => {
+        if (imgCache[path] !== undefined) return imgCache[path];
+        const f = zip.file(path);
+        if (!f || /\.(emf|wmf|tiff?)$/i.test(path)) return (imgCache[path] = null);
+        const url = URL.createObjectURL(await f.async('blob'));
+        imgCache[path] = await new Promise(r => { const im = new Image(); im.onload = () => r(im); im.onerror = () => r(null); im.src = url; });
+        return imgCache[path];
+    };
+    for (const sp of ids.slice(0, max || ids.length)) {
+        const doc = await xml(sp), srel = await rels(sp);
+        const layoutPath = Object.values(srel).find(t => /slideLayouts\//.test(t));
+        const layout = layoutPath ? await xml(layoutPath) : null;
+        const lrel = layoutPath ? await rels(layoutPath) : {};
+        const masterPath = Object.values(lrel).find(t => /slideMasters\//.test(t));
+        const master = masterPath ? await xml(masterPath) : null;
+        const phPos = key => {
+            for (const d of [layout, master]) {
+                const hit = all(d, 'sp').find(s => { const k = phKey(s); return k && (k[1] && k[1] === key[1] || k[0] === key[0]); });
+                const p = hit && xf(hit); if (p) return p;
+            }
+            return null;
+        };
+        const cv = document.createElement('canvas');
+        cv.width = width; cv.height = Math.round(H * sc);
+        const g = cv.getContext('2d');
+        const bgOf = d => { const bg = one(d, 'bg'); return bg && color(one(bg, 'solidFill')); };
+        g.fillStyle = bgOf(doc) || bgOf(layout) || bgOf(master) || '#fff';
+        g.fillRect(0, 0, cv.width, cv.height);
+        const draw = async (el, T) => {
+            for (const k of kids(el)) {
+                const n = k.localName;
+                if (n === 'grpSp') {
+                    const gx = one(kids(k, 'grpSpPr')[0], 'xfrm');
+                    let T2 = T;
+                    if (gx) {
+                        const o = one(gx, 'off'), e = one(gx, 'ext'), co = one(gx, 'chOff'), ce = one(gx, 'chExt');
+                        if (o && e && co && ce) {
+                            const sx = (+e.getAttribute('cx') || 1) / (+ce.getAttribute('cx') || 1), sy = (+e.getAttribute('cy') || 1) / (+ce.getAttribute('cy') || 1);
+                            const ox = +o.getAttribute('x') - +co.getAttribute('x') * sx, oy = +o.getAttribute('y') - +co.getAttribute('y') * sy;
+                            T2 = { x: T.x + ox * T.sx, y: T.y + oy * T.sy, sx: T.sx * sx, sy: T.sy * sy };
+                        }
+                    }
+                    await draw(k, T2);
+                    continue;
+                }
+                if (n !== 'sp' && n !== 'pic') continue;
+                let p = xf(k);
+                if (!p) { const key = phKey(k); p = key && phPos(key); }
+                if (!p) continue;
+                const X = (T.x + p.x * T.sx) * sc, Y = (T.y + p.y * T.sy) * sc, Wd = p.w * T.sx * sc, Ht = p.h * T.sy * sc;
+                if (n === 'pic') {
+                    const blip = one(k, 'blip');
+                    const rid = blip && (blip.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'embed') || blip.getAttribute('r:embed'));
+                    const im = rid && srel[rid] ? await loadImg(srel[rid]) : null;
+                    if (im) g.drawImage(im, X, Y, Wd, Ht);
+                    continue;
+                }
+                const spPr = kids(k, 'spPr')[0];
+                const fill = spPr && kids(spPr, 'solidFill')[0];
+                if (fill) { g.fillStyle = color(fill) || '#ddd'; g.fillRect(X, Y, Wd, Ht); }
+                const bfill = spPr && one(spPr, 'blipFill');
+                if (bfill) { const b = one(bfill, 'blip'); const rid = b && (b.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'embed') || b.getAttribute('r:embed')); const im = rid && srel[rid] ? await loadImg(srel[rid]) : null; if (im) g.drawImage(im, X, Y, Wd, Ht); }
+                const tx = kids(k, 'txBody')[0];
+                if (!tx) continue;
+                const key = phKey(k), isTitle = key && /title|ctrTitle/.test(key[0]);
+                let cy = Y + 6 * (width / 960);
+                for (const para of kids(tx, 'p')) {
+                    const runs = all(para, 'r');
+                    const text = runs.map(r => (one(r, 't') || {}).textContent || '').join('');
+                    const rp = runs.length ? one(runs[0], 'rPr') : null;
+                    const szv = rp && rp.getAttribute('sz');
+                    const pt = szv ? +szv / 100 : (isTitle ? 36 : 18);
+                    const px = Math.max(6, pt * 12700 * sc * T.sy);
+                    if (!text.trim()) { cy += px * 0.8; continue; }
+                    g.font = `${rp && rp.getAttribute('b') === '1' || isTitle ? '700 ' : ''}${px}px Pretendard, 'Apple SD Gothic Neo', sans-serif`;
+                    g.fillStyle = color(rp && one(rp, 'solidFill')) || '#222';
+                    const al = (one(para, 'pPr') || { getAttribute: () => null }).getAttribute('algn');
+                    g.textAlign = al === 'ctr' ? 'center' : al === 'r' ? 'right' : 'left';
+                    g.textBaseline = 'top';
+                    const ax = al === 'ctr' ? X + Wd / 2 : al === 'r' ? X + Wd - 4 : X + 4;
+                    let line = '';
+                    for (const ch of text) {
+                        if (g.measureText(line + ch).width > Wd - 8 && line) { g.fillText(line, ax, cy); cy += px * 1.2; line = ch; }
+                        else line += ch;
+                        if (cy > Y + Ht + px * 3) break;
+                    }
+                    if (line) { g.fillText(line, ax, cy); cy += px * 1.25; }
+                }
+            }
+        };
+        const tree = one(doc, 'spTree');
+        if (tree) await draw(tree, { x: 0, y: 0, sx: 1, sy: 1 });
+        out.push(cv);
+    }
+    Object.values(imgCache).forEach(im => { if (im && im.src) URL.revokeObjectURL(im.src); });
+    return out;
 }
 
 // ---- 크게 보기 ----
@@ -30231,7 +30362,19 @@ async function docsRenderView(d) {
         set(`<div class="dcv-xls"><div class="dcv-sheets">${wb.SheetNames.map((n, i) => `<button class="${i ? '' : 'on'}" onclick="docsSheet(${i},this)">${docsEsc(n)}</button>`).join('')}</div><div class="dcv-sheet" id="dcvSheet"></div></div>`);
         return docsSheet(0);
     }
-    // 그 밖(PPT·한글·디자인 파일 등)은 썸네일 크게 + 내려받기
+    if (d.ext === 'pptx') {
+        set('<div class="dc-empty">슬라이드 그리는 중…</div>');
+        const buf = await (await fetch(url)).arrayBuffer();
+        const slides = await docsPptxRender(buf, 60, 1280);
+        if (slides.length) {
+            if (_docsOpenId !== d.id || !v()) return;
+            v().innerHTML = `<div class="dcv-slides"><div class="dcv-note">슬라이드를 간단히 그린 미리 보기예요 (글꼴·효과는 실제와 다를 수 있어요 — 정확한 모양은 내려받아 확인)</div></div>`;
+            const box = v().querySelector('.dcv-slides');
+            slides.forEach((c, i) => { c.className = 'dcv-slide'; const w = document.createElement('div'); w.className = 'dcv-slidewrap'; w.innerHTML = `<span>${i + 1}</span>`; w.appendChild(c); box.appendChild(w); });
+            return;
+        }
+    }
+    // 그 밖(옛 PPT·한글·디자인 파일 등)은 썸네일 크게 + 내려받기
     const [t] = d.thumb_path ? await docsSigned([d.thumb_path]) : [''];
     set(`<div class="dcv-img">${t ? `<img src="${docsEsc(t)}" alt="">` : ''}<div class="dcv-note">이 형식(${docsEsc((d.ext || '').toUpperCase())})은 화면에서 첫 장 미리보기만 보여요 — 전체는 <b>⬇ 내려받기</b>로 열어 주세요</div></div>`);
 }

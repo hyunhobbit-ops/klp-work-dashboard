@@ -7191,3 +7191,7 @@ button.sc-kpi{cursor:pointer}
   .dc-search{width:100%} .dc-tools{width:100%}
   .dc-grid{grid-template-columns:repeat(2, 1fr); gap:10px}
 }
+.dcv-slides{display:flex; flex-direction:column; align-items:center; gap:18px; padding:20px}
+.dcv-slidewrap{position:relative; width:min(1100px, 100%)}
+.dcv-slidewrap span{position:absolute; left:-30px; top:0; font-size:13px; font-weight:700; color:var(--gray-500)}
+.dcv-slide{display:block; width:100%; height:auto; background:#fff; box-shadow:0 4px 18px rgba(0,0,0,.12)}
