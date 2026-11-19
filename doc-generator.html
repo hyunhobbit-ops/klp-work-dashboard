@@ -3383,6 +3383,9 @@ function poValidate(){
   w.classList.add('hidden');return true;
 }
 function poUsedKeys(){var ks=po.summary.imgs.map(function(i){return i.key});po.pages.forEach(function(p){(p.imgs||[]).forEach(function(i){ks.push(i.key)})});return ks}
+/* ORDER 칸의 주문 수량: "Total 1200pcs (1000 / 100 / 100)"처럼 숫자가 여러 개면 숫자를 모두 이어 붙이지 말고
+   Total 뒤 숫자, 없으면 첫 숫자만 쓴다 (예전엔 12001000100100이 돼서 저장 실패) — 2026-11 */
+function poQtyNum(v){var t=String(v||''),m=t.match(/total\s*[:=]?\s*([\d,]+)/i)||t.match(/\d[\d,]*/);var n=m?parseInt(String(m[1]||m[0]).replace(/,/g,''),10):0;return isNaN(n)?0:Math.min(n,2147483647)}
 async function poSaveAndPreview(){
   if(!poValidate())return;
   var btn=document.getElementById('btnPoSave');btn.disabled=true;btn.textContent='저장 중...';
@@ -3392,7 +3395,7 @@ async function poSaveAndPreview(){
     var docNum=val('poDocNum')||await poNextDocNum(poLinkedDcNum);
     var qtyRow=(po.spec.find(function(g){return g.g==='QUANTITY'})||{rows:[]}).rows.find(function(r){return r.k==='ORDER'});
     var data={doc_date:po.date||null,company_name:po.to,contact_person:po.attn,manager:po.from,title:po.po_no||'해외작업요청서',product_name:po.model,
-      quantity:qtyRow?toNum(qtyRow.v):0,unit:'pcs',delivery_date:po.need_by||null,status:'해외작업요청서',
+      quantity:qtyRow?poQtyNum(qtyRow.v):0,unit:'pcs',delivery_date:po.need_by||null,status:'해외작업요청서',
       images_data:JSON.stringify(packed),extra:Object.assign({},po,{dc:poLinkedDcNum})};
     for(var a=0;a<3;a++){
       var ex=await sbFetch('confirmations?doc_number=eq.'+encodeURIComponent(docNum)+'&select=id,status','GET');
