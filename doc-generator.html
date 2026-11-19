@@ -50,6 +50,13 @@ body{font-family:'Noto Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans
 .ps-slot-hint small{font-weight:500;color:#999;font-size:10.5px}
 .ps-slot-x{position:absolute;right:4px;top:4px;width:24px;height:24px;border:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:14px;cursor:pointer;z-index:1}
 .mode-btn.active-po{background:#E11D24;border-color:#E11D24;color:#fff;box-shadow:0 2px 8px rgba(225,29,36,.3)}
+.po-adj-hint{max-width:794px;margin:0 auto 10px;font-size:12.5px;color:#666;text-align:center}
+#poDocEl img[data-poadj]{cursor:move;touch-action:none;user-select:none;-webkit-user-drag:none}
+#poDocEl img.po-adj-on{outline:2px dashed #2563EB;outline-offset:2px}
+#poAdjBar{position:fixed;z-index:9999;display:flex;gap:4px;background:#111827;border-radius:9px;padding:4px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+#poAdjBar.hidden{display:none}
+#poAdjBar button{width:32px;height:30px;border:0;border-radius:6px;background:rgba(255,255,255,.12);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}
+#poAdjBar button:hover{background:rgba(255,255,255,.28)}
 .po-hint{font-size:12px;font-weight:500;color:#999;margin-left:8px;letter-spacing:0}
 .po-imgs{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}
 .po-imgcell{width:170px;display:flex;flex-direction:column;gap:5px}
@@ -579,7 +586,9 @@ body:not(.view-mode):not(.quote-only-mode) .preview-area .action-bar,body:not(.v
     <button class="btn-dl" id="btnPoPdf" style="background:#E11D24;color:#fff" onclick="dlPo('pdf')">📄 PDF (전체)</button>
     <button class="btn-dl" id="btnPoJpg" style="background:#991B1B;color:#fff" onclick="dlPo('jpg')">📷 JPG (쪽마다)</button>
     <button class="btn-dl" style="background:#111827;color:#fff" onclick="poPrint()">🖨️ 인쇄</button>
+    <button class="btn-dl hidden" id="poAdjSave" style="background:#2563EB;color:#fff" onclick="poSaveAndPreview()" title="바꾼 사진 위치·크기를 PO에 저장">💾 사진 위치 저장</button>
   </div>
+  <div class="po-adj-hint">🖱️ 사진을 끌어서 옮기고, 눌러서 고른 뒤 ＋/－로 크기 조절 (화살표 키로 1px, Shift+화살표 10px)</div>
   <div class="preview-wrap"><div id="poDocEl"></div></div>
 </div>
 
@@ -3446,8 +3455,47 @@ function poImgDim(u){
   if(!_poDims[u])_poDims[u]=new Promise(function(ok){var im=new Image();im.onload=function(){ok({w:im.naturalWidth||1,h:im.naturalHeight||1})};im.onerror=function(){ok({w:1,h:1})};im.src=u});
   return _poDims[u];
 }
-function poFitStyle(d,mw,mh){var k=Math.min(mw/d.w,mh/d.h);return 'width:'+Math.max(1,Math.floor(d.w*k))+'px;height:'+Math.max(1,Math.floor(d.h*k))+'px'}
+function poFitStyle(d,mw,mh,it){var k=Math.min(mw/d.w,mh/d.h)*((it&&it.sc)||1);return 'width:'+Math.max(1,Math.floor(d.w*k))+'px;height:'+Math.max(1,Math.floor(d.h*k))+'px'+(it?';position:relative;left:'+(it.dx||0)+'px;top:'+(it.dy||0)+'px;max-width:none':'')}
+/* 미리보기에서 사진 위치·크기 조정 (2026-11): 끌어서 옮기기 · 눌러서 고른 뒤 ＋/－ · 화살표 키 */
+var _poAdjRefs=[],_poAdjSel=null,_poAdjDirty=false;
+function poAdjAttr(it){_poAdjRefs.push(it);return ' data-poadj="'+(_poAdjRefs.length-1)+'"'}
+function poAdjBar(){var b=document.getElementById('poAdjBar');if(b)return b;b=document.createElement('div');b.id='poAdjBar';b.className='hidden';
+  b.innerHTML='<button type="button" data-a="-" title="작게">－</button><button type="button" data-a="+" title="크게">＋</button><button type="button" data-a="0" title="처음 위치·크기로">↺</button><button type="button" data-a="x" title="선택 해제">✓</button>';
+  b.addEventListener('mousedown',function(e){e.preventDefault()});
+  b.addEventListener('click',function(e){var a=e.target.getAttribute('data-a');if(!a||!_poAdjSel)return;var el=_poAdjSel,it=_poAdjRefs[+el.getAttribute('data-poadj')];
+    if(a==='x'){poAdjSelect(null);return}
+    var sc=it.sc||1,ns=a==='0'?1:Math.max(.3,Math.min(3,Math.round(sc*(a==='+'?1.06:1/1.06)*1000)/1000));
+    var w=parseFloat(el.style.width)/sc,h=parseFloat(el.style.height)/sc;el.style.width=Math.max(1,Math.floor(w*ns))+'px';el.style.height=Math.max(1,Math.floor(h*ns))+'px';it.sc=ns;
+    if(a==='0'){it.dx=0;it.dy=0;el.style.left='0px';el.style.top='0px'}
+    poAdjChanged();poAdjPlace()});
+  document.body.appendChild(b);return b}
+function poAdjPlace(){var b=poAdjBar();if(!_poAdjSel){b.classList.add('hidden');return}var r=_poAdjSel.getBoundingClientRect();b.classList.remove('hidden');b.style.left=Math.max(6,r.left+r.width/2-b.offsetWidth/2)+'px';b.style.top=Math.max(6,r.top-b.offsetHeight-8)+'px'}
+function poAdjSelect(el){if(_poAdjSel)_poAdjSel.classList.remove('po-adj-on');_poAdjSel=el;if(el)el.classList.add('po-adj-on');poAdjPlace()}
+function poAdjChanged(){_poAdjDirty=true;var n=document.getElementById('poAdjSave');if(n)n.classList.remove('hidden')}
+function poBindAdjust(){
+  if(document.body.classList.contains('view-mode'))return;
+  _poAdjSel=null;poAdjPlace();
+  document.querySelectorAll('#poDocEl img[data-poadj]').forEach(function(el){
+    el.addEventListener('pointerdown',function(e){e.preventDefault();var it=_poAdjRefs[+el.getAttribute('data-poadj')];if(!it)return;poAdjSelect(el);
+      var k=el.getBoundingClientRect().width/el.offsetWidth||1,sx=e.clientX,sy=e.clientY,ox=it.dx||0,oy=it.dy||0,moved=false;
+      el.setPointerCapture(e.pointerId);
+      var mv=function(ev){var dx=Math.round(ox+(ev.clientX-sx)/k),dy=Math.round(oy+(ev.clientY-sy)/k);if(dx!==it.dx||dy!==it.dy){moved=true;it.dx=dx;it.dy=dy;el.style.left=dx+'px';el.style.top=dy+'px';poAdjPlace()}};
+      var up=function(){el.removeEventListener('pointermove',mv);el.removeEventListener('pointerup',up);el.removeEventListener('pointercancel',up);if(moved)poAdjChanged()};
+      el.addEventListener('pointermove',mv);el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);
+    });
+  });
+}
+document.addEventListener('keydown',function(e){
+  if(!_poAdjSel||!document.body.contains(_poAdjSel))return;if(/INPUT|TEXTAREA|SELECT/.test((e.target||{}).tagName||''))return;
+  var m={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];
+  if(e.key==='Escape'){poAdjSelect(null);return}
+  if(!m)return;e.preventDefault();var st=e.shiftKey?10:1,it=_poAdjRefs[+_poAdjSel.getAttribute('data-poadj')];
+  it.dx=(it.dx||0)+m[0]*st;it.dy=(it.dy||0)+m[1]*st;_poAdjSel.style.left=it.dx+'px';_poAdjSel.style.top=it.dy+'px';poAdjPlace();poAdjChanged();
+});
+document.addEventListener('pointerdown',function(e){if(_poAdjSel&&!e.target.closest('img[data-poadj]')&&!e.target.closest('#poAdjBar'))poAdjSelect(null)});
+window.addEventListener('scroll',function(){if(_poAdjSel)poAdjPlace()},true);
 async function buildPoDocAsync(){
+  _poAdjRefs=[];_poAdjDirty=false;var _sv=document.getElementById('poAdjSave');if(_sv)_sv.classList.add('hidden');
   /* 2026-10 피드백: 바탕색 없음(잉크 절약) · 글자 크게(A4 인쇄) · 쪽 나눔 SUMMARY / SPECIFICATION / DESIGN DETAIL · 진행 단계는 문서에서 뺌 */
   var W=794,H=1123,PX=34,PT=26,PB=22,INW=W-PX*2;
   var dims={};
@@ -3548,7 +3596,7 @@ async function buildPoDocAsync(){
   var cw=L?L.w:0,imgsH=L?L.rows*L.rh+(L.rows-1)*GP:0;
   var sumHtml=secTitle('SUMMARY','KEY POINTS — PLEASE CHECK BEFORE PRODUCTION','I')+
     (sImgs.length?'<div style="height:'+imgsH+'px;padding:'+BX+'px;border:1px solid '+LN+';box-sizing:content-box;display:flex;flex-wrap:wrap;gap:'+GP+'px;justify-content:center;align-content:flex-start;flex-shrink:0">'+sImgs.map(function(it){
-      return '<div style="width:'+cw+'px;height:'+L.rh+'px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;box-sizing:border-box"><img src="'+poImgs[it.key]+'" style="'+poFitStyle(dims[it.key]||{w:1,h:1},cw,L.rh-capH(it))+'">'+(it.cap?'<div style="font-size:13px;font-weight:700;color:'+TX+';text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>':'')+
+      return '<div style="width:'+cw+'px;height:'+L.rh+'px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;box-sizing:border-box"><img src="'+poImgs[it.key]+'"'+poAdjAttr(it)+' style="'+poFitStyle(dims[it.key]||{w:1,h:1},cw,L.rh-capH(it),it)+'">'+(it.cap?'<div style="font-size:13px;font-weight:700;color:'+TX+';text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>':'')+
     (lines.length?'<div style="height:30px;margin-top:12px;display:flex;align-items:center;gap:10px;border-bottom:1.5px solid '+TX+';flex-shrink:0"><span style="font-size:14px;font-weight:900;letter-spacing:1.5px;color:'+C+'">IMPORTANT NOTES</span><span style="font-size:11.5px;font-weight:700;color:'+SUB+';letter-spacing:.5px">MUST BE FOLLOWED</span></div>'+
       '<div style="margin-top:2px;flex-shrink:0">'+lines.map(function(l,i){
       return '<div style="height:'+LH+'px;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:'+(l.hl?900:700)+';color:'+(l.hl?C:TX)+';white-space:nowrap;overflow:hidden"><b style="min-width:24px;font-weight:900">'+(i+1)+'.</b><span style="overflow:hidden;text-overflow:ellipsis;'+(l.hl?'text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px':'')+'">'+esc(poLineText(l))+'</span></div>'}).join('')+'</div>':'')+
@@ -3617,7 +3665,7 @@ async function buildPoDocAsync(){
     var cols=ims.length<=1?1:2,rows=ims.length>2?2:1;
     var cw2=Math.floor((INW-(cols-1)*14)/cols),chh=Math.floor((areaH-(rows-1)*14)/rows);
     var grid=ims.length?'<div style="height:'+areaH+'px;display:grid;grid-template-columns:repeat('+cols+','+cw2+'px);grid-template-rows:repeat('+rows+','+chh+'px);gap:14px;justify-content:center;flex-shrink:0">'+ims.map(function(it){
-        return '<div style="border:1px solid '+LN+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px;box-sizing:border-box;overflow:hidden"><img src="'+poImgs[it.key]+'" style="'+poFitStyle(dims[it.key]||{w:1,h:1},cw2-22,chh-(it.cap?46:22))+'">'+(it.cap?'<div style="font-size:15px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>'
+        return '<div style="border:1px solid '+LN+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px;box-sizing:border-box;overflow:hidden"><img src="'+poImgs[it.key]+'"'+poAdjAttr(it)+' style="'+poFitStyle(dims[it.key]||{w:1,h:1},cw2-22,chh-(it.cap?46:22),it)+'">'+(it.cap?'<div style="font-size:15px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>'
       :'<div style="height:'+areaH+'px;border:1px dashed '+LN+';display:flex;align-items:center;justify-content:center;color:#bbb;font-size:14px;flex-shrink:0">No image</div>';
     var inner=head('DESIGN DETAIL')+
       '<div style="height:'+titleH+'px;display:flex;align-items:center;gap:10px;flex-shrink:0"><span style="font-size:30px;font-weight:900;color:'+C+';letter-spacing:.5px">III-'+(pgi+1)+'</span><span style="font-size:30px;font-weight:900;letter-spacing:1px;white-space:nowrap">DETAIL : '+esc(pg.title||'')+'</span></div>'+
@@ -3630,10 +3678,12 @@ async function buildPoDocAsync(){
 
   var N=pages.length;
   document.getElementById('poDocEl').innerHTML=pages.map(function(p,i){return p.replace('{P}',i+1).replace('{N}',N)}).join('<div style="height:18px;background:#e9e9e6"></div>');
+  try{poBindAdjust()}catch(e){console.warn(e)}
   return N;
 }
 async function poCanvases(scale){
   await (_poBuilt||buildPoDoc());
+  poAdjSelect(null);
   var out=[],pgs=document.querySelectorAll('#poDocEl .po-pg');
   for(var i=0;i<pgs.length;i++)out.push(await html2canvas(pgs[i],{scale:scale||2.5,useCORS:true,backgroundColor:'#fff',logging:false,width:794,height:1123,windowWidth:794,windowHeight:1123}));
   return out;
