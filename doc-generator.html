@@ -3536,11 +3536,19 @@ async function buildPoDocAsync(){
   var linesH=lines.length*LH;
   var needH=need?60:0;
   var restH=usable-used-52-linesH-(lines.length?12+30:0)-needH;
-  var imgsH=sImgs.length?Math.max(200,Math.min(600,restH)):0;   /* 남는 높이를 사진이 채움 */
-  var cw=Math.floor((INW-(sImgs.length-1)*14)/Math.max(1,sImgs.length));
+  /* 사진 배치: 한 줄 vs 두 줄 중 사진이 더 크게 보이는 쪽, 칸 선 없음, 높이는 사진에 맞춤 — 2026-11 */
+  var GP=14,maxH=sImgs.length?Math.max(200,Math.min(sImgs.length>=3?720:600,restH)):0;
+  var capH=function(it){return it.cap?28:0};
+  var layout=function(cols){var rows=Math.ceil(sImgs.length/cols),w=Math.floor((INW-(cols-1)*GP)/cols),rh=Math.floor((maxH-(rows-1)*GP)/rows),sc=Infinity;
+    sImgs.forEach(function(it){var d=dims[it.key]||{w:1,h:1};sc=Math.min(sc,Math.min(w/d.w,(rh-capH(it))/d.h))});
+    var need=0;sImgs.forEach(function(it){var d=dims[it.key]||{w:1,h:1};need=Math.max(need,Math.floor(Math.min(w/d.w,(rh-capH(it))/d.h)*d.h)+capH(it))});
+    return {cols:cols,rows:rows,w:w,rh:Math.max(100,need),sc:sc}};
+  var L=sImgs.length?layout(sImgs.length):null;
+  if(sImgs.length>=3){var L2=layout(Math.ceil(sImgs.length/2));if(L2.sc>L.sc*1.3)L=L2}
+  var cw=L?L.w:0,imgsH=L?L.rows*L.rh+(L.rows-1)*GP:0;
   var sumHtml=secTitle('SUMMARY','KEY POINTS — PLEASE CHECK BEFORE PRODUCTION','I')+
-    (sImgs.length?'<div style="height:'+imgsH+'px;display:flex;gap:14px;justify-content:center;flex-shrink:0">'+sImgs.map(function(it){
-      return '<div style="width:'+cw+'px;border:1px solid '+LN+';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:8px;box-sizing:border-box"><img src="'+poImgs[it.key]+'" style="'+poFitStyle(dims[it.key]||{w:1,h:1},cw-18,imgsH-(it.cap?40:18))+'">'+(it.cap?'<div style="font-size:13px;font-weight:700;color:'+TX+';text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>':'')+
+    (sImgs.length?'<div style="height:'+imgsH+'px;display:flex;flex-wrap:wrap;gap:'+GP+'px;justify-content:center;align-content:flex-start;flex-shrink:0">'+sImgs.map(function(it){
+      return '<div style="width:'+cw+'px;height:'+L.rh+'px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;box-sizing:border-box"><img src="'+poImgs[it.key]+'" style="'+poFitStyle(dims[it.key]||{w:1,h:1},cw,L.rh-capH(it))+'">'+(it.cap?'<div style="font-size:13px;font-weight:700;color:'+TX+';text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">'+esc(it.cap)+'</div>':'')+'</div>'}).join('')+'</div>':'')+
     (lines.length?'<div style="height:30px;margin-top:12px;display:flex;align-items:center;gap:10px;border-bottom:1.5px solid '+TX+';flex-shrink:0"><span style="font-size:14px;font-weight:900;letter-spacing:1.5px;color:'+C+'">IMPORTANT NOTES</span><span style="font-size:11.5px;font-weight:700;color:'+SUB+';letter-spacing:.5px">MUST BE FOLLOWED</span></div>'+
       '<div style="margin-top:2px;flex-shrink:0">'+lines.map(function(l,i){
       return '<div style="height:'+LH+'px;display:flex;align-items:center;gap:10px;font-size:16px;font-weight:'+(l.hl?900:700)+';color:'+(l.hl?C:TX)+';white-space:nowrap;overflow:hidden"><b style="min-width:24px;font-weight:900">'+(i+1)+'.</b><span style="overflow:hidden;text-overflow:ellipsis;'+(l.hl?'text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px':'')+'">'+esc(poLineText(l))+'</span></div>'}).join('')+'</div>':'')+
