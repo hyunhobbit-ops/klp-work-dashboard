@@ -112,6 +112,11 @@
 - **범위 밖(다음 단계)**: 셀프 회원가입+자동 결제, 업종별 모듈팩(택배·문서생성 등), 랜딩. 설계·계획: `docs/superpowers/{specs,plans}/2026-07-20-multitenant-saas-*`.
 - **새 테넌트 테이블 추가 시**: `company_id bigint references companies(id) not null` + `set_company_id` 트리거 + 회사 스코프 RLS 필수.
 
+## 📁 회사 문서 (자료실, 탭 id `docs` → `#docsRoot`, `docsEnter`) — migration 083, 2026-11-19
+- 회사 양식·규정·계약서 등 파일 보관 + **썸네일 바둑판**으로 미리 보기. 테이블 `company_docs`(title·category `DOC_CATS`·memo·file_path·file_name·mime·size·ext·thumb_path·pinned·created_by/updated_by, 회사 RLS·realtime). 파일은 **비공개 버킷 `company-docs`** `<company_id>/<연도>/<랜덤>.<확장자>`(한글 파일명은 DB에만), 썸네일 `<company_id>/thumbs/<랜덤>.jpg`. 화면은 1시간 서명 주소(`docsSigned`, 50분 캐시), 내려받기는 원래 파일명으로. 한 파일 50MB(서버 FILE_SIZE_LIMIT)
+- 썸네일은 올릴 때 브라우저가 만듦(`docsMakeThumb`, 가로 480 JPEG): PDF 첫 장(pdf.js 3.11 cdnjs, 필요할 때만 로드) · 사진 · 엑셀 첫 시트(SheetJS → html2canvas) · 워드(파일 속 미리보기 그림 → 없으면 mammoth로 그림) · pptx(`docsPptxRender` — 슬라이드 xml의 위치대로 사진·도형 색·글자를 직접 그림, 자리표시자 위치는 레이아웃·마스터에서) · hwpx(Preview/PrvImage) · hwp(OLE `PrvImage` 스트림, `XLSX.CFB`). 못 만들면 확장자 아이콘
+- 카드 누르면 크게 보기(`docsOpen`): PDF는 iframe, 사진, 엑셀 시트 탭, 워드 HTML, pptx 슬라이드 전체(간단 그림), 그 밖은 썸네일 + 내려받기. 오른쪽에 이름·분류·메모·📌 고정·새 파일로 바꾸기·삭제. 화면에 파일을 끌어다 놓아도 올라감(지금 고른 분류로, 전체면 '기타')
+
 ## 📘 회사 매뉴얼 (2026-10-16 오픈)
 
 - **매뉴얼 마크다운 (migration 069, 2026-10-22)**: `manuals.format` 'md'|'html'. md 글은 원문 그대로 저장, 볼 때 `mnMdToHtml`(marked@12 + 맨 위 `---` 머리말은 표) → `planningSanitizeHtml`. 편집창 형식 버튼(문서/마크다운, 미리보기), 빈 편집기에 md처럼 보이는 글(`mnLooksMd`)을 붙여넣으면 자동으로 md 형식. '📋 md 복사' = 원문 복사. 카테고리 맨 앞 '스킬md'(고르면 md 형식). 초안 10편 삭제(백업 ~/Desktop/hyunho-server/backups/manuals/)

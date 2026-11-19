@@ -7195,3 +7195,4 @@ button.sc-kpi{cursor:pointer}
 .dcv-slidewrap{position:relative; width:min(1100px, 100%)}
 .dcv-slidewrap span{position:absolute; left:-30px; top:0; font-size:13px; font-weight:700; color:var(--gray-500)}
 .dcv-slide{display:block; width:100%; height:auto; background:#fff; box-shadow:0 4px 18px rgba(0,0,0,.12)}
+.dc-upbtn{white-space:nowrap}
