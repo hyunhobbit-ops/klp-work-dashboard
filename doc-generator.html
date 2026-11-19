@@ -3542,9 +3542,12 @@ async function buildPoDocAsync(){
     if(tw<=avail)return '<div style="font-size:'+fs+'px;'+base+'white-space:nowrap;overflow:hidden;line-height:'+lh+'">'+V(c.v)+'</div>';
     var fs1=Math.floor(fs*avail/tw*10)/10;
     if(fs1>=Math.max(12,fs*0.62))return '<div style="font-size:'+fs1+'px;'+base+'white-space:nowrap;overflow:hidden;line-height:'+lh+'">'+V(c.v)+'</div>';
-    var fs2=Math.min(fs,Math.floor(fs*(2*avail*0.9)/tw*10)/10,Math.floor(valH/2/1.15*10)/10);
-    fs2=Math.max(9,fs2);
-    return '<div style="font-size:'+fs2+'px;'+base+'white-space:normal;word-break:break-word;overflow:hidden;line-height:1.15;max-height:'+Math.ceil(fs2*1.15*2+1)+'px">'+V(c.v)+'</div>';
+    /* 두 줄: 실제 줄바꿈(띄어쓰기·/·( 뒤)을 흉내 내서 두 줄 안에 들어가는 가장 큰 글씨를 찾음 */
+    var toks=String(c.v).split(/(?<=[\s\/(,])/),fs2=Math.min(fs,Math.floor((valH-4)/2/1.15*10)/10);
+    var av2=avail*0.95;var lines=function(f){var avail=av2,n=1,cur=0;for(var i=0;i<toks.length;i++){var w=poTextW(toks[i],f,wt);if(cur&&cur+w>avail){n++;cur=poTextW(toks[i].replace(/^\s+/,''),f,wt)}else cur+=w;if(w>avail)n+=Math.floor(w/avail)}return n};
+    while(fs2>9&&lines(fs2)>2)fs2=Math.round((fs2-0.5)*10)/10;
+    var html=toks.map(function(t){return esc(t)+(/[\/(,]$/.test(t)?'<wbr>':'')}).join('');
+    return '<div style="font-size:'+fs2+'px;'+base+'white-space:normal;overflow-wrap:anywhere;overflow:hidden;line-height:1.15;max-height:'+Math.ceil(fs2*1.15*2+1)+'px">'+html+'</div>';
   };
   var h0=RW,u0=4;
   var row=function(cells,top,h){cells[0].first=1;h0=h||RW;u0=Math.max(1,cells.reduce(function(a,c){return a+(c.w||1)},0));return '<div style="display:flex;height:'+(h||RW)+'px;'+(top?'border-top:1px solid '+LN2+';':'')+'">'+cells.map(cell).join('')+'</div>'};
