@@ -1249,7 +1249,27 @@ function iaBar(){var b=document.getElementById('iaBar');if(b)return b;b=document
 function iaPlace(){var b=iaBar();if(!_ia.sel||!document.body.contains(_ia.sel)){b.classList.add('hidden');return}var r=_ia.sel.getBoundingClientRect();b.classList.remove('hidden');b.style.left=Math.max(6,r.left+r.width/2-b.offsetWidth/2)+'px';b.style.top=Math.max(6,r.top-b.offsetHeight-8)+'px'}
 function iaSelect(el){if(_ia.sel)_ia.sel.classList.remove('ia-on');_ia.sel=el;if(el)el.classList.add('ia-on');iaPlace()}
 function iaChanged(el){var cid=(el.getAttribute('data-ia')||'').split('|')[0];var n=document.getElementById(cid==='wrDocEl'?'wrAdjSave':'dcAdjSave');if(n)n.classList.remove('hidden')}
+/* 아래 내용(메모·배송·금액)이 예상보다 길어 페이지 밖으로 넘치면, 넘친 만큼 큰 사진을 줄인다 (2026-11: 맨 아래가 잘리던 문제) */
+function iaFit(cid){
+  var root=document.getElementById(cid),pg=root&&root.firstElementChild,inner=pg&&pg.firstElementChild;if(!inner)return Promise.resolve();
+  var imgs=[].slice.call(root.querySelectorAll('img'));
+  return Promise.all(imgs.map(function(im){return im.complete?0:new Promise(function(r){im.onload=im.onerror=r;setTimeout(r,3000)})})).then(function(){
+    var main=root.querySelector('img.ia-main');
+    /* 사진 상자는 내용에 맞게(작은 사진이 상자 밖으로 잘리지 않게), 줄이는 건 큰 사진만 */
+    var box=main&&main.parentElement&&main.parentElement.parentElement;if(box&&box.style.maxHeight)box.style.maxHeight='none';
+    for(var i=0;i<6;i++){
+      var over=inner.scrollHeight-inner.clientHeight;if(over<=0)break;
+      if(main&&main.offsetHeight>80){
+        main.style.maxHeight=Math.max(80,main.offsetHeight-over-4)+'px';
+      }else{
+        var box2=(main||root.querySelector('img[data-ia]')||{}).parentElement;box2=box2&&box2.closest('[style*="max-height"]');
+        if(box2&&box2.offsetHeight>60)box2.style.maxHeight=Math.max(40,box2.offsetHeight-over-4)+'px';else break;
+      }
+    }
+  });
+}
 function iaBind(cid){
+  try{iaFit(cid)}catch(e){console.warn(e)}
   if(document.body.classList.contains('view-mode'))return;
   var root=document.getElementById(cid);if(!root)return;
   var n=document.getElementById(cid==='wrDocEl'?'wrAdjSave':'dcAdjSave');if(n)n.classList.add('hidden');
@@ -1273,7 +1293,7 @@ document.addEventListener('keydown',function(e){
 document.addEventListener('pointerdown',function(e){if(_ia.sel&&!e.target.closest('img[data-ia]')&&!e.target.closest('#iaBar'))iaSelect(null)});
 window.addEventListener('scroll',function(){if(_ia.sel)iaPlace()},true);
 /* 이미지로 뽑기 직전엔 선택 표시(점선)·버튼을 없앰 */
-(function(){if(typeof window.html2canvas!=='function'||window.html2canvas._ia)return;var h=window.html2canvas;window.html2canvas=function(){try{iaSelect(null)}catch(_){}try{if(typeof poAdjSelect==='function')poAdjSelect(null)}catch(_){}return h.apply(this,arguments)};window.html2canvas._ia=1})();
+(function(){if(typeof window.html2canvas!=='function'||window.html2canvas._ia)return;var h=window.html2canvas;window.html2canvas=function(el){var self=this,args=arguments;try{iaSelect(null)}catch(_){}try{if(typeof poAdjSelect==='function')poAdjSelect(null)}catch(_){}var id=el&&el.id;if(id==='docEl'||id==='wrDocEl')return iaFit(id).then(function(){return h.apply(self,args)});return h.apply(this,args)};window.html2canvas._ia=1})();
 
 function buildDoc(){
   var seq=Math.max(1,parseInt(document.getElementById('docSeq').value)||1);
@@ -1303,7 +1323,7 @@ function buildDoc(){
   if(dcMainMaxH<80)dcMainMaxH=80;
 
   var imgHtml='';
-  if(mainImg||subImgs.length>0){imgHtml+='<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 20px">';iaReset('docEl');if(mainImg)imgHtml+='<img src="'+mainImg.url+'"'+iaAttr('docEl',mainImg)+' style="max-width:460px;max-height:'+dcMainMaxH+'px;object-fit:contain;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.08)'+iaStyle(mainImg)+'">';if(subImgs.length>0){imgHtml+='<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">';subImgs.forEach(function(img){imgHtml+='<img src="'+img.url+'"'+iaAttr('docEl',img)+' style="width:70px;height:70px;object-fit:contain;border-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,.06)'+iaStyle(img)+'">'});imgHtml+='</div>'}imgHtml+='</div>'}else{imgHtml='<div style="display:flex;align-items:center;justify-content:center;min-height:80px;color:#ccc;font-size:12px">시안 이미지 없음</div>'}
+  if(mainImg||subImgs.length>0){imgHtml+='<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 20px">';iaReset('docEl');if(mainImg)imgHtml+='<img class="ia-main" src="'+mainImg.url+'"'+iaAttr('docEl',mainImg)+' style="max-width:460px;max-height:'+dcMainMaxH+'px;object-fit:contain;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.08)'+iaStyle(mainImg)+'">';if(subImgs.length>0){imgHtml+='<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">';subImgs.forEach(function(img){imgHtml+='<img src="'+img.url+'"'+iaAttr('docEl',img)+' style="width:70px;height:70px;object-fit:contain;border-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,.06)'+iaStyle(img)+'">'});imgHtml+='</div>'}imgHtml+='</div>'}else{imgHtml='<div style="display:flex;align-items:center;justify-content:center;min-height:80px;color:#ccc;font-size:12px">시안 이미지 없음</div>'}
   var dcShipAddr=[val('dcRecipient'),val('dcPhone'),val('dcAddress')].filter(function(v){return v}).join(' / ')||'확인 필요';
   var leftRows=[['품명',val('productName')],['수량',qtyStr],['단가',fmtP(val('unitPrice'))+' ('+val('unitPriceVat')+')'],['제품 색상',val('color')],['인쇄 색상 및 사이즈',val('printColorSize')],['납기',val('deliveryDate')?fmtDate(val('deliveryDate'))+' 출고':'']];
   var shCostStr=shCost?fmtN(shCost)+' ('+val('shippingVat')+')':'-';
@@ -1363,7 +1383,7 @@ function buildWrDoc(){
   if(wrMainMaxH<60)wrMainMaxH=60;
 
   var imgHtml='';
-  if(wrMainImg||wrSubImgs.length>0){imgHtml+='<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 16px">';iaReset('wrDocEl');if(wrMainImg)imgHtml+='<img src="'+wrMainImg.url+'"'+iaAttr('wrDocEl',wrMainImg)+' style="max-width:300px;max-height:'+wrMainMaxH+'px;object-fit:contain;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.08)'+iaStyle(wrMainImg)+'">';if(wrSubImgs.length>0){imgHtml+='<div style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center">';wrSubImgs.forEach(function(img){imgHtml+='<img src="'+img.url+'"'+iaAttr('wrDocEl',img)+' style="width:60px;height:60px;object-fit:contain;border-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,.06)'+iaStyle(img)+'">'});imgHtml+='</div>'}imgHtml+='</div>'}else{imgHtml='<div style="display:flex;align-items:center;justify-content:center;min-height:60px;color:#ccc;font-size:12px">시안 이미지 없음</div>'}
+  if(wrMainImg||wrSubImgs.length>0){imgHtml+='<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 16px">';iaReset('wrDocEl');if(wrMainImg)imgHtml+='<img class="ia-main" src="'+wrMainImg.url+'"'+iaAttr('wrDocEl',wrMainImg)+' style="max-width:300px;max-height:'+wrMainMaxH+'px;object-fit:contain;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.08)'+iaStyle(wrMainImg)+'">';if(wrSubImgs.length>0){imgHtml+='<div style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center">';wrSubImgs.forEach(function(img){imgHtml+='<img src="'+img.url+'"'+iaAttr('wrDocEl',img)+' style="width:60px;height:60px;object-fit:contain;border-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,.06)'+iaStyle(img)+'">'});imgHtml+='</div>'}imgHtml+='</div>'}else{imgHtml='<div style="display:flex;align-items:center;justify-content:center;min-height:60px;color:#ccc;font-size:12px">시안 이미지 없음</div>'}
 
   function row(k,v){return '<tr><td style="padding:5px 12px;font-weight:600;color:#888;font-size:10px;letter-spacing:.3px;border-bottom:1px solid #f0f0f0;width:110px;vertical-align:top;background:#fafaf8">'+k+'</td><td style="padding:5px 12px;font-size:11px;border-bottom:1px solid #f0f0f0;color:#222;font-weight:500">'+v+'</td></tr>'}
 
