@@ -2086,9 +2086,9 @@ async function loadRecord(id){
       }
       /* 예전에 인쇄 방법이 빈 값으로 저장된 작업요청서(목록에 없는 방법이라 사라짐) — 인쇄비가 있으면 '없음'으로 보지 않음.
          그대로 두면 인쇄비가 합계에서 빠져 저장한 금액과 서류 금액이 달라졌음 */
-      /* 메모 칸이 생기기 전(2026-10-19) 작업요청서만 연결된 디자인확인서 메모를 가져옴.
-         그 뒤에 메모를 비워서 저장한 건 일부러 지운 것이라 다시 채우지 않음 (판매가 등이 다시 보이던 문제, 2026-11) */
-      if(!r.memo&&linkedDC&&linkedDC.memo&&r.created_at&&new Date(r.created_at)<new Date('2026-10-19T14:50:00+09:00'))document.getElementById('wrMemo').value=linkedDC.memo;
+      /* 메모가 아예 없는(null) 예전 작업요청서만 연결된 디자인확인서 메모를 가져옴.
+         메모를 비워서 저장한 건('' 로 저장됨) 일부러 지운 것이라 다시 채우지 않음 (판매가 등이 다시 보이던 문제, 2026-11) */
+      if(r.memo==null&&linkedDC&&linkedDC.memo)document.getElementById('wrMemo').value=linkedDC.memo;
       if(!r.print_method&&toNum(r.print_fee)>0){
         var dcPm=linkedDC&&linkedDC.print_method&&linkedDC.print_method!=='없음'?linkedDC.print_method:'기타';
         setSelOrCustom('wrPrintMethod',dcPm,'기타');toggleWrPrintFee();
