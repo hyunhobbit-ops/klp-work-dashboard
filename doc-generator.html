@@ -3211,7 +3211,7 @@ function poSetWatchType(t){
 }
 function poBlank(){
   var from='';try{from=localStorage.getItem('po_from')||''}catch(_){}
-  return {po_no:'',rev:'',date:psTodayStr(),to:'',attn:'',from:from,model:'',stage:'g3d',stage_dates:{g3d:'',sample:'',order:''},need_by:'',need_text:'',price_term:'EXF',
+  return {po_no:'',rev:'',date:psTodayStr(),to:'',attn:'',from:from,model:'',stage:'g3d',stage_dates:{g3d:'',sample:'',order:''},need_by:'',need_text:'',price_term:'EXW',
     summary:{imgs:[],lines:[{t:'',hl:0}]},watch_type:'wrist',spec:poDefaultSpec('wrist'),hide_empty:1,files:[],link:'',remarks:'',pages:[]};
 }
 /* 값 칸: 선택지가 있으면 '한글 · English' 고르기 + 기타(직접 입력) */
@@ -3262,7 +3262,7 @@ function poRenderForm(){
   /* 기본 정보 */
   h+='<div class="section"><div class="section-title">📋 기본 정보 <span class="po-hint">문서에는 영어 제목으로 나가요</span></div>'+
     '<div class="row">'+poInput('to','받는 회사 (TO)','KODA-LEILA','','')+poInput('attn','받는 사람 (ATTN)','Ms. Leila','','')+poInput('from','보내는 사람 (FROM) — 이름만','Hyunho Kim','','')+'</div>'+
-    '<div class="row">'+poInput('po_no','품번 (ITEM NO.)','#KLP2605','','')+poInput('model','모델명 (MODEL NAME)','KIMGU POCKET WATCH','','')+poInput('need_by','납기일 (DELIVERY DATE)','','max-width:200px','date')+poInput('price_term','단가 조건 (UNIT PRICE 옆)','EXF','max-width:150px')+'</div>'+
+    '<div class="row">'+poInput('po_no','품번 (ITEM NO.)','#KLP2605','','')+poInput('model','모델명 (MODEL NAME)','KIMGU POCKET WATCH','','')+poInput('need_by','납기일 (DELIVERY DATE)','','max-width:200px','date')+poInput('price_term','단가 조건 (UNIT PRICE 옆)','EXW','max-width:150px')+'</div>'+
     '<div class="row">'+poInput('date','작성일 (DATE)','','max-width:200px','date')+poInput('rev','수정 차수 (Revision)','Rev.1 — 수정본 보낼 때','max-width:240px','')+poInput('need_text','마감 강조 문구 (선택 — 적으면 SUMMARY에 빨간 상자로)','예) We need to receive by November 6th','','')+'</div></div>';
   /* 진행 단계 */
   h+='<div class="section"><div class="section-title">📈 진행 단계 <span class="po-hint">내부 확인용 — 문서에는 안 나와요 · 3D 그래픽 컨펌 → 샘플 컨펌 → 본 주문</span></div>'+
@@ -3619,7 +3619,7 @@ async function buildPoDocAsync(){
       poFitVal(c,INW,h0)+'</div>';
   };
   /* 긴 값(예: ORDER·UNIT PRICE)은 잘리지 않게: 먼저 글씨를 줄이고, 그래도 넘치면 두 줄로 — 2026-11 */
-  /* 칸 이름표도 길면(예: Antique UNIT PRICE (EXF)) 글씨를 줄여 다 보이게 */
+  /* 칸 이름표도 길면(예: Antique UNIT PRICE (EXW)) 글씨를 줄여 다 보이게 */
   var poFitKey=function(c){var fs=c.fs>20?13.5:12,wt=c.fs>16?900:700,t=String(c.k||''),av=INW*(c.w||1)/u0-26-(c.box?4:0);while(fs>8&&poTextW(t,fs,wt)+t.length*.8>av)fs-=.5;return fs};
   var poFitVal=function(c,inw,rh){
     var fs=c.fs||17,wt=c.fs>20?900:800,lh=c.fs>20?1.3:1.45;
@@ -3648,7 +3648,7 @@ async function buildPoDocAsync(){
     rows.forEach(function(r,i){
       if(/^SHIP DATE/i.test(r.k)){shipDate=r.v;return}
       var pt=String(po.price_term||'').trim(),kt=r.k;
-      if(pt&&/UNIT PRICE/i.test(kt)&&kt.toUpperCase().indexOf(pt.toUpperCase())<0)kt=kt.trim()+' ('+pt+')';   /* 단가 조건 — 기본 EXF */
+      if(pt&&/UNIT PRICE/i.test(kt)&&kt.toUpperCase().indexOf(pt.toUpperCase())<0)kt=kt.trim()+' ('+pt+')';   /* 단가 조건 — 기본 EXW */
       var c={k:kt,v:r.v,red:r.hl,w:String(r.v).length>20?2:1};
       if(i===0&&!isDel){c.red=1;c.fs=23;if(kt.length>20)c.w=2;key.push(c)}else rest.push(c);
     });
