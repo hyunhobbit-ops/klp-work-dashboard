@@ -5756,8 +5756,11 @@ function ovsCalc(d, qty) {
     return { goodsUsd, paidUsd, paidKrw, remainUsd, goodsKrw, goodsKrwQuote, fxDiff, extrasKrw, ivat, ivatAuto, ivatManual, total, unitKrw: q ? Math.round(goodsKrw / q) : 0, rate };
 }
 function ovsIsOn(P) { const el = document.getElementById(P + 'Ovs'); return !!(el && el.checked); }
-function ovsCalcFn(P) { return P === 'editProject' ? calcEditSupplierTotal : calcSupplierTotal; }
-function ovsBoxHtml(P, data) {
+function ovsCalcFn(P) {
+    if (/^tgo\d+$/.test(P)) return () => tgoCalc(Number(P.slice(3)));   // 견적 편집 창 품목
+    return P === 'editProject' ? calcEditSupplierTotal : calcSupplierTotal;
+}
+function ovsBoxHtml(P, data, opt) {
     _ovs[P] = data ? JSON.parse(JSON.stringify(data)) : ovsDefault();
     if (!_ovs[P].extras) _ovs[P].extras = [];
     if (!_ovs[P].pays) _ovs[P].pays = [];
@@ -5781,9 +5784,9 @@ function ovsBoxHtml(P, data) {
             <input type="text" inputmode="numeric" class="form-input" id="${P}OvsIvat" value="${d.ivat === null || d.ivat === undefined ? '' : Number(d.ivat).toLocaleString()}" placeholder="비우면 자동 10%" oninput="ovsSet('${P}','ivat',this)"></div>
           <div class="ovs-note">국내 매입처의 VAT처럼 매입액에 넣어 마진을 같은 기준으로 비교해요. 실제 금액은 통관 서류를 보고 고쳐 주세요.</div>
         </div>
-        <div class="ovs-sub">송금 기록 <small>보낼 때마다 그날 환율로 — 선금·잔금으로 나누거나 한 번에(일괄)</small></div>
+        ${opt && opt.noPays ? '' : `<div class="ovs-sub">송금 기록 <small>보낼 때마다 그날 환율로 — 선금·잔금으로 나누거나 한 번에(일괄)</small></div>
         <div id="${P}OvsPays"></div>
-        <div class="ovs-quick">${OVS_PAY_KINDS.map(k => `<button type="button" onclick="ovsAddPay('${P}','${k}')">+ ${k} 송금</button>`).join('')}</div>
+        <div class="ovs-quick">${OVS_PAY_KINDS.map(k => `<button type="button" onclick="ovsAddPay('${P}','${k}')">+ ${k} 송금</button>`).join('')}</div>`}
       </div>`;
 }
 function ovsToggle(P) {
@@ -11962,7 +11965,8 @@ function _projectsTempRowToObj(r) {
         transferredProjectIds: r.transferred_project_ids || [],
         inquiryId: r.inquiry_id || null,
         quoteGroup: r.quote_group || '',
-        extraFees: Array.isArray(r.extra_fees) ? r.extra_fees : []
+        extraFees: Array.isArray(r.extra_fees) ? r.extra_fees : [],
+        supplierOverseas: r.supplier_overseas || null   // 해외 매입(달러) — migration 084
     };
 }
 // 견적 묶음 기준 — 묶음 번호(quote_group, migration 060)가 있으면 그걸로, 없으면(예전 견적) 날짜+매출처
@@ -12074,7 +12078,8 @@ function renderTempProjects() {
             const supPackTotal = calcTempFeeTotal(p.supPackagingFee, p.supPackagingFeeApply, p.qty || 0);
             const supLabelTotal = calcTempFeeTotal(p.supLabelFee, p.supLabelFeeApply || '1개당', p.qty || 0);
             const supShipTotal = (p.supShippingFee || 0) * (p.supShippingBoxes || 0);
-            const supFeeDetails = [
+            const ovsC = p.supplierOverseas ? ovsCalc(p.supplierOverseas, p.qty || 0) : null;
+            const supFeeDetails = ovsC ? [ovsC.extrasKrw ? `부대비용 ${ovsC.extrasKrw.toLocaleString()}` : '', `수입 부가세 ${ovsC.ivat.toLocaleString()}`].filter(Boolean) : [
                 supPrintTotal > 0 ? `인쇄 ${supPrintTotal.toLocaleString()}` : '',
                 supPackTotal > 0 ? `포장 ${supPackTotal.toLocaleString()}` : '',
                 supLabelTotal > 0 ? `라벨 ${supLabelTotal.toLocaleString()}` : '',
@@ -12089,7 +12094,7 @@ function renderTempProjects() {
             <td>${revenueStr}${feeBadge}</td>
             <td ${ce('supplier')} style="cursor:pointer">${p.supplier || '-'}</td>
             <td ${ce('supplierContact')} style="cursor:pointer">${p.supplierContact || '-'}</td>
-            <td ${ce('supplierUnitPrice','number')} style="cursor:pointer">${p.supplierUnitPrice ? p.supplierUnitPrice.toLocaleString() + '원' : '-'}${vatBadge(p.supplierUnitPriceVat)}</td>
+            ${ovsC ? `<td style="cursor:pointer" onclick="openTempGroupEdit(${gi})" title="해외 매입 — 눌러서 편집">🌏 <b>${ovsUsd(p.supplierOverseas.unit)}</b><div style="font-size:10px;color:var(--text-tertiary)">≈ ${ovsC.unitKrw.toLocaleString()}원 · 환율 ${Number(ovsC.rate).toLocaleString()}</div></td>` : `<td ${ce('supplierUnitPrice','number')} style="cursor:pointer">${p.supplierUnitPrice ? p.supplierUnitPrice.toLocaleString() + '원' : '-'}${vatBadge(p.supplierUnitPriceVat)}</td>`}
             <td>${purchaseStr}${supFeeBadge}</td>
             <td>${marginStr}</td>
             <td style="white-space:nowrap">
@@ -12257,7 +12262,7 @@ function openTempProjectModal(id) {
         <div class="field"><label>품목</label><input id="tempItem" value="${isEdit ? (p.item || '') : ''}" placeholder="품목명"></div>
         <div style="display:flex;gap:12px">
             <div class="field" style="flex:1"><label>매출단가</label><input id="tempUnitPrice" value="${isEdit ? (p.unitPrice || '') : ''}" placeholder="0" oninput="fmtCommaTemp(this);calcTempAmounts()"></div>
-            <div class="field" style="flex:1"><label>매입단가</label><input id="tempSupUnitPrice" value="${isEdit ? (p.supplierUnitPrice || '') : ''}" placeholder="0" oninput="fmtCommaTemp(this);calcTempAmounts()"></div>
+            <div class="field" style="flex:1"><label>매입단가${isEdit && p.supplierOverseas ? ' 🌏' : ''}</label><input id="tempSupUnitPrice" ${isEdit && p.supplierOverseas ? 'readonly title="해외 매입 — 견적 목록의 편집에서 달러로 고쳐요"' : ''} value="${isEdit ? (p.supplierUnitPrice || '') : ''}" placeholder="0" oninput="fmtCommaTemp(this);calcTempAmounts()"></div>
             <div class="field" style="flex:1"><label>수량</label><input id="tempQty" value="${isEdit ? (p.qty || '') : ''}" placeholder="0" oninput="fmtCommaTemp(this);calcTempAmounts()"></div>
         </div>
         <div style="display:flex;gap:12px">
@@ -12312,7 +12317,8 @@ async function saveTempProject(id) {
     const supplierUnitPrice = Number((document.getElementById('tempSupUnitPrice').value || '').replace(/[^0-9]/g, '')) || 0;
     const qty = Number((document.getElementById('tempQty').value || '').replace(/[^0-9]/g, '')) || 0;
     const revenue = unitPrice * qty;
-    const supplierRevenue = supplierUnitPrice * qty;
+    const _ovsP = id ? tempProjects.find(x => x.id === id && x.supplierOverseas) : null;   // 해외 매입은 달러 기준으로 다시 계산 (단가는 견적 '편집'에서)
+    const supplierRevenue = _ovsP ? calcTempGroupSupRevenue(Object.assign({}, _ovsP, { qty })) : supplierUnitPrice * qty;
 
     if (!client && !item) {
         showToast('매출처 또는 품목을 입력해주세요');
@@ -12668,6 +12674,7 @@ function calcTempRevenueWithVat(p) {
 // VAT 포함가 기준 매입액
 function calcTempSupRevenueWithVat(p) {
     const qty = p.qty || 0;
+    if (p.supplierOverseas) return ovsCalc(p.supplierOverseas, qty).total;   // 해외 매입 = 물품 대금 + 부대비용 + 수입 부가세
     const addVat = (amount, vat) => vat === 'VAT 포함' ? amount : Math.round(amount * 1.1);
     let total = addVat((p.supplierUnitPrice || 0) * qty, p.supplierUnitPriceVat);
     total += addVat(calcTempFeeTotal(p.supPrintFee, p.supPrintFeeApply, qty), p.supPrintFeeVat);
@@ -12690,6 +12697,7 @@ function calcTempGroupRevenue(p) {
 
 function calcTempGroupSupRevenue(p) {
     const qty = p.qty || 0;
+    if (p.supplierOverseas) { const c = ovsCalc(p.supplierOverseas, qty); return c.goodsKrw + c.extrasKrw; }
     return (p.supplierUnitPrice || 0) * qty
         + calcTempFeeTotal(p.supPrintFee, p.supPrintFeeApply, qty)
         + calcTempFeeTotal(p.supPackagingFee, p.supPackagingFeeApply, qty)
@@ -12734,9 +12742,11 @@ function recalcTempFeeRow(prefix, i, qty) {
     if (sfEl) sfEl.textContent = sfT ? `= ${sfT.toLocaleString()}원` : '';
 }
 
+let _tgeItems = [];   // 지금 편집 창에 열린 견적 품목들
 function openTempGroupEdit(gi) {
     const g = tempGroups[gi];
     if (!g || !g.items.length) return;
+    _tgeItems = g.items;
 
     const vatOpts = v => `<option${v !== 'VAT 포함' ? ' selected' : ''}>VAT 별도</option><option${v === 'VAT 포함' ? ' selected' : ''}>VAT 포함</option>`;
     const fmtV = n => n ? Number(n).toLocaleString() : '';
@@ -12826,7 +12836,7 @@ function openTempGroupEdit(gi) {
     const secStyle = (color, bg) => `border-left:3px solid ${color};background:${bg};border-radius:10px;padding:14px;margin-bottom:10px`;
 
     let itemsHtml = g.items.map((p, i) => `
-    <div style="background:var(--gray-50);border-radius:14px;padding:16px;margin-bottom:14px">
+    <div oninput="tgoCalc(${i})" onchange="tgoCalc(${i})" style="background:var(--gray-50);border-radius:14px;padding:16px;margin-bottom:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px">
             <div style="font-weight:700;font-size:15px;color:var(--gray-900)">${p.item || '품목 ' + (i + 1)}</div>
             <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
@@ -12848,11 +12858,25 @@ function openTempGroupEdit(gi) {
             <!-- 매입 -->
             <div style="${secStyle('#E67E22', 'rgba(230,126,34,0.05)')}">
                 <div style="font-size:13px;font-weight:800;color:#E67E22;margin-bottom:10px">매입</div>
+                <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:6px;align-items:end;margin-bottom:10px">
+                    <div><label style="${LB}">매입처</label><input id="tge_supn_${i}" value="${escHtml(p.supplier || '')}" list="tgeSupNames" autocomplete="off" placeholder="매입처명" onchange="ovsMaybeAuto('tgo${i}','tge_supn_${i}')" style="${IS}"></div>
+                    <div><label style="${LB}">담당자</label><input id="tge_supc_${i}" value="${escHtml(p.supplierContact || '')}" autocomplete="off" placeholder="담당자" style="${IS}"></div>
+                </div>
+                ${ovsBoxHtml('tgo' + i, p.supplierOverseas, { noPays: true })}
+                <div class="tgo-sum" id="tgo${i}Sum" style="display:${p.supplierOverseas ? '' : 'none'}">
+                    <div id="tgo${i}SupBreakdown" class="tgo-bd"></div>
+                    <div class="tgo-total"><span>매입액 <small>원화 환산</small></span><b id="tgo${i}SupTotalDisplay"></b></div>
+                    <span id="tgo${i}Rev" hidden></span>
+                    <div id="tgo${i}Margin"></div>
+                    <div class="tgo-note">송금 기록(그날 환율)은 국내 등록 뒤 국내 프로젝트의 매입처 칸에서 적어요.</div>
+                </div>
+                <div id="tgo${i}SupDom" style="display:${p.supplierOverseas ? 'none' : ''}">
                 <div style="display:grid;grid-template-columns:1fr auto;gap:6px;align-items:end;margin-bottom:10px">
                     <div><label style="${LB}">단가</label><input id="tge_sup_${i}" value="${fmtV(p.supplierUnitPrice)}" placeholder="0" oninput="fmtCommaTemp(this)" style="${IS};text-align:right"></div>
                     <div><label style="${LB}">VAT</label><select id="tge_supv_${i}" style="${SS}">${vatOpts(p.supplierUnitPriceVat)}</select></div>
                 </div>
                 ${feeSection('tgs', i, { pm: p.supPrintMethod, pf: p.supPrintFee, pfa: p.supPrintFeeApply, pfv: p.supPrintFeeVat, pkm: p.supPackMethod, pkf: p.supPackagingFee, pkfa: p.supPackagingFeeApply, pkfv: p.supPackagingFeeVat, lf: p.supLabelFee, lfa: p.supLabelFeeApply, lfv: p.supLabelFeeVat, sb: p.supShippingBoxes, sf: p.supShippingFee, sfv: p.supShippingFeeVat }, p.qty || 0, true)}
+                </div>
             </div>
         </div>
     </div>`).join('');
@@ -12886,7 +12910,75 @@ function openTempGroupEdit(gi) {
         recalcTempFeeRow('tgs', i, p.qty || 0);
         tempExtras(p).forEach(e => tgeAddExtra(i, e.kind, e, true));
         tgeExtraRecalc(i);
+        if (p.supplierOverseas) ovsRenderRows('tgo' + i);
+        tgoCalc(i);
     });
+    tgeFillSupNames();
+}
+
+// ----- 견적 해외 매입(달러) — 국내 프로젝트의 '🌏 해외 매입' 칸(ovs*)을 견적 편집 창 품목마다 (P = 'tgo'+품목번호) -----
+// 매입처 이름 목록 = 국내 거래처 + 해외 거래처
+async function tgeFillSupNames() {
+    let dl = document.getElementById('tgeSupNames');
+    if (!dl) { dl = document.createElement('datalist'); dl.id = 'tgeSupNames'; document.body.appendChild(dl); }
+    try {
+        const { data } = await sb.from('clients_overseas').select('company_name').limit(2000);
+        let names = [];
+        try { names = await fetchAllClientNames(); } catch (_) { names = clients.map(c => c.companyName).filter(Boolean); }
+        const ovs = (data || []).map(r => r.company_name).filter(Boolean);
+        dl.innerHTML = ovs.map(n => `<option value="${escHtml(n)}" label="🌏 해외">`).join('') + names.map(n => `<option value="${escHtml(n)}">`).join('');
+    } catch (_) {}
+}
+function tgoCalc(i) {
+    const P = 'tgo' + i, sum = document.getElementById(P + 'Sum');
+    if (!sum) return;
+    const on = ovsIsOn(P);
+    sum.style.display = on ? '' : 'none';
+    if (!on || !_tgeItems[i]) return;
+    const rev = document.getElementById(P + 'Rev');
+    if (rev) rev.textContent = String(calcTempRevenueWithVat(tgeReadItem(i, _tgeItems[i])));   // 지금 입력된 판매 금액(VAT 포함)
+    ovsShowTotal(P, tgeQty(i), P + 'Rev', P + 'Margin');
+}
+// 이미 국내로 등록한 견적의 해외 매입을 바꾸면 → 연결된 국내 프로젝트에도 넣을지 물어봄
+// (송금 기록이 있는 국내 프로젝트는 실제 금액이라 건드리지 않음)
+async function tgoSyncDomestic(list) {
+    for (const p of list) {
+        const ids = p.transferredProjectIds || [];
+        if (!ids.length) continue;
+        const { data, error } = await sb.from('projects_domestic').select('id, client, product_name, quantity, revenue, supplier, supplier_overseas, extra_suppliers').in('id', ids);
+        if (error || !data || !data.length) continue;
+        let hit = data.filter(r => (r.product_name || '') === (p.item || ''));
+        if (!hit.length && data.length === 1) hit = data;
+        if (hit.length !== 1) { showToast(`'${p.item}' 은 국내 프로젝트를 하나로 못 골라서 국내 쪽은 그대로예요`); continue; }
+        const r = hit[0];
+        if (r.supplier_overseas && (r.supplier_overseas.pays || []).length) { showToast('국내 프로젝트에 송금 기록이 있어 국내 쪽은 그대로 뒀어요'); continue; }
+        const q = r.quantity || 0, c = ovsCalc(p.supplierOverseas, q), sup = c.total + xsSum(r.extra_suppliers);
+        if (!confirm(`이미 국내로 등록된 견적이에요.\n연결된 국내 프로젝트에도 해외 매입을 넣을까요?\n\n${r.client || ''} · ${r.product_name || ''} · ${q.toLocaleString()}개\n매입처: ${r.supplier || '(비어 있음)'} → ${p.supplier}\n매입액: ${c.total.toLocaleString()}원 (${ovsUsd(p.supplierOverseas.unit)} × 환율 ${Number(p.supplierOverseas.rate).toLocaleString()} 등)${r.supplier_overseas ? '\n\n⚠️ 국내 프로젝트에 이미 적힌 해외 매입 내용은 이 견적 내용으로 바뀌어요.' : ''}`)) continue;
+        const { error: e2 } = await sb.from('projects_domestic').update(Object.assign({ supplier: p.supplier, supplier_contact: p.supplierContact || '', supplier_revenue: sup, supplier_shipping_type: '' }, tgoDomesticFields(p, q))).eq('id', r.id);
+        if (e2) { showToast('국내 프로젝트 반영 실패: ' + e2.message); continue; }
+        showToast('국내 프로젝트에도 해외 매입을 넣었습니다');
+        try { await loadDomesticProjectsFromDb(); renderProjects(); } catch (_) {}
+    }
+}
+// 해외 매입 견적 → 국내 프로젝트 매입 칸 (국내용 인쇄·포장·배송 매입은 0)
+function tgoDomesticFields(p, qty) {
+    return {
+        supplier_overseas: p.supplierOverseas,
+        supplier_unit_price: ovsCalc(p.supplierOverseas, qty).unitKrw, supplier_unit_price_vat: 'VAT 별도',
+        supplier_print_fee: 0, supplier_packaging_fee: 0,
+        supplier_shipping_cost_per_box: 0, supplier_shipping_boxes: 0, supplier_shipping_cost: 0
+    };
+}
+// 해외 매입 업체가 거래처 DB에 없으면 해외 거래처로 등록 (안 하면 자동 추가 트리거가 국내 매입처로 넣음)
+async function tgoEnsureOverseasClient(p) {
+    const { data, error } = await sb.from('clients_overseas').select('company_name').limit(2000);
+    if (error) return;
+    const k = clientNameKey(p.supplier);
+    if ((data || []).some(c => clientNameKey(c.company_name || '') === k)) return;
+    const { error: e2 } = await sb.from('clients_overseas').insert({ company_name: p.supplier, items: p.item || '', contact_name: p.supplierContact || '' });
+    if (e2) { console.error('해외 거래처 추가 실패', e2); return; }
+    _ovsClientKeys = null;
+    showToast(`해외 거래처 DB에 '${p.supplier}' 추가`);
 }
 
 // 편집창 '추가 비용' — 인쇄·포장·라벨·택배 칸마다 '+ 추가'. 매출 칸에 내용·적용·금액, 매입 칸 같은 자리에 짝 줄(금액만)
@@ -12994,66 +13086,97 @@ function handleQuoteNoteFocus(ev) {
     }
 }
 
+// 편집 창 품목 하나의 입력값 → 견적 품목 (저장·실시간 계산 공통, base는 안 바꿈)
+function tgeReadItem(i, base) {
+    const getNum = id => Number((document.getElementById(id)?.value || '').replace(/[^0-9]/g, '')) || 0;
+    const getVal = id => document.getElementById(id)?.value || '';
+    const p = Object.assign({}, base);
+    // 수량·단가
+    if (document.getElementById(`tge_qty_${i}`)) p.qty = getNum(`tge_qty_${i}`);
+    p.unitPrice = getNum(`tge_up_${i}`);
+    p.unitPriceVat = getVal(`tge_upv_${i}`);
+    p.supplierUnitPrice = getNum(`tge_sup_${i}`);
+    p.supplierUnitPriceVat = getVal(`tge_supv_${i}`);
+
+    // 인쇄 (기타 시 커스텀 값)
+    p.printMethod = getVal(`tge_pm_${i}`) === '기타' ? (getVal(`tge_pmc_${i}`) || '기타') : getVal(`tge_pm_${i}`);
+    p.printFee = getNum(`tge_pf_${i}`);
+    p.printFeeApply = getVal(`tge_pfa_${i}`);
+    p.printFeeVat = getVal(`tge_pfv_${i}`);
+
+    // 포장 (기타 시 커스텀 값)
+    p.packMethod = getVal(`tge_pkm_${i}`) === '기타' ? (getVal(`tge_pkmc_${i}`) || '기타') : getVal(`tge_pkm_${i}`);
+    p.packagingFee = getNum(`tge_pkf_${i}`);
+    p.packagingFeeApply = getVal(`tge_pkfa_${i}`);
+    p.packagingFeeVat = getVal(`tge_pkfv_${i}`);
+
+    // 라벨
+    p.labelFee = getNum(`tge_lf_${i}`);
+    p.labelFeeApply = getVal(`tge_lfa_${i}`);
+    p.labelFeeVat = getVal(`tge_lfv_${i}`);
+
+    // 택배
+    p.shippingBoxes = getNum(`tge_sb_${i}`);
+    p.shippingFee = getNum(`tge_sf_${i}`);
+    p.shippingFeeVat = getVal(`tge_sfv_${i}`);
+
+    // 매입 부대비용 — 방법은 매출(tge)에서 복사, 비용만 tgs 에서 읽음
+    p.supPrintMethod = p.printMethod;
+    p.supPrintFee = getNum(`tgs_pf_${i}`);
+    p.supPrintFeeApply = getVal(`tgs_pfa_${i}`);
+    p.supPrintFeeVat = getVal(`tgs_pfv_${i}`);
+    p.supPackMethod = p.packMethod;
+    p.supPackagingFee = getNum(`tgs_pkf_${i}`);
+    p.supPackagingFeeApply = getVal(`tgs_pkfa_${i}`);
+    p.supPackagingFeeVat = getVal(`tgs_pkfv_${i}`);
+    p.supLabelFee = getNum(`tgs_lf_${i}`);
+    p.supLabelFeeApply = getVal(`tgs_lfa_${i}`);
+    p.supLabelFeeVat = getVal(`tgs_lfv_${i}`);
+    p.supShippingBoxes = getNum(`tgs_sb_${i}`);
+    p.supShippingFee = getNum(`tgs_sf_${i}`);
+    p.supShippingFeeVat = getVal(`tgs_sfv_${i}`);
+
+    // 추가 비용 — 이름·금액이 모두 빈 줄은 버림
+    if (document.getElementById(`tge_xf_${i}_ship`)) p.extraFees = tgeReadExtras(i).filter(e => e.name || e.fee || e.supFee);
+
+    // 매입처 · 해외 매입(달러) — 켜면 원화 매입 단가는 환산값, 국내 부대비용 칸은 계산에서 빠짐(값은 남겨 둠)
+    if (document.getElementById(`tge_supn_${i}`)) {
+        p.supplier = getVal(`tge_supn_${i}`).trim();
+        p.supplierContact = getVal(`tge_supc_${i}`).trim();
+    }
+    if (ovsIsOn('tgo' + i)) {
+        p.supplierOverseas = ovsClean(_ovs['tgo' + i]);
+        p.supplierUnitPrice = ovsCalc(p.supplierOverseas, p.qty || 0).unitKrw;
+        p.supplierUnitPriceVat = 'VAT 별도';
+    } else p.supplierOverseas = null;
+    return p;
+}
+
 async function saveTempGroupEdit(gi) {
     const g = tempGroups[gi];
     if (!g) return;
 
-    const getNum = id => Number((document.getElementById(id)?.value || '').replace(/[^0-9]/g, '')) || 0;
-    const getVal = id => document.getElementById(id)?.value || '';
-
     const quoteNote = document.getElementById('tge_quoteNote')?.value || '';
+    // 해외 매입은 매입처 이름·단가·환율이 있어야 계산·국내 등록이 됨
+    for (let i = 0; i < g.items.length; i++) {
+        if (!ovsIsOn('tgo' + i)) continue;
+        const t = tgeReadItem(i, g.items[i]);
+        const miss = !t.supplier ? ['매입처 이름', `tge_supn_${i}`] : !t.supplierOverseas.unit ? ['외화 단가', `tgo${i}OvsUnit`] : !t.supplierOverseas.rate ? ['견적 환율', `tgo${i}OvsRate`] : null;
+        if (miss) { showToast(`해외 매입: ${miss[0]}을(를) 넣어 주세요`); document.getElementById(miss[1])?.focus(); return; }
+    }
+    const ovsChanged = [];
 
     for (let i = 0; i < g.items.length; i++) {
         const p = g.items[i];
         p.quoteNote = quoteNote;
 
-        // 수량·단가
-        if (document.getElementById(`tge_qty_${i}`)) p.qty = getNum(`tge_qty_${i}`);
-        p.unitPrice = getNum(`tge_up_${i}`);
-        p.unitPriceVat = getVal(`tge_upv_${i}`);
-        p.supplierUnitPrice = getNum(`tge_sup_${i}`);
-        p.supplierUnitPriceVat = getVal(`tge_supv_${i}`);
-
-        // 인쇄 (기타 시 커스텀 값)
-        p.printMethod = getVal(`tge_pm_${i}`) === '기타' ? (getVal(`tge_pmc_${i}`) || '기타') : getVal(`tge_pm_${i}`);
-        p.printFee = getNum(`tge_pf_${i}`);
-        p.printFeeApply = getVal(`tge_pfa_${i}`);
-        p.printFeeVat = getVal(`tge_pfv_${i}`);
-
-        // 포장 (기타 시 커스텀 값)
-        p.packMethod = getVal(`tge_pkm_${i}`) === '기타' ? (getVal(`tge_pkmc_${i}`) || '기타') : getVal(`tge_pkm_${i}`);
-        p.packagingFee = getNum(`tge_pkf_${i}`);
-        p.packagingFeeApply = getVal(`tge_pkfa_${i}`);
-        p.packagingFeeVat = getVal(`tge_pkfv_${i}`);
-
-        // 라벨
-        p.labelFee = getNum(`tge_lf_${i}`);
-        p.labelFeeApply = getVal(`tge_lfa_${i}`);
-        p.labelFeeVat = getVal(`tge_lfv_${i}`);
-
-        // 택배
-        p.shippingBoxes = getNum(`tge_sb_${i}`);
-        p.shippingFee = getNum(`tge_sf_${i}`);
-        p.shippingFeeVat = getVal(`tge_sfv_${i}`);
-
-        // 매입 부대비용 — 방법은 매출(tge)에서 복사, 비용만 tgs 에서 읽음
-        p.supPrintMethod = p.printMethod;
-        p.supPrintFee = getNum(`tgs_pf_${i}`);
-        p.supPrintFeeApply = getVal(`tgs_pfa_${i}`);
-        p.supPrintFeeVat = getVal(`tgs_pfv_${i}`);
-        p.supPackMethod = p.packMethod;
-        p.supPackagingFee = getNum(`tgs_pkf_${i}`);
-        p.supPackagingFeeApply = getVal(`tgs_pkfa_${i}`);
-        p.supPackagingFeeVat = getVal(`tgs_pkfv_${i}`);
-        p.supLabelFee = getNum(`tgs_lf_${i}`);
-        p.supLabelFeeApply = getVal(`tgs_lfa_${i}`);
-        p.supLabelFeeVat = getVal(`tgs_lfv_${i}`);
-        p.supShippingBoxes = getNum(`tgs_sb_${i}`);
-        p.supShippingFee = getNum(`tgs_sf_${i}`);
-        p.supShippingFeeVat = getVal(`tgs_sfv_${i}`);
-
-        // 추가 비용 — 이름·금액이 모두 빈 줄은 버림
-        if (document.getElementById(`tge_xf_${i}_ship`)) p.extraFees = tgeReadExtras(i).filter(e => e.name || e.fee || e.supFee);
+        const ovsBefore = JSON.stringify([p.supplierOverseas || null, p.supplier || '']);
+        Object.assign(p, tgeReadItem(i, p));
+        if (p.supplierOverseas) {
+            ovsRememberRate(p.supplierOverseas.rate);
+            await tgoEnsureOverseasClient(p);
+            if (JSON.stringify([p.supplierOverseas, p.supplier]) !== ovsBefore) ovsChanged.push(p);
+        }
 
         // 매출액/매입액 재계산
         p.revenue = calcTempGroupRevenue(p);
@@ -13096,7 +13219,10 @@ async function saveTempGroupEdit(gi) {
             revenue: p.revenue,
             supplier_revenue: p.supplierRevenue,
             quote_note: p.quoteNote,
-            extra_fees: tempExtras(p)
+            extra_fees: tempExtras(p),
+            supplier: p.supplier || '',
+            supplier_contact: p.supplierContact || '',
+            supplier_overseas: p.supplierOverseas || null
         };
 
         // Supabase JS 클라이언트는 에러를 throw 하지 않고 { data, error } 로 반환함.
@@ -13112,6 +13238,7 @@ async function saveTempGroupEdit(gi) {
     showToast('저장 완료');
     closeTempModal();
     renderTempProjects();
+    if (ovsChanged.length) await tgoSyncDomestic(ovsChanged);
 }
 
 let _tempQuoteGroup = null;
@@ -13255,7 +13382,7 @@ async function transferGroupToDomestic(gi) {
         start_date: null,
         checks: { design: false, workOrder: false, advancePayment: false, finalPayment: false, invoice: false, supplierPayment: false, delivered: false },
         // 국내에는 추가 비용 칸이 없어 — 금액은 매출·매입 합계에 들어가 있고, 내용은 메모로 남김
-        memo: tempExtras(p).filter(e => e.fee || e.supFee).map(e => `추가 비용 ${tempExtraLabel(e)}: 매출 ${tempExtraTotal(e, p.qty || 0).toLocaleString()}원 / 매입 ${tempExtraTotal(e, p.qty || 0, true).toLocaleString()}원`).join('\n'),
+        memo: tempExtras(p).filter(e => e.fee || e.supFee).map(e => `추가 비용 ${tempExtraLabel(e)}: 매출 ${tempExtraTotal(e, p.qty || 0).toLocaleString()}원 / 매입 ${(p.supplierOverseas ? 0 : tempExtraTotal(e, p.qty || 0, true)).toLocaleString()}원`).join('\n'),
         inquiry_id: p.inquiryId || null,   // 상담에 연결 → 상담 화면에서 이어서 진행 (migration 038)
         supplier: p.supplier || '',
         supplier_contact: p.supplierContact || '',
@@ -13279,7 +13406,7 @@ async function transferGroupToDomestic(gi) {
         supplier_shipping_vat: p.supShippingFeeVat || 'VAT 별도'
     });
 
-    const rows = g.items.map(buildRow);
+    const rows = g.items.map(p => p.supplierOverseas ? Object.assign(buildRow(p), tgoDomesticFields(p, p.qty || 0)) : Object.assign(buildRow(p), { supplier_overseas: null }));
 
     try {
         // 1) 국내 프로젝트 일괄 insert
@@ -26672,6 +26799,12 @@ function inqQuoteBreakdown(p) {
         const x = (fee, vat, sup) => ({ amt: tempExtraTotal(e, q, sup), vat, calc: fee ? (e.apply === '1개당' ? `${Number(fee).toLocaleString()} × ${q.toLocaleString()}` : e.apply === '박스' ? `${e.boxes || 0}박스 × ${Number(fee).toLocaleString()}` : '일괄') : '' });
         rows.push({ label: e.kind && e.kind !== '기타' ? e.kind : '기타', sub: e.name || '', sale: x(e.fee, e.vat), buy: x(e.supFee, e.supVat, true) });
     });
+    if (p.supplierOverseas) {   // 해외 매입: 국내 매입 칸 대신 물품 대금($) + 부대비용, 부가세 줄 = 수입 부가세
+        const d = p.supplierOverseas, c = ovsCalc(d, q);
+        rows.forEach(r => { r.buy = { amt: 0, vat: 'VAT 별도', calc: '' }; });
+        rows[0].buy = { amt: c.goodsKrw, vat: 'VAT 별도', calc: `🌏 ${ovsUsd(d.unit)} × ${q.toLocaleString()} × 환율 ${Number(c.rate).toLocaleString()}` };
+        (d.extras || []).forEach(e => { const usd = e.cur === 'USD'; rows.push({ label: e.name || '부대비용', sub: '', sale: { amt: 0, calc: '' }, buy: { amt: usd ? Math.round(ovsNum(e.amt) * c.rate) : Math.round(ovsNum(e.amt)), vat: 'VAT 별도', calc: usd ? `${ovsUsd(e.amt)} × ${Number(c.rate).toLocaleString()}` : '' } }); });
+    }
     // 금액도 내용도 없는 줄은 뺀다 (제품 줄은 항상)
     const shown = rows.filter((r, i) => i === 0 || r.sale.amt || r.buy.amt || r.sub);
     const tot = side => {
