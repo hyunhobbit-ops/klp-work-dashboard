@@ -30599,10 +30599,30 @@ let _gsDay = '';
 let _gsChan = null;
 let _gsLoaded = null;
 let _gsReloadTimer = null;
+let _gsDisp = (localStorage.getItem('gsDisp') === 'KRW') ? 'KRW' : 'USD';   // 화면 표시 통화 — 기본 달러, 원화로 바꿀 수 있음 (2026-11-26)
 
 function gsMonthNow() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
 function gsNumFmt(n, d = 0) { return (Number(n) || 0).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 function gsWon(n) { const v = Math.round(Number(n) || 0); return (v < 0 ? '−' : '') + Math.abs(v).toLocaleString('ko-KR'); }
+// 표시 통화 (달러 기본 / 원화) — 합계·표·그래프에 쓰는 값은 gsTotals가 이 통화로 더해 줌
+function gsIsUsd() { return _gsDisp === 'USD'; }
+function gsUnit() { return gsIsUsd() ? '달러' : '원'; }
+function gsD(n) {   // 표 칸: $1,234 / 1,234
+    if (!gsIsUsd()) return gsWon(n);
+    const v = Math.round(Number(n) || 0); return (v < 0 ? '−' : '') + '$' + Math.abs(v).toLocaleString('en-US');
+}
+function gsD2(n) {   // 주문 한 건: $12.34 / 12,345
+    if (!gsIsUsd()) return gsWon(n);
+    const v = Number(n) || 0; return (v < 0 ? '−' : '') + '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function gsMid(n) { return gsIsUsd() ? gsD(n) : taxWon(n); }   // 타일 보조: $7,650 / 1,070만
+function gsBig(n) { return gsIsUsd() ? gsD(n) : taxWon(n) + '원'; }   // 타일 큰 숫자
+function gsAx(n) {   // 그래프 축: $12k / 1,200만
+    if (!gsIsUsd()) return taxWon(n);
+    const a = Math.abs(n); return (n < 0 ? '−' : '') + '$' + (a >= 1000 ? (Math.round(a / 100) / 10).toLocaleString('en-US') + 'k' : Math.round(a));
+}
+function gsSetDisp(c) { _gsDisp = c === 'KRW' ? 'KRW' : 'USD'; localStorage.setItem('gsDisp', _gsDisp); gsRender(); }
+function gsSyncDisp() { document.querySelectorAll('#gsDisp button').forEach(b => b.classList.toggle('on', b.dataset.c === _gsDisp)); }
 function gsMoney(n, cur) {
     const v = Number(n) || 0;
     const sym = { USD: '$', EUR: '€', GBP: '£', JPY: '¥', KRW: '₩', CAD: 'C$', AUD: 'A$' }[cur];
@@ -30621,7 +30641,10 @@ function gsRateFor(cur) {
 // 주문 한 건 → 원화 계산
 function gsCalc(r) {
     const ship = r.ship_cost_krw == null || r.ship_cost_krw === '' ? null : Number(r.ship_cost_krw);
-    if (r.status === '취소') return { saleKrw: 0, feeKrw: 0, refundKrw: 0, ship: ship || 0, margin: -(ship || 0), rate: 0, feeEst: false, noRate: false, noShip: false, cancelled: true };
+    const usdK = r.currency === 'USD' ? (Number(r.fx_rate) || gsRateFor('USD')) : gsRateFor('USD');   // 원 → 달러 환산용 (달러 주문은 그 주문 환율)
+    const toUsd = krw => usdK ? krw / usdK : 0;
+    if (r.status === '취소') return { saleKrw: 0, feeKrw: 0, refundKrw: 0, ship: ship || 0, margin: -(ship || 0), rate: 0, feeEst: false, noRate: false, noShip: false, cancelled: true,
+        saleUsd: 0, feeUsd: 0, refundUsd: 0, shipUsd: toUsd(ship || 0), marginUsd: -toUsd(ship || 0) };
     const sale = Number(r.sale_amount) || 0;
     let refund = Number(r.refund_amount) || 0;
     if (r.status === '환불' && !refund) refund = sale;   // 환불인데 금액이 없으면 전액 환불로
@@ -30629,7 +30652,10 @@ function gsCalc(r) {
     const fee = feeEst ? sale * gsFeePct(r.shop) / 100 : Number(r.fee_amount);
     const rate = Number(r.fx_rate) || gsRateFor(r.currency);
     const saleKrw = Math.round(sale * rate), feeKrw = Math.round(fee * rate), refundKrw = Math.round(refund * rate);
-    return { saleKrw, feeKrw, refundKrw, ship: ship || 0, margin: saleKrw - feeKrw - refundKrw - (ship || 0), rate, feeEst, noRate: !rate, noShip: ship == null, cancelled: false };
+    const isUsd = r.currency === 'USD';
+    const saleUsd = isUsd ? sale : toUsd(saleKrw), feeUsd = isUsd ? fee : toUsd(feeKrw), refundUsd = isUsd ? refund : toUsd(refundKrw), shipUsd = toUsd(ship || 0);
+    return { saleKrw, feeKrw, refundKrw, ship: ship || 0, margin: saleKrw - feeKrw - refundKrw - (ship || 0), rate, feeEst, noRate: !rate, noShip: ship == null, cancelled: false,
+        saleUsd, feeUsd, refundUsd, shipUsd, marginUsd: saleUsd - feeUsd - refundUsd - shipUsd };
 }
 
 function gsPad(n) { return String(n).padStart(2, '0'); }
@@ -30726,6 +30752,7 @@ function gsVisible() { return _gsRows.filter(r => !_gsShop || r.shop === _gsShop
 function gsRender() {
     const sel = document.getElementById('gsShop');
     if (sel) sel.value = _gsShop;
+    gsSyncDisp();
     gsRenderTiles();
     gsRenderChart();
     const el = document.getElementById('gsRoot');
@@ -30738,13 +30765,15 @@ function gsTotals(rows) {
     for (const r of rows) {
         const c = gsCalc(r);
         if (!c.cancelled) t.n++;
-        t.sale += c.saleKrw; t.fee += c.feeKrw; t.refund += c.refundKrw; t.ship += c.ship; t.margin += c.margin;
+        const u = gsIsUsd();   // 표시 통화로 더하기
+        const cs = u ? c.saleUsd : c.saleKrw, cf = u ? c.feeUsd : c.feeKrw, cr = u ? c.refundUsd : c.refundKrw, csh = u ? c.shipUsd : c.ship, cm = u ? c.marginUsd : c.margin;
+        t.sale += cs; t.fee += cf; t.refund += cr; t.ship += csh; t.margin += cm;
         if (c.noShip) t.noShip++;
         if (c.noRate) t.noRate++;
         if (c.feeEst && !c.cancelled) t.feeEst++;
         const b = t.byShop[r.shop] || (t.byShop[r.shop] = { n: 0, sale: 0 });
         if (!c.cancelled) b.n++;
-        b.sale += c.saleKrw - c.refundKrw;
+        b.sale += cs - cr;
     }
     return t;
 }
@@ -30755,17 +30784,17 @@ function gsRenderTiles() {
     if (!el) return;
     const t = gsTotals(gsVisible());
     const net = t.sale - t.refund;
-    const shops = GS_SHOPS.filter(s => t.byShop[s]).map(s => `${s} ${taxWon(t.byShop[s].sale)}`).join(' · ');
+    const shops = GS_SHOPS.filter(s => t.byShop[s]).map(s => `${s} ${gsMid(t.byShop[s].sale)}`).join(' · ');
     el.innerHTML = `
-        <div class="cash-tile top"><span>${gsRange().label} 매출${_gsShop ? ' · ' + escHtml(_gsShop) : ''}</span><b>${taxWon(net)}원</b>
-            <small>${shops || '아직 주문이 없어요'}${t.refund ? ` · 환불 ${taxWon(t.refund)} 뺌` : ''}</small></div>
+        <div class="cash-tile top"><span>${gsRange().label} 매출${_gsShop ? ' · ' + escHtml(_gsShop) : ''}</span><b>${gsBig(net)}</b>
+            <small>${shops || '아직 주문이 없어요'}${t.refund ? ` · 환불 ${gsMid(t.refund)} 뺌` : ''}</small></div>
         <div class="cash-tile"><span>주문</span><b>${t.n.toLocaleString()}건</b>
-            <small>${t.n ? '한 건 평균 ' + taxWon(net / t.n) + '원' : ''}</small></div>
-        <div class="cash-tile"><span>쇼핑몰 수수료</span><b>${taxWon(t.fee)}원</b>
+            <small>${t.n ? '한 건 평균 ' + gsBig(net / t.n) : ''}</small></div>
+        <div class="cash-tile"><span>쇼핑몰 수수료</span><b>${gsBig(t.fee)}</b>
             <small>${t.feeEst ? `${t.feeEst}건은 수수료율로 예상` : '실제 수수료'}</small></div>
-        <div class="cash-tile"><span>배송비</span><b>${taxWon(t.ship)}원</b>
+        <div class="cash-tile"><span>배송비</span><b>${gsBig(t.ship)}</b>
             <small class="${t.noShip ? 'bad' : ''}">${t.noShip ? `⚠️ 배송비 안 적은 주문 ${t.noShip}건` : '모든 주문 입력됨'}</small></div>
-        <div class="cash-tile"><span>예상 마진 (원가 제외)</span><b class="${t.margin < 0 ? 'bad' : ''}">${taxWon(t.margin)}원</b>
+        <div class="cash-tile"><span>예상 마진 (원가 제외)</span><b class="${t.margin < 0 ? 'bad' : ''}">${gsBig(t.margin)}</b>
             <small>매출의 ${gsPctTxt(t.margin, net)}${t.noRate ? ` · ⚠️ 환율 없는 주문 ${t.noRate}건` : ''}</small></div>`;
 }
 
@@ -30789,24 +30818,24 @@ function gsDailyHtml() {
         const net = t.sale - t.refund;
         const dt = new Date(day + 'T00:00:00');
         const dow = dt.getDay();
-        const cells = shops.map(s => { const b = t.byShop[s]; return `<td>${b ? gsWon(b.sale) + `<small class="gs-n">${b.n}건</small>` : '<span class="gs-z">-</span>'}</td>`; }).join('');
+        const cells = shops.map(s => { const b = t.byShop[s]; return `<td>${b ? gsD(b.sale) + `<small class="gs-n">${b.n}건</small>` : '<span class="gs-z">-</span>'}</td>`; }).join('');
         return `<tr class="gs-day ${rs.length ? '' : 'empty'} ${_gsDay === day ? 'on' : ''}" onclick="${rs.length ? `gsPickDay('${day}')` : ''}">
             <td>${Number(day.slice(5, 7))}/${Number(day.slice(8))} <span class="gs-dow ${dow === 0 ? 'sun' : dow === 6 ? 'sat' : ''}">${wk[dow]}</span></td>
             <td>${rs.length ? t.n + '건' : ''}</td>${cells}
-            <td><b>${rs.length ? gsWon(net) : ''}</b></td>
-            <td class="sub">${rs.length ? gsWon(t.fee) : ''}</td>
-            <td class="sub">${rs.length ? gsWon(t.ship) + (t.noShip ? ` <span class="gs-warn" title="배송비 안 적은 주문">${t.noShip}건 미입력</span>` : '') : ''}</td>
-            <td class="${t.margin < 0 ? 'bad' : 'ok'}">${rs.length ? gsWon(t.margin) : ''}</td>
+            <td><b>${rs.length ? gsD(net) : ''}</b></td>
+            <td class="sub">${rs.length ? gsD(t.fee) : ''}</td>
+            <td class="sub">${rs.length ? gsD(t.ship) + (t.noShip ? ` <span class="gs-warn" title="배송비 안 적은 주문">${t.noShip}건 미입력</span>` : '') : ''}</td>
+            <td class="${t.margin < 0 ? 'bad' : 'ok'}">${rs.length ? gsD(t.margin) : ''}</td>
             <td class="sub">${rs.length ? gsPctTxt(t.margin, net) : ''}</td></tr>`;
     }).join('');
     const T = gsTotals(rows), tnet = T.sale - T.refund;
-    const foot = `<tr><td>합계</td><td>${T.n}건</td>${shops.map(s => `<td>${T.byShop[s] ? gsWon(T.byShop[s].sale) : '-'}</td>`).join('')}
-        <td>${gsWon(tnet)}</td><td>${gsWon(T.fee)}</td><td>${gsWon(T.ship)}</td><td class="${T.margin < 0 ? 'bad' : 'ok'}">${gsWon(T.margin)}</td><td>${gsPctTxt(T.margin, tnet)}</td></tr>`;
+    const foot = `<tr><td>합계</td><td>${T.n}건</td>${shops.map(s => `<td>${T.byShop[s] ? gsD(T.byShop[s].sale) : '-'}</td>`).join('')}
+        <td>${gsD(tnet)}</td><td>${gsD(T.fee)}</td><td>${gsD(T.ship)}</td><td class="${T.margin < 0 ? 'bad' : 'ok'}">${gsD(T.margin)}</td><td>${gsPctTxt(T.margin, tnet)}</td></tr>`;
     const table = `<div class="tax-scroll"><table class="tax-table gs-table">
         <thead><tr><th>날짜</th><th>주문</th>${shops.map(s => `<th>${s}</th>`).join('')}<th>매출 합계</th><th>수수료</th><th>배송비</th><th>예상 마진</th><th>마진율</th></tr></thead>
         <tbody>${body || `<tr><td colspan="${7 + shops.length}" class="sub">이 달에는 주문이 없어요</td></tr>`}</tbody><tfoot>${foot}</tfoot></table></div>
-        <p class="tax-note">금액은 원(₩) — 판매액 × 환율. <b>예상 마진 = 매출 − 쇼핑몰 수수료 − 환불 − 배송비</b> (상품 원가는 빼지 않음). 날짜를 누르면 그날 주문만 아래에 보여요.</p>`;
-    return taxSec('일별 매출', '쇼핑몰별 · 원', table, 'wide');
+        <p class="tax-note">${gsIsUsd() ? '금액은 달러($) — 원화로 낸 배송비는 그 주문 환율로 달러로 바꿔서 뺌.' : '금액은 원(₩) — 판매액 × 환율.'} <b>예상 마진 = 매출 − 쇼핑몰 수수료 − 환불 − 배송비</b> (상품 원가는 빼지 않음). 날짜를 누르면 그날 주문만 아래에 보여요.</p>`;
+    return taxSec('일별 매출', '쇼핑몰별 · ' + gsUnit(), table, 'wide');
 }
 
 // 분기·연: 달마다 쇼핑몰별 매출(쌓은 막대) + 예상 마진(선) — 같은 원화 축 하나
@@ -30845,7 +30874,7 @@ function gsRenderChart() {
     const band = pw / data.length, bw = Math.min(56, band * 0.4);
     const cx = i => L + band * i + band / 2;
     let g = '';
-    for (let v = yMin; v <= yMax + 1; v += step) g += `<line x1="${L}" x2="${W - Rp}" y1="${y(v)}" y2="${y(v)}" class="${v === 0 ? 'base' : 'grid'}"/><text x="${L - 8}" y="${y(v) + 4}" class="ax" text-anchor="end">${v ? taxWon(v) : '0'}</text>`;
+    for (let v = yMin; v <= yMax + 1; v += step) g += `<line x1="${L}" x2="${W - Rp}" y1="${y(v)}" y2="${y(v)}" class="${v === 0 ? 'base' : 'grid'}"/><text x="${L - 8}" y="${y(v) + 4}" class="ax" text-anchor="end">${v ? gsAx(v) : '0'}</text>`;
     let bars = '', labels = '';
     data.forEach((d, i) => {
         let acc = 0;
@@ -30860,7 +30889,7 @@ function gsRenderChart() {
                 : `<rect class="gs-c-${GS_SHOPS.indexOf(x.s)}" x="${x0}" y="${yy}" width="${bw}" height="${hgt}"/>`;
             acc += x.v;
         });
-        if (acc) labels += `<text x="${cx(i)}" y="${y(acc) - 6}" class="val" text-anchor="middle">${taxWon(acc)}</text>`;
+        if (acc) labels += `<text x="${cx(i)}" y="${y(acc) - 6}" class="val" text-anchor="middle">${gsAx(acc)}</text>`;
         labels += `<text x="${cx(i)}" y="${H - 8}" class="ax" text-anchor="middle">${Number(d.ym.slice(5))}월</text>`;
     });
     const pts = data.map((d, i) => [cx(i), y(d.t.margin)]);
@@ -30869,7 +30898,7 @@ function gsRenderChart() {
     window._gsChartData = { data, shops };
     const legend = shops.map(s => `<span><i class="gs-c-${GS_SHOPS.indexOf(s)}"></i>${s}</span>`).join('') + `<span><i class="line"></i>예상 마진</span>`;
     const sumNet = data.reduce((a, d) => a + d.net, 0), sumM = data.reduce((a, d) => a + d.t.margin, 0);
-    el.innerHTML = `<section class="cash-sec gs-chart"><div class="cash-sec-head"><b>월별 비교</b><span>${gsRange().label} · 매출 ${taxWon(sumNet)}원 · 예상 마진 ${taxWon(sumM)}원 (${gsPctTxt(sumM, sumNet)}) · 막대를 누르면 그 달로</span></div>
+    el.innerHTML = `<section class="cash-sec gs-chart"><div class="cash-sec-head"><b>월별 비교</b><span>${gsRange().label} · 매출 ${gsBig(sumNet)} · 예상 마진 ${gsBig(sumM)} (${gsPctTxt(sumM, sumNet)}) · 막대를 누르면 그 달로</span></div>
         <div class="gs-legend">${legend}</div>
         <div class="gs-chart-wrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="월별 쇼핑몰 매출과 예상 마진">${g}${bars}${line}${labels}${hits}</svg><div class="gs-tip" id="gsTip"></div></div></section>`;
 }
@@ -30880,9 +30909,9 @@ function gsChartTip(i, ev) {
     if (i < 0 || !window._gsChartData) { tip.style.display = 'none'; return; }
     const { data, shops } = window._gsChartData, d = data[i];
     tip.innerHTML = `<b>${d.ym.slice(0, 4)}년 ${Number(d.ym.slice(5))}월</b> <small>${d.t.n}건</small>`
-        + shops.map(s => { const b = d.t.byShop[s]; return `<div><i class="gs-c-${GS_SHOPS.indexOf(s)}"></i>${s}<span>${b ? gsWon(b.sale) + '원' : '-'}</span></div>`; }).join('')
-        + `<div class="sum">매출 합계<span>${gsWon(d.net)}원</span></div><div>수수료<span>${gsWon(d.t.fee)}원 (${gsPctTxt(d.t.fee, d.t.sale)})</span></div><div>배송비<span>${gsWon(d.t.ship)}원</span></div>`
-        + `<div class="sum"><i class="line"></i>예상 마진<span>${gsWon(d.t.margin)}원 (${gsPctTxt(d.t.margin, d.net)})</span></div>`;
+        + shops.map(s => { const b = d.t.byShop[s]; return `<div><i class="gs-c-${GS_SHOPS.indexOf(s)}"></i>${s}<span>${b ? gsBig(b.sale) : '-'}</span></div>`; }).join('')
+        + `<div class="sum">매출 합계<span>${gsBig(d.net)}</span></div><div>수수료<span>${gsBig(d.t.fee)} (${gsPctTxt(d.t.fee, d.t.sale)})</span></div><div>배송비<span>${gsBig(d.t.ship)}</span></div>`
+        + `<div class="sum"><i class="line"></i>예상 마진<span>${gsBig(d.t.margin)} (${gsPctTxt(d.t.margin, d.net)})</span></div>`;
     const wrap = tip.parentElement.getBoundingClientRect();
     tip.style.display = 'block';
     let x = ev.clientX - wrap.left + 14;
@@ -30906,24 +30935,24 @@ function gsMonthlyHtml() {
     const body = months.reverse().map(ym => {
         const rs = byM[ym] || [];
         const t = gsTotals(rs), net = t.sale - t.refund;
-        const cells = shops.map(s => { const b = t.byShop[s]; return `<td>${b ? gsWon(b.sale) + `<small class="gs-n">${b.n}건</small>` : '<span class="gs-z">-</span>'}</td>`; }).join('');
+        const cells = shops.map(s => { const b = t.byShop[s]; return `<td>${b ? gsD(b.sale) + `<small class="gs-n">${b.n}건</small>` : '<span class="gs-z">-</span>'}</td>`; }).join('');
         return `<tr class="gs-day ${rs.length ? '' : 'empty'}" onclick="gsPickMonth('${ym}')" title="${Number(ym.slice(5))}월 일별로 보기">
             <td>${Number(ym.slice(5))}월</td>
             <td>${rs.length ? t.n + '건' : ''}</td>${cells}
-            <td><b>${rs.length ? gsWon(net) : ''}</b></td>
-            <td class="sub">${rs.length ? gsWon(t.fee) + `<small>${gsPctTxt(t.fee, t.sale)}</small>` : ''}</td>
-            <td class="sub">${rs.length ? gsWon(t.ship) + (t.noShip ? ` <span class="gs-warn">${t.noShip}건 미입력</span>` : '') : ''}</td>
-            <td class="${t.margin < 0 ? 'bad' : 'ok'}">${rs.length ? gsWon(t.margin) : ''}</td>
+            <td><b>${rs.length ? gsD(net) : ''}</b></td>
+            <td class="sub">${rs.length ? gsD(t.fee) + `<small>${gsPctTxt(t.fee, t.sale)}</small>` : ''}</td>
+            <td class="sub">${rs.length ? gsD(t.ship) + (t.noShip ? ` <span class="gs-warn">${t.noShip}건 미입력</span>` : '') : ''}</td>
+            <td class="${t.margin < 0 ? 'bad' : 'ok'}">${rs.length ? gsD(t.margin) : ''}</td>
             <td class="sub">${rs.length ? gsPctTxt(t.margin, net) : ''}</td></tr>`;
     }).join('');
     const T = gsTotals(rows), tnet = T.sale - T.refund;
-    const foot = `<tr><td>합계</td><td>${T.n}건</td>${shops.map(s => `<td>${T.byShop[s] ? gsWon(T.byShop[s].sale) : '-'}</td>`).join('')}
-        <td>${gsWon(tnet)}</td><td>${gsWon(T.fee)}</td><td>${gsWon(T.ship)}</td><td class="${T.margin < 0 ? 'bad' : 'ok'}">${gsWon(T.margin)}</td><td>${gsPctTxt(T.margin, tnet)}</td></tr>`;
+    const foot = `<tr><td>합계</td><td>${T.n}건</td>${shops.map(s => `<td>${T.byShop[s] ? gsD(T.byShop[s].sale) : '-'}</td>`).join('')}
+        <td>${gsD(tnet)}</td><td>${gsD(T.fee)}</td><td>${gsD(T.ship)}</td><td class="${T.margin < 0 ? 'bad' : 'ok'}">${gsD(T.margin)}</td><td>${gsPctTxt(T.margin, tnet)}</td></tr>`;
     const table = `<div class="tax-scroll"><table class="tax-table gs-table">
         <thead><tr><th>월</th><th>주문</th>${shops.map(s => `<th>${s}</th>`).join('')}<th>매출 합계</th><th>수수료</th><th>배송비</th><th>예상 마진</th><th>마진율</th></tr></thead>
         <tbody>${body || `<tr><td colspan="${7 + shops.length}" class="sub">이 기간에는 주문이 없어요</td></tr>`}</tbody><tfoot>${foot}</tfoot></table></div>
-        <p class="tax-note">금액은 원(₩). <b>예상 마진 = 매출 − 쇼핑몰 수수료 − 환불 − 배송비</b> (상품 원가는 빼지 않음). 달을 누르면 그 달 일별 표로 가요.</p>`;
-    return taxSec('월별 매출', `${r.label} · 쇼핑몰별 · 원`, table, 'wide');
+        <p class="tax-note">${gsIsUsd() ? '금액은 달러($).' : '금액은 원(₩).'} <b>예상 마진 = 매출 − 쇼핑몰 수수료 − 환불 − 배송비</b> (상품 원가는 빼지 않음). 달을 누르면 그 달 일별 표로 가요.</p>`;
+    return taxSec('월별 매출', `${r.label} · 쇼핑몰별 · ${gsUnit()}`, table, 'wide');
 }
 
 function gsOrdersHtml() {
@@ -30939,15 +30968,15 @@ function gsOrdersHtml() {
             <td class="gs-l" title="${escHtml([r.phone, r.email].filter(Boolean).join(' · '))}">${escHtml(r.buyer || '')}${r.country ? `<small>${escHtml(r.country)}</small>` : ''}${r.email || r.phone ? `<small>${escHtml(r.email || r.phone)}</small>` : ''}</td>
             <td class="gs-l gs-items" title="${escHtml(r.items || '')}">${escHtml(r.items || '')}${r.qty ? `<small>${r.qty}개</small>` : ''}</td>
             <td>${gsMoney(r.sale_amount, r.currency)}${c.rate && r.currency !== 'KRW' ? `<small>${gsWon(c.saleKrw)}원</small>` : ''}${c.noRate ? '<small class="bad">환율 없음</small>' : ''}${Number(r.sales_tax) ? `<small title="구매자가 낸 판매세 — 쇼핑몰이 대신 내서 매출에 안 넣음">판매세 ${gsMoney(r.sales_tax, r.currency)} 별도</small>` : ''}</td>
-            <td class="sub">${gsWon(c.feeKrw)}${c.cancelled ? '' : c.feeEst ? `<small>예상 ${gsFeePct(r.shop)}%</small>` : c.saleKrw ? `<small>${(c.feeKrw / c.saleKrw * 100).toFixed(1)}%</small>` : ''}</td>
-            <td><input class="gs-ship ${c.noShip ? 'need' : ''}" inputmode="numeric" value="${r.ship_cost_krw == null ? '' : gsWon(r.ship_cost_krw)}" placeholder="배송비" oninput="fmtCommaTemp(this)" onchange="gsSaveShip(${r.id}, this.value)" onclick="event.stopPropagation()" title="우리가 낸 배송비 (원)"></td>
-            <td class="${c.margin < 0 ? 'bad' : 'ok'}">${gsWon(c.margin)}${c.refundKrw ? `<small>환불 ${gsWon(c.refundKrw)}</small>` : ''}</td>
+            <td class="sub">${gsD2(gsIsUsd() ? c.feeUsd : c.feeKrw)}${c.cancelled ? '' : c.feeEst ? `<small>예상 ${gsFeePct(r.shop)}%</small>` : c.saleKrw ? `<small>${(c.feeKrw / c.saleKrw * 100).toFixed(1)}%</small>` : ''}</td>
+            <td><input class="gs-ship ${c.noShip ? 'need' : ''}" inputmode="numeric" value="${r.ship_cost_krw == null ? '' : gsWon(r.ship_cost_krw)}" placeholder="배송비(원)" oninput="fmtCommaTemp(this)" onchange="gsSaveShip(${r.id}, this.value)" onclick="event.stopPropagation()" title="우리가 낸 배송비 (원) — 원화로 입력">${gsIsUsd() && r.ship_cost_krw != null ? `<small>${gsD2(c.shipUsd)}</small>` : ''}</td>
+            <td class="${c.margin < 0 ? 'bad' : 'ok'}">${gsD2(gsIsUsd() ? c.marginUsd : c.margin)}${c.refundKrw ? `<small>환불 ${gsD2(gsIsUsd() ? c.refundUsd : c.refundKrw)}</small>` : ''}</td>
             <td><button class="btn-ghost gs-edit" onclick="gsOpenEdit(${r.id})" title="수정">수정</button></td></tr>`;
     }).join('');
     const title = _gsDay ? `${Number(_gsDay.slice(5, 7))}월 ${Number(_gsDay.slice(8))}일 주문` : `${gsRange().label} 주문`;
     const sub = `${rows.length}건${_gsDay ? ` · <a href="#" onclick="gsPickDay('${_gsDay}');return false">이 달 전체 보기</a>` : ''}`;
     const table = `<div class="tax-scroll"><table class="tax-table gs-table gs-orders">
-        <thead><tr><th>날짜</th><th>쇼핑몰</th><th>주문번호</th><th>구매자</th><th>상품</th><th>판매액</th><th>수수료(원)</th><th>배송비(원)</th><th>예상 마진(원)</th><th></th></tr></thead>
+        <thead><tr><th>날짜</th><th>쇼핑몰</th><th>주문번호</th><th>구매자</th><th>상품</th><th>판매액</th><th>수수료(${gsIsUsd() ? '$' : '원'})</th><th>배송비(원 입력)</th><th>예상 마진(${gsIsUsd() ? '$' : '원'})</th><th></th></tr></thead>
         <tbody>${body || '<tr><td colspan="10" class="sub">주문이 없어요 — 위 <b>CSV 올리기</b>나 <b>+ 주문 추가</b>로 넣어 주세요</td></tr>'}</tbody></table></div>`;
     return `<div id="gsOrders" class="wide">${taxSec(title, sub, table)}</div>`;
 }

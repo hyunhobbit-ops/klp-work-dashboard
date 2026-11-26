@@ -1577,6 +1577,7 @@
                     <div class="toolbar-left">
                         <div class="gs-modes" id="gsModes"><button data-m="month" onclick="gsSetMode('month')">월별</button><button data-m="quarter" onclick="gsSetMode('quarter')">분기별</button><button data-m="year" onclick="gsSetMode('year')">연별</button></div>
                         <select id="gsPeriod" class="tax-year" onchange="gsSetPeriod(this.value)"></select>
+                        <div class="gs-modes" id="gsDisp" title="화면 금액 통화 (원하면 원화로)"><button data-c="USD" onclick="gsSetDisp('USD')">$ 달러</button><button data-c="KRW" onclick="gsSetDisp('KRW')">₩ 원화</button></div>
                         <select id="gsShop" class="tax-year" onchange="gsSetShop(this.value)">
                             <option value="">전체 쇼핑몰</option><option>Etsy</option><option>Shopify</option><option>eBay</option><option>기타</option>
                         </select>
@@ -1979,6 +1980,6 @@
     </div>
 
     <script src="send-kit.js?v=20261001i"></script>
-    <script src="app.js?v=20261126h"></script>
+    <script src="app.js?v=20261126i"></script>
 </body>
 </html>
