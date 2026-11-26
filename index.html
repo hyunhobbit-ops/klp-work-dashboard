@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261126e">
+    <link rel="stylesheet" href="styles.css?v=20261126f">
     <link rel="stylesheet" href="mobile.css?v=20261104a" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -1575,7 +1575,8 @@
             <main class="content" id="tab-gshop">
                 <div class="content-toolbar">
                     <div class="toolbar-left">
-                        <input type="month" id="gsMonth" class="tax-year" onchange="gsSetMonth(this.value)">
+                        <div class="gs-modes" id="gsModes"><button data-m="month" onclick="gsSetMode('month')">월별</button><button data-m="quarter" onclick="gsSetMode('quarter')">분기별</button><button data-m="year" onclick="gsSetMode('year')">연별</button></div>
+                        <select id="gsPeriod" class="tax-year" onchange="gsSetPeriod(this.value)"></select>
                         <select id="gsShop" class="tax-year" onchange="gsSetShop(this.value)">
                             <option value="">전체 쇼핑몰</option><option>Etsy</option><option>Shopify</option><option>eBay</option><option>기타</option>
                         </select>
@@ -1977,6 +1978,6 @@
     </div>
 
     <script src="send-kit.js?v=20261001i"></script>
-    <script src="app.js?v=20261126e"></script>
+    <script src="app.js?v=20261126f"></script>
 </body>
 </html>

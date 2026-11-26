@@ -30591,7 +30591,9 @@ const GS_FEE_DEFAULT = { Etsy: 16, Shopify: 4, eBay: 13.5, '기타': 0 };   // %
 const GS_CURS = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'KRW'];
 let _gsRows = [];
 let _gsSettings = { fx: {}, fee: {} };
-let _gsMonth = new Date().toISOString().slice(0, 7);
+let _gsMonth = gsMonthNow();   // 월별일 때 고른 달 (YYYY-MM)
+let _gsMode = 'month';   // month | quarter | year
+let _gsKey = _gsMonth;   // YYYY-MM | YYYY-Q4 | YYYY
 let _gsShop = '';
 let _gsDay = '';
 let _gsChan = null;
@@ -30630,22 +30632,63 @@ function gsCalc(r) {
     return { saleKrw, feeKrw, refundKrw, ship: ship || 0, margin: saleKrw - feeKrw - refundKrw - (ship || 0), rate, feeEst, noRate: !rate, noShip: ship == null, cancelled: false };
 }
 
+function gsPad(n) { return String(n).padStart(2, '0'); }
+function gsYmd(y, m, d) { return `${y}-${gsPad(m)}-${gsPad(d)}`; }
+// 고른 기간 → { from, to, label }
+function gsRange(mode = _gsMode, key = _gsKey) {
+    if (mode === 'year') return { from: `${key}-01-01`, to: `${key}-12-31`, label: `${key}년` };
+    if (mode === 'quarter') {
+        const [y, q] = key.split('-Q').map(Number);
+        return { from: gsYmd(y, q * 3 - 2, 1), to: gsYmd(y, q * 3, new Date(y, q * 3, 0).getDate()), label: `${y}년 ${q}분기` };
+    }
+    const [y, m] = key.split('-').map(Number);
+    return { from: gsYmd(y, m, 1), to: gsYmd(y, m, new Date(y, m, 0).getDate()), label: `${y}년 ${m}월` };
+}
+function gsKeyOf(mode, ymd) {
+    const y = ymd.slice(0, 4), m = Number(ymd.slice(5, 7));
+    return mode === 'year' ? y : mode === 'quarter' ? `${y}-Q${Math.ceil(m / 3)}` : ymd.slice(0, 7);
+}
+function gsFillPeriod() {
+    document.querySelectorAll('#gsModes button').forEach(b => b.classList.toggle('on', b.dataset.m === _gsMode));
+    const sel = document.getElementById('gsPeriod');
+    if (!sel) return;
+    const now = new Date(), opts = [];
+    const firstYear = 2024;
+    if (_gsMode === 'year') for (let y = now.getFullYear(); y >= firstYear; y--) opts.push(String(y));
+    else if (_gsMode === 'quarter') for (let y = now.getFullYear(); y >= firstYear; y--) for (let q = 4; q >= 1; q--) { if (y === now.getFullYear() && q > Math.ceil((now.getMonth() + 1) / 3)) continue; opts.push(`${y}-Q${q}`); }
+    else for (let y = now.getFullYear(); y >= firstYear; y--) for (let m = 12; m >= 1; m--) { if (y === now.getFullYear() && m > now.getMonth() + 1) continue; opts.push(`${y}-${gsPad(m)}`); }
+    if (!opts.includes(_gsKey)) opts.unshift(_gsKey);
+    sel.innerHTML = opts.map(k => `<option value="${k}" ${k === _gsKey ? 'selected' : ''}>${gsRange(_gsMode, k).label}</option>`).join('');
+}
 async function gsEnter() {
     gsSubscribe();
-    const m = document.getElementById('gsMonth');
-    if (m && !m.value) m.value = _gsMonth;
-    if (_gsLoaded !== _gsMonth) await gsLoad();
+    gsFillPeriod();
+    if (_gsLoaded !== _gsMode + ':' + _gsKey) await gsLoad();
     else gsRender();
 }
-function gsSetMonth(v) { if (!v) return; _gsMonth = v; _gsDay = ''; gsLoad(); }
+function gsSetMode(mode) {
+    if (mode === _gsMode) return;
+    const r = gsRange(), today = hmDateStr(new Date());
+    const anchor = today >= r.from && today <= r.to ? today : r.from;   // 지금 기간에 오늘이 있으면 오늘 기준
+    _gsMode = mode; _gsKey = gsKeyOf(mode, anchor); _gsDay = '';
+    if (mode === 'month') _gsMonth = _gsKey;
+    gsFillPeriod(); gsLoad();
+}
+function gsSetPeriod(v) { if (!v) return; _gsKey = v; if (_gsMode === 'month') _gsMonth = v; _gsDay = ''; gsLoad(); }
+function gsJumpTo(ymd) {   // 저장·CSV 뒤 그 날짜가 지금 기간 밖이면 그 달로
+    const r = gsRange();
+    if (ymd >= r.from && ymd <= r.to) return;
+    _gsMode = 'month'; _gsKey = _gsMonth = ymd.slice(0, 7); _gsDay = '';
+    gsFillPeriod();
+}
+function gsPickMonth(ym) { _gsMode = 'month'; _gsKey = _gsMonth = ym; _gsDay = ''; gsFillPeriod(); gsLoad(); }
 function gsSetShop(v) { _gsShop = v; gsRender(); }
 function gsPickDay(d) { _gsDay = _gsDay === d ? '' : d; gsRender(); const el = document.getElementById('gsOrders'); if (el && _gsDay) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
 async function gsLoad() {
     try {
-        const [y, mo] = _gsMonth.split('-').map(Number);
-        const from = `${_gsMonth}-01`;
-        const to = `${_gsMonth}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}`;
+        const { from, to } = gsRange();
+        const want = _gsMode + ':' + _gsKey;
         const rows = [];
         for (let off = 0; ; off += 1000) {
             const { data, error } = await sb.from('global_shop_orders').select('*')
@@ -30659,7 +30702,8 @@ async function gsLoad() {
         if (st.error) throw st.error;
         _gsRows = rows;
         _gsSettings = Object.assign({ fx: {}, fee: {} }, (st.data && st.data.settings) || {});
-        _gsLoaded = _gsMonth;
+        if (want !== _gsMode + ':' + _gsKey) return;   // 불러오는 사이 기간을 바꿨으면 버림
+        _gsLoaded = want;
         gsRender();
     } catch (err) {
         console.error('해외 쇼핑몰 불러오기 실패:', err);
@@ -30710,10 +30754,9 @@ function gsRenderTiles() {
     if (!el) return;
     const t = gsTotals(gsVisible());
     const net = t.sale - t.refund;
-    const [y, m] = _gsMonth.split('-').map(Number);
     const shops = GS_SHOPS.filter(s => t.byShop[s]).map(s => `${s} ${taxWon(t.byShop[s].sale)}`).join(' · ');
     el.innerHTML = `
-        <div class="cash-tile top"><span>${y}년 ${m}월 매출${_gsShop ? ' · ' + escHtml(_gsShop) : ''}</span><b>${taxWon(net)}원</b>
+        <div class="cash-tile top"><span>${gsRange().label} 매출${_gsShop ? ' · ' + escHtml(_gsShop) : ''}</span><b>${taxWon(net)}원</b>
             <small>${shops || '아직 주문이 없어요'}${t.refund ? ` · 환불 ${taxWon(t.refund)} 뺌` : ''}</small></div>
         <div class="cash-tile"><span>주문</span><b>${t.n.toLocaleString()}건</b>
             <small>${t.n ? '한 건 평균 ' + taxWon(net / t.n) + '원' : ''}</small></div>
@@ -30726,6 +30769,7 @@ function gsRenderTiles() {
 }
 
 function gsDailyHtml() {
+    if (_gsMode !== 'month') return gsMonthlyHtml();
     const rows = gsVisible();
     const [y, m] = _gsMonth.split('-').map(Number);
     const last = new Date(y, m, 0).getDate();
@@ -30764,6 +30808,41 @@ function gsDailyHtml() {
     return taxSec('일별 매출', '쇼핑몰별 · 원', table, 'wide');
 }
 
+// 분기·연: 달마다 한 줄 (누르면 그 달 일별로)
+function gsMonthlyHtml() {
+    const rows = gsVisible();
+    const r = gsRange(), nowYm = gsMonthNow();
+    const shops = GS_SHOPS.filter(s => s !== '기타' || rows.some(x => x.shop === '기타')).filter(s => !_gsShop || s === _gsShop);
+    const byM = {};
+    rows.forEach(x => (byM[x.order_date.slice(0, 7)] || (byM[x.order_date.slice(0, 7)] = [])).push(x));
+    const months = [];
+    for (let y = Number(r.from.slice(0, 4)), m = Number(r.from.slice(5, 7)); `${y}-${gsPad(m)}` <= r.to.slice(0, 7); m === 12 ? (y++, m = 1) : m++) {
+        const ym = `${y}-${gsPad(m)}`;
+        if (ym <= nowYm || byM[ym]) months.push(ym);
+    }
+    const body = months.reverse().map(ym => {
+        const rs = byM[ym] || [];
+        const t = gsTotals(rs), net = t.sale - t.refund;
+        const cells = shops.map(s => { const b = t.byShop[s]; return `<td>${b ? gsWon(b.sale) + `<small class="gs-n">${b.n}건</small>` : '<span class="gs-z">-</span>'}</td>`; }).join('');
+        return `<tr class="gs-day ${rs.length ? '' : 'empty'}" onclick="gsPickMonth('${ym}')" title="${Number(ym.slice(5))}월 일별로 보기">
+            <td>${Number(ym.slice(5))}월</td>
+            <td>${rs.length ? t.n + '건' : ''}</td>${cells}
+            <td><b>${rs.length ? gsWon(net) : ''}</b></td>
+            <td class="sub">${rs.length ? gsWon(t.fee) + `<small>${gsPctTxt(t.fee, t.sale)}</small>` : ''}</td>
+            <td class="sub">${rs.length ? gsWon(t.ship) + (t.noShip ? ` <span class="gs-warn">${t.noShip}건 미입력</span>` : '') : ''}</td>
+            <td class="${t.margin < 0 ? 'bad' : 'ok'}">${rs.length ? gsWon(t.margin) : ''}</td>
+            <td class="sub">${rs.length ? gsPctTxt(t.margin, net) : ''}</td></tr>`;
+    }).join('');
+    const T = gsTotals(rows), tnet = T.sale - T.refund;
+    const foot = `<tr><td>합계</td><td>${T.n}건</td>${shops.map(s => `<td>${T.byShop[s] ? gsWon(T.byShop[s].sale) : '-'}</td>`).join('')}
+        <td>${gsWon(tnet)}</td><td>${gsWon(T.fee)}</td><td>${gsWon(T.ship)}</td><td class="${T.margin < 0 ? 'bad' : 'ok'}">${gsWon(T.margin)}</td><td>${gsPctTxt(T.margin, tnet)}</td></tr>`;
+    const table = `<div class="tax-scroll"><table class="tax-table gs-table">
+        <thead><tr><th>월</th><th>주문</th>${shops.map(s => `<th>${s}</th>`).join('')}<th>매출 합계</th><th>수수료</th><th>배송비</th><th>예상 마진</th><th>마진율</th></tr></thead>
+        <tbody>${body || `<tr><td colspan="${7 + shops.length}" class="sub">이 기간에는 주문이 없어요</td></tr>`}</tbody><tfoot>${foot}</tfoot></table></div>
+        <p class="tax-note">금액은 원(₩). <b>예상 마진 = 매출 − 쇼핑몰 수수료 − 환불 − 배송비</b> (상품 원가는 빼지 않음). 달을 누르면 그 달 일별 표로 가요.</p>`;
+    return taxSec('월별 매출', `${r.label} · 쇼핑몰별 · 원`, table, 'wide');
+}
+
 function gsOrdersHtml() {
     let rows = gsVisible();
     if (_gsDay) rows = rows.filter(r => r.order_date === _gsDay);
@@ -30772,22 +30851,21 @@ function gsOrdersHtml() {
         const c = gsCalc(r);
         return `<tr class="${c.cancelled ? 'gs-cancel' : ''}">
             <td>${Number(r.order_date.slice(5, 7))}/${Number(r.order_date.slice(8))}</td>
-            <td><span class="gs-shop gs-${escHtml(r.shop)}">${escHtml(r.shop)}</span></td>
+            <td><span class="gs-shop gs-${escHtml(r.shop)}">${escHtml(r.shop)}</span>${r.status !== '정상' ? `<span class="gs-st ${stCls[r.status] || ''}" title="${r.status === '취소' ? '취소된 주문 — 매출·수수료 0으로 계산' : '환불된 주문 — 환불액을 매출에서 뺌'}">${escHtml(r.status)}</span>` : ''}</td>
             <td class="sub">${escHtml(r.order_no || '')}</td>
             <td class="gs-l" title="${escHtml([r.phone, r.email].filter(Boolean).join(' · '))}">${escHtml(r.buyer || '')}${r.country ? `<small>${escHtml(r.country)}</small>` : ''}${r.email || r.phone ? `<small>${escHtml(r.email || r.phone)}</small>` : ''}</td>
             <td class="gs-l gs-items" title="${escHtml(r.items || '')}">${escHtml(r.items || '')}${r.qty ? `<small>${r.qty}개</small>` : ''}</td>
             <td>${gsMoney(r.sale_amount, r.currency)}${c.rate && r.currency !== 'KRW' ? `<small>${gsWon(c.saleKrw)}원</small>` : ''}${c.noRate ? '<small class="bad">환율 없음</small>' : ''}${Number(r.sales_tax) ? `<small title="구매자가 낸 판매세 — 쇼핑몰이 대신 내서 매출에 안 넣음">판매세 ${gsMoney(r.sales_tax, r.currency)} 별도</small>` : ''}</td>
-            <td class="sub">${gsWon(c.feeKrw)}${c.feeEst && !c.cancelled ? `<small>예상 ${gsFeePct(r.shop)}%</small>` : ''}</td>
+            <td class="sub">${gsWon(c.feeKrw)}${c.cancelled ? '' : c.feeEst ? `<small>예상 ${gsFeePct(r.shop)}%</small>` : c.saleKrw ? `<small>${(c.feeKrw / c.saleKrw * 100).toFixed(1)}%</small>` : ''}</td>
             <td><input class="gs-ship ${c.noShip ? 'need' : ''}" inputmode="numeric" value="${r.ship_cost_krw == null ? '' : gsWon(r.ship_cost_krw)}" placeholder="배송비" oninput="fmtCommaTemp(this)" onchange="gsSaveShip(${r.id}, this.value)" onclick="event.stopPropagation()" title="우리가 낸 배송비 (원)"></td>
             <td class="${c.margin < 0 ? 'bad' : 'ok'}">${gsWon(c.margin)}${c.refundKrw ? `<small>환불 ${gsWon(c.refundKrw)}</small>` : ''}</td>
-            <td>${r.status !== '정상' ? `<span class="gs-st ${stCls[r.status] || ''}">${escHtml(r.status)}</span>` : ''}</td>
-            <td><button class="btn-ghost gs-edit" onclick="gsOpenEdit(${r.id})" title="고치기">고치기</button></td></tr>`;
+            <td><button class="btn-ghost gs-edit" onclick="gsOpenEdit(${r.id})" title="수정">수정</button></td></tr>`;
     }).join('');
-    const title = _gsDay ? `${Number(_gsDay.slice(5, 7))}월 ${Number(_gsDay.slice(8))}일 주문` : '이 달 주문';
+    const title = _gsDay ? `${Number(_gsDay.slice(5, 7))}월 ${Number(_gsDay.slice(8))}일 주문` : `${gsRange().label} 주문`;
     const sub = `${rows.length}건${_gsDay ? ` · <a href="#" onclick="gsPickDay('${_gsDay}');return false">이 달 전체 보기</a>` : ''}`;
     const table = `<div class="tax-scroll"><table class="tax-table gs-table gs-orders">
-        <thead><tr><th>날짜</th><th>쇼핑몰</th><th>주문번호</th><th>구매자</th><th>상품</th><th>판매액</th><th>수수료(원)</th><th>배송비(원)</th><th>예상 마진(원)</th><th>상태</th><th></th></tr></thead>
-        <tbody>${body || '<tr><td colspan="11" class="sub">주문이 없어요 — 위 <b>CSV 올리기</b>나 <b>+ 주문 추가</b>로 넣어 주세요</td></tr>'}</tbody></table></div>`;
+        <thead><tr><th>날짜</th><th>쇼핑몰</th><th>주문번호</th><th>구매자</th><th>상품</th><th>판매액</th><th>수수료(원)</th><th>배송비(원)</th><th>예상 마진(원)</th><th></th></tr></thead>
+        <tbody>${body || '<tr><td colspan="10" class="sub">주문이 없어요 — 위 <b>CSV 올리기</b>나 <b>+ 주문 추가</b>로 넣어 주세요</td></tr>'}</tbody></table></div>`;
     return `<div id="gsOrders" class="wide">${taxSec(title, sub, table)}</div>`;
 }
 
@@ -30801,7 +30879,7 @@ async function gsSaveShip(id, v, field = 'ship_cost_krw') {
     gsRender();
 }
 
-// ---------- 주문 직접 입력·고치기 ----------
+// ---------- 주문 직접 입력·수정 ----------
 function gsOv(id) {
     let ov = document.getElementById(id);
     if (!ov) {
@@ -30817,12 +30895,13 @@ function gsOv(id) {
 function gsOpenEdit(id) {
     const r = id ? _gsRows.find(x => x.id === id) : null;
     const today = hmDateStr(new Date());
-    const v = r || { order_date: _gsDay || (_gsMonth === gsMonthNow() ? today : `${_gsMonth}-01`), shop: _gsShop || 'Etsy', currency: 'USD', status: '정상', qty: 1 };
+    const rg = gsRange();
+    const v = r || { order_date: _gsDay || (today >= rg.from && today <= rg.to ? today : rg.from), shop: _gsShop || 'Etsy', currency: 'USD', status: '정상', qty: 1 };
     const val = (k) => v[k] == null ? '' : escHtml(String(v[k]));
     const ov = gsOv('gsEditOverlay');
     const fld = (label, html, hint = '') => `<label class="gs-f"><span>${label}${hint ? ` <small>${hint}</small>` : ''}</span>${html}</label>`;
     ov.innerHTML = `<div class="tax-ov-box gs-box">
-        <div class="tax-ov-h"><b>${r ? '주문 고치기' : '주문 추가'}</b><button onclick="document.getElementById('gsEditOverlay').style.display='none'">×</button></div>
+        <div class="tax-ov-h"><b>${r ? '주문 수정' : '주문 추가'}</b><button onclick="document.getElementById('gsEditOverlay').style.display='none'">×</button></div>
         <div class="gs-form">
             <div class="gs-sec">주문</div>
             ${fld('주문 날짜', `<input type="date" id="gsE_order_date" value="${val('order_date')}">`)}
@@ -30892,7 +30971,7 @@ async function gsSaveEdit(id) {
     }
     document.getElementById('gsEditOverlay').style.display = 'none';
     showToast('저장했어요');
-    if (row.order_date.slice(0, 7) !== _gsMonth) { _gsMonth = row.order_date.slice(0, 7); const m = document.getElementById('gsMonth'); if (m) m.value = _gsMonth; }
+    gsJumpTo(row.order_date);
     await gsLoad();
 }
 async function gsDelete(id) {
@@ -31167,12 +31246,12 @@ async function gsUpload(ev) {
                 if (error) throw error;
             }
             showToast(`${kindName}: 새 ${fresh.length}건${old.length ? ` · 갱신 ${old.length}건` : ''}`);
-            lastMonth = dates[dates.length - 1].slice(0, 7);
+            lastMonth = dates[dates.length - 1];
         } catch (err) {
             console.error('CSV 올리기 실패:', err);
             alert('CSV 올리기 실패\n' + (err.message || err));
         }
     }
-    if (lastMonth && lastMonth !== _gsMonth) { _gsMonth = lastMonth; _gsDay = ''; const m = document.getElementById('gsMonth'); if (m) m.value = _gsMonth; }
+    if (lastMonth) gsJumpTo(lastMonth);
     await gsLoad();
 }
