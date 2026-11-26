@@ -7248,4 +7248,6 @@ button.sc-kpi{cursor:pointer}
 #gsEditOverlay .gs-form{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:640px){ #gsEditOverlay .gs-form{grid-template-columns:repeat(2,minmax(0,1fr))} }
 .gs-curnote{font-size:12px; font-weight:500; color:var(--gray-500)}
-.gs-ship.gs-tax{width:80px}
+.gs-total{grid-column:1 / -1; font-size:13px; color:var(--gray-700, #374151); background:var(--gray-50, #f7f8fa); border-radius:9px; padding:8px 12px}
+.gs-total:empty{display:none}
+.gs-total small{color:var(--gray-500); margin-left:6px}

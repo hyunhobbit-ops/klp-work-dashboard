@@ -30582,7 +30582,8 @@ async function docsDelete(id) {
 // ============================================================
 // 해외 쇼핑몰 매출 (매입매출 > 해외 쇼핑몰, 탭 id gshop) — 2026-11-26, migration 086
 // Etsy·Shopify·eBay B2C 주문. 쇼핑몰 CSV 올리기(Aside도 이 버튼으로) + 직접 입력
-// 예상 마진 = (판매액 − 수수료 − 환불) × 환율 − 실제 배송비(원) − 우리가 낸 세금(원). 원가는 빼지 않음
+// 예상 마진 = (판매액 − 수수료 − 환불) × 환율 − 실제 배송비(원). 원가는 빼지 않음
+// 판매세(sales_tax)는 구매자가 내고 쇼핑몰이 대신 내는 돈 → 매출·마진에 넣지 않음 (영수증 대조용)
 // 권한: 세무·손익과 같은 3명 (cashCanAccess, RLS tax_can_access)
 // ============================================================
 const GS_SHOPS = ['Etsy', 'Shopify', 'eBay', '기타'];
@@ -30618,8 +30619,7 @@ function gsRateFor(cur) {
 // 주문 한 건 → 원화 계산
 function gsCalc(r) {
     const ship = r.ship_cost_krw == null || r.ship_cost_krw === '' ? null : Number(r.ship_cost_krw);
-    const tax = Number(r.tax_krw) || 0;   // 미국 관세·세금 등 우리가 낸 돈 (원)
-    if (r.status === '취소') return { saleKrw: 0, feeKrw: 0, refundKrw: 0, ship: ship || 0, tax, margin: -(ship || 0) - tax, rate: 0, feeEst: false, noRate: false, noShip: false, cancelled: true };
+    if (r.status === '취소') return { saleKrw: 0, feeKrw: 0, refundKrw: 0, ship: ship || 0, margin: -(ship || 0), rate: 0, feeEst: false, noRate: false, noShip: false, cancelled: true };
     const sale = Number(r.sale_amount) || 0;
     let refund = Number(r.refund_amount) || 0;
     if (r.status === '환불' && !refund) refund = sale;   // 환불인데 금액이 없으면 전액 환불로
@@ -30627,7 +30627,7 @@ function gsCalc(r) {
     const fee = feeEst ? sale * gsFeePct(r.shop) / 100 : Number(r.fee_amount);
     const rate = Number(r.fx_rate) || gsRateFor(r.currency);
     const saleKrw = Math.round(sale * rate), feeKrw = Math.round(fee * rate), refundKrw = Math.round(refund * rate);
-    return { saleKrw, feeKrw, refundKrw, ship: ship || 0, tax, margin: saleKrw - feeKrw - refundKrw - (ship || 0) - tax, rate, feeEst, noRate: !rate, noShip: ship == null, cancelled: false };
+    return { saleKrw, feeKrw, refundKrw, ship: ship || 0, margin: saleKrw - feeKrw - refundKrw - (ship || 0), rate, feeEst, noRate: !rate, noShip: ship == null, cancelled: false };
 }
 
 async function gsEnter() {
@@ -30689,11 +30689,11 @@ function gsRender() {
 }
 
 function gsTotals(rows) {
-    const t = { n: 0, sale: 0, fee: 0, refund: 0, ship: 0, tax: 0, margin: 0, noShip: 0, noRate: 0, feeEst: 0, byShop: {} };
+    const t = { n: 0, sale: 0, fee: 0, refund: 0, ship: 0, margin: 0, noShip: 0, noRate: 0, feeEst: 0, byShop: {} };
     for (const r of rows) {
         const c = gsCalc(r);
         if (!c.cancelled) t.n++;
-        t.sale += c.saleKrw; t.fee += c.feeKrw; t.refund += c.refundKrw; t.ship += c.ship; t.tax += c.tax; t.margin += c.margin;
+        t.sale += c.saleKrw; t.fee += c.feeKrw; t.refund += c.refundKrw; t.ship += c.ship; t.margin += c.margin;
         if (c.noShip) t.noShip++;
         if (c.noRate) t.noRate++;
         if (c.feeEst && !c.cancelled) t.feeEst++;
@@ -30720,7 +30720,7 @@ function gsRenderTiles() {
         <div class="cash-tile"><span>쇼핑몰 수수료</span><b>${taxWon(t.fee)}원</b>
             <small>${t.feeEst ? `${t.feeEst}건은 수수료율로 예상` : '실제 수수료'}</small></div>
         <div class="cash-tile"><span>배송비</span><b>${taxWon(t.ship)}원</b>
-            <small class="${t.noShip ? 'bad' : ''}">${t.noShip ? `⚠️ 배송비 안 적은 주문 ${t.noShip}건` : '모든 주문 입력됨'}${t.tax ? ` · 세금 ${gsWon(t.tax)}원 따로` : ''}</small></div>
+            <small class="${t.noShip ? 'bad' : ''}">${t.noShip ? `⚠️ 배송비 안 적은 주문 ${t.noShip}건` : '모든 주문 입력됨'}</small></div>
         <div class="cash-tile"><span>예상 마진 (원가 제외)</span><b class="${t.margin < 0 ? 'bad' : ''}">${taxWon(t.margin)}원</b>
             <small>매출의 ${gsPctTxt(t.margin, net)}${t.noRate ? ` · ⚠️ 환율 없는 주문 ${t.noRate}건` : ''}</small></div>`;
 }
@@ -30751,17 +30751,16 @@ function gsDailyHtml() {
             <td><b>${rs.length ? gsWon(net) : ''}</b></td>
             <td class="sub">${rs.length ? gsWon(t.fee) : ''}</td>
             <td class="sub">${rs.length ? gsWon(t.ship) + (t.noShip ? ` <span class="gs-warn" title="배송비 안 적은 주문">${t.noShip}건 미입력</span>` : '') : ''}</td>
-            <td class="sub">${t.tax ? gsWon(t.tax) : ''}</td>
             <td class="${t.margin < 0 ? 'bad' : 'ok'}">${rs.length ? gsWon(t.margin) : ''}</td>
             <td class="sub">${rs.length ? gsPctTxt(t.margin, net) : ''}</td></tr>`;
     }).join('');
     const T = gsTotals(rows), tnet = T.sale - T.refund;
     const foot = `<tr><td>합계</td><td>${T.n}건</td>${shops.map(s => `<td>${T.byShop[s] ? gsWon(T.byShop[s].sale) : '-'}</td>`).join('')}
-        <td>${gsWon(tnet)}</td><td>${gsWon(T.fee)}</td><td>${gsWon(T.ship)}</td><td>${T.tax ? gsWon(T.tax) : '-'}</td><td class="${T.margin < 0 ? 'bad' : 'ok'}">${gsWon(T.margin)}</td><td>${gsPctTxt(T.margin, tnet)}</td></tr>`;
+        <td>${gsWon(tnet)}</td><td>${gsWon(T.fee)}</td><td>${gsWon(T.ship)}</td><td class="${T.margin < 0 ? 'bad' : 'ok'}">${gsWon(T.margin)}</td><td>${gsPctTxt(T.margin, tnet)}</td></tr>`;
     const table = `<div class="tax-scroll"><table class="tax-table gs-table">
-        <thead><tr><th>날짜</th><th>주문</th>${shops.map(s => `<th>${s}</th>`).join('')}<th>매출 합계</th><th>수수료</th><th>배송비</th><th>세금</th><th>예상 마진</th><th>마진율</th></tr></thead>
-        <tbody>${body || `<tr><td colspan="${8 + shops.length}" class="sub">이 달에는 주문이 없어요</td></tr>`}</tbody><tfoot>${foot}</tfoot></table></div>
-        <p class="tax-note">금액은 원(₩) — 판매액 × 환율. <b>예상 마진 = 매출 − 쇼핑몰 수수료 − 환불 − 배송비 − 세금</b> (상품 원가는 빼지 않음). 날짜를 누르면 그날 주문만 아래에 보여요.</p>`;
+        <thead><tr><th>날짜</th><th>주문</th>${shops.map(s => `<th>${s}</th>`).join('')}<th>매출 합계</th><th>수수료</th><th>배송비</th><th>예상 마진</th><th>마진율</th></tr></thead>
+        <tbody>${body || `<tr><td colspan="${7 + shops.length}" class="sub">이 달에는 주문이 없어요</td></tr>`}</tbody><tfoot>${foot}</tfoot></table></div>
+        <p class="tax-note">금액은 원(₩) — 판매액 × 환율. <b>예상 마진 = 매출 − 쇼핑몰 수수료 − 환불 − 배송비</b> (상품 원가는 빼지 않음). 날짜를 누르면 그날 주문만 아래에 보여요.</p>`;
     return taxSec('일별 매출', '쇼핑몰별 · 원', table, 'wide');
 }
 
@@ -30777,10 +30776,9 @@ function gsOrdersHtml() {
             <td class="sub">${escHtml(r.order_no || '')}</td>
             <td class="gs-l" title="${escHtml([r.phone, r.email].filter(Boolean).join(' · '))}">${escHtml(r.buyer || '')}${r.country ? `<small>${escHtml(r.country)}</small>` : ''}${r.email || r.phone ? `<small>${escHtml(r.email || r.phone)}</small>` : ''}</td>
             <td class="gs-l gs-items" title="${escHtml(r.items || '')}">${escHtml(r.items || '')}${r.qty ? `<small>${r.qty}개</small>` : ''}</td>
-            <td>${gsMoney(r.sale_amount, r.currency)}${c.rate && r.currency !== 'KRW' ? `<small>${gsWon(c.saleKrw)}원</small>` : ''}${c.noRate ? '<small class="bad">환율 없음</small>' : ''}</td>
+            <td>${gsMoney(r.sale_amount, r.currency)}${c.rate && r.currency !== 'KRW' ? `<small>${gsWon(c.saleKrw)}원</small>` : ''}${c.noRate ? '<small class="bad">환율 없음</small>' : ''}${Number(r.sales_tax) ? `<small title="구매자가 낸 판매세 — 쇼핑몰이 대신 내서 매출에 안 넣음">판매세 ${gsMoney(r.sales_tax, r.currency)} 별도</small>` : ''}</td>
             <td class="sub">${gsWon(c.feeKrw)}${c.feeEst && !c.cancelled ? `<small>예상 ${gsFeePct(r.shop)}%</small>` : ''}</td>
             <td><input class="gs-ship ${c.noShip ? 'need' : ''}" inputmode="numeric" value="${r.ship_cost_krw == null ? '' : gsWon(r.ship_cost_krw)}" placeholder="배송비" oninput="fmtCommaTemp(this)" onchange="gsSaveShip(${r.id}, this.value)" onclick="event.stopPropagation()" title="우리가 낸 배송비 (원)"></td>
-            <td><input class="gs-ship gs-tax" inputmode="numeric" value="${r.tax_krw == null ? '' : gsWon(r.tax_krw)}" placeholder="-" oninput="fmtCommaTemp(this)" onchange="gsSaveShip(${r.id}, this.value, 'tax_krw')" onclick="event.stopPropagation()" title="우리가 낸 세금·관세 (원) — 없으면 비워 두기"></td>
             <td class="${c.margin < 0 ? 'bad' : 'ok'}">${gsWon(c.margin)}${c.refundKrw ? `<small>환불 ${gsWon(c.refundKrw)}</small>` : ''}</td>
             <td>${r.status !== '정상' ? `<span class="gs-st ${stCls[r.status] || ''}">${escHtml(r.status)}</span>` : ''}</td>
             <td><button class="btn-ghost gs-edit" onclick="gsOpenEdit(${r.id})" title="고치기">고치기</button></td></tr>`;
@@ -30788,8 +30786,8 @@ function gsOrdersHtml() {
     const title = _gsDay ? `${Number(_gsDay.slice(5, 7))}월 ${Number(_gsDay.slice(8))}일 주문` : '이 달 주문';
     const sub = `${rows.length}건${_gsDay ? ` · <a href="#" onclick="gsPickDay('${_gsDay}');return false">이 달 전체 보기</a>` : ''}`;
     const table = `<div class="tax-scroll"><table class="tax-table gs-table gs-orders">
-        <thead><tr><th>날짜</th><th>쇼핑몰</th><th>주문번호</th><th>구매자</th><th>상품</th><th>판매액</th><th>수수료(원)</th><th>배송비(원)</th><th>세금(원)</th><th>예상 마진(원)</th><th>상태</th><th></th></tr></thead>
-        <tbody>${body || '<tr><td colspan="12" class="sub">주문이 없어요 — 위 <b>CSV 올리기</b>나 <b>+ 주문 추가</b>로 넣어 주세요</td></tr>'}</tbody></table></div>`;
+        <thead><tr><th>날짜</th><th>쇼핑몰</th><th>주문번호</th><th>구매자</th><th>상품</th><th>판매액</th><th>수수료(원)</th><th>배송비(원)</th><th>예상 마진(원)</th><th>상태</th><th></th></tr></thead>
+        <tbody>${body || '<tr><td colspan="11" class="sub">주문이 없어요 — 위 <b>CSV 올리기</b>나 <b>+ 주문 추가</b>로 넣어 주세요</td></tr>'}</tbody></table></div>`;
     return `<div id="gsOrders" class="wide">${taxSec(title, sub, table)}</div>`;
 }
 
@@ -30836,17 +30834,27 @@ function gsOpenEdit(id) {
             ${fld('나라', `<input id="gsE_country" value="${val('country')}" placeholder="예: United States">`)}
             ${fld('전화번호', `<input id="gsE_phone" type="tel" value="${val('phone')}">`)}
             ${fld('이메일 주소', `<input id="gsE_email" type="email" value="${val('email')}">`)}
-            <div class="gs-sec">금액 <select id="gsE_currency" class="gs-cur" onchange="gsEditRateHint()">${[...new Set(GS_CURS.concat(v.currency ? [v.currency] : []))].map(c => `<option ${c === v.currency ? 'selected' : ''}>${c}</option>`).join('')}</select> <small class="gs-curnote">상품 가격·배송비·수수료는 이 통화로</small>
+            <div class="gs-sec">금액 <select id="gsE_currency" class="gs-cur" onchange="gsEditRateHint(); gsEditTotal()">${[...new Set(GS_CURS.concat(v.currency ? [v.currency] : []))].map(c => `<option ${c === v.currency ? 'selected' : ''}>${c}</option>`).join('')}</select> <small class="gs-curnote">상품 가격·배송비·수수료는 이 통화로</small>
                 <span class="gs-rate" id="gsE_rateBox">환율 <input id="gsE_fx_rate" inputmode="decimal" value="${val('fx_rate')}"> <small id="gsE_rateHint"></small></span></div>
-            ${fld('상품 판매 가격', `<input id="gsE_item_price" inputmode="decimal" value="${r ? escHtml(String(Math.round(((Number(r.sale_amount) || 0) - (Number(r.shipping_charged) || 0)) * 100) / 100)) : ''}">`, '외화')}
-            ${fld('배송비', `<input id="gsE_shipping_charged" inputmode="decimal" value="${val('shipping_charged')}">`, '구매자가 낸')}
+            ${fld('상품 판매 가격', `<input id="gsE_item_price" inputmode="decimal" oninput="gsEditTotal()" value="${r ? escHtml(String(Math.round(((Number(r.sale_amount) || 0) - (Number(r.shipping_charged) || 0)) * 100) / 100)) : ''}">`, '외화')}
+            ${fld('배송비', `<input id="gsE_shipping_charged" inputmode="decimal" value="${val('shipping_charged')}" oninput="gsEditTotal()">`, '구매자가 낸')}
+            ${fld('판매세', `<input id="gsE_sales_tax" inputmode="decimal" value="${Number(v.sales_tax) ? val('sales_tax') : ''}" oninput="gsEditTotal()">`, 'Sales tax')}
+            <div class="gs-total" id="gsE_total"></div>
             ${fld('수수료', `<input id="gsE_fee_amount" inputmode="decimal" value="${val('fee_amount')}">`, '<span id="gsE_feeHint"></span>')}
             ${fld('실제 배송비 (원)', `<input id="gsE_ship_cost_krw" inputmode="numeric" value="${v.ship_cost_krw == null ? '' : gsWon(v.ship_cost_krw)}" oninput="fmtCommaTemp(this)" placeholder="FedEx 등 우리가 낸 돈">`)}
-            ${fld('세금 (원)', `<input id="gsE_tax_krw" inputmode="numeric" value="${v.tax_krw == null ? '' : gsWon(v.tax_krw)}" oninput="fmtCommaTemp(this)" placeholder="없으면 비워 두기">`, '관세 등 우리가 낸')}
         </div>
         <div class="tax-ov-f">${r ? `<button class="btn-ghost" onclick="gsDelete(${r.id})" style="color:var(--red)">삭제</button>` : '<span></span>'}
             <button class="btn-primary" onclick="gsSaveEdit(${r ? r.id : 'null'})">저장</button></div></div>`;
     gsEditRateHint();
+    gsEditTotal();
+}
+function gsEditTotal() {   // 영수증 Order total과 맞춰 보기
+    const n = k => Number(String(document.getElementById('gsE_' + k)?.value || '').replace(/,/g, '')) || 0;
+    const el = document.getElementById('gsE_total');
+    if (!el) return;
+    const cur = document.getElementById('gsE_currency')?.value;
+    const tot = n('item_price') + n('shipping_charged') + n('sales_tax');
+    el.innerHTML = tot ? `주문 합계 <b>${gsMoney(tot, cur)}</b> <small>영수증 Order total과 같아야 해요 · 매출은 판매세 뺀 ${gsMoney(n('item_price') + n('shipping_charged'), cur)}</small>` : '';
 }
 function gsEditRateHint() {
     const cur = document.getElementById('gsE_currency')?.value;
@@ -30867,7 +30875,7 @@ async function gsSaveEdit(id) {
         order_date: g('order_date'), shop: g('shop'), order_no: g('order_no') || null, items: g('items'),
         buyer: g('buyer'), country: g('country'), phone: g('phone'), email: g('email'),
         currency: g('currency'), sale_amount: Math.round(((price || 0) + (shipIn || 0)) * 100) / 100, shipping_charged: shipIn || 0,
-        fee_amount: num('fee_amount'), fx_rate: num('fx_rate'), ship_cost_krw: num('ship_cost_krw', true), tax_krw: num('tax_krw', true),
+        fee_amount: num('fee_amount'), fx_rate: num('fx_rate'), ship_cost_krw: num('ship_cost_krw', true), sales_tax: num('sales_tax') || 0,
     };
     if (!id) row.qty = 1;   // 수량·상태·환불·운송장·메모는 창에서 뺌 — 고칠 때는 원래 값 그대로
     if (!row.order_date) { alert('주문 날짜를 넣어 주세요'); return; }
@@ -31008,7 +31016,7 @@ function gsParseTable(aoa, fileName) {
             orders.push({
                 shop: 'Etsy', order_no: no, order_date: gsDate(g('sale date')), buyer: String(g('full name') || g('buyer') || g('buyer user id')).trim(), email: String(g('buyer email', 'email')).trim(), phone: String(g('ship phone', 'phone', 'phone number')).trim(),
                 country: String(g('ship country')).trim(), qty: Math.round(gsNum(g('number of items'))), currency: String(g('currency')).trim().toUpperCase() || gsCurOf(g('order total')) || 'USD',
-                sale_amount: Math.round(sale * 100) / 100, shipping_charged: Math.round((gsNum(g('shipping')) - gsNum(g('shipping discount'))) * 100) / 100,
+                sale_amount: Math.round(sale * 100) / 100, shipping_charged: Math.round((gsNum(g('shipping')) - gsNum(g('shipping discount'))) * 100) / 100, sales_tax: tax,
                 refund_amount: Math.round(refund * 100) / 100, status: gsStatusOf(g('status')),
             });
         }
@@ -31042,6 +31050,7 @@ function gsParseTable(aoa, fileName) {
                 o.currency = String(g('currency')).trim().toUpperCase() || 'USD';
                 o.sale_amount = Math.round((gsNum(g('total')) - gsNum(g('taxes'))) * 100) / 100;
                 o.shipping_charged = gsNum(g('shipping'));
+                o.sales_tax = gsNum(g('taxes'));
                 o.refund_amount = gsNum(g('refunded amount'));
                 o.buyer = String(g('shipping name') || g('billing name') || g('email')).trim();
                 o.email = String(g('email')).trim();
@@ -31082,7 +31091,7 @@ function gsParseTable(aoa, fileName) {
         for (const o of order) {
             const total = o.total || ((o.soldFallback || 0) + o.ship);
             orders.push({ shop: 'eBay', order_no: o.order_no, order_date: o.order_date, buyer: o.buyer, country: o.country, email: o.email || '', phone: o.phone || '', tracking: o.tracking || '',
-                items: o.names.join(', '), qty: o.qty, currency: o.cur || 'USD', sale_amount: Math.round((total - o.tax) * 100) / 100, shipping_charged: o.ship, status: '정상' });
+                items: o.names.join(', '), qty: o.qty, currency: o.cur || 'USD', sales_tax: Math.round(o.tax * 100) / 100, sale_amount: Math.round((total - o.tax) * 100) / 100, shipping_charged: o.ship, status: '정상' });
         }
     }
     const bad = orders.filter(o => !o.order_date);
