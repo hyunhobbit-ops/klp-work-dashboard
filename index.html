@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261124a">
+    <link rel="stylesheet" href="styles.css?v=20261126a">
     <link rel="stylesheet" href="mobile.css?v=20261104a" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -157,6 +157,9 @@
                     </button>
                     <button class="nav-item" data-tab="projects-overseas" data-tip="해외 주문 프로젝트 진행 현황">
                         <span>해외</span>
+                    </button>
+                    <button class="nav-item" data-tab="gshop" id="navGshop" data-tip="해외 쇼핑몰 — Etsy·Shopify·eBay 매일 매출·배송비·예상 마진 (관리자 전용)" style="display:none">
+                        <span>해외 쇼핑몰</span>
                     </button>
                     <button class="nav-item" data-tab="sourcing" data-tip="해외 소싱 — 알리바바 등에서 받은 견적을 품목별로 모아 비교, 결정한 업체는 국내 프로젝트로">
                         <span>해외 소싱</span>
@@ -1568,6 +1571,26 @@
                 <div id="cashSections" class="cash-sections"></div>
             </main>
 
+            <!-- ===== 해외 쇼핑몰 (migration 086) ===== -->
+            <main class="content" id="tab-gshop">
+                <div class="content-toolbar">
+                    <div class="toolbar-left">
+                        <input type="month" id="gsMonth" class="tax-year" onchange="gsSetMonth(this.value)">
+                        <select id="gsShop" class="tax-year" onchange="gsSetShop(this.value)">
+                            <option value="">전체 쇼핑몰</option><option>Etsy</option><option>Shopify</option><option>eBay</option><option>기타</option>
+                        </select>
+                    </div>
+                    <div class="toolbar-buttons">
+                        <button class="btn-ghost" onclick="gsOpenSettings()" title="통화별 환율과 쇼핑몰별 수수료율">환율·수수료</button>
+                        <button class="btn-ghost" onclick="document.getElementById('gsFile').click()" title="Etsy·Shopify·eBay 관리자에서 받은 주문 CSV (여러 개 한 번에 가능, 같은 주문은 겹치지 않음)">CSV 올리기</button>
+                        <input type="file" id="gsFile" accept=".csv,.xlsx,.xls" multiple style="display:none" onchange="gsUpload(event)">
+                        <button class="btn-primary" onclick="gsOpenEdit()">+ 주문 추가</button>
+                    </div>
+                </div>
+                <div id="gsTiles" class="cash-tiles"></div>
+                <div id="gsRoot" class="tax-grid"></div>
+            </main>
+
             <!-- ===== 세무·손익 (migration 081, docs/tax-prep-plan-2026-11.md) ===== -->
             <main class="content" id="tab-tax">
                 <div class="content-toolbar">
@@ -1913,6 +1936,6 @@
     </div>
 
     <script src="send-kit.js?v=20261001i"></script>
-    <script src="app.js?v=20261124a"></script>
+    <script src="app.js?v=20261126a"></script>
 </body>
 </html>

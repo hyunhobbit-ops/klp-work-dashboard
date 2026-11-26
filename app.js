@@ -695,7 +695,7 @@ function applyModuleGating() {
         'planning':'planning','planning-company':'planning','planning-personal':'planning','planning-funding':'planning',
         'projects-temp':'projects','projects-domestic':'projects','projects-overseas':'projects','sourcing':'projects',
         'daily':'daily','timebox':'daily','meetings':'meetings','delivery':'delivery','marketing':'marketing',
-        'marketdb':'marketdb','cash':'cash','tax':'cash','product-db':'product-db','proposals':'proposals',
+        'marketdb':'marketdb','cash':'cash','tax':'cash','gshop':'cash','product-db':'product-db','proposals':'proposals',
         'docs':'docs','manual':'manual','calls':'calls','ceo-vision':'ceo-vision','clients':'clients',
         'clients-overseas':'clients-overseas','quotes':'quotes','margin-calc':'margin-calc','ad-studio':'ad-studio'
     };
@@ -1025,6 +1025,7 @@ const pageTitles = {
     'projects-domestic': '매입매출 — 국내',
     'projects-overseas': '매입매출 — 해외',
     sourcing: '매입매출 — 해외 소싱',
+    gshop: '매입매출 — 해외 쇼핑몰',
     daily: '일일계획표',
     delivery: '택배 관리',
     marketing: '마케팅',
@@ -1596,6 +1597,10 @@ function switchTab(tabId, fromHistory = false) {
         tabId = 'home';
     }
     if (tabId === 'tax' && cashCanAccess()) taxEnter();
+    if (tabId === 'gshop' && !cashCanAccess()) {
+        showToast('접근 권한이 없습니다');
+        tabId = 'home';
+    }
     if (tabId === 'cash' && !cashCanAccess()) {
         showToast('접근 권한이 없습니다');
         tabId = 'home';
@@ -1644,6 +1649,7 @@ function switchTab(tabId, fromHistory = false) {
     if (tabId === 'docs') { try { docsEnter(); } catch (e) { console.error(e); } }
     if (tabId === 'calls') { try { callsEnter(); } catch (e) { console.error(e); } }
     if (tabId === 'sourcing') { try { scEnter(); } catch (e) { console.error(e); } }
+    if (tabId === 'gshop' && cashCanAccess()) { try { gsEnter(); } catch (e) { console.error(e); } }
 
     // Close mobile sidebar
     document.getElementById('sidebar').classList.remove('open');
@@ -20203,6 +20209,8 @@ function applyCashPermission() {
     if (nav) nav.style.display = cashCanAccess() ? '' : 'none';
     const navTax = document.getElementById('navTax');   // 세무·손익도 같은 3명 (RLS tax_can_access와 같은 기준)
     if (navTax) navTax.style.display = cashCanAccess() ? '' : 'none';
+    const navGshop = document.getElementById('navGshop');   // 해외 쇼핑몰도 같은 3명 (migration 086)
+    if (navGshop) navGshop.style.display = cashCanAccess() ? '' : 'none';
 }
 
 const CASH_CATEGORIES = [
@@ -30569,4 +30577,581 @@ async function docsDelete(id) {
     _docs = _docs.filter(x => x.id !== id);
     docsClose(); docsRender();
     showToast('삭제했어요');
+}
+
+// ============================================================
+// 해외 쇼핑몰 매출 (매입매출 > 해외 쇼핑몰, 탭 id gshop) — 2026-11-26, migration 086
+// Etsy·Shopify·eBay B2C 주문. 쇼핑몰 CSV 올리기(Aside도 이 버튼으로) + 직접 입력
+// 예상 마진 = (판매액 − 수수료 − 환불) × 환율 − 실제 배송비(원). 원가는 빼지 않음
+// 권한: 세무·손익과 같은 3명 (cashCanAccess, RLS tax_can_access)
+// ============================================================
+const GS_SHOPS = ['Etsy', 'Shopify', 'eBay', '기타'];
+const GS_FEE_DEFAULT = { Etsy: 10, Shopify: 3.5, eBay: 13.5, '기타': 0 };   // % — 설정에서 바꿈
+const GS_CURS = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'KRW'];
+let _gsRows = [];
+let _gsSettings = { fx: {}, fee: {} };
+let _gsMonth = new Date().toISOString().slice(0, 7);
+let _gsShop = '';
+let _gsDay = '';
+let _gsChan = null;
+let _gsLoaded = null;
+let _gsReloadTimer = null;
+
+function gsMonthNow() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`; }
+function gsNumFmt(n, d = 0) { return (Number(n) || 0).toLocaleString('ko-KR', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+function gsWon(n) { const v = Math.round(Number(n) || 0); return (v < 0 ? '−' : '') + Math.abs(v).toLocaleString('ko-KR'); }
+function gsMoney(n, cur) {
+    const v = Number(n) || 0;
+    const sym = { USD: '$', EUR: '€', GBP: '£', JPY: '¥', KRW: '₩', CAD: 'C$', AUD: 'A$' }[cur];
+    const d = cur === 'JPY' || cur === 'KRW' ? 0 : 2;
+    return sym ? sym + gsNumFmt(v, d) : `${gsNumFmt(v, d)} ${escHtml(cur || '')}`;
+}
+function gsFeePct(shop) {
+    const f = _gsSettings.fee || {};
+    return f[shop] != null && f[shop] !== '' ? Number(f[shop]) : (GS_FEE_DEFAULT[shop] || 0);
+}
+function gsRateFor(cur) {
+    if (cur === 'KRW') return 1;
+    const v = Number((_gsSettings.fx || {})[cur]);
+    return v > 0 ? v : 0;
+}
+// 주문 한 건 → 원화 계산
+function gsCalc(r) {
+    const ship = r.ship_cost_krw == null || r.ship_cost_krw === '' ? null : Number(r.ship_cost_krw);
+    if (r.status === '취소') return { saleKrw: 0, feeKrw: 0, refundKrw: 0, ship: ship || 0, margin: -(ship || 0), rate: 0, feeEst: false, noRate: false, noShip: false, cancelled: true };
+    const sale = Number(r.sale_amount) || 0;
+    let refund = Number(r.refund_amount) || 0;
+    if (r.status === '환불' && !refund) refund = sale;   // 환불인데 금액이 없으면 전액 환불로
+    const feeEst = r.fee_amount == null || r.fee_amount === '';
+    const fee = feeEst ? sale * gsFeePct(r.shop) / 100 : Number(r.fee_amount);
+    const rate = Number(r.fx_rate) || gsRateFor(r.currency);
+    const saleKrw = Math.round(sale * rate), feeKrw = Math.round(fee * rate), refundKrw = Math.round(refund * rate);
+    return { saleKrw, feeKrw, refundKrw, ship: ship || 0, margin: saleKrw - feeKrw - refundKrw - (ship || 0), rate, feeEst, noRate: !rate, noShip: ship == null, cancelled: false };
+}
+
+async function gsEnter() {
+    gsSubscribe();
+    const m = document.getElementById('gsMonth');
+    if (m && !m.value) m.value = _gsMonth;
+    if (_gsLoaded !== _gsMonth) await gsLoad();
+    else gsRender();
+}
+function gsSetMonth(v) { if (!v) return; _gsMonth = v; _gsDay = ''; gsLoad(); }
+function gsSetShop(v) { _gsShop = v; gsRender(); }
+function gsPickDay(d) { _gsDay = _gsDay === d ? '' : d; gsRender(); const el = document.getElementById('gsOrders'); if (el && _gsDay) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+
+async function gsLoad() {
+    try {
+        const [y, mo] = _gsMonth.split('-').map(Number);
+        const from = `${_gsMonth}-01`;
+        const to = `${_gsMonth}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}`;
+        const rows = [];
+        for (let off = 0; ; off += 1000) {
+            const { data, error } = await sb.from('global_shop_orders').select('*')
+                .gte('order_date', from).lte('order_date', to)
+                .order('order_date', { ascending: false }).order('id', { ascending: false }).range(off, off + 999);
+            if (error) throw error;
+            rows.push(...(data || []));
+            if (!data || data.length < 1000) break;
+        }
+        const st = await sb.from('global_shop_settings').select('*').maybeSingle();
+        if (st.error) throw st.error;
+        _gsRows = rows;
+        _gsSettings = Object.assign({ fx: {}, fee: {} }, (st.data && st.data.settings) || {});
+        _gsLoaded = _gsMonth;
+        gsRender();
+    } catch (err) {
+        console.error('해외 쇼핑몰 불러오기 실패:', err);
+        showToast('해외 쇼핑몰 불러오기 실패: ' + (err.message || err));
+    }
+}
+
+function gsSubscribe() {
+    if (_gsChan) return;
+    _gsChan = sb.channel('global_shop_orders_rt')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'global_shop_orders' }, () => {
+            clearTimeout(_gsReloadTimer);   // CSV로 여러 줄이 한꺼번에 바뀌면 한 번만 다시 불러오기
+            _gsReloadTimer = setTimeout(() => { if (document.getElementById('tab-gshop')?.classList.contains('active')) gsLoad(); else _gsLoaded = null; }, 600);
+        })
+        .subscribe();
+}
+
+function gsVisible() { return _gsRows.filter(r => !_gsShop || r.shop === _gsShop); }
+
+function gsRender() {
+    const sel = document.getElementById('gsShop');
+    if (sel) sel.value = _gsShop;
+    gsRenderTiles();
+    const el = document.getElementById('gsRoot');
+    if (!el) return;
+    el.innerHTML = gsDailyHtml() + gsOrdersHtml();
+}
+
+function gsTotals(rows) {
+    const t = { n: 0, sale: 0, fee: 0, refund: 0, ship: 0, margin: 0, noShip: 0, noRate: 0, feeEst: 0, byShop: {} };
+    for (const r of rows) {
+        const c = gsCalc(r);
+        if (!c.cancelled) t.n++;
+        t.sale += c.saleKrw; t.fee += c.feeKrw; t.refund += c.refundKrw; t.ship += c.ship; t.margin += c.margin;
+        if (c.noShip) t.noShip++;
+        if (c.noRate) t.noRate++;
+        if (c.feeEst && !c.cancelled) t.feeEst++;
+        const b = t.byShop[r.shop] || (t.byShop[r.shop] = { n: 0, sale: 0 });
+        if (!c.cancelled) b.n++;
+        b.sale += c.saleKrw - c.refundKrw;
+    }
+    return t;
+}
+function gsPctTxt(a, b) { return b ? Math.round(a / b * 100) + '%' : '-'; }
+
+function gsRenderTiles() {
+    const el = document.getElementById('gsTiles');
+    if (!el) return;
+    const t = gsTotals(gsVisible());
+    const net = t.sale - t.refund;
+    const [y, m] = _gsMonth.split('-').map(Number);
+    const shops = GS_SHOPS.filter(s => t.byShop[s]).map(s => `${s} ${taxWon(t.byShop[s].sale)}`).join(' · ');
+    el.innerHTML = `
+        <div class="cash-tile top"><span>${y}년 ${m}월 매출${_gsShop ? ' · ' + escHtml(_gsShop) : ''}</span><b>${taxWon(net)}원</b>
+            <small>${shops || '아직 주문이 없어요'}${t.refund ? ` · 환불 ${taxWon(t.refund)} 뺌` : ''}</small></div>
+        <div class="cash-tile"><span>주문</span><b>${t.n.toLocaleString()}건</b>
+            <small>${t.n ? '한 건 평균 ' + taxWon(net / t.n) + '원' : ''}</small></div>
+        <div class="cash-tile"><span>쇼핑몰 수수료</span><b>${taxWon(t.fee)}원</b>
+            <small>${t.feeEst ? `${t.feeEst}건은 수수료율로 예상` : '실제 수수료'}</small></div>
+        <div class="cash-tile"><span>배송비</span><b>${taxWon(t.ship)}원</b>
+            <small class="${t.noShip ? 'bad' : ''}">${t.noShip ? `⚠️ 배송비 안 적은 주문 ${t.noShip}건` : '모든 주문 입력됨'}</small></div>
+        <div class="cash-tile"><span>예상 마진 (원가 제외)</span><b class="${t.margin < 0 ? 'bad' : ''}">${taxWon(t.margin)}원</b>
+            <small>매출의 ${gsPctTxt(t.margin, net)}${t.noRate ? ` · ⚠️ 환율 없는 주문 ${t.noRate}건` : ''}</small></div>`;
+}
+
+function gsDailyHtml() {
+    const rows = gsVisible();
+    const [y, m] = _gsMonth.split('-').map(Number);
+    const last = new Date(y, m, 0).getDate();
+    const nowYm = gsMonthNow();
+    const lastDay = _gsMonth === nowYm ? new Date().getDate() : (_gsMonth > nowYm ? 0 : last);
+    const byDay = {};
+    rows.forEach(r => (byDay[r.order_date] || (byDay[r.order_date] = [])).push(r));
+    const shops = GS_SHOPS.filter(s => s !== '기타' || rows.some(r => r.shop === '기타')).filter(s => !_gsShop || s === _gsShop);
+    const days = new Set(Object.keys(byDay));
+    for (let d = 1; d <= lastDay; d++) days.add(`${_gsMonth}-${String(d).padStart(2, '0')}`);
+    const list = [...days].sort().reverse();
+    const wk = ['일', '월', '화', '수', '목', '금', '토'];
+    const body = list.map(day => {
+        const rs = byDay[day] || [];
+        const t = gsTotals(rs);
+        const net = t.sale - t.refund;
+        const dt = new Date(day + 'T00:00:00');
+        const dow = dt.getDay();
+        const cells = shops.map(s => { const b = t.byShop[s]; return `<td>${b ? gsWon(b.sale) + `<small class="gs-n">${b.n}건</small>` : '<span class="gs-z">-</span>'}</td>`; }).join('');
+        return `<tr class="gs-day ${rs.length ? '' : 'empty'} ${_gsDay === day ? 'on' : ''}" onclick="${rs.length ? `gsPickDay('${day}')` : ''}">
+            <td>${Number(day.slice(5, 7))}/${Number(day.slice(8))} <span class="gs-dow ${dow === 0 ? 'sun' : dow === 6 ? 'sat' : ''}">${wk[dow]}</span></td>
+            <td>${rs.length ? t.n + '건' : ''}</td>${cells}
+            <td><b>${rs.length ? gsWon(net) : ''}</b></td>
+            <td class="sub">${rs.length ? gsWon(t.fee) : ''}</td>
+            <td class="sub">${rs.length ? gsWon(t.ship) + (t.noShip ? ` <span class="gs-warn" title="배송비 안 적은 주문">${t.noShip}건 미입력</span>` : '') : ''}</td>
+            <td class="${t.margin < 0 ? 'bad' : 'ok'}">${rs.length ? gsWon(t.margin) : ''}</td>
+            <td class="sub">${rs.length ? gsPctTxt(t.margin, net) : ''}</td></tr>`;
+    }).join('');
+    const T = gsTotals(rows), tnet = T.sale - T.refund;
+    const foot = `<tr><td>합계</td><td>${T.n}건</td>${shops.map(s => `<td>${T.byShop[s] ? gsWon(T.byShop[s].sale) : '-'}</td>`).join('')}
+        <td>${gsWon(tnet)}</td><td>${gsWon(T.fee)}</td><td>${gsWon(T.ship)}</td><td class="${T.margin < 0 ? 'bad' : 'ok'}">${gsWon(T.margin)}</td><td>${gsPctTxt(T.margin, tnet)}</td></tr>`;
+    const table = `<div class="tax-scroll"><table class="tax-table gs-table">
+        <thead><tr><th>날짜</th><th>주문</th>${shops.map(s => `<th>${s}</th>`).join('')}<th>매출 합계</th><th>수수료</th><th>배송비</th><th>예상 마진</th><th>마진율</th></tr></thead>
+        <tbody>${body || `<tr><td colspan="${7 + shops.length}" class="sub">이 달에는 주문이 없어요</td></tr>`}</tbody><tfoot>${foot}</tfoot></table></div>
+        <p class="tax-note">금액은 원(₩) — 판매액 × 환율. <b>예상 마진 = 매출 − 쇼핑몰 수수료 − 환불 − 배송비</b> (상품 원가는 빼지 않음). 날짜를 누르면 그날 주문만 아래에 보여요.</p>`;
+    return taxSec('일별 매출', '쇼핑몰별 · 원', table, 'wide');
+}
+
+function gsOrdersHtml() {
+    let rows = gsVisible();
+    if (_gsDay) rows = rows.filter(r => r.order_date === _gsDay);
+    const stCls = { '환불': 'gs-st-r', '취소': 'gs-st-c' };
+    const body = rows.map(r => {
+        const c = gsCalc(r);
+        return `<tr class="${c.cancelled ? 'gs-cancel' : ''}">
+            <td>${Number(r.order_date.slice(5, 7))}/${Number(r.order_date.slice(8))}</td>
+            <td><span class="gs-shop gs-${escHtml(r.shop)}">${escHtml(r.shop)}</span></td>
+            <td class="sub">${escHtml(r.order_no || '')}</td>
+            <td class="gs-l">${escHtml(r.buyer || '')}${r.country ? `<small>${escHtml(r.country)}</small>` : ''}</td>
+            <td class="gs-l gs-items" title="${escHtml(r.items || '')}">${escHtml(r.items || '')}${r.qty ? `<small>${r.qty}개</small>` : ''}</td>
+            <td>${gsMoney(r.sale_amount, r.currency)}${c.rate && r.currency !== 'KRW' ? `<small>${gsWon(c.saleKrw)}원</small>` : ''}${c.noRate ? '<small class="bad">환율 없음</small>' : ''}</td>
+            <td class="sub">${gsWon(c.feeKrw)}${c.feeEst && !c.cancelled ? `<small>예상 ${gsFeePct(r.shop)}%</small>` : ''}</td>
+            <td><input class="gs-ship ${c.noShip ? 'need' : ''}" inputmode="numeric" value="${r.ship_cost_krw == null ? '' : gsWon(r.ship_cost_krw)}" placeholder="배송비" oninput="fmtCommaTemp(this)" onchange="gsSaveShip(${r.id}, this.value)" onclick="event.stopPropagation()" title="우리가 낸 배송비 (원)"></td>
+            <td class="${c.margin < 0 ? 'bad' : 'ok'}">${gsWon(c.margin)}${c.refundKrw ? `<small>환불 ${gsWon(c.refundKrw)}</small>` : ''}</td>
+            <td>${r.status !== '정상' ? `<span class="gs-st ${stCls[r.status] || ''}">${escHtml(r.status)}</span>` : ''}</td>
+            <td><button class="btn-ghost gs-edit" onclick="gsOpenEdit(${r.id})" title="고치기">고치기</button></td></tr>`;
+    }).join('');
+    const title = _gsDay ? `${Number(_gsDay.slice(5, 7))}월 ${Number(_gsDay.slice(8))}일 주문` : '이 달 주문';
+    const sub = `${rows.length}건${_gsDay ? ` · <a href="#" onclick="gsPickDay('${_gsDay}');return false">이 달 전체 보기</a>` : ''}`;
+    const table = `<div class="tax-scroll"><table class="tax-table gs-table gs-orders">
+        <thead><tr><th>날짜</th><th>쇼핑몰</th><th>주문번호</th><th>구매자</th><th>상품</th><th>판매액</th><th>수수료(원)</th><th>배송비(원)</th><th>예상 마진(원)</th><th>상태</th><th></th></tr></thead>
+        <tbody>${body || '<tr><td colspan="11" class="sub">주문이 없어요 — 위 <b>CSV 올리기</b>나 <b>+ 주문 추가</b>로 넣어 주세요</td></tr>'}</tbody></table></div>`;
+    return `<div id="gsOrders" class="wide">${taxSec(title, sub, table)}</div>`;
+}
+
+async function gsSaveShip(id, v) {
+    const s = String(v).replace(/[^\d-]/g, '');
+    const val = s === '' ? null : Number(s);
+    const { error } = await sb.from('global_shop_orders').update({ ship_cost_krw: val }).eq('id', id);
+    if (error) { console.error(error); showToast('배송비 저장 실패: ' + error.message); return; }
+    const r = _gsRows.find(x => x.id === id);
+    if (r) r.ship_cost_krw = val;
+    gsRender();
+}
+
+// ---------- 주문 직접 입력·고치기 ----------
+function gsOv(id) {
+    let ov = document.getElementById(id);
+    if (!ov) {
+        ov = document.createElement('div');
+        ov.id = id;
+        ov.className = 'tax-ov';
+        ov.addEventListener('click', e => { if (e.target === ov) ov.style.display = 'none'; });
+        document.body.appendChild(ov);
+    }
+    ov.style.display = 'block';
+    return ov;
+}
+function gsOpenEdit(id) {
+    const r = id ? _gsRows.find(x => x.id === id) : null;
+    const today = hmDateStr(new Date());
+    const v = r || { order_date: _gsDay || (_gsMonth === gsMonthNow() ? today : `${_gsMonth}-01`), shop: _gsShop || 'Etsy', currency: 'USD', status: '정상', qty: 1 };
+    const val = (k) => v[k] == null ? '' : escHtml(String(v[k]));
+    const ov = gsOv('gsEditOverlay');
+    const fld = (label, html, hint = '') => `<label class="gs-f"><span>${label}${hint ? ` <small>${hint}</small>` : ''}</span>${html}</label>`;
+    ov.innerHTML = `<div class="tax-ov-box gs-box">
+        <div class="tax-ov-h"><b>${r ? '주문 고치기' : '주문 추가'}</b><button onclick="document.getElementById('gsEditOverlay').style.display='none'">×</button></div>
+        <div class="gs-form">
+            ${fld('주문 날짜', `<input type="date" id="gsE_order_date" value="${val('order_date')}">`)}
+            ${fld('쇼핑몰', `<select id="gsE_shop">${GS_SHOPS.map(s => `<option ${s === v.shop ? 'selected' : ''}>${s}</option>`).join('')}</select>`)}
+            ${fld('주문번호', `<input id="gsE_order_no" value="${val('order_no')}" placeholder="쇼핑몰 주문번호">`)}
+            ${fld('상태', `<select id="gsE_status">${['정상', '환불', '취소'].map(s => `<option ${s === v.status ? 'selected' : ''}>${s}</option>`).join('')}</select>`)}
+            ${fld('구매자', `<input id="gsE_buyer" value="${val('buyer')}">`)}
+            ${fld('나라', `<input id="gsE_country" value="${val('country')}" placeholder="예: United States">`)}
+            ${fld('상품', `<input id="gsE_items" value="${val('items')}" placeholder="예: Pocket watch silver">`, '')}
+            ${fld('수량', `<input id="gsE_qty" inputmode="numeric" value="${val('qty')}">`)}
+            ${fld('통화', `<select id="gsE_currency" onchange="gsEditRateHint()">${[...new Set(GS_CURS.concat(v.currency ? [v.currency] : []))].map(c => `<option ${c === v.currency ? 'selected' : ''}>${c}</option>`).join('')}</select>`)}
+            ${fld('판매액', `<input id="gsE_sale_amount" inputmode="decimal" value="${val('sale_amount')}" placeholder="구매자가 낸 금액">`, '상품+배송비, 할인 뺀 값, 판매세 제외')}
+            ${fld('그중 받은 배송비', `<input id="gsE_shipping_charged" inputmode="decimal" value="${val('shipping_charged')}">`, '참고용')}
+            ${fld('쇼핑몰 수수료', `<input id="gsE_fee_amount" inputmode="decimal" value="${val('fee_amount')}" placeholder="비우면 예상">`, '외화 · 비우면 수수료율로 예상')}
+            ${fld('환불액', `<input id="gsE_refund_amount" inputmode="decimal" value="${val('refund_amount')}">`, '외화')}
+            ${fld('환율', `<input id="gsE_fx_rate" inputmode="decimal" value="${val('fx_rate')}">`, '<span id="gsE_rateHint"></span>')}
+            ${fld('실제 배송비 (원)', `<input id="gsE_ship_cost_krw" inputmode="numeric" value="${v.ship_cost_krw == null ? '' : gsWon(v.ship_cost_krw)}" oninput="fmtCommaTemp(this)" placeholder="FedEx 등 우리가 낸 돈">`)}
+            ${fld('운송장', `<input id="gsE_tracking" value="${val('tracking')}">`)}
+            <label class="gs-f wide"><span>메모</span><input id="gsE_memo" value="${val('memo')}"></label>
+        </div>
+        <div class="tax-ov-f">${r ? `<button class="btn-ghost" onclick="gsDelete(${r.id})" style="color:var(--red)">삭제</button>` : '<span></span>'}
+            <button class="btn-primary" onclick="gsSaveEdit(${r ? r.id : 'null'})">저장</button></div></div>`;
+    gsEditRateHint();
+}
+function gsEditRateHint() {
+    const cur = document.getElementById('gsE_currency')?.value;
+    const h = document.getElementById('gsE_rateHint');
+    if (!h) return;
+    const rt = gsRateFor(cur);
+    h.textContent = cur === 'KRW' ? '원화는 1' : rt ? `비우면 설정 환율 ${gsNumFmt(rt, 2)}` : '설정에 환율이 없어요 — 꼭 넣어 주세요';
+}
+async function gsSaveEdit(id) {
+    const g = k => (document.getElementById('gsE_' + k)?.value || '').trim();
+    const num = (k, int) => { const s = g(k).replace(/,/g, ''); if (s === '') return null; const n = Number(s); return isFinite(n) ? (int ? Math.round(n) : n) : NaN; };
+    const row = {
+        order_date: g('order_date'), shop: g('shop'), order_no: g('order_no') || null, status: g('status'),
+        buyer: g('buyer'), country: g('country'), items: g('items'), qty: num('qty', true) || 0,
+        currency: g('currency'), sale_amount: num('sale_amount') || 0, shipping_charged: num('shipping_charged') || 0,
+        fee_amount: num('fee_amount'), refund_amount: num('refund_amount') || 0,
+        fx_rate: num('fx_rate'), ship_cost_krw: num('ship_cost_krw', true), tracking: g('tracking'), memo: g('memo'),
+    };
+    if (!row.order_date) { alert('주문 날짜를 넣어 주세요'); return; }
+    if (Object.values(row).some(x => typeof x === 'number' && isNaN(x))) { alert('숫자 칸에 숫자만 넣어 주세요'); return; }
+    if (row.fx_rate == null) row.fx_rate = gsRateFor(row.currency) || null;
+    if (!row.fx_rate && row.currency !== 'KRW') { alert(`${row.currency} 환율을 넣어 주세요 (또는 위 '환율·수수료'에서 기본 환율을 정해 주세요)`); return; }
+    let res;
+    if (id) res = await sb.from('global_shop_orders').update(row).eq('id', id);
+    else res = await sb.from('global_shop_orders').insert(Object.assign(row, { source: 'manual', created_by: (currentUser && currentUser.name) || '' }));
+    if (res.error) {
+        console.error('주문 저장 실패:', res.error);
+        alert(res.error.code === '23505' ? '같은 쇼핑몰에 같은 주문번호가 이미 있어요' : '저장 실패: ' + res.error.message);
+        return;
+    }
+    document.getElementById('gsEditOverlay').style.display = 'none';
+    showToast('저장했어요');
+    if (row.order_date.slice(0, 7) !== _gsMonth) { _gsMonth = row.order_date.slice(0, 7); const m = document.getElementById('gsMonth'); if (m) m.value = _gsMonth; }
+    await gsLoad();
+}
+async function gsDelete(id) {
+    const r = _gsRows.find(x => x.id === id);
+    if (!r || !confirm(`${r.order_date} ${r.shop} ${r.order_no || ''} ${r.buyer || ''} 주문을 지울까요?`)) return;
+    const { error } = await sb.from('global_shop_orders').delete().eq('id', id);
+    if (error) { alert('삭제 실패: ' + error.message); return; }
+    document.getElementById('gsEditOverlay').style.display = 'none';
+    showToast('지웠어요');
+    await gsLoad();
+}
+
+// ---------- 환율·수수료 설정 ----------
+function gsOpenSettings() {
+    const ov = gsOv('gsSetOverlay');
+    const curs = [...new Set(['USD', 'EUR', 'GBP', 'CAD', 'AUD'].concat(_gsRows.map(r => r.currency)).concat(Object.keys(_gsSettings.fx || {})))].filter(c => c && c !== 'KRW');
+    ov.innerHTML = `<div class="tax-ov-box gs-box">
+        <div class="tax-ov-h"><b>환율·수수료</b><button onclick="document.getElementById('gsSetOverlay').style.display='none'">×</button></div>
+        <p class="tax-note">새로 넣는 주문에 이 환율이 들어가요. 이미 넣은 주문의 환율은 그대로예요 (저장할 때 이번 달 주문도 바꿀지 물어봐요).</p>
+        <div class="gs-form">${curs.map(c => `<label class="gs-f"><span>${c} 환율 <small>원 / 1 ${c}</small></span><input id="gsS_fx_${c}" inputmode="decimal" value="${(_gsSettings.fx || {})[c] || ''}"></label>`).join('')}</div>
+        <p class="tax-note">쇼핑몰 수수료율 — 주문에 실제 수수료를 안 적으면 판매액 × 이 비율로 예상해요. 쇼핑몰 정산 내역을 보고 맞춰 주세요.</p>
+        <div class="gs-form">${GS_SHOPS.map(s => `<label class="gs-f"><span>${s} 수수료 <small>%</small></span><input id="gsS_fee_${s}" inputmode="decimal" value="${gsFeePct(s)}"></label>`).join('')}</div>
+        <div class="tax-ov-f"><span></span><button class="btn-primary" onclick="gsSaveSettings()">저장</button></div></div>`;
+}
+async function gsSaveSettings() {
+    const fx = {}, fee = {};
+    document.querySelectorAll('[id^="gsS_fx_"]').forEach(el => { const n = Number(el.value.replace(/,/g, '')); if (n > 0) fx[el.id.slice(7)] = n; });
+    document.querySelectorAll('[id^="gsS_fee_"]').forEach(el => { const n = Number(el.value); if (el.value.trim() !== '' && isFinite(n) && n >= 0) fee[el.id.slice(8)] = n; });
+    const settings = Object.assign({}, _gsSettings, { fx, fee });
+    const row = { settings, updated_at: new Date().toISOString() };
+    if (currentCompany && currentCompany.id) row.company_id = currentCompany.id;
+    const { error } = await sb.from('global_shop_settings').upsert(row, { onConflict: 'company_id' });
+    if (error) { console.error(error); alert('설정 저장 실패: ' + error.message); return; }
+    const old = _gsSettings.fx || {};
+    _gsSettings = settings;
+    document.getElementById('gsSetOverlay').style.display = 'none';
+    for (const [c, rate] of Object.entries(fx)) {
+        const targets = _gsRows.filter(r => r.currency === c && Number(r.fx_rate) !== rate);
+        if (!targets.length || old[c] === rate) continue;
+        if (!confirm(`이번 달 ${c} 주문 ${targets.length}건의 환율도 ${gsNumFmt(rate, 2)}로 바꿀까요?`)) continue;
+        const { error: e2 } = await sb.from('global_shop_orders').update({ fx_rate: rate }).in('id', targets.map(r => r.id));
+        if (e2) { alert('환율 바꾸기 실패: ' + e2.message); break; }
+    }
+    showToast('설정을 저장했어요');
+    await gsLoad();
+}
+
+// ---------- CSV 올리기 (Etsy·Shopify·eBay) ----------
+function gsNum(v) {
+    if (typeof v === 'number') return v;
+    let s = String(v == null ? '' : v).trim();
+    if (!s) return 0;
+    const neg = /^\(.*\)$/.test(s) || /^-/.test(s.replace(/[^\d.,-]/g, ''));
+    s = s.replace(/[^\d.,]/g, '');
+    if (s.includes(',') && s.includes('.')) s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+    else if (/,\d{2}$/.test(s) && !/,\d{3}/.test(s)) s = s.replace(',', '.');
+    else s = s.replace(/,/g, '');
+    const n = Number(s);
+    return isFinite(n) ? (neg ? -Math.abs(n) : n) : 0;
+}
+function gsCurOf(v) {
+    const s = String(v || '');
+    if (/AU\s?\$|A\$/.test(s)) return 'AUD';
+    if (/C\s?\$|CA\$/.test(s)) return 'CAD';
+    if (/£/.test(s)) return 'GBP';
+    if (/€/.test(s)) return 'EUR';
+    if (/¥|円/.test(s)) return 'JPY';
+    if (/\$/.test(s)) return 'USD';
+    const m = s.match(/\b(USD|EUR|GBP|CAD|AUD|JPY)\b/);
+    return m ? m[1] : '';
+}
+const GS_MON = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+function gsDate(v) {
+    if (v instanceof Date && !isNaN(v)) return hmDateStr(v);
+    if (typeof v === 'number' && v > 30000 && v < 80000) return hmDateStr(new Date(Math.round((v - 25569) * 86400000) + new Date().getTimezoneOffset() * 60000));
+    const s = String(v || '').trim();
+    let m;
+    if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+    if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/))) { const y = m[3].length === 2 ? '20' + m[3] : m[3]; return `${y}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`; }   // 미국식 월/일/연
+    if ((m = s.match(/^([A-Za-z]{3})[a-z]*[-\s](\d{1,2}),?[-\s](\d{2,4})/))) { const mo = GS_MON[m[1].toLowerCase()]; const y = m[3].length === 2 ? '20' + m[3] : m[3]; if (mo) return `${y}-${String(mo).padStart(2, '0')}-${m[2].padStart(2, '0')}`; }   // Nov-25-26, Nov 25, 2026
+    if ((m = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[a-z]*[-\s](\d{2,4})/))) { const mo = GS_MON[m[2].toLowerCase()]; const y = m[3].length === 2 ? '20' + m[3] : m[3]; if (mo) return `${y}-${String(mo).padStart(2, '0')}-${m[1].padStart(2, '0')}`; }   // 25-Nov-26
+    return '';
+}
+function gsStatusOf(s, refund) {
+    const t = String(s || '').toLowerCase();
+    if (/cancel|void|취소/.test(t)) return '취소';
+    if (/^refunded$|fully.?refund|환불/.test(t)) return '환불';
+    return '정상';
+}
+
+// 표(배열의 배열) → { shop, kind, orders:[...] }
+function gsParseTable(aoa, fileName) {
+    const norm = x => String(x == null ? '' : x).trim().toLowerCase().replace(/\s+/g, ' ');
+    let hi = -1, kind = '';
+    for (let i = 0; i < Math.min(aoa.length, 15); i++) {
+        const h = (aoa[i] || []).map(norm);
+        const has = k => h.includes(k);
+        if (has('order id') && has('item name')) { hi = i; kind = 'etsy-items'; break; }
+        if (has('order id') && has('sale date') && (has('order total') || has('order value'))) { hi = i; kind = 'etsy'; break; }
+        if (has('name') && (has('financial status') || has('lineitem name'))) { hi = i; kind = 'shopify'; break; }
+        if (has('order number') && (has('sale date') || has('item title') || has('sold for'))) { hi = i; kind = 'ebay'; break; }
+    }
+    if (hi < 0) {
+        const head = (aoa.find(r => r && r.filter(x => x !== '' && x != null).length > 3) || []).slice(0, 12).join(', ');
+        throw new Error(`${fileName}: 어느 쇼핑몰 CSV인지 모르겠어요.\nEtsy(Orders/Order Items), Shopify(Orders), eBay(Orders report) CSV만 읽을 수 있어요.\n첫 줄: ${head}`);
+    }
+    const H = (aoa[hi] || []).map(norm);
+    const data = aoa.slice(hi + 1).filter(r => r && r.some(x => x !== '' && x != null));
+    const col = (...names) => { for (const n of names) { const i = H.indexOf(n); if (i >= 0) return i; } return -1; };
+    const getter = r => (...names) => { const i = col(...names); return i < 0 ? '' : (r[i] == null ? '' : r[i]); };
+    const orders = [];
+    if (kind === 'etsy') {
+        for (const r of data) {
+            const g = getter(r);
+            const no = String(g('order id')).trim();
+            if (!no) continue;
+            const total = gsNum(g('order total')), tax = gsNum(g('sales tax'));
+            const adj = String(g('adjusted order total')).trim();
+            const sale = total ? total - tax : gsNum(g('order value')) - gsNum(g('discount amount')) + gsNum(g('shipping')) - gsNum(g('shipping discount'));
+            const refund = adj !== '' && gsNum(adj) < total ? total - gsNum(adj) : 0;
+            orders.push({
+                shop: 'Etsy', order_no: no, order_date: gsDate(g('sale date')), buyer: String(g('full name') || g('buyer') || g('buyer user id')).trim(),
+                country: String(g('ship country')).trim(), qty: Math.round(gsNum(g('number of items'))), currency: String(g('currency')).trim().toUpperCase() || gsCurOf(g('order total')) || 'USD',
+                sale_amount: Math.round(sale * 100) / 100, shipping_charged: Math.round((gsNum(g('shipping')) - gsNum(g('shipping discount'))) * 100) / 100,
+                refund_amount: Math.round(refund * 100) / 100, status: gsStatusOf(g('status')),
+            });
+        }
+    } else if (kind === 'etsy-items') {
+        const by = {};
+        for (const r of data) {
+            const g = getter(r);
+            const no = String(g('order id')).trim();
+            if (!no) continue;
+            const o = by[no] || (by[no] = { shop: 'Etsy', order_no: no, order_date: gsDate(g('sale date')), buyer: String(g('ship name') || g('buyer')).trim(), country: String(g('ship country')).trim(), currency: String(g('currency')).trim().toUpperCase() || 'USD', names: [], qty: 0, itemsTotal: 0, ship: 0, _itemsOnly: true });
+            const q = Math.round(gsNum(g('quantity'))) || 1;
+            o.names.push(String(g('item name')).trim() + (q > 1 ? ` ×${q}` : ''));
+            o.qty += q;
+            o.itemsTotal += gsNum(g('item total'));
+            o.ship = Math.max(o.ship, gsNum(g('order shipping', 'order delivery')));
+        }
+        for (const o of Object.values(by)) {
+            orders.push({ shop: 'Etsy', order_no: o.order_no, order_date: o.order_date, buyer: o.buyer, country: o.country, currency: o.currency, items: o.names.join(', '), qty: o.qty,
+                sale_amount: Math.round((o.itemsTotal + o.ship) * 100) / 100, shipping_charged: o.ship, _itemsOnly: true });
+        }
+    } else if (kind === 'shopify') {
+        const by = {}, order = [];
+        for (const r of data) {
+            const g = getter(r);
+            const no = String(g('name')).trim();
+            if (!no) continue;
+            let o = by[no];
+            if (!o) { o = by[no] = { shop: 'Shopify', order_no: no, names: [], qty: 0 }; order.push(o); }
+            if (String(g('financial status')).trim() || String(g('total')).trim()) {   // 주문 정보는 첫 줄에만
+                o.order_date = gsDate(g('created at', 'paid at'));
+                o.currency = String(g('currency')).trim().toUpperCase() || 'USD';
+                o.sale_amount = Math.round((gsNum(g('total')) - gsNum(g('taxes'))) * 100) / 100;
+                o.shipping_charged = gsNum(g('shipping'));
+                o.refund_amount = gsNum(g('refunded amount'));
+                o.buyer = String(g('shipping name') || g('billing name') || g('email')).trim();
+                o.country = String(g('shipping country') || g('billing country')).trim();
+                o.status = String(g('cancelled at')).trim() ? '취소' : gsStatusOf(g('financial status'));
+            }
+            const nm = String(g('lineitem name')).trim();
+            if (nm) { const q = Math.round(gsNum(g('lineitem quantity'))) || 1; o.names.push(nm + (q > 1 ? ` ×${q}` : '')); o.qty += q; }
+        }
+        for (const o of order) { o.items = o.names.join(', '); delete o.names; orders.push(o); }
+    } else if (kind === 'ebay') {
+        const by = {}, order = [];
+        for (const r of data) {
+            const g = getter(r);
+            const no = String(g('order number')).trim();
+            if (!no || /record\(s\)|seller id/i.test(no)) continue;
+            let o = by[no];
+            if (!o) { o = by[no] = { shop: 'eBay', order_no: no, names: [], qty: 0, total: 0, tax: 0, ship: 0, cur: '' }; order.push(o); }
+            if (!o.order_date) o.order_date = gsDate(g('sale date', 'paid on date'));
+            if (!o.buyer) o.buyer = String(g('buyer name', 'buyer username')).trim();
+            if (!o.country) o.country = String(g('ship to country', 'buyer country')).trim();
+            if (!o.tracking) o.tracking = String(g('tracking number')).trim();
+            const tp = g('total price');
+            o.total += gsNum(tp);
+            o.tax += gsNum(g('ebay collected tax'));
+            o.ship += gsNum(g('shipping and handling', 'shipping & handling'));
+            o.cur = o.cur || gsCurOf(tp) || gsCurOf(g('sold for'));
+            const nm = String(g('item title')).trim();
+            if (nm) {
+                const q = Math.round(gsNum(g('quantity'))) || 1;
+                o.names.push(nm + (q > 1 ? ` ×${q}` : '')); o.qty += q;
+                if (!String(tp).trim()) o.soldFallback = (o.soldFallback || 0) + gsNum(g('sold for')) * q;
+            }
+        }
+        for (const o of order) {
+            const total = o.total || ((o.soldFallback || 0) + o.ship);
+            orders.push({ shop: 'eBay', order_no: o.order_no, order_date: o.order_date, buyer: o.buyer, country: o.country, tracking: o.tracking || '',
+                items: o.names.join(', '), qty: o.qty, currency: o.cur || 'USD', sale_amount: Math.round((total - o.tax) * 100) / 100, shipping_charged: o.ship, status: '정상' });
+        }
+    }
+    const bad = orders.filter(o => !o.order_date);
+    if (bad.length) throw new Error(`${fileName}: 날짜를 못 읽은 주문이 ${bad.length}건 있어요 (예: ${bad[0].order_no}). 넣지 않았어요.`);
+    return { kind, shop: orders[0] ? orders[0].shop : '', orders };
+}
+
+async function gsReadFile(file) {
+    if (/\.(xlsx|xls)$/i.test(file.name)) {
+        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+        return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+    }
+    let text = await file.text();
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const wb = XLSX.read(text, { type: 'string', raw: true });   // raw: 주문번호·날짜를 글자 그대로
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+}
+
+async function gsUpload(ev) {
+    const files = [...(ev.target.files || [])];
+    ev.target.value = '';
+    if (!files.length) return;
+    let lastMonth = null;
+    for (const file of files) {
+        try {
+            const p = gsParseTable(await gsReadFile(file), file.name);
+            if (!p.orders.length) { showToast(`${file.name}: 주문이 없어요`); continue; }
+            // 이미 있는 주문 찾기 (쇼핑몰 + 주문번호)
+            const nos = [...new Set(p.orders.map(o => o.order_no))];
+            const exist = {};
+            for (let i = 0; i < nos.length; i += 200) {
+                const { data, error } = await sb.from('global_shop_orders').select('id,order_no').eq('shop', p.shop).in('order_no', nos.slice(i, i + 200));
+                if (error) throw error;
+                (data || []).forEach(x => { exist[x.order_no] = x.id; });
+            }
+            const fresh = p.orders.filter(o => !exist[o.order_no]);
+            const old = p.orders.filter(o => exist[o.order_no]);
+            // 새 주문의 환율 — 설정에 없으면 물어봄
+            for (const c of [...new Set(fresh.map(o => o.currency))]) {
+                if (c === 'KRW' || gsRateFor(c)) continue;
+                const a = prompt(`${c} 환율이 설정에 없어요. 원 / 1 ${c} 를 넣어 주세요 (예: 1400)`);
+                const n = Number(String(a || '').replace(/,/g, ''));
+                if (!(n > 0)) { showToast('환율이 없어 넣지 않았어요'); return; }
+                _gsSettings.fx = Object.assign({}, _gsSettings.fx, { [c]: n });
+                const row = { settings: _gsSettings, updated_at: new Date().toISOString() };
+                if (currentCompany && currentCompany.id) row.company_id = currentCompany.id;
+                const { error } = await sb.from('global_shop_settings').upsert(row, { onConflict: 'company_id' });
+                if (error) throw error;
+            }
+            const dates = p.orders.map(o => o.order_date).sort();
+            const sums = {};
+            p.orders.forEach(o => { sums[o.currency] = (sums[o.currency] || 0) + (Number(o.sale_amount) || 0); });
+            const sumTxt = Object.entries(sums).map(([c, v]) => gsMoney(v, c)).join(' + ');
+            const kindName = { etsy: 'Etsy 주문', 'etsy-items': 'Etsy 주문 상품', shopify: 'Shopify 주문', ebay: 'eBay 주문' }[p.kind];
+            if (!confirm(`${file.name}\n${kindName} ${p.orders.length}건 · ${dates[0]} ~ ${dates[dates.length - 1]} · 판매액 ${sumTxt}\n\n새 주문 ${fresh.length}건 넣기${old.length ? `\n이미 있는 주문 ${old.length}건은 쇼핑몰 내용만 새로 (배송비·수수료·환율·메모는 그대로)` : ''}\n\n진행할까요?`)) continue;
+            const me = (currentUser && currentUser.name) || '';
+            if (fresh.length) {
+                const ins = fresh.map(o => {
+                    const r = Object.assign({}, o, { source: 'csv', created_by: me, fx_rate: o.currency === 'KRW' ? 1 : gsRateFor(o.currency) });
+                    delete r._itemsOnly;
+                    return r;
+                });
+                for (let i = 0; i < ins.length; i += 500) {
+                    const { error } = await sb.from('global_shop_orders').insert(ins.slice(i, i + 500));
+                    if (error) throw error;
+                }
+            }
+            for (const o of old) {   // 쇼핑몰에서 온 칸만 고침
+                const r = o._itemsOnly ? { items: o.items, qty: o.qty } : Object.assign({}, o);
+                delete r._itemsOnly; delete r.shop; delete r.order_no;
+                if (r.tracking === '') delete r.tracking;
+                const { error } = await sb.from('global_shop_orders').update(r).eq('id', exist[o.order_no]);
+                if (error) throw error;
+            }
+            showToast(`${kindName}: 새 ${fresh.length}건${old.length ? ` · 갱신 ${old.length}건` : ''}`);
+            lastMonth = dates[dates.length - 1].slice(0, 7);
+        } catch (err) {
+            console.error('CSV 올리기 실패:', err);
+            alert('CSV 올리기 실패\n' + (err.message || err));
+        }
+    }
+    if (lastMonth && lastMonth !== _gsMonth) { _gsMonth = lastMonth; _gsDay = ''; const m = document.getElementById('gsMonth'); if (m) m.value = _gsMonth; }
+    await gsLoad();
 }

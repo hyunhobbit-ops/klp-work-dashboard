@@ -7204,3 +7204,38 @@ button.sc-kpi{cursor:pointer}
 .tgo-total small{font-weight:500;color:var(--gray-500)}
 .tgo-total b{font-size:18px;color:#E67E22}
 .tgo-note{margin-top:8px;font-size:11.5px;color:var(--gray-500);line-height:1.5}
+
+/* ===== 해외 쇼핑몰 (gshop, migration 086) ===== */
+.gs-table{min-width:860px}
+.gs-table td small{display:block; font-size:11px; font-weight:500; color:var(--gray-500); margin-top:1px}
+.gs-table td small.bad{color:var(--red)}
+.gs-table .gs-n{display:inline; margin-left:4px}
+.gs-table .gs-z{color:var(--gray-300)}
+.gs-day{cursor:pointer}
+.gs-day.empty{cursor:default}
+.gs-day.empty td{color:var(--gray-300)}
+.gs-day:not(.empty):hover td{background:var(--gray-50, #f7f8fa)}
+.gs-day.on td{background:#EAF3FF}
+.gs-dow{font-size:11px; color:var(--gray-500); margin-left:2px}
+.gs-dow.sun{color:var(--red)} .gs-dow.sat{color:var(--blue)}
+.gs-warn{font-size:11px; color:var(--red); font-weight:600}
+.gs-orders td.gs-l{text-align:left; white-space:normal; min-width:110px}
+.gs-orders td.gs-items{max-width:240px; overflow:hidden; text-overflow:ellipsis}
+.gs-shop{display:inline-block; padding:2px 8px; border-radius:999px; font-size:11.5px; font-weight:700; background:var(--gray-100); color:var(--gray-700)}
+.gs-shop.gs-Etsy{background:#FFF0E6; color:#C2410C}
+.gs-shop.gs-Shopify{background:#E9F7EF; color:#15803D}
+.gs-shop.gs-eBay{background:#EAF3FF; color:#1D4ED8}
+.gs-ship{width:92px; padding:6px 8px; border:1.5px solid var(--gray-200); border-radius:8px; font:inherit; font-size:13px; text-align:right; background:var(--white); color:var(--gray-900)}
+.gs-ship.need{border-color:#FCA5A5; background:#FFF5F5}
+.gs-st{font-size:11.5px; font-weight:700; padding:2px 7px; border-radius:6px}
+.gs-st-r{background:#FFF7E6; color:#B45309} .gs-st-c{background:var(--gray-100); color:var(--gray-500)}
+.gs-cancel td{color:var(--gray-300)!important; text-decoration:line-through}
+.gs-cancel td:last-child,.gs-cancel td:nth-last-child(2){text-decoration:none}
+.gs-edit{padding:5px 9px; font-size:12.5px}
+.gs-box{max-width:720px}
+.gs-form{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px 12px; margin-top:12px}
+.gs-f{display:flex; flex-direction:column; gap:4px; font-size:12.5px; color:var(--gray-500); font-weight:600}
+.gs-f.wide{grid-column:1 / -1}
+.gs-f small{font-weight:500; color:var(--gray-400, #9aa1ab)}
+.gs-f input,.gs-f select{padding:9px 10px; border:1.5px solid var(--gray-200); border-radius:9px; font:inherit; font-size:14px; color:var(--gray-900); background:var(--white); min-width:0}
+.gs-day.empty td{padding-top:3px; padding-bottom:3px; font-size:12px}
