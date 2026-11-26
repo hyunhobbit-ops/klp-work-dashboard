@@ -7272,3 +7272,28 @@ button.sc-kpi{cursor:pointer}
 .gs-modes button{border:0; background:transparent; padding:6px 12px; border-radius:8px; font:inherit; font-size:13.5px; font-weight:600; color:var(--gray-500); cursor:pointer}
 .gs-modes button.on{background:var(--white); color:var(--gray-900); box-shadow:var(--shadow-sm)}
 .gs-orders .gs-st{display:inline-block; margin-left:4px}
+/* 해외 쇼핑몰 월별 비교 그래프 — 쇼핑몰 색 = 검증한 categorical 3칸(주황·청록·파랑) + 기타 노랑 */
+.gs-chart{--gs-s0:#eb6834; --gs-s1:#1baf7a; --gs-s2:#2a78d6; --gs-s3:#eda100; --gs-line:#52514e; --gs-surf:var(--white); margin-bottom:14px}
+[data-theme="dark"] .gs-chart{--gs-s0:#d95926; --gs-s1:#199e70; --gs-s2:#3987e5; --gs-s3:#c98500; --gs-line:#c3c2b7}
+.gs-chart .gs-c-0{fill:var(--gs-s0); background:var(--gs-s0)} .gs-chart .gs-c-1{fill:var(--gs-s1); background:var(--gs-s1)}
+.gs-chart .gs-c-2{fill:var(--gs-s2); background:var(--gs-s2)} .gs-chart .gs-c-3{fill:var(--gs-s3); background:var(--gs-s3)}
+.gs-legend{display:flex; flex-wrap:wrap; gap:14px; font-size:12.5px; color:var(--gray-700, #374151); margin:2px 0 6px}
+.gs-legend span{display:inline-flex; align-items:center; gap:6px}
+.gs-chart i{display:inline-block; width:10px; height:10px; border-radius:3px}
+.gs-chart i.line{width:14px; height:2px; border-radius:1px; background:var(--gs-line)}
+.gs-chart-wrap{position:relative}
+.gs-chart svg{width:100%; height:auto; display:block; overflow:visible}
+.gs-chart line.grid{stroke:var(--gray-100); stroke-width:1}
+.gs-chart line.base{stroke:var(--gray-300); stroke-width:1}
+.gs-chart text{font-family:inherit}
+.gs-chart text.ax{font-size:11px; fill:var(--gray-500)}
+.gs-chart text.val{font-size:11px; font-weight:700; fill:var(--gray-700, #374151)}
+.gs-chart .mline{fill:none; stroke:var(--gs-line); stroke-width:2; stroke-linejoin:round}
+.gs-chart .mdot{fill:var(--gs-line); stroke:var(--gs-surf); stroke-width:2}
+.gs-chart .hit{fill:transparent; cursor:pointer}
+.gs-chart .hit.on{fill:var(--gray-900); fill-opacity:.04}
+.gs-tip{display:none; position:absolute; pointer-events:none; z-index:5; min-width:210px; background:var(--white); border:1px solid var(--gray-200); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.14); padding:9px 11px; font-size:12.5px; color:var(--gray-900)}
+.gs-tip b{font-size:13px} .gs-tip small{color:var(--gray-500)}
+.gs-tip div{display:flex; align-items:center; gap:6px; margin-top:3px}
+.gs-tip div span{margin-left:auto; font-variant-numeric:tabular-nums; font-weight:600}
+.gs-tip div.sum{border-top:1px solid var(--gray-100); padding-top:4px; margin-top:5px; font-weight:700}

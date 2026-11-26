@@ -30727,6 +30727,7 @@ function gsRender() {
     const sel = document.getElementById('gsShop');
     if (sel) sel.value = _gsShop;
     gsRenderTiles();
+    gsRenderChart();
     const el = document.getElementById('gsRoot');
     if (!el) return;
     el.innerHTML = gsDailyHtml() + gsOrdersHtml();
@@ -30806,6 +30807,88 @@ function gsDailyHtml() {
         <tbody>${body || `<tr><td colspan="${7 + shops.length}" class="sub">이 달에는 주문이 없어요</td></tr>`}</tbody><tfoot>${foot}</tfoot></table></div>
         <p class="tax-note">금액은 원(₩) — 판매액 × 환율. <b>예상 마진 = 매출 − 쇼핑몰 수수료 − 환불 − 배송비</b> (상품 원가는 빼지 않음). 날짜를 누르면 그날 주문만 아래에 보여요.</p>`;
     return taxSec('일별 매출', '쇼핑몰별 · 원', table, 'wide');
+}
+
+// 분기·연: 달마다 쇼핑몰별 매출(쌓은 막대) + 예상 마진(선) — 같은 원화 축 하나
+function gsChartMonths() {
+    const rows = gsVisible(), r = gsRange(), nowYm = gsMonthNow();
+    const byM = {};
+    rows.forEach(x => (byM[x.order_date.slice(0, 7)] || (byM[x.order_date.slice(0, 7)] = [])).push(x));
+    const out = [];
+    for (let y = Number(r.from.slice(0, 4)), m = Number(r.from.slice(5, 7)); `${y}-${gsPad(m)}` <= r.to.slice(0, 7); m === 12 ? (y++, m = 1) : m++) {
+        const ym = `${y}-${gsPad(m)}`;
+        if (ym > nowYm && !byM[ym]) continue;
+        const t = gsTotals(byM[ym] || []);
+        out.push({ ym, t, n: (byM[ym] || []).length, net: t.sale - t.refund });
+    }
+    while (out.length && !out[0].n) out.shift();   // 주문이 생기기 전 빈 달은 빼기 (연별 1~8월 등)
+    return out;
+}
+function gsNiceMax(v) {
+    if (v <= 0) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+}
+function gsRenderChart() {
+    const el = document.getElementById('gsChart');
+    if (!el) return;
+    const data = _gsMode === 'month' ? [] : gsChartMonths();
+    if (data.length < 2) { el.innerHTML = ''; return; }
+    const shops = GS_SHOPS.filter(s => (s !== '기타' || data.some(d => d.t.byShop['기타'])) && (!_gsShop || s === _gsShop));
+    const W = 760, H = 250, L = 52, Rp = 10, T = 22, B = 26;
+    const pw = W - L - Rp, ph = H - T - B;
+    const hi = Math.max(1, ...data.map(d => Math.max(d.net, d.t.margin, shops.reduce((a, s) => a + Math.max(0, (d.t.byShop[s] || {}).sale || 0), 0))));
+    const lo = Math.min(0, ...data.map(d => d.t.margin));
+    const step = gsNiceMax((hi - lo) / 4);
+    const yMax = Math.ceil(hi / step) * step, yMin = Math.floor(lo / step) * step;
+    const y = v => T + ph - (v - yMin) / (yMax - yMin) * ph;
+    const band = pw / data.length, bw = Math.min(46, band * 0.52);
+    const cx = i => L + band * i + band / 2;
+    let g = '';
+    for (let v = yMin; v <= yMax + 1; v += step) g += `<line x1="${L}" x2="${W - Rp}" y1="${y(v)}" y2="${y(v)}" class="${v === 0 ? 'base' : 'grid'}"/><text x="${L - 8}" y="${y(v) + 4}" class="ax" text-anchor="end">${v ? taxWon(v) : '0'}</text>`;
+    let bars = '', labels = '';
+    data.forEach((d, i) => {
+        let acc = 0;
+        const segs = shops.map(s => ({ s, v: Math.max(0, (d.t.byShop[s] || {}).sale || 0) })).filter(x => x.v > 0);
+        segs.forEach((x, k) => {
+            const y0 = y(acc), y1 = y(acc + x.v);
+            const top = k === segs.length - 1;
+            const hgt = Math.max(0, y0 - y1 - (k ? 2 : 0));   // 칸 사이 2px 틈
+            const yy = y1, x0 = cx(i) - bw / 2;
+            const rr = top ? Math.min(4, hgt / 2) : 0;
+            bars += rr ? `<path class="gs-c-${GS_SHOPS.indexOf(x.s)}" d="M${x0},${yy + hgt} V${yy + rr} Q${x0},${yy} ${x0 + rr},${yy} H${x0 + bw - rr} Q${x0 + bw},${yy} ${x0 + bw},${yy + rr} V${yy + hgt} Z"/>`
+                : `<rect class="gs-c-${GS_SHOPS.indexOf(x.s)}" x="${x0}" y="${yy}" width="${bw}" height="${hgt}"/>`;
+            acc += x.v;
+        });
+        if (acc) labels += `<text x="${cx(i)}" y="${y(acc) - 6}" class="val" text-anchor="middle">${taxWon(acc)}</text>`;
+        labels += `<text x="${cx(i)}" y="${H - 8}" class="ax" text-anchor="middle">${Number(d.ym.slice(5))}월</text>`;
+    });
+    const pts = data.map((d, i) => [cx(i), y(d.t.margin)]);
+    const line = `<polyline class="mline" points="${pts.map(p => p.join(',')).join(' ')}"/>` + pts.map(p => `<circle class="mdot" cx="${p[0]}" cy="${p[1]}" r="4"/>`).join('');
+    const hits = data.map((d, i) => `<rect class="hit" x="${L + band * i}" y="${T}" width="${band}" height="${ph}" onmousemove="gsChartTip(${i}, event)" onmouseleave="gsChartTip(-1)" onclick="gsPickMonth('${d.ym}')"/>`).join('');
+    window._gsChartData = { data, shops };
+    const legend = shops.map(s => `<span><i class="gs-c-${GS_SHOPS.indexOf(s)}"></i>${s}</span>`).join('') + `<span><i class="line"></i>예상 마진</span>`;
+    const sumNet = data.reduce((a, d) => a + d.net, 0), sumM = data.reduce((a, d) => a + d.t.margin, 0);
+    el.innerHTML = `<section class="cash-sec gs-chart"><div class="cash-sec-head"><b>월별 비교</b><span>${gsRange().label} · 매출 ${taxWon(sumNet)}원 · 예상 마진 ${taxWon(sumM)}원 (${gsPctTxt(sumM, sumNet)}) · 막대를 누르면 그 달로</span></div>
+        <div class="gs-legend">${legend}</div>
+        <div class="gs-chart-wrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="월별 쇼핑몰 매출과 예상 마진">${g}${bars}${line}${labels}${hits}</svg><div class="gs-tip" id="gsTip"></div></div></section>`;
+}
+function gsChartTip(i, ev) {
+    const tip = document.getElementById('gsTip');
+    if (!tip) return;
+    document.querySelectorAll('.gs-chart .hit').forEach((h, k) => h.classList.toggle('on', k === i));
+    if (i < 0 || !window._gsChartData) { tip.style.display = 'none'; return; }
+    const { data, shops } = window._gsChartData, d = data[i];
+    tip.innerHTML = `<b>${d.ym.slice(0, 4)}년 ${Number(d.ym.slice(5))}월</b> <small>${d.t.n}건</small>`
+        + shops.map(s => { const b = d.t.byShop[s]; return `<div><i class="gs-c-${GS_SHOPS.indexOf(s)}"></i>${s}<span>${b ? gsWon(b.sale) + '원' : '-'}</span></div>`; }).join('')
+        + `<div class="sum">매출 합계<span>${gsWon(d.net)}원</span></div><div>수수료<span>${gsWon(d.t.fee)}원 (${gsPctTxt(d.t.fee, d.t.sale)})</span></div><div>배송비<span>${gsWon(d.t.ship)}원</span></div>`
+        + `<div class="sum"><i class="line"></i>예상 마진<span>${gsWon(d.t.margin)}원 (${gsPctTxt(d.t.margin, d.net)})</span></div>`;
+    const wrap = tip.parentElement.getBoundingClientRect();
+    tip.style.display = 'block';
+    let x = ev.clientX - wrap.left + 14;
+    if (x + tip.offsetWidth > wrap.width) x = ev.clientX - wrap.left - tip.offsetWidth - 14;
+    tip.style.left = Math.max(0, x) + 'px';
+    tip.style.top = Math.max(0, ev.clientY - wrap.top - 20) + 'px';
 }
 
 // 분기·연: 달마다 한 줄 (누르면 그 달 일별로)
