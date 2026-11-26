@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261126d">
+    <link rel="stylesheet" href="styles.css?v=20261126e">
     <link rel="stylesheet" href="mobile.css?v=20261104a" media="(max-width: 1023px)">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -1587,6 +1587,47 @@
                         <button class="btn-primary" onclick="gsOpenEdit()">+ 주문 추가</button>
                     </div>
                 </div>
+                <details class="gs-feeinfo">
+                    <summary><b>수수료율 안내</b> <span>Etsy 평균 약 19% · Shopify 평균 약 3.9%</span> <small>2026-09-01 ~ 11-26 실제 주문 221건(취소 4건 제외), Etsy 월별 명세서·Shopify 결제 내역 기준 — 눌러서 자세히</small></summary>
+                    <div class="gs-fee-grid">
+                        <section>
+                            <h4>Etsy <small>판매액 대비 실제 평균</small></h4>
+                            <table><tbody>
+                                <tr><td>일반 주문 (TimepieceBoutique·CustomPlatingKR)</td><td>약 15% <small>(14.7~16.8%)</small></td></tr>
+                                <tr><td>일반 주문 (KoreaMerchandise)</td><td>약 11.5%</td></tr>
+                                <tr><td>오프사이트 광고로 들어온 주문</td><td>약 28%</td></tr>
+                                <tr class="sum"><td>전체 평균 (광고 주문 약 30% 포함)</td><td>약 19%</td></tr>
+                            </tbody></table>
+                            <h5>주문 1건에 붙는 항목</h5>
+                            <table><tbody>
+                                <tr><td>거래 수수료</td><td>상품가 × 6.5%</td></tr>
+                                <tr><td>배송비 거래 수수료</td><td>배송비 × 6.5%</td></tr>
+                                <tr><td>결제 처리 수수료 (TB·CPK)</td><td>주문 총액(판매세 포함) × 6.5% + $0.30</td></tr>
+                                <tr><td>결제 처리 수수료 (KM)</td><td>주문 총액(판매세 포함) × 3% + $0.25</td></tr>
+                                <tr><td>수수료 부가세</td><td>위 수수료 합계 × 10%</td></tr>
+                                <tr><td>오프사이트 광고 (해당 주문만)</td><td>주문 총액 × 12% (TB), 15% (KM) + 부가세 10%</td></tr>
+                                <tr><td>리스팅 자동 갱신</td><td>판매 1개당 $0.20 + 부가세 = $0.22</td></tr>
+                            </tbody></table>
+                            <h5>주문에 안 들어가는 샵 단위 비용 (월별)</h5>
+                            <ul><li>Etsy Ads 광고비: 월 약 $52~62 (TB·CPK)</li><li>기타 리스팅 수수료: 월 약 $12~15</li></ul>
+                            <p>판매세(미국 sales tax, 유럽 IOSS VAT)는 Etsy가 대신 내므로 매출에서 빼요. 단, 결제 처리 수수료는 판매세 포함 총액에 붙어요. 오프사이트 광고비는 연 매출 $10,000 이상 샵 12%, 미만 샵 15%.</p>
+                        </section>
+                        <section>
+                            <h4>Shopify <small>판매액 대비 실제 평균</small></h4>
+                            <table><thead><tr><th>결제 수단</th><th>요율</th><th>실제 평균</th></tr></thead><tbody>
+                                <tr><td>미국 카드 (Shopify Payments)</td><td>2.9% + $0.30</td><td>약 3.2%</td></tr>
+                                <tr><td>해외 카드</td><td>3.9% + $0.30 <small>(해외카드 1% 추가)</small></td><td>약 4.1%</td></tr>
+                                <tr><td>해외 아멕스</td><td>4.5% + $0.30</td><td>약 4.8%</td></tr>
+                                <tr><td>Shop Pay 할부</td><td>5.9% + $0.30</td><td>약 6.3%</td></tr>
+                                <tr><td>PayPal</td><td>4.4% + $0.30 <small>(Shopify 추가 수수료 없음)</small></td><td>약 4.6%</td></tr>
+                                <tr class="sum"><td>전체 평균</td><td></td><td>약 3.9%</td></tr>
+                            </tbody></table>
+                            <p>Shop 앱으로 들어온 미국 주문은 Shopify가 판매세를 떼고 정산해요 — 수수료가 아니라 판매세로 처리. 주문에 안 들어가는 고정비: Basic 요금제 연 $348, 앱 요금 월 $7.46 정도. 환불해도 원래 결제 수수료는 돌려받지 못해요.</p>
+                            <h5>기본 예상 수수료율 (주문에 실제 수수료가 없을 때)</h5>
+                            <p>Etsy <b>16%</b> · Shopify <b>4%</b> · eBay 13.5% — 위 '환율·수수료'에서 바꿀 수 있어요.</p>
+                        </section>
+                    </div>
+                </details>
                 <div id="gsTiles" class="cash-tiles"></div>
                 <div id="gsRoot" class="tax-grid"></div>
             </main>
@@ -1936,6 +1977,6 @@
     </div>
 
     <script src="send-kit.js?v=20261001i"></script>
-    <script src="app.js?v=20261126d"></script>
+    <script src="app.js?v=20261126e"></script>
 </body>
 </html>

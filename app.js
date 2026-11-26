@@ -30587,7 +30587,7 @@ async function docsDelete(id) {
 // 권한: 세무·손익과 같은 3명 (cashCanAccess, RLS tax_can_access)
 // ============================================================
 const GS_SHOPS = ['Etsy', 'Shopify', 'eBay', '기타'];
-const GS_FEE_DEFAULT = { Etsy: 10, Shopify: 3.5, eBay: 13.5, '기타': 0 };   // % — 설정에서 바꿈
+const GS_FEE_DEFAULT = { Etsy: 16, Shopify: 4, eBay: 13.5, '기타': 0 };   // % — 설정에서 바꿈. 2026-11-26 실제 221건 기준(Etsy 광고 주문 비중 반영)
 const GS_CURS = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'KRW'];
 let _gsRows = [];
 let _gsSettings = { fx: {}, fee: {} };

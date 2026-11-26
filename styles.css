@@ -7251,3 +7251,20 @@ button.sc-kpi{cursor:pointer}
 .gs-total{grid-column:1 / -1; font-size:13px; color:var(--gray-700, #374151); background:var(--gray-50, #f7f8fa); border-radius:9px; padding:8px 12px}
 .gs-total:empty{display:none}
 .gs-total small{color:var(--gray-500); margin-left:6px}
+.gs-feeinfo{background:var(--white); border-radius:14px; box-shadow:var(--shadow-sm); padding:12px 16px; margin-bottom:14px}
+.gs-feeinfo summary{cursor:pointer; display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; font-size:14px; color:var(--gray-900)}
+.gs-feeinfo summary span{font-weight:700; color:var(--blue)}
+.gs-feeinfo summary small{font-size:12px; color:var(--gray-500)}
+.gs-fee-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(380px,1fr)); gap:18px; margin-top:12px}
+.gs-fee-grid h4{font-size:15px; margin:0 0 6px} .gs-fee-grid h4 small{font-size:12px; font-weight:500; color:var(--gray-500)}
+.gs-fee-grid h5{font-size:13px; margin:12px 0 4px; color:var(--gray-700, #374151)}
+.gs-fee-grid table{width:100%; border-collapse:collapse; font-size:13px}
+.gs-fee-grid th{font-size:12px; font-weight:600; color:var(--gray-500); text-align:left; padding:5px 6px; border-bottom:1px solid var(--gray-200)}
+.gs-fee-grid td{padding:5px 6px; border-bottom:1px solid var(--gray-100); color:var(--gray-900); vertical-align:top}
+.gs-fee-grid td:last-child{font-weight:700; white-space:nowrap}
+.gs-fee-grid td small{font-weight:500; color:var(--gray-500)}
+.gs-fee-grid tr.sum td{font-weight:800; border-bottom:0; border-top:1.5px solid var(--gray-200)}
+.gs-fee-grid ul{margin:0; padding-left:18px; font-size:13px; line-height:1.6}
+.gs-fee-grid p{font-size:12.5px; color:var(--gray-500); line-height:1.6; margin:8px 0 0}
+.gs-fee-grid p b{color:var(--gray-900)}
+@media (max-width:640px){ .gs-fee-grid{grid-template-columns:1fr} .gs-fee-grid td:last-child{white-space:normal} }
