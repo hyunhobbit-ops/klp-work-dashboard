@@ -7248,3 +7248,4 @@ button.sc-kpi{cursor:pointer}
 #gsEditOverlay .gs-form{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:640px){ #gsEditOverlay .gs-form{grid-template-columns:repeat(2,minmax(0,1fr))} }
 .gs-curnote{font-size:12px; font-weight:500; color:var(--gray-500)}
+.gs-ship.gs-tax{width:80px}
