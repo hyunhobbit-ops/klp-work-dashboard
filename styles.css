@@ -7286,8 +7286,8 @@ button.sc-kpi{cursor:pointer}
 .gs-chart line.grid{stroke:var(--gray-100); stroke-width:1}
 .gs-chart line.base{stroke:var(--gray-300); stroke-width:1}
 .gs-chart text{font-family:inherit}
-.gs-chart text.ax{font-size:11px; fill:var(--gray-500)}
-.gs-chart text.val{font-size:11px; font-weight:700; fill:var(--gray-700, #374151)}
+.gs-chart text.ax{font-size:13px; fill:var(--gray-500)}
+.gs-chart text.val{font-size:13px; font-weight:700; fill:var(--gray-700, #374151)}
 .gs-chart .mline{fill:none; stroke:var(--gs-line); stroke-width:2; stroke-linejoin:round}
 .gs-chart .mdot{fill:var(--gs-line); stroke:var(--gs-surf); stroke-width:2}
 .gs-chart .hit{fill:transparent; cursor:pointer}

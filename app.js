@@ -30835,14 +30835,14 @@ function gsRenderChart() {
     const data = _gsMode === 'month' ? [] : gsChartMonths();
     if (data.length < 2) { el.innerHTML = ''; return; }
     const shops = GS_SHOPS.filter(s => (s !== '기타' || data.some(d => d.t.byShop['기타'])) && (!_gsShop || s === _gsShop));
-    const W = 760, H = 250, L = 52, Rp = 10, T = 22, B = 26;
+    const W = 1200, H = 200, L = 52, Rp = 10, T = 20, B = 24;   // 가로로 넓게 → 화면에서 높이 약 200px
     const pw = W - L - Rp, ph = H - T - B;
     const hi = Math.max(1, ...data.map(d => Math.max(d.net, d.t.margin, shops.reduce((a, s) => a + Math.max(0, (d.t.byShop[s] || {}).sale || 0), 0))));
     const lo = Math.min(0, ...data.map(d => d.t.margin));
-    const step = gsNiceMax((hi - lo) / 4);
+    const step = gsNiceMax((hi - lo) / 3);
     const yMax = Math.ceil(hi / step) * step, yMin = Math.floor(lo / step) * step;
     const y = v => T + ph - (v - yMin) / (yMax - yMin) * ph;
-    const band = pw / data.length, bw = Math.min(46, band * 0.52);
+    const band = pw / data.length, bw = Math.min(56, band * 0.4);
     const cx = i => L + band * i + band / 2;
     let g = '';
     for (let v = yMin; v <= yMax + 1; v += step) g += `<line x1="${L}" x2="${W - Rp}" y1="${y(v)}" y2="${y(v)}" class="${v === 0 ? 'base' : 'grid'}"/><text x="${L - 8}" y="${y(v) + 4}" class="ax" text-anchor="end">${v ? taxWon(v) : '0'}</text>`;
