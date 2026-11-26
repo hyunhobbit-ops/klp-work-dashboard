@@ -181,6 +181,7 @@
 - **예상 마진 = (판매액 − 수수료 − 환불) × 환율 − 실제 배송비** — 상품 원가는 빼지 않음 (현호님 결정). 환불 상태인데 환불액이 0이면 전액 환불로, 취소는 0
 - 화면: 숫자 5칸(월 매출·주문·수수료·배송비 + 미입력 건수·예상 마진) / 일별 표(쇼핑몰별 열, 주문 없는 날도 표시, 날짜 누르면 그날 주문만) / 주문 표(배송비 칸에서 바로 입력 `gsSaveShip`, 고치기 창 `gsOpenEdit`) / 환율·수수료 창(`gsOpenSettings`, 저장 때 이번 달 주문 환율도 바꿀지 물음)
 - **CSV 올리기 `gsUpload`** (Aside도 이 버튼으로 올림): 머리줄로 종류를 알아봄(`gsParseTable`) — Etsy Orders(Sale Date·Order ID·Order Total−Sales Tax, Adjusted Order Total로 환불) / Etsy Order Items(Item Name → 상품명·수량만 채움) / Shopify Orders(Name 기준 여러 줄 묶음, Total−Taxes, Refunded Amount, Cancelled at) / eBay Orders report(앞 빈 줄·끝 'record(s) downloaded' 건너뜀, Order Number로 묶어 Total Price−eBay Collected Tax 합). 날짜는 MM/DD/YY·Nov-25-26·ISO. **이미 있는 주문은 쇼핑몰 칸만 고치고 배송비·수수료·환율·메모는 그대로**. 설정에 없는 통화는 환율을 물어봄
+- **주문 추가·고치기 창(2026-11-26 현호님 요청으로 단순화, migration 087 phone·email)**: 주문(날짜·쇼핑몰·주문번호·상품) / 구매자(이름·나라·전화번호·이메일) / 금액(통화·환율 + 상품 판매 가격·배송비(구매자가 낸)·수수료·실제 배송비(원)). sale_amount = 상품 가격 + 배송비로 저장. 수량·상태·환불·운송장·메모는 창에서 뺌 — 고칠 때 원래 값 유지(CSV로만 채워짐). CSV의 Email·Phone도 읽고, 비어 있으면 적어 둔 값 유지
 - ⚠️ 실제 쇼핑몰 CSV로는 아직 시험 안 함(2026-11-26, 가짜 CSV로만) — 첫 실제 파일에서 열 이름이 다르면 `gsParseTable`의 이름 목록에 추가
 
 ## 🌏 해외 소싱 — 알리바바 소싱 현황 (매입매출 > 해외 소싱, 탭 id `sourcing`) — migration 071 (070 대체), 2026-10-27

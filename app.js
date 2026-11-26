@@ -30773,7 +30773,7 @@ function gsOrdersHtml() {
             <td>${Number(r.order_date.slice(5, 7))}/${Number(r.order_date.slice(8))}</td>
             <td><span class="gs-shop gs-${escHtml(r.shop)}">${escHtml(r.shop)}</span></td>
             <td class="sub">${escHtml(r.order_no || '')}</td>
-            <td class="gs-l">${escHtml(r.buyer || '')}${r.country ? `<small>${escHtml(r.country)}</small>` : ''}</td>
+            <td class="gs-l" title="${escHtml([r.phone, r.email].filter(Boolean).join(' · '))}">${escHtml(r.buyer || '')}${r.country ? `<small>${escHtml(r.country)}</small>` : ''}${r.email || r.phone ? `<small>${escHtml(r.email || r.phone)}</small>` : ''}</td>
             <td class="gs-l gs-items" title="${escHtml(r.items || '')}">${escHtml(r.items || '')}${r.qty ? `<small>${r.qty}개</small>` : ''}</td>
             <td>${gsMoney(r.sale_amount, r.currency)}${c.rate && r.currency !== 'KRW' ? `<small>${gsWon(c.saleKrw)}원</small>` : ''}${c.noRate ? '<small class="bad">환율 없음</small>' : ''}</td>
             <td class="sub">${gsWon(c.feeKrw)}${c.feeEst && !c.cancelled ? `<small>예상 ${gsFeePct(r.shop)}%</small>` : ''}</td>
@@ -30823,23 +30823,22 @@ function gsOpenEdit(id) {
     ov.innerHTML = `<div class="tax-ov-box gs-box">
         <div class="tax-ov-h"><b>${r ? '주문 고치기' : '주문 추가'}</b><button onclick="document.getElementById('gsEditOverlay').style.display='none'">×</button></div>
         <div class="gs-form">
+            <div class="gs-sec">주문</div>
             ${fld('주문 날짜', `<input type="date" id="gsE_order_date" value="${val('order_date')}">`)}
-            ${fld('쇼핑몰', `<select id="gsE_shop">${GS_SHOPS.map(s => `<option ${s === v.shop ? 'selected' : ''}>${s}</option>`).join('')}</select>`)}
+            ${fld('쇼핑몰', `<select id="gsE_shop" onchange="gsEditRateHint()">${GS_SHOPS.map(s => `<option ${s === v.shop ? 'selected' : ''}>${s}</option>`).join('')}</select>`)}
             ${fld('주문번호', `<input id="gsE_order_no" value="${val('order_no')}" placeholder="쇼핑몰 주문번호">`)}
-            ${fld('상태', `<select id="gsE_status">${['정상', '환불', '취소'].map(s => `<option ${s === v.status ? 'selected' : ''}>${s}</option>`).join('')}</select>`)}
+            ${fld('상품', `<input id="gsE_items" value="${val('items')}" placeholder="예: Pocket watch silver">`)}
+            <div class="gs-sec">구매자</div>
             ${fld('구매자', `<input id="gsE_buyer" value="${val('buyer')}">`)}
             ${fld('나라', `<input id="gsE_country" value="${val('country')}" placeholder="예: United States">`)}
-            ${fld('상품', `<input id="gsE_items" value="${val('items')}" placeholder="예: Pocket watch silver">`, '')}
-            ${fld('수량', `<input id="gsE_qty" inputmode="numeric" value="${val('qty')}">`)}
-            ${fld('통화', `<select id="gsE_currency" onchange="gsEditRateHint()">${[...new Set(GS_CURS.concat(v.currency ? [v.currency] : []))].map(c => `<option ${c === v.currency ? 'selected' : ''}>${c}</option>`).join('')}</select>`)}
-            ${fld('판매액', `<input id="gsE_sale_amount" inputmode="decimal" value="${val('sale_amount')}" placeholder="구매자가 낸 금액">`, '상품+배송비, 할인 뺀 값, 판매세 제외')}
-            ${fld('그중 받은 배송비', `<input id="gsE_shipping_charged" inputmode="decimal" value="${val('shipping_charged')}">`, '참고용')}
-            ${fld('쇼핑몰 수수료', `<input id="gsE_fee_amount" inputmode="decimal" value="${val('fee_amount')}" placeholder="비우면 예상">`, '외화 · 비우면 수수료율로 예상')}
-            ${fld('환불액', `<input id="gsE_refund_amount" inputmode="decimal" value="${val('refund_amount')}">`, '외화')}
-            ${fld('환율', `<input id="gsE_fx_rate" inputmode="decimal" value="${val('fx_rate')}">`, '<span id="gsE_rateHint"></span>')}
+            ${fld('전화번호', `<input id="gsE_phone" type="tel" value="${val('phone')}">`)}
+            ${fld('이메일 주소', `<input id="gsE_email" type="email" value="${val('email')}">`)}
+            <div class="gs-sec">금액 <select id="gsE_currency" class="gs-cur" onchange="gsEditRateHint()">${[...new Set(GS_CURS.concat(v.currency ? [v.currency] : []))].map(c => `<option ${c === v.currency ? 'selected' : ''}>${c}</option>`).join('')}</select> <small class="gs-curnote">상품 가격·배송비·수수료는 이 통화로</small>
+                <span class="gs-rate" id="gsE_rateBox">환율 <input id="gsE_fx_rate" inputmode="decimal" value="${val('fx_rate')}"> <small id="gsE_rateHint"></small></span></div>
+            ${fld('상품 판매 가격', `<input id="gsE_item_price" inputmode="decimal" value="${r ? escHtml(String(Math.round(((Number(r.sale_amount) || 0) - (Number(r.shipping_charged) || 0)) * 100) / 100)) : ''}">`, '외화')}
+            ${fld('배송비', `<input id="gsE_shipping_charged" inputmode="decimal" value="${val('shipping_charged')}">`, '구매자가 낸')}
+            ${fld('수수료', `<input id="gsE_fee_amount" inputmode="decimal" value="${val('fee_amount')}">`, '<span id="gsE_feeHint"></span>')}
             ${fld('실제 배송비 (원)', `<input id="gsE_ship_cost_krw" inputmode="numeric" value="${v.ship_cost_krw == null ? '' : gsWon(v.ship_cost_krw)}" oninput="fmtCommaTemp(this)" placeholder="FedEx 등 우리가 낸 돈">`)}
-            ${fld('운송장', `<input id="gsE_tracking" value="${val('tracking')}">`)}
-            <label class="gs-f wide"><span>메모</span><input id="gsE_memo" value="${val('memo')}"></label>
         </div>
         <div class="tax-ov-f">${r ? `<button class="btn-ghost" onclick="gsDelete(${r.id})" style="color:var(--red)">삭제</button>` : '<span></span>'}
             <button class="btn-primary" onclick="gsSaveEdit(${r ? r.id : 'null'})">저장</button></div></div>`;
@@ -30850,18 +30849,23 @@ function gsEditRateHint() {
     const h = document.getElementById('gsE_rateHint');
     if (!h) return;
     const rt = gsRateFor(cur);
-    h.textContent = cur === 'KRW' ? '원화는 1' : rt ? `비우면 설정 환율 ${gsNumFmt(rt, 2)}` : '설정에 환율이 없어요 — 꼭 넣어 주세요';
+    h.textContent = rt ? `비우면 ${gsNumFmt(rt, 2)}` : '설정에 없어요 — 꼭 넣어 주세요';
+    const box = document.getElementById('gsE_rateBox');
+    if (box) box.style.display = cur === 'KRW' ? 'none' : '';
+    const fh = document.getElementById('gsE_feeHint');
+    if (fh) fh.textContent = `비우면 ${gsFeePct(document.getElementById('gsE_shop')?.value)}% 예상`;
 }
 async function gsSaveEdit(id) {
     const g = k => (document.getElementById('gsE_' + k)?.value || '').trim();
     const num = (k, int) => { const s = g(k).replace(/,/g, ''); if (s === '') return null; const n = Number(s); return isFinite(n) ? (int ? Math.round(n) : n) : NaN; };
+    const price = num('item_price'), shipIn = num('shipping_charged');
     const row = {
-        order_date: g('order_date'), shop: g('shop'), order_no: g('order_no') || null, status: g('status'),
-        buyer: g('buyer'), country: g('country'), items: g('items'), qty: num('qty', true) || 0,
-        currency: g('currency'), sale_amount: num('sale_amount') || 0, shipping_charged: num('shipping_charged') || 0,
-        fee_amount: num('fee_amount'), refund_amount: num('refund_amount') || 0,
-        fx_rate: num('fx_rate'), ship_cost_krw: num('ship_cost_krw', true), tracking: g('tracking'), memo: g('memo'),
+        order_date: g('order_date'), shop: g('shop'), order_no: g('order_no') || null, items: g('items'),
+        buyer: g('buyer'), country: g('country'), phone: g('phone'), email: g('email'),
+        currency: g('currency'), sale_amount: Math.round(((price || 0) + (shipIn || 0)) * 100) / 100, shipping_charged: shipIn || 0,
+        fee_amount: num('fee_amount'), fx_rate: num('fx_rate'), ship_cost_krw: num('ship_cost_krw', true),
     };
+    if (!id) row.qty = 1;   // 수량·상태·환불·운송장·메모는 창에서 뺌 — 고칠 때는 원래 값 그대로
     if (!row.order_date) { alert('주문 날짜를 넣어 주세요'); return; }
     if (Object.values(row).some(x => typeof x === 'number' && isNaN(x))) { alert('숫자 칸에 숫자만 넣어 주세요'); return; }
     if (row.fx_rate == null) row.fx_rate = gsRateFor(row.currency) || null;
@@ -30998,7 +31002,7 @@ function gsParseTable(aoa, fileName) {
             const sale = total ? total - tax : gsNum(g('order value')) - gsNum(g('discount amount')) + gsNum(g('shipping')) - gsNum(g('shipping discount'));
             const refund = adj !== '' && gsNum(adj) < total ? total - gsNum(adj) : 0;
             orders.push({
-                shop: 'Etsy', order_no: no, order_date: gsDate(g('sale date')), buyer: String(g('full name') || g('buyer') || g('buyer user id')).trim(),
+                shop: 'Etsy', order_no: no, order_date: gsDate(g('sale date')), buyer: String(g('full name') || g('buyer') || g('buyer user id')).trim(), email: String(g('buyer email', 'email')).trim(), phone: String(g('ship phone', 'phone', 'phone number')).trim(),
                 country: String(g('ship country')).trim(), qty: Math.round(gsNum(g('number of items'))), currency: String(g('currency')).trim().toUpperCase() || gsCurOf(g('order total')) || 'USD',
                 sale_amount: Math.round(sale * 100) / 100, shipping_charged: Math.round((gsNum(g('shipping')) - gsNum(g('shipping discount'))) * 100) / 100,
                 refund_amount: Math.round(refund * 100) / 100, status: gsStatusOf(g('status')),
@@ -31036,6 +31040,8 @@ function gsParseTable(aoa, fileName) {
                 o.shipping_charged = gsNum(g('shipping'));
                 o.refund_amount = gsNum(g('refunded amount'));
                 o.buyer = String(g('shipping name') || g('billing name') || g('email')).trim();
+                o.email = String(g('email')).trim();
+                o.phone = String(g('shipping phone') || g('phone') || g('billing phone')).trim();
                 o.country = String(g('shipping country') || g('billing country')).trim();
                 o.status = String(g('cancelled at')).trim() ? '취소' : gsStatusOf(g('financial status'));
             }
@@ -31053,6 +31059,8 @@ function gsParseTable(aoa, fileName) {
             if (!o) { o = by[no] = { shop: 'eBay', order_no: no, names: [], qty: 0, total: 0, tax: 0, ship: 0, cur: '' }; order.push(o); }
             if (!o.order_date) o.order_date = gsDate(g('sale date', 'paid on date'));
             if (!o.buyer) o.buyer = String(g('buyer name', 'buyer username')).trim();
+            if (!o.email) o.email = String(g('buyer email')).trim();
+            if (!o.phone) o.phone = String(g('ship to phone', 'buyer phone')).trim();
             if (!o.country) o.country = String(g('ship to country', 'buyer country')).trim();
             if (!o.tracking) o.tracking = String(g('tracking number')).trim();
             const tp = g('total price');
@@ -31069,7 +31077,7 @@ function gsParseTable(aoa, fileName) {
         }
         for (const o of order) {
             const total = o.total || ((o.soldFallback || 0) + o.ship);
-            orders.push({ shop: 'eBay', order_no: o.order_no, order_date: o.order_date, buyer: o.buyer, country: o.country, tracking: o.tracking || '',
+            orders.push({ shop: 'eBay', order_no: o.order_no, order_date: o.order_date, buyer: o.buyer, country: o.country, email: o.email || '', phone: o.phone || '', tracking: o.tracking || '',
                 items: o.names.join(', '), qty: o.qty, currency: o.cur || 'USD', sale_amount: Math.round((total - o.tax) * 100) / 100, shipping_charged: o.ship, status: '정상' });
         }
     }
@@ -31141,7 +31149,7 @@ async function gsUpload(ev) {
             for (const o of old) {   // 쇼핑몰에서 온 칸만 고침
                 const r = o._itemsOnly ? { items: o.items, qty: o.qty } : Object.assign({}, o);
                 delete r._itemsOnly; delete r.shop; delete r.order_no;
-                if (r.tracking === '') delete r.tracking;
+                for (const k of ['tracking', 'email', 'phone']) if (r[k] === '') delete r[k];   // CSV에 없으면 적어 둔 값 유지
                 const { error } = await sb.from('global_shop_orders').update(r).eq('id', exist[o.order_no]);
                 if (error) throw error;
             }
