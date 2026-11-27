@@ -14138,7 +14138,7 @@ let currentPlanningQuill = null;
 // 4개 모달이 공유하는 빌더. div#containerId 자리에 Quill 마운트.
 // ===================== 회사 매뉴얼 (manuals, migration 062) =====================
 // 카테고리 + 검색 + 읽기/편집. 직원 누구나 작성·수정(마지막 수정자 표시). 목록은 본문 없이, 본문은 열 때 불러옴
-const MANUAL_CATS = ['스킬md', '업무 프로세스', '장비 사용법', '신입 온보딩', '회사 규정', '기타'];
+const MANUAL_CATS = ['스킬md', '업무 프로세스', 'AI', '장비 사용법', '신입 온보딩', '회사 규정', '기타'];
 let _mnMdPreview = false;
 let _mnList = [], _mnLoaded = false, _mnSel = null, _mnCat = 'all', _mnQ = '', _mnHits = null, _mnEdit = null, _mnQuill = null, _mnChan = null;
 const _mnBody = {};
