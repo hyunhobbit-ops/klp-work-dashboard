@@ -30757,7 +30757,7 @@ function gsRender() {
     gsRenderChart();
     const el = document.getElementById('gsRoot');
     if (!el) return;
-    el.innerHTML = gsDailyHtml() + gsOrdersHtml();
+    el.innerHTML = gsDailyHtml() + gsProductsHtml() + gsOrdersHtml();
 }
 
 function gsTotals(rows) {
@@ -30966,7 +30966,7 @@ function gsOrdersHtml() {
             <td><span class="gs-shop gs-${escHtml(r.shop)}">${escHtml(r.shop)}</span>${r.status !== '정상' ? `<span class="gs-st ${stCls[r.status] || ''}" title="${r.status === '취소' ? '취소된 주문 — 매출·수수료 0으로 계산' : '환불된 주문 — 환불액을 매출에서 뺌'}">${escHtml(r.status)}</span>` : ''}</td>
             <td class="sub">${escHtml(r.order_no || '')}</td>
             <td class="gs-l" title="${escHtml([r.phone, r.email].filter(Boolean).join(' · '))}">${escHtml(r.buyer || '')}${r.country ? `<small>${escHtml(r.country)}</small>` : ''}${r.email || r.phone ? `<small>${escHtml(r.email || r.phone)}</small>` : ''}</td>
-            <td class="gs-l gs-items" title="${escHtml(r.items || '')}">${escHtml(r.items || '')}${r.qty ? `<small>${r.qty}개</small>` : ''}</td>
+            <td class="gs-l gs-items" title="${escHtml(r.items || '')}">${gsItemsShort(r)}</td>
             <td>${gsMoney(r.sale_amount, r.currency)}${c.rate && r.currency !== 'KRW' ? `<small>${gsWon(c.saleKrw)}원</small>` : ''}${c.noRate ? '<small class="bad">환율 없음</small>' : ''}${Number(r.sales_tax) ? `<small title="구매자가 낸 판매세 — 쇼핑몰이 대신 내서 매출에 안 넣음">판매세 ${gsMoney(r.sales_tax, r.currency)} 별도</small>` : ''}</td>
             <td class="sub">${gsD2(gsIsUsd() ? c.feeUsd : c.feeKrw)}${c.cancelled ? '' : c.feeEst ? `<small>예상 ${gsFeePct(r.shop)}%</small>` : c.saleKrw ? `<small>${(c.feeKrw / c.saleKrw * 100).toFixed(1)}%</small>` : ''}</td>
             <td><input class="gs-ship ${c.noShip ? 'need' : ''}" inputmode="numeric" value="${r.ship_cost_krw == null ? '' : gsWon(r.ship_cost_krw)}" placeholder="배송비(원)" oninput="fmtCommaTemp(this)" onchange="gsSaveShip(${r.id}, this.value)" onclick="event.stopPropagation()" title="우리가 낸 배송비 (원) — 원화로 입력">${gsIsUsd() && r.ship_cost_krw != null ? `<small>${gsD2(c.shipUsd)}</small>` : ''}</td>
@@ -31366,4 +31366,158 @@ async function gsUpload(ev) {
     }
     if (lastMonth) gsJumpTo(lastMonth);
     await gsLoad();
+}
+
+// ---------- 상품별 판매 (긴 상품명 → 짧은 이름) — 2026-11-27 ----------
+// 키워드(띄어쓰기로 나눈 단어가 모두 들어 있으면) → 이름. 위에서부터 먼저 맞는 것. 설정(settings.products)에서 바꿀 수 있음
+const GS_PRODUCT_DEFAULT = [
+    ['Omniscient Artbook', '전독시 아트북'], ['Omniscient Novel', '전독시 소설책'],
+    ['Omniscient GOLD', '전독시 골드 회중시계'], ['Omniscient Pocket Watch', '전독시 오리지널 회중시계'],
+    ['Fullmetal Shinning', '강철 200SP 회중시계'], ['Fullmetal Antique', '강철 200AP 회중시계'], ['Fullmetal', '강철 회중시계 (판 종류 없음)'],
+    ['hakma', '호크마 회중시계'],
+    ['Lord of Heroes Table Clock', '로드 오브 히어로즈 탁상시계'], ['Lord of Heroes Pocket', '로드 오브 히어로즈 회중시계'],
+    ['Miku Plush', '하츠네 미쿠 인형'], ['Miku Acrylic', '하츠네 미쿠 아크릴 스탠드'], ['Miku Sleep Mask', '하츠네 미쿠 수면안대'], ['Miku Photo Card', '하츠네 미쿠 포토카드'],
+    ['Hands Installation Practice', '시곗바늘 조립 연습 키트'], ['Watch Making Kit', '손목시계 조립 키트'],
+    ['Astroboy', '아톰 어린이 손목시계'], ['Robot Air Plane Table Clock', '미니 로봇·비행기 탁상시계'], ['ET Robot Miniature', 'ET 로봇 미니 탁상시계'], ['Mini Cute Table Clock', '미니 탁상시계'],
+    ['Initial D', '이니셜D 손목시계'], ['Cookierun', '쿠키런 시계탑'], ['Old Story Omega', '올드스토리 오메가 회중시계'], ['Engraved Mechanical Pocket', '각인 기계식 회중시계'],
+    ['CROSS Pen', '크로스 볼펜'], ['Sticker', '스티커'], ['Storage Box', '굿즈 보관함'], ['Display Rack', '아크릴 진열대'], ['Card Storage Album', '카드 앨범'],
+].map(([k, name]) => ({ k, name }));
+let _gsProdAll = false;
+
+function gsProdRules() {
+    const p = _gsSettings.products;
+    return (Array.isArray(p) && p.length ? p : GS_PRODUCT_DEFAULT).filter(r => r && r.k && r.name);
+}
+function gsProdName(piece, rules) {
+    const s = piece.toLowerCase();
+    for (const r of rules) if (String(r.k).toLowerCase().split(/\s+/).filter(Boolean).every(w => s.includes(w))) return r.name;
+    return null;
+}
+// 주문 한 건의 상품 칸 → [{name, raw, qty, known}] (Shopify는 " | ", Etsy는 ", "로 이어 붙여 옴. 상품명 안의 쉼표는 이어 붙임)
+function gsSplitItems(r, rules) {
+    const out = [];
+    const segs = String(r.items || '').split(/\s*\|\s*/).filter(Boolean);
+    for (const seg of segs) {
+        const parts = seg.split(', ');
+        let cur = parts[0];
+        const flush = (p) => {
+            let t = p.trim(), q = 1;
+            const m = t.match(/\s*[×x](\d+)\s*$/);
+            if (m) { q = Number(m[1]); t = t.slice(0, m.index).trim(); }
+            if (!t || /^shipping$/i.test(t) || /^\(.*\)$/.test(t)) return;
+            const name = gsProdName(t, rules);
+            out.push({ name: name || t.replace(/\s+/g, ' '), raw: t, qty: q, known: !!name, explicit: !!m });
+        };
+        for (let i = 1; i < parts.length; i++) {
+            if (gsProdName(cur, rules) && gsProdName(parts[i], rules)) { flush(cur); cur = parts[i]; }
+            else cur += ', ' + parts[i];
+        }
+        flush(cur);
+    }
+    // 상품 하나에 ×표시가 없으면 주문 수량을 씀 (Etsy)
+    if (out.length === 1 && !out[0].explicit && Number(r.qty) > 1) out[0].qty = Number(r.qty);
+    return out;
+}
+function gsItemsShort(r) {   // 주문 표: 짧은 이름 ×수량 (원래 이름은 마우스를 올리면)
+    const its = gsSplitItems(r, gsProdRules());
+    if (!its.length) return escHtml(r.items || '') + (r.qty ? `<small>${r.qty}개</small>` : '');
+    return its.map(it => `<div${it.known ? '' : ' class="gs-raw"'}>${escHtml(it.name)}${it.qty > 1 ? ` <b>×${it.qty}</b>` : ''}</div>`).join('');
+}
+function gsProducts(rows) {
+    const rules = gsProdRules(), u = gsIsUsd(), by = {};
+    for (const r of rows) {
+        const c = gsCalc(r);
+        if (c.cancelled || (r.status === '환불' && c.refundKrw >= c.saleKrw)) continue;   // 취소·전액 환불은 뺌
+        const items = gsSplitItems(r, rules);
+        const tq = items.reduce((a, b) => a + b.qty, 0);
+        if (!tq) continue;
+        const net = u ? c.saleUsd - c.refundUsd : c.saleKrw - c.refundKrw;
+        const seen = new Set();
+        for (const it of items) {
+            const p = by[it.name] || (by[it.name] = { name: it.name, known: it.known, qty: 0, orders: 0, sale: 0, shop: {}, mixed: 0 });
+            p.qty += it.qty;
+            p.sale += net * it.qty / tq;   // 여러 상품 주문은 수량대로 나눔
+            p.shop[r.shop] = (p.shop[r.shop] || 0) + it.qty;
+            if (!seen.has(it.name)) { p.orders++; seen.add(it.name); if (items.length > 1) p.mixed++; }
+        }
+    }
+    return Object.values(by).sort((a, b) => b.qty - a.qty || b.sale - a.sale);
+}
+function gsProductsHtml() {
+    const list = gsProducts(gsVisible());
+    if (!list.length) return '';
+    const max = list[0].qty, totQ = list.reduce((a, b) => a + b.qty, 0), totS = list.reduce((a, b) => a + b.sale, 0);
+    const unknown = list.filter(p => !p.known).length;
+    const show = _gsProdAll ? list : list.slice(0, 10);
+    const body = show.map((p, i) => {
+        const segs = GS_SHOPS.map((s, si) => p.shop[s] ? `<span class="gs-c-${si}" style="width:${p.shop[s] / max * 100}%" title="${s} ${p.shop[s]}개"></span>` : '').join('');
+        const split = GS_SHOPS.filter(s => p.shop[s]).map(s => `${s} ${p.shop[s]}`).join(' · ');
+        return `<tr>
+            <td class="sub">${i + 1}</td>
+            <td class="gs-l gs-pname">${escHtml(p.name)}${p.known ? '' : ' <span class="gs-warn" title="짧은 이름이 아직 없어요 — 이름 정리에서 만들어 주세요">정리 안 됨</span>'}</td>
+            <td class="gs-pbar"><div>${segs}</div></td>
+            <td><b>${p.qty.toLocaleString()}개</b></td>
+            <td class="sub">${p.orders.toLocaleString()}건</td>
+            <td class="sub gs-l">${split}</td>
+            <td>${gsD(p.sale)}${p.mixed ? `<small title="다른 상품과 함께 산 주문 ${p.mixed}건은 수량대로 나눠 계산">나눠 계산 ${p.mixed}건</small>` : ''}</td>
+            <td class="sub">${gsPctTxt(p.sale, totS)}</td></tr>`;
+    }).join('');
+    const more = list.length > 10 ? `<button class="btn-ghost" onclick="_gsProdAll=!_gsProdAll;gsRender()">${_gsProdAll ? '10개만 보기' : `전체 ${list.length}개 보기`}</button>` : '';
+    const legend = GS_SHOPS.map((s, si) => list.some(p => p.shop[s]) ? `<span><i class="gs-c-${si}"></i>${s}</span>` : '').join('');
+    const table = `<div class="gs-plegend">${legend}<button class="btn-ghost" onclick="gsOpenProducts()">이름 정리${unknown ? ` <b class="gs-warn">${unknown}</b>` : ''}</button></div>
+        <div class="tax-scroll"><table class="tax-table gs-table gs-prod">
+        <thead><tr><th>#</th><th>상품</th><th>판매 수량</th><th>수량</th><th>주문</th><th>쇼핑몰별 수량</th><th>매출(${gsIsUsd() ? '$' : '원'})</th><th>비중</th></tr></thead>
+        <tbody>${body}</tbody>
+        <tfoot><tr><td></td><td>합계</td><td></td><td>${totQ.toLocaleString()}개</td><td></td><td></td><td>${gsD(totS)}</td><td>100%</td></tr></tfoot></table></div>
+        <div class="gs-pmore">${more}</div>
+        <p class="tax-note">취소·전액 환불 주문은 뺐어요. 한 주문에 여러 상품이 있으면 매출을 수량대로 나눠요. 긴 상품명은 <b>이름 정리</b>의 키워드로 짧은 이름에 묶어요.</p>`;
+    return taxSec('상품별 판매', `${gsRange().label} · 많이 팔린 순`, table, 'wide');
+}
+
+// 이름 정리 창 — 키워드 → 짧은 이름 규칙
+function gsOpenProducts() {
+    const ov = gsOv('gsProdOverlay');
+    const rules = gsProdRules().map(r => ({ k: r.k, name: r.name }));
+    const unknown = [...new Set(gsVisible().flatMap(r => gsSplitItems(r, rules)).filter(it => !it.known).map(it => it.raw))];
+    const row = (r) => `<div class="gs-prule"><input class="k" value="${escHtml(r.k)}" placeholder="키워드 (영문 단어 여러 개 가능)"><span>→</span><input class="n" value="${escHtml(r.name)}" placeholder="짧은 이름"><button class="btn-ghost" onclick="this.parentElement.remove()" title="빼기">×</button></div>`;
+    ov.innerHTML = `<div class="tax-ov-box gs-box gs-pbox">
+        <div class="tax-ov-h"><b>상품 이름 정리</b><button onclick="document.getElementById('gsProdOverlay').style.display='none'">×</button></div>
+        <p class="tax-note">상품명에 <b>키워드의 단어가 모두</b> 들어 있으면 오른쪽 이름으로 묶어요 (대소문자 상관없음). <b>위에서부터</b> 먼저 맞는 규칙을 써요 — 예: "Omniscient GOLD"를 "Omniscient Pocket Watch"보다 위에.</p>
+        ${unknown.length ? `<div class="gs-punk"><b>정리 안 된 상품 ${unknown.length}개</b> <small>(이 기간) — 누르면 아래에 규칙이 추가돼요</small>
+            ${unknown.map(t => `<button class="btn-ghost" data-raw="${escHtml(t)}" onclick="gsProdAddFrom(this)">${escHtml(t.length > 70 ? t.slice(0, 70) + '…' : t)}</button>`).join('')}</div>` : ''}
+        <div id="gsPRules">${rules.map(row).join('')}</div>
+        <button class="btn-ghost" onclick="gsProdAdd()">+ 규칙 추가</button>
+        <div class="tax-ov-f"><button class="btn-ghost" onclick="if(confirm('기본 규칙으로 되돌릴까요?')){gsProdSave(true)}">기본값으로</button><button class="btn-primary" onclick="gsProdSave()">저장</button></div></div>`;
+    ov._row = row;
+}
+function gsProdAdd(k = '', name = '') {
+    const ov = document.getElementById('gsProdOverlay'), box = document.getElementById('gsPRules');
+    box.insertAdjacentHTML('beforeend', ov._row({ k, name }));
+    const last = box.lastElementChild;
+    last.scrollIntoView({ block: 'nearest' });
+    (k ? last.querySelector('.n') : last.querySelector('.k')).focus();
+    return last;
+}
+function gsProdAddFrom(btn) {
+    const raw = btn.dataset.raw || '';
+    const k = raw.replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).filter(w => w.length > 1).slice(0, 4).join(' ');
+    gsProdAdd(k);
+    btn.remove();
+}
+async function gsProdSave(reset) {
+    let products = null;
+    if (!reset) {
+        products = [...document.querySelectorAll('#gsPRules .gs-prule')].map(el => ({ k: el.querySelector('.k').value.trim(), name: el.querySelector('.n').value.trim() })).filter(r => r.k && r.name);
+        if (!products.length) { alert('규칙이 하나도 없어요'); return; }
+    }
+    const settings = Object.assign({}, _gsSettings);
+    if (reset) delete settings.products; else settings.products = products;
+    const row = { settings, updated_at: new Date().toISOString() };
+    if (currentCompany && currentCompany.id) row.company_id = currentCompany.id;
+    const { error } = await sb.from('global_shop_settings').upsert(row, { onConflict: 'company_id' });
+    if (error) { console.error(error); alert('저장 실패: ' + error.message); return; }
+    _gsSettings = settings;
+    document.getElementById('gsProdOverlay').style.display = 'none';
+    showToast('상품 이름 정리를 저장했어요');
+    gsRender();
 }

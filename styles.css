@@ -7297,3 +7297,32 @@ button.sc-kpi{cursor:pointer}
 .gs-tip div{display:flex; align-items:center; gap:6px; margin-top:3px}
 .gs-tip div span{margin-left:auto; font-variant-numeric:tabular-nums; font-weight:600}
 .gs-tip div.sum{border-top:1px solid var(--gray-100); padding-top:4px; margin-top:5px; font-weight:700}
+
+/* 해외 쇼핑몰 — 상품별 판매 (2026-11-27) */
+.gs-prod{--gs-s0:#eb6834; --gs-s1:#1baf7a; --gs-s2:#2a78d6; --gs-s3:#eda100}
+[data-theme="dark"] .gs-prod, [data-theme="dark"] .gs-plegend{--gs-s0:#d95926; --gs-s1:#199e70; --gs-s2:#3987e5; --gs-s3:#c98500}
+.gs-plegend{--gs-s0:#eb6834; --gs-s1:#1baf7a; --gs-s2:#2a78d6; --gs-s3:#eda100; display:flex; gap:14px; align-items:center; flex-wrap:wrap; font-size:12px; color:var(--gray-600); margin-bottom:8px}
+.gs-plegend span{display:inline-flex; align-items:center; gap:5px}
+.gs-plegend i{display:inline-block; width:10px; height:10px; border-radius:3px}
+.gs-plegend button{margin-left:auto}
+.gs-plegend .gs-c-0, .gs-prod .gs-c-0{background:var(--gs-s0)} .gs-plegend .gs-c-1, .gs-prod .gs-c-1{background:var(--gs-s1)}
+.gs-plegend .gs-c-2, .gs-prod .gs-c-2{background:var(--gs-s2)} .gs-plegend .gs-c-3, .gs-prod .gs-c-3{background:var(--gs-s3)}
+.gs-prod td.gs-pname{font-weight:600; white-space:nowrap}
+.gs-prod td.gs-pbar{width:28%; min-width:140px}
+.gs-prod td.gs-pbar div{display:flex; gap:2px; height:12px}
+.gs-prod td.gs-pbar span{display:block; height:100%; min-width:3px}
+.gs-prod td.gs-pbar span:last-child{border-radius:0 4px 4px 0}
+.gs-pmore{text-align:center; margin-top:8px}
+.gs-pmore:empty{display:none}
+.gs-pbox{max-width:720px}
+.gs-prule{display:grid; grid-template-columns:1.3fr auto 1fr auto; gap:6px; align-items:center; margin-bottom:6px}
+.gs-prule input{padding:6px 8px; border:1px solid var(--gray-300); border-radius:6px; font:inherit; font-size:13px; background:var(--white); color:inherit; min-width:0}
+.gs-prule span{color:var(--gray-400)}
+#gsPRules{max-height:46vh; overflow:auto; margin:10px 0}
+.gs-punk{background:var(--gray-50); border-radius:8px; padding:10px; margin:8px 0; display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:13px}
+.gs-punk b{width:auto}
+.gs-punk button{font-size:12px; text-align:left}
+.gs-prod th:nth-child(2), .gs-prod td.gs-l{text-align:left}
+.gs-prod td.gs-l.sub{white-space:nowrap}
+.gs-orders td.gs-items div + div{margin-top:2px}
+.gs-orders td.gs-items .gs-raw{font-weight:400; color:var(--gray-500); font-size:12px}
